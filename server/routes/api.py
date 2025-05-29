@@ -1,12 +1,12 @@
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from fastapi import APIRouter, Depends
-from fastapi.exceptions import HTTPException
-from pydantic import BaseModel
-from typing import List
-
 import hashlib
 import secrets
 import uuid
+from typing import Dict
+
+from fastapi import APIRouter, Depends
+from fastapi.exceptions import HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -39,8 +39,7 @@ class KeyResponse(BaseModel):
     api_key: str
 
 
-class KeyRecord(BaseModel):
-    api_key: str
+class KeyData(BaseModel):
     user: str
     created_at: str
 
@@ -72,6 +71,6 @@ async def generate_api_key(request: KeyRequest):
     return KeyResponse(api_key=api_key)
 
 
-@router.get("/keys", response_model=List[KeyRecord])
+@router.get("/keys", response_model=Dict[str, KeyData])
 async def get_all_api_keys():
     return API_KEYS
