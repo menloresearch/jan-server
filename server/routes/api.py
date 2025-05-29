@@ -20,9 +20,6 @@ security = HTTPBearer()
 def validate_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Validate the API key from the Authorization header"""
     api_key = credentials.credentials
-    print(api_key)
-
-    print(API_KEYS)
 
     if api_key not in API_KEYS:
         raise HTTPException(
