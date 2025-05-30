@@ -1,12 +1,13 @@
 from typing import List, Optional
 
 import requests
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.exceptions import HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from .api import validate_api_key
+from .limiter import limiter
 
 VLLM_SERVER_URL = "http://localhost:5000"
 
@@ -52,6 +53,22 @@ class ModelsResponse(BaseModel):
     data: List[ModelInfo]
 
 
+@router.post(
+    "/chat/completions",
+    summary="Create chat completion",
+    description="Generate a chat completion using the specified model and messages",
+    response_description="Chat completion response or stream",
+)
+@limiter.limit("10/minute")
+async def chat_completions(
+    request: Request,
+    chat_request: ChatCompletionRequest,
+    api_key: str = Depends(validate_api_key),
+):
+    """Create a chat completion"""
+    return proxy_to_vllm("/chat/completions", "POST", chat_request.dict())
+
+
 def proxy_to_vllm(
     endpoint: str, method: str = "POST", json_data: dict = None, params: dict = None
 ):
@@ -80,17 +97,3 @@ def proxy_to_vllm(
 
     except requests.RequestException as e:
         raise HTTPException(status_code=502, detail=f"vLLM server error: {str(e)}")
-
-
-@router.post(
-    "/chat/completions",
-    summary="Create chat completion",
-    description="Generate a chat completion using the specified model and messages",
-    response_description="Chat completion response or stream",
-)
-async def chat_completions(
-    request: ChatCompletionRequest,
-    api_key: str = Depends(validate_api_key),
-):
-    """Create a chat completion"""
-    return proxy_to_vllm("/chat/completions", "POST", request.dict())
