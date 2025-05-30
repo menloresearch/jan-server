@@ -4,7 +4,7 @@ import time
 import json
 
 
-async def send_streaming_request(session, url, payload, request_id):
+async def send_streaming_request(session, url, payload, request_id, auth_token=None):
     try:
         start_time = time.time()
         first_token_time = None
@@ -13,7 +13,12 @@ async def send_streaming_request(session, url, payload, request_id):
 
         print(f"\n[Request {request_id}] Starting...")
 
-        async with session.post(url, json=payload) as response:
+        # Prepare headers
+        headers = {"Content-Type": "application/json"}
+        if auth_token:
+            headers["Authorization"] = f"Bearer {auth_token}"
+
+        async with session.post(url, json=payload, headers=headers) as response:
             if response.status != 200:
                 print(f"[Request {request_id}] ERROR: HTTP {response.status}")
                 return {
@@ -123,21 +128,27 @@ async def send_streaming_request(session, url, payload, request_id):
         }
 
 
-async def load_test_streaming(num_requests=20):
-    url = "http://10.200.108.149:5000/v1/completions"  # or /v1/chat/completions
+async def load_test_streaming(num_requests=20, auth_token=None):
+    url = "http://10.200.108.149:8000/v1/chat/completions"  # or /v1/chat/completions
 
     # Payload for streaming
     payload = {
         "model": "Qwen/Qwen3-32B-AWQ",
-        "prompt": "Write a short story about a robot discovering emotions. Be creative and detailed.",
-        "max_tokens": 200,
+        "max_tokens": 100,
+        "messages": [
+            {
+                "role": "user",
+                "content": "Write a short story about a robot discovering emotions. Be creative and detailed.",
+            }
+        ],
         "temperature": 0.7,
         "stream": True,
     }
 
     print(f"🚀 Starting STREAMING load test with {num_requests} concurrent requests...")
     print(f"📡 Target URL: {url}")
-    print(f"📝 Prompt: {payload['prompt']}")
+    print(f"🔐 Auth token: {'✓ Provided' if auth_token else '✗ None'}")
+    print(f"📝 Prompt: {payload['messages']}")
     print(f"🎯 Max tokens: {payload['max_tokens']}")
     print("=" * 80)
     print(
@@ -148,7 +159,7 @@ async def load_test_streaming(num_requests=20):
     async with aiohttp.ClientSession() as session:
         # Create tasks
         tasks = [
-            send_streaming_request(session, url, payload, i + 1)
+            send_streaming_request(session, url, payload, i + 1, auth_token)
             for i in range(num_requests)
         ]
 
@@ -227,37 +238,8 @@ async def load_test_streaming(num_requests=20):
     return successful_requests, failed_requests
 
 
-async def single_request_demo():
-    """Demo with just one request to see streaming clearly"""
-    print("🎯 SINGLE REQUEST STREAMING DEMO")
-    print("=" * 50)
-
-    await load_test_streaming(num_requests=1)
-
-
-async def few_requests_demo():
-    """Demo with a few requests to see concurrent streaming"""
-    print("🎯 CONCURRENT STREAMING DEMO (5 requests)")
-    print("=" * 50)
-
-    await load_test_streaming(num_requests=5)
-
-
 if __name__ == "__main__":
     print("🤖 vLLM Streaming Load Test")
-    print("Remember to update the URL and model name in the script!")
-    print("\nChoose test mode:")
-    print("1. Single request demo (clearest streaming view)")
-    print("2. Few requests demo (5 concurrent)")
-    print("3. Full load test (20 concurrent)")
-
-    # Uncomment the test you want to run:
-
-    # Single request - easiest to follow
-    # asyncio.run(single_request_demo())
-
-    # Few requests - see concurrent streaming
-    # asyncio.run(few_requests_demo())
 
     # Full load test
-    asyncio.run(load_test_streaming(num_requests=20))
+    asyncio.run(load_test_streaming(num_requests=20, auth_token=""))
