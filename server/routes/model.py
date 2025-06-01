@@ -4,8 +4,8 @@ import requests
 from fastapi import APIRouter, Depends, Request
 from fastapi.exceptions import HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-from typing import Literal, Dict, Any, Field, Union
+from pydantic import BaseModel, Field
+from typing import Literal, Dict, Any, Union
 
 from .api import validate_api_key
 from .limiter import limiter
