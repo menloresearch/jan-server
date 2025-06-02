@@ -5,8 +5,12 @@ from fastapi.responses import StreamingResponse
 from .openai_protocol import ChatCompletionRequest
 from .api import validate_api_key
 from .limiter import limiter
+import os
+from dotenv import load_dotenv
 
-VLLM_SERVER_URL = "http://localhost:5000"
+load_dotenv()
+
+VLLM_SERVER_URL = os.getenv("VLLM_SERVER_URL")
 
 router = APIRouter(prefix="/v1", tags=["v1"])
 

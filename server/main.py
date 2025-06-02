@@ -5,6 +5,12 @@ from routes import api, model
 from routes.limiter import limiter
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+PORT = os.getenv("PORT")
 
 app = FastAPI(title="vLLM Proxy with API Key Auth")
 
@@ -26,6 +32,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=PORT,
         # workers=8,
     )
