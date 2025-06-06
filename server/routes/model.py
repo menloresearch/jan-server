@@ -1,13 +1,21 @@
+import asyncio
+import os
+import json
+
 import requests
-from fastapi import APIRouter, Depends, Request
+from dotenv import load_dotenv
+from fastapi import APIRouter, Request
 from fastapi.exceptions import HTTPException
 from fastapi.responses import StreamingResponse
-from .openai_protocol import ChatCompletionRequest
-from .api import validate_api_key
-from .limiter import limiter
-import os
-from dotenv import load_dotenv
 from skills.deep_research.core import deep_research
+
+from .limiter import limiter
+from .openai_protocol import (
+    ChatCompletionRequest,
+    ChatCompletionResponseStreamChoice,
+    ChatCompletionStreamResponse,
+    DeltaMessage,
+)
 
 load_dotenv()
 
@@ -20,7 +28,7 @@ router = APIRouter(prefix="/v1", tags=["v1"])
     "/test",
 )
 async def test():
-    return await deep_research("Research about Yuuki from Menlo Research")
+    return await deep_research("Who is Yuuki from Menlo Research")
 
 
 @router.post(
@@ -33,13 +41,48 @@ async def test():
 async def chat_completions(
     request: Request,
     chat_request: ChatCompletionRequest,
-    api_key: str = Depends(validate_api_key),
+    # api_key: str = Depends(validate_api_key),
 ):
     """Create a chat completion"""
-    return proxy_to_vllm(
-        "/chat/completions",
-        "POST",
-        chat_request.model_dump(mode="json"),
+    # return proxy_to_vllm(
+    #     "/chat/completions",
+    #     "POST",
+    #     chat_request.model_dump(mode="json"),
+    # )
+
+    async def generate_responses():
+        response = await deep_research("Research who is Yuuki from Menlo Research")
+
+        stream = ChatCompletionStreamResponse(
+            id=response.id,
+            choices=[
+                ChatCompletionResponseStreamChoice(
+                    index=0,
+                    delta=DeltaMessage(content=response.choices[0].message.content),
+                )
+            ],
+            model=response.model,
+        )
+
+        responses = [
+            stream.model_dump(),
+            stream.model_dump(),
+            stream.model_dump(),
+        ]
+
+        for response in responses:
+            # Format similar to OpenAI/vLLM streaming
+            chunk = f"data: {json.dumps(response)}\n\n"
+            yield chunk.encode("utf-8")  # Return bytes like iter_content
+            await asyncio.sleep(1)
+
+        # End stream marker (common in LLM APIs)
+        yield b"data: [DONE]\n\n"
+
+    return StreamingResponse(
+        generate_responses(),
+        media_type="text/plain",  # Must be this for SSE
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )
 
 
@@ -51,7 +94,7 @@ async def chat_completions(
 )
 async def models(
     request: Request,
-    api_key: str = Depends(validate_api_key),
+    # api_key: str = Depends(validate_api_key),
 ):
     """Create a chat completion"""
     return proxy_to_vllm(
