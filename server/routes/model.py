@@ -7,12 +7,20 @@ from .api import validate_api_key
 from .limiter import limiter
 import os
 from dotenv import load_dotenv
+from skills.deep_research.core import deep_research
 
 load_dotenv()
 
 VLLM_SERVER_URL = os.getenv("VLLM_SERVER_URL")
 
 router = APIRouter(prefix="/v1", tags=["v1"])
+
+
+@router.get(
+    "/test",
+)
+async def test():
+    return await deep_research("Research about Yuuki from Menlo Research")
 
 
 @router.post(

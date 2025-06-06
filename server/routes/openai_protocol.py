@@ -1492,7 +1492,7 @@ class ChatMessage(OpenAIBaseModel):
     role: str
     reasoning_content: Optional[str] = None
     content: Optional[str] = None
-    tool_calls: list[ToolCall] = Field(default_factory=list)
+    tool_calls: Optional[list[ToolCall]] = Field(default_factory=list)
 
 
 class ChatCompletionLogProb(OpenAIBaseModel):

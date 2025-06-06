@@ -8,6 +8,7 @@ from slowapi.errors import RateLimitExceeded
 from dotenv import load_dotenv
 import os
 
+
 load_dotenv()
 
 PORT = os.getenv("PORT")
@@ -28,10 +29,25 @@ app.include_router(model.router)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# params = StdioServerParameters(
+#     command="uvx",
+#     args=["mcp-server-fetch"],
+# )
+
+
+# async def start_mcp():
+#     async with stdio_client(params) as streams:
+#         async with ClientSession(streams[0], streams[1]) as session:
+#             await session.initialize()
+#             print(session)
+#             await session
+#             print(session)
+
+
 if __name__ == "__main__":
+    # asyncio.run(start_mcp())
     uvicorn.run(
-        "main:app",
+        app,
         host="0.0.0.0",
-        port=PORT,
-        # workers=8,
+        port=int(PORT),
     )
