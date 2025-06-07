@@ -1,20 +1,15 @@
-import asyncio
 import os
-import json
 
 import requests
 from dotenv import load_dotenv
 from fastapi import APIRouter, Request
 from fastapi.exceptions import HTTPException
 from fastapi.responses import StreamingResponse
-from skills.deep_research.core import deep_research
+from skills.deep_research.core import deep_research, deep_research_stream
 
 from .limiter import limiter
 from .openai_protocol import (
     ChatCompletionRequest,
-    ChatCompletionResponseStreamChoice,
-    ChatCompletionStreamResponse,
-    DeltaMessage,
 )
 
 load_dotenv()
@@ -50,37 +45,37 @@ async def chat_completions(
     #     chat_request.model_dump(mode="json"),
     # )
 
-    async def generate_responses():
-        response = await deep_research("Research who is Yuuki from Menlo Research")
-
-        stream = ChatCompletionStreamResponse(
-            id=response.id,
-            choices=[
-                ChatCompletionResponseStreamChoice(
-                    index=0,
-                    delta=DeltaMessage(content=response.choices[0].message.content),
-                )
-            ],
-            model=response.model,
-        )
-
-        responses = [
-            stream.model_dump(),
-            stream.model_dump(),
-            stream.model_dump(),
-        ]
-
-        for response in responses:
-            # Format similar to OpenAI/vLLM streaming
-            chunk = f"data: {json.dumps(response)}\n\n"
-            yield chunk.encode("utf-8")  # Return bytes like iter_content
-            await asyncio.sleep(1)
-
-        # End stream marker (common in LLM APIs)
-        yield b"data: [DONE]\n\n"
+    # async def generate_responses():
+    #     response = await deep_research("Research who is Yuuki from Menlo Research")
+    #
+    #     stream = ChatCompletionStreamResponse(
+    #         id=response.id,
+    #         choices=[
+    #             ChatCompletionResponseStreamChoice(
+    #                 index=0,
+    #                 delta=DeltaMessage(content=response.choices[0].message.content),
+    #             )
+    #         ],
+    #         model=response.model,
+    #     )
+    #
+    #     responses = [
+    #         stream.model_dump(),
+    #         stream.model_dump(),
+    #         stream.model_dump(),
+    #     ]
+    #
+    #     for response in responses:
+    #         # Format similar to OpenAI/vLLM streaming
+    #         chunk = f"data: {json.dumps(response)}\n\n"
+    #         yield chunk.encode("utf-8")  # Return bytes like iter_content
+    #         await asyncio.sleep(1)
+    #
+    #     # End stream marker (common in LLM APIs)
+    #     yield b"data: [DONE]\n\n"
 
     return StreamingResponse(
-        generate_responses(),
+        deep_research_stream("Who is Yuuki from Menlo Research"),
         media_type="text/plain",  # Must be this for SSE
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )

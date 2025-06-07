@@ -7,6 +7,12 @@ class GenerateQueryData(BaseModel):
     query: List[str]
 
 
+class ReflectionData(BaseModel):
+    is_sufficient: str
+    knowledge_gap: str
+    follow_up_queries: List[str]
+
+
 class ChatCompletionUserMessage(BaseModel):
     content: str
     """The contents of the user message."""
