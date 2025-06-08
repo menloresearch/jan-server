@@ -6,7 +6,8 @@ from typing import Dict
 from fastapi import APIRouter, Depends
 from fastapi.exceptions import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel
+
+from .schema import KeyRequest, KeyData, KeyResponse
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -29,19 +30,6 @@ def validate_api_key(credentials: HTTPAuthorizationCredentials = Depends(securit
             },
         )
     return api_key
-
-
-class KeyRequest(BaseModel):
-    user: str
-
-
-class KeyResponse(BaseModel):
-    api_key: str
-
-
-class KeyData(BaseModel):
-    user: str
-    created_at: str
 
 
 @router.post("/gen", response_model=KeyResponse)
