@@ -20,7 +20,6 @@ from pydantic import (
     model_validator,
 )
 from typing_extensions import TypeAlias
-
 from vllm import envs
 from vllm.entrypoints.chat_utils import ChatCompletionMessageParam, random_tool_call_id
 from vllm.logger import init_logger

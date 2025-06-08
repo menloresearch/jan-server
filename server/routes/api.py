@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends
 from fastapi.exceptions import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from .schema import KeyRequest, KeyData, KeyResponse
+from .schema import KeyData, KeyRequest, KeyResponse
 
 router = APIRouter(prefix="/api", tags=["api"])
 

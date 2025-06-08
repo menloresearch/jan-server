@@ -5,13 +5,12 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, Request
 from fastapi.exceptions import HTTPException
 from fastapi.responses import StreamingResponse
-from skills.deep_research.core import deep_research_stream
+from skills.deep_research.core import deep_research
 
 from .limiter import limiter
 from .vllm_openai_protocol import (
     ChatCompletionRequest,
 )
-
 
 router = APIRouter(prefix="/v1", tags=["v1"])
 
@@ -44,7 +43,7 @@ async def chat_completions(
             content = msg["content"]
 
     return StreamingResponse(
-        deep_research_stream(content),
+        deep_research(content),
         media_type="text/text-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )

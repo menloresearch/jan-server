@@ -4,7 +4,7 @@ import os
 import asyncio
 
 from openai import OpenAI
-from routes.openai_protocol import (
+from routes.vllm_openai_protocol import (
     ChatCompletionResponse,
     ChatCompletionResponseStreamChoice,
     ChatCompletionStreamResponse,
@@ -25,7 +25,7 @@ from .schema import (
 from .utils import SerperClient
 
 
-async def deep_research_stream(request: str):
+async def deep_research(request: str):
     """Generator function that yields streaming updates"""
     try:
         llm = OpenAI(
@@ -131,20 +131,6 @@ def create_sse_message(message_type: str, content: str) -> str:
 
     chunk = f"data: {json.dumps(stream)}\n\n"
     return chunk.encode("utf-8")
-
-
-async def deep_research(request):
-    llm = OpenAI(
-        api_key=os.getenv("MENLO_API_KEY"),
-        base_url="http://10.200.108.149:1234/v1",
-    )
-
-    query = generate_query(llm, request)
-    print("[LOG] Finish generate_query")
-    search_summary = web_research(llm, request, query.query)
-    print("[LOG] Finish search_summary")
-
-    return search_summary
 
 
 def generate_query(llm, request):
