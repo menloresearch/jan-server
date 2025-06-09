@@ -77,7 +77,7 @@ class ChatCompletionRequest(BaseModel):
 class ChatMessage(BaseModel):
     role: str
     content: str
-    reasoning_content: str
+    reasoning_content: Optional[str] = None
 
 
 class ChatCompletionResponseChoice(BaseModel):

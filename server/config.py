@@ -11,7 +11,9 @@ class Config(BaseModel):
     model_api_key: str = os.getenv("MODEL_API_KEY", "")
     search_api_key: str = os.getenv("SEARCH_API_KEY", "")
     port: int = int(os.getenv("PORT", "8000"))
-    max_search_loop: int = 1
+    max_search_loop: int = 3
+    search_query_results: int = 5
+    num_query_generated: int = 3
 
 
 config = Config()

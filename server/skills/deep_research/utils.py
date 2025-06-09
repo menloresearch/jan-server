@@ -1,4 +1,5 @@
 import json
+import re
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from typing import Any, Dict, List
@@ -190,3 +191,62 @@ class SerperClient:
         if len(snippets) == 0:
             return ["No good Google Search Result was found"]
         return snippets
+
+
+def clean_and_parse_json(content: str) -> dict:
+    """
+    Clean and parse JSON content that may or may not be wrapped in markdown code blocks.
+
+    Args:
+        content (str): Raw content from LLM that should contain JSON
+
+    Returns:
+        dict: Parsed JSON object
+
+    Raises:
+        ValueError: If content is empty or invalid
+        json.JSONDecodeError: If JSON parsing fails after cleaning
+    """
+    if not content:
+        raise ValueError("Empty content provided")
+
+    # Strip whitespace
+    cleaned_content = content.strip()
+
+    if not cleaned_content:
+        raise ValueError("Content is empty after stripping whitespace")
+
+    # Remove markdown code blocks if present
+    # Handle ```json and ``` patterns
+    if cleaned_content.startswith("```json"):
+        cleaned_content = cleaned_content[7:]  # Remove ```json
+    elif cleaned_content.startswith("```"):
+        cleaned_content = cleaned_content[3:]  # Remove ```
+
+    if cleaned_content.endswith("```"):
+        cleaned_content = cleaned_content[:-3]  # Remove trailing ```
+
+    # Strip again after removing markdown
+    cleaned_content = cleaned_content.strip()
+
+    # Additional cleaning: remove any leading/trailing backticks that might remain
+    cleaned_content = cleaned_content.strip("`")
+
+    try:
+        # Parse the JSON
+        parsed_json = json.loads(cleaned_content)
+        return parsed_json
+    except json.JSONDecodeError as e:
+        # Try one more aggressive cleaning approach
+        # Sometimes there might be extra text before/after the JSON
+        try:
+            # Look for JSON object pattern
+            json_match = re.search(r"\{.*\}", cleaned_content, re.DOTALL)
+            if json_match:
+                json_only = json_match.group(0)
+                return json.loads(json_only)
+        except json.JSONDecodeError:
+            pass
+
+        # If all cleaning attempts fail, re-raise the original error
+        raise e

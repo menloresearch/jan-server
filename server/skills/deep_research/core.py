@@ -1,6 +1,4 @@
-import json
 import os
-import ast
 import httpx
 
 from config import config
@@ -20,10 +18,13 @@ from .schema import (
 )
 from .utils import (
     SerperClient,
+    clean_and_parse_json,
     get_current_date,
     create_sse_message,
     create_message,
 )
+
+from logger import logger
 
 
 async def deep_research(request: str):
@@ -33,66 +34,79 @@ async def deep_research(request: str):
             api_key=config.model_api_key,
             base_url=config.model_base_url,
             timeout=httpx.Timeout(
-                connect=30.0,  # Connection timeout
-                read=120.0,  # Read timeout
-                write=30.0,  # Write timeout
-                pool=30.0,  # Pool timeout
+                connect=300.0,  # Connection timeout
+                read=300.0,  # Read timeout
+                write=300.0,  # Write timeout
+                pool=30.0,
             ),
             max_retries=3,
         )
 
         # Step 1: Generate query
         yield create_sse_message("[NOTIFY] Starting query generation...\n\n")
+        logger.info(f"Running {generate_query.__name__}")
 
         query = await generate_query(llm, request)
-        print("Query done")
+        logger.debug(f"{generate_query.__name__} results: \n\n{query}")
 
         yield create_sse_message("[NOTIFY] Finished query generation\n\n")
+        logger.info(f"Complete {generate_query.__name__}")
 
         # # Step 2: Web research
         yield create_sse_message("[NOTIFY] Starting web research...\n\n")
+        logger.info(f"Running {web_research.__name__}")
 
         search_summary = await web_research(llm, request, query.query)
-        print("Search done")
+        logger.debug(f"{web_research.__name__} results: \n\n{search_summary}")
 
         yield create_sse_message("[NOTIFY] Finished web research\n\n")
+        logger.info(f"Complete {web_research.__name__}")
 
         # Step 3: Reflection
         yield create_sse_message("[NOTIFY] Starting reflection...\n\n")
+        logger.info(f"Running {reflection.__name__}")
 
         reflection_result = await reflection(llm, request, search_summary)
-        print("Reflection done")
+        logger.debug(f"{reflection.__name__} results: \n\n{reflection_result}")
 
         yield create_sse_message("[NOTIFY] Finished reflection\n\n")
+        logger.info(f"Complete {reflection.__name__}")
 
         loop = 0
 
         while not reflection_result["is_sufficient"] and loop < config.max_search_loop:
-            yield create_sse_message("[NOTIFY] Finding more infomration...\n\n")
+            yield create_sse_message("[NOTIFY] Finding more information...\n\n")
+            logger.info(f"Running {web_research.__name__}")
 
             search_summary = await web_research(
                 llm,
                 request,
                 reflection_result["follow_up_queries"],
             )
+            logger.debug(f"{web_research.__name__} results: \n\n{search_summary}")
 
             yield create_sse_message("[NOTIFY] Starting reflection...\n\n")
+            logger.info(f"Running {reflection.__name__}")
 
             reflection_result = await reflection(llm, request, search_summary)
+            logger.debug(f"{reflection.__name__} results: \n\n{reflection_result}")
 
             yield create_sse_message("[NOTIFY] Finished reflection\n\n")
+            logger.info(f"Complete {reflection.__name__}")
 
             loop += 1
 
         # Step 4: Finalize
+        logger.info(f"Running {finalize_answer.__name__}")
         async for chunk in finalize_answer(llm, request, search_summary):
             yield create_sse_message(chunk)
 
     except Exception as e:
+        logger.error(f"{e}")
         yield create_sse_message(f"[ERROR] An error occurred: {str(e)}")
         print(f"Error: {str(e)}")
 
-    print("Completed")
+    logger.info("Complete Deep Research workflow")
     yield b"data: [DONE]\n\n"
 
 
@@ -101,7 +115,7 @@ async def generate_query(llm, request):
     formatted_request = query_writer_instructions.format(
         current_date=current_date,
         research_topic=request,
-        number_queries=1,
+        number_queries=config.num_query_generated,
     )
 
     response = await llm.chat.completions.create(
@@ -111,8 +125,9 @@ async def generate_query(llm, request):
 
     parsed_response = ChatCompletionResponse.model_validate(response.model_dump())
     content = parsed_response.choices[0].message.content
+    content = clean_and_parse_json(content)
 
-    parsed_content = GenerateQueryData.model_validate(ast.literal_eval(content.strip()))
+    parsed_content = GenerateQueryData.model_validate(content)
 
     return parsed_content
 
@@ -130,7 +145,7 @@ async def web_research(llm, request, queries):
     search_context = ""
 
     for query in queries:
-        search_results = serper.search(query, num=3)
+        search_results = serper.search(query, num=config.search_query_results)
         search_context += serper.format_search_results(search_results) + "\n"
 
     response = await llm.chat.completions.create(
@@ -168,11 +183,11 @@ async def reflection(llm, request, summary):
 
     parsed_response = ChatCompletionResponse.model_validate(response.model_dump())
     content = parsed_response.choices[0].message.content
+    content = clean_and_parse_json(content)
 
-    literal = json.loads(content.strip())
-    # parsed_content = ReflectionData.model_validate_json(literal)
+    # parsed_content = ReflectionData.model_validate(content)
 
-    return literal
+    return content
 
 
 async def finalize_answer(llm, request, summary):
