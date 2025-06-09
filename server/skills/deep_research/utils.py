@@ -9,6 +9,11 @@ from protocol.fastchat_openai import (
     ChatCompletionStreamResponse,
     DeltaMessage,
 )
+from .schema import ChatCompletionUserMessage
+
+
+def create_message(role: str, content: str) -> ChatCompletionUserMessage:
+    return ChatCompletionUserMessage(role=role, content=content).model_dump(mode="json")
 
 
 def create_sse_message(content: str) -> str:

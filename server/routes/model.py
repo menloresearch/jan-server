@@ -34,7 +34,6 @@ async def deep_chat_completions(
     """Create a deep research completion"""
 
     messages = chat_request.messages
-    print(messages)
     content = ""
 
     for msg in messages:
@@ -43,7 +42,7 @@ async def deep_chat_completions(
 
     return StreamingResponse(
         deep_research(content),
-        media_type="text/text-stream",
+        media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
     )
 
@@ -109,7 +108,7 @@ def proxy_to_vllm(
     endpoint: str, method: str = "POST", json_data: dict = None, params: dict = None
 ):
     """Helper function to proxy requests to vLLM"""
-    target_url = f"{config.model_base_url.rstrip('/')}/v1/{endpoint.lstrip('/')}"
+    target_url = f"{config.model_base_url.rstrip('/')}/{endpoint.lstrip('/')}"
 
     try:
         response = requests.request(
