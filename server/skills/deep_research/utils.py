@@ -4,6 +4,27 @@ from datetime import datetime
 from typing import Any, Dict, List
 
 import requests
+from protocol.fastchat_openai import (
+    ChatCompletionResponseStreamChoice,
+    ChatCompletionStreamResponse,
+    DeltaMessage,
+)
+
+
+def create_sse_message(content: str) -> str:
+    """Create a Server-Sent Events formatted message"""
+    stream = ChatCompletionStreamResponse(
+        choices=[
+            ChatCompletionResponseStreamChoice(
+                index=0,
+                delta=DeltaMessage(content=content),
+            )
+        ],
+        model="test",
+    ).model_dump()
+
+    chunk = f"data: {json.dumps(stream)}\n\n"
+    return chunk.encode("utf-8")
 
 
 def get_current_date():

@@ -7,9 +7,6 @@ from config import config
 from openai import OpenAI
 from protocol.fastchat_openai import (
     ChatCompletionResponse,
-    ChatCompletionResponseStreamChoice,
-    ChatCompletionStreamResponse,
-    DeltaMessage,
 )
 
 from .prompt import (
@@ -25,6 +22,7 @@ from .schema import (
 from .utils import (
     SerperClient,
     get_current_date,
+    create_sse_message,
 )
 
 
@@ -37,39 +35,34 @@ async def deep_research(request: str):
         )
 
         # Step 1: Generate query
-        yield create_sse_message("notify", "Starting query generation...")
+        yield create_sse_message("[NOTIFY] Starting query generation...")
         await asyncio.sleep(0)
-        print("Starting query gen")
 
         query = generate_query(llm, request)
-        yield create_sse_message("notify", "Finished query generation")
-        yield create_sse_message("results", query.query)
-        print("Finished query gen")
+
+        yield create_sse_message("[NOTIFY] Finished query generation")
 
         # Step 2: Web research
-        yield create_sse_message("notify", "Starting web research...")
+        yield create_sse_message("[NOTIFY] Starting web research...")
         await asyncio.sleep(0)
-        print("Starting web research")
 
         search_summary = web_research(llm, request, query.query)
 
-        yield create_sse_message("notify", "Finished web research")
-        print("Finished summary")
+        yield create_sse_message("[NOTIFY] Finished web research")
 
-        yield create_sse_message("notify", "Starting reflection...")
+        # Step 3: Reflection
+        yield create_sse_message("[NOTIFY] Starting reflection...")
         await asyncio.sleep(0)
-        print("Starting reflection")
 
         reflection_result = reflection(llm, request, search_summary)
         print(reflection_result)
-        yield create_sse_message("notify", "Finished reflection...")
+        yield create_sse_message("[NOTIFY] Finished reflection...")
 
         loop = 0
 
-        while not reflection_result["is_sufficient"] and loop < 3:
-            yield create_sse_message("notify", "Starting web research...")
+        while not reflection_result["is_sufficient"] and loop < config.max_search_loop:
+            yield create_sse_message("[NOTIFY] Starting web research...")
             await asyncio.sleep(0)
-            print("Starting web research")
 
             search_summary = web_research(
                 llm,
@@ -77,63 +70,27 @@ async def deep_research(request: str):
                 reflection_result["follow_up_queries"],
             )
 
-            yield create_sse_message("notify", "Finished web research")
-            print("Finished summary")
+            yield create_sse_message("[NOTIFY] Finished web research")
 
-            yield create_sse_message("notify", "Starting reflection...")
+            yield create_sse_message("[NOTIFY] Starting reflection...")
             await asyncio.sleep(0)
-            print("Starting reflection")
 
             reflection_result = reflection(llm, request, search_summary)
             print(reflection_result)
-            yield create_sse_message("notify", "Finished reflection...")
+            yield create_sse_message("[NOTIFY] Finished reflection...")
 
             loop += 1
 
+        # Step 4: Finalize
         async for chunk in finalize_answer(llm, request, search_summary):
-            yield create_finalise_message(chunk)
+            yield create_sse_message(chunk)
 
     except Exception as e:
-        yield create_sse_message("error", f"An error occurred: {str(e)}")
+        yield create_sse_message(f"[ERROR] An error occurred: {str(e)}")
         print(f"Error: {str(e)}")
 
     print("Completed")
     yield b"data: [DONE]\n\n"
-
-
-def create_finalise_message(content: str) -> str:
-    """Create a Server-Sent Events formatted message"""
-    stream = ChatCompletionStreamResponse(
-        choices=[
-            ChatCompletionResponseStreamChoice(
-                index=0,
-                delta=DeltaMessage(content=content),
-            )
-        ],
-        model="test",
-    ).model_dump()
-
-    chunk = f"data: {json.dumps(stream)}\n\n"
-    return chunk.encode("utf-8")
-
-
-def create_sse_message(message_type: str, content: str) -> str:
-    """Create a Server-Sent Events formatted message"""
-
-    data = {"message": message_type, "content": content}
-
-    stream = ChatCompletionStreamResponse(
-        choices=[
-            ChatCompletionResponseStreamChoice(
-                index=0,
-                delta=DeltaMessage(content=f"{json.dumps(data)}\n\n"),
-            )
-        ],
-        model="test",
-    ).model_dump()
-
-    chunk = f"data: {json.dumps(stream)}\n\n"
-    return chunk.encode("utf-8")
 
 
 def generate_query(llm, request):
