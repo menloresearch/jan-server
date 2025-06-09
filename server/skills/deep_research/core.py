@@ -3,6 +3,7 @@ import json
 import os
 import asyncio
 
+from config import config
 from openai import OpenAI
 from protocol.fastchat_openai import (
     ChatCompletionResponse,
@@ -31,8 +32,8 @@ async def deep_research(request: str):
     """Generator function that yields streaming updates"""
     try:
         llm = OpenAI(
-            api_key=os.getenv("MENLO_API_KEY"),
-            base_url="http://10.200.108.149:1234/v1",
+            api_key=config.model_api_key,
+            base_url=config.model_base_url,
         )
 
         # Step 1: Generate query
@@ -145,7 +146,7 @@ def generate_query(llm, request):
     )
 
     response = llm.chat.completions.create(
-        model="jan-hq/Qwen3-14B-v0.2-deepresearch-no-think-100-step",
+        model=config.model_name,
         messages=[
             ChatCompletionUserMessage(
                 role="user",
@@ -182,7 +183,7 @@ def web_research(llm, request, queries):
 
     # Generate analysis using OpenAI
     response = llm.chat.completions.create(
-        model="jan-hq/Qwen3-14B-v0.2-deepresearch-no-think-100-step",
+        model=config.model_name,
         messages=[
             ChatCompletionUserMessage(
                 role="system",
@@ -221,7 +222,7 @@ def reflection(llm, request, summary):
     )
     # init Reasoning Model
     response = llm.chat.completions.create(
-        model="jan-hq/Qwen3-14B-v0.2-deepresearch-no-think-100-step",
+        model=config.model_name,
         messages=[
             ChatCompletionUserMessage(
                 role="system",
@@ -252,7 +253,7 @@ async def finalize_answer(llm, request, summary):
     )
 
     response = llm.chat.completions.create(
-        model="jan-hq/Qwen3-14B-v0.2-deepresearch-no-think-100-step",
+        model=config.model_name,
         messages=[
             ChatCompletionUserMessage(
                 role="system",
