@@ -1,8 +1,13 @@
 import json
 import xml.etree.ElementTree as ET
+from datetime import datetime
 from typing import Any, Dict, List
 
 import requests
+
+
+def get_current_date():
+    return datetime.now().strftime("%B %d, %Y")
 
 
 def parse_xml_tags(xml_string):

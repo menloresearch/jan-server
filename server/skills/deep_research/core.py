@@ -4,7 +4,7 @@ import os
 import asyncio
 
 from openai import OpenAI
-from routes.vllm_openai_protocol import (
+from protocol.fastchat_openai import (
     ChatCompletionResponse,
     ChatCompletionResponseStreamChoice,
     ChatCompletionStreamResponse,
@@ -12,7 +12,6 @@ from routes.vllm_openai_protocol import (
 )
 
 from .prompt import (
-    get_current_date,
     query_writer_instructions,
     web_searcher_instructions,
     reflection_instructions,
@@ -22,7 +21,10 @@ from .schema import (
     ChatCompletionUserMessage,
     GenerateQueryData,
 )
-from .utils import SerperClient
+from .utils import (
+    SerperClient,
+    get_current_date,
+)
 
 
 async def deep_research(request: str):

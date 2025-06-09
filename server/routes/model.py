@@ -1,16 +1,15 @@
-import os
-
 import requests
-from dotenv import load_dotenv
 from fastapi import APIRouter, Request
 from fastapi.exceptions import HTTPException
 from fastapi.responses import StreamingResponse
 from skills.deep_research.core import deep_research
 
 from .limiter import limiter
-from .vllm_openai_protocol import (
+from protocol.fastchat_openai import (
     ChatCompletionRequest,
 )
+
+from config import config
 
 router = APIRouter(prefix="/v1", tags=["v1"])
 
@@ -27,7 +26,7 @@ router = APIRouter(prefix="/v1", tags=["v1"])
     response_description="Chat completion response or stream",
 )
 @limiter.limit("10/minute")
-async def chat_completions(
+async def deep_chat_completions(
     request: Request,
     chat_request: ChatCompletionRequest,
     # api_key: str = Depends(validate_api_key),
@@ -55,7 +54,7 @@ async def chat_completions(
     description="Show a list of all the available models serve by the endpoint",
     response_description="JSON list of available model",
 )
-async def models(
+async def deep_models(
     request: Request,
     # api_key: str = Depends(validate_api_key),
 ):
@@ -69,11 +68,6 @@ async def models(
 ######################################
 # Standard OpenAI route implementation
 ######################################
-load_dotenv()
-
-VLLM_SERVER_URL = os.getenv("VLLM_SERVER_URL")
-
-
 @router.post(
     "/chat/completions",
     summary="Create chat completion",
@@ -115,7 +109,7 @@ def proxy_to_vllm(
     endpoint: str, method: str = "POST", json_data: dict = None, params: dict = None
 ):
     """Helper function to proxy requests to vLLM"""
-    target_url = f"{VLLM_SERVER_URL.rstrip('/')}/v1/{endpoint.lstrip('/')}"
+    target_url = f"{config.model_base_url.rstrip('/')}/v1/{endpoint.lstrip('/')}"
 
     try:
         response = requests.request(
