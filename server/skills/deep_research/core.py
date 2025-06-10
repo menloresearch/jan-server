@@ -78,7 +78,7 @@ async def deep_research(request: str):
             yield create_sse_message("[NOTIFY] Finding more information...\n\n")
             logger.info(f"Running {web_research.__name__}")
 
-            search_summary = await web_research(
+            search_summary += "\n\n" + await web_research(
                 llm,
                 request,
                 reflection_result["follow_up_queries"],
@@ -173,7 +173,7 @@ async def reflection(llm, request, summary):
     formatted_prompt = reflection_instructions.format(
         current_date=current_date,
         research_topic=request,
-        summaries="\n\n---\n\n".join(summary),
+        summaries=summary,
     )
 
     response = await llm.chat.completions.create(
@@ -195,7 +195,7 @@ async def finalize_answer(llm, request, summary):
     formatted_prompt = answer_instructions.format(
         current_date=current_date,
         research_topic=request,
-        summaries="\n---\n\n".join(summary),
+        summaries=summary,
     )
 
     response = await llm.chat.completions.create(
