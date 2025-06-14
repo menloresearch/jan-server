@@ -3,6 +3,7 @@ from fastapi import APIRouter, Request
 from fastapi.exceptions import HTTPException
 from fastapi.responses import StreamingResponse
 from skills.deep_research.core import deep_research
+from skills.research.core import research_chat
 
 from .limiter import limiter
 from protocol.fastchat_openai import (
@@ -12,6 +13,34 @@ from protocol.fastchat_openai import (
 from config import config
 
 router = APIRouter(prefix="/v1", tags=["v1"])
+
+
+####################################
+# Research route implementation
+####################################
+
+
+@router.post(
+    "/research/chat/completions",
+    summary="Create research chat completion",
+    description="Generate a research chat completion with tool calling capabilities",
+    response_description="Research chat completion response stream",
+)
+@limiter.limit("10/minute")
+async def research_chat_completions(
+    request: Request,
+    chat_request: ChatCompletionRequest,
+    # api_key: str = Depends(validate_api_key),
+):
+    """Create a research completion with tool calling"""
+    
+    messages = chat_request.messages
+    
+    return StreamingResponse(
+        research_chat(messages),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
 
 
 ####################################

@@ -3,6 +3,7 @@
 ## Build/Run Commands
 - **Run server**: `python server/main.py` or `python -m server.main`
 - **Run with venv**: `source .venv/bin/activate && python server/main.py`
+- **Run with SERPER_API_KEY**: `SERPER_API_KEY=your_key python server/main.py`
 - **Test scripts**: `python test-script/chat-completion.py` (streaming load test), `python test-script/completion.py` (completion test)
 - **Single test**: No formal test framework - use individual test scripts in `test-script/` directory
 
@@ -23,6 +24,7 @@
 - `server/` - Main application code
 - `server/routes/` - API route handlers  
 - `server/protocol/` - Protocol implementations (OpenAI compatibility)
-- `server/skills/` - Feature modules (deep_research, mcp)
+- `server/skills/` - Feature modules (deep_research, mcp, research)
+- `server/skills/research/` - Intelligent research skill with tool calling
 - `server/routes/mcp.py` - Model Context Protocol server for Serper search/scrape
 - `test-script/` - Manual testing scripts
