@@ -26,20 +26,37 @@ router = APIRouter(prefix="/v1", tags=["v1"])
     description="Generate a research chat completion with tool calling capabilities",
     response_description="Research chat completion response stream",
 )
-@limiter.limit("10/minute")
+@limiter.limit("150/minute")
 async def research_chat_completions(
     request: Request,
     chat_request: ChatCompletionRequest,
     # api_key: str = Depends(validate_api_key),
 ):
     """Create a research completion with tool calling"""
-    
+
     messages = chat_request.messages
-    
+
     return StreamingResponse(
         research_chat(messages),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
+
+
+@router.get(
+    "/research/models",
+    summary="Show available models",
+    description="Show a list of all the available models serve by the endpoint",
+    response_description="JSON list of available model",
+)
+async def deep_models(
+    request: Request,
+    # api_key: str = Depends(validate_api_key),
+):
+    """Create a chat completion"""
+    return proxy_to_vllm(
+        "/models",
+        "GET",
     )
 
 
@@ -54,7 +71,7 @@ async def research_chat_completions(
     description="Generate a chat completion using the specified model and messages",
     response_description="Chat completion response or stream",
 )
-@limiter.limit("10/minute")
+@limiter.limit("150/minute")
 async def deep_chat_completions(
     request: Request,
     chat_request: ChatCompletionRequest,
