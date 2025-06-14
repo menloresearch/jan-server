@@ -50,3 +50,6 @@ bun.lockb
 .Trashes
 .AppleDouble
 .LSOverride
+
+# Coder
+.opencode
