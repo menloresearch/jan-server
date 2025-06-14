@@ -1,10 +1,10 @@
 #!/bin/bash
 
-curl -X POST 'http://10.200.108.149:8000/v1/chat/completions' \
+curl -X POST 'http://10.200.108.149:1234/v1/chat/completions' \
 -H 'Content-Type: application/json' \
 -H "Authorization: Bearer $1" \
 -d '{
-    "model": "Qwen/Qwen3-32B-AWQ",
+    "model": "jan-hq/Qwen3-14B-v0.2-deepresearch-no-think-100-step",
     "messages": [
       {
         "role": "system",
