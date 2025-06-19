@@ -1,11 +1,13 @@
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes import api, model, mcp
+from routes import api, model
 from routes.limiter import limiter
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from config import config
+
+from mcp.demo import mcp
 
 app = FastAPI(title="vLLM Proxy with API Key Auth")
 
@@ -19,31 +21,18 @@ app.add_middleware(
 
 app.include_router(api.router)
 app.include_router(model.router)
-app.include_router(mcp.router)
+# app.include_router(mcp.router)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# params = StdioServerParameters(
-#     command="uvx",
-#     args=["mcp-server-fetch"],
-# )
-
-
-# async def start_mcp():
-#     async with stdio_client(params) as streams:
-#         async with ClientSession(streams[0], streams[1]) as session:
-#             await session.initialize()
-#             print(session)
-#             await session
-#             print(session)
-
+app.mount("/mcp", mcp.streamable_http_app())
 
 if __name__ == "__main__":
-    # asyncio.run(start_mcp())
     uvicorn.run(
-        app,
+        "main:app",
         host="0.0.0.0",
         port=config.port,
         timeout_keep_alive=300,
+        workers=8,
     )
