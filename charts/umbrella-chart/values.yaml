@@ -1,0 +1,20 @@
+jan-api-gateway:
+  replicaCount: 1
+  image:
+    repository: jan-api-gateway
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8080
+  env:
+    - name: JAN_INFERENCE_MODEL_URL
+      value: http://jan-server-jan-inference-model:8101
+
+jan-inference-model:
+  replicaCount: 1
+  image:
+    repository: jan-inference-model
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 8101

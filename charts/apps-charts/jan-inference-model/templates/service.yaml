@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "jan-inference-model.fullname" . }}
+  labels:
+    {{- include "jan-inference-model.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.port }}
+  selector:
+    app.kubernetes.io/name: {{ include "jan-inference-model.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
