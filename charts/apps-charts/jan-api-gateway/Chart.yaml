@@ -1,0 +1,6 @@
+apiVersion: v2
+name: jan-api-gateway
+description: A Helm chart for deploying the API Gateway service
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

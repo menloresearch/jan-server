@@ -1,0 +1,13 @@
+apiVersion: v2
+name: Jan-Server
+description: A Helm chart to deploy all projects in the mono-repo
+type: application
+version: 0.1.0
+
+dependencies:
+  - name: jan-api-gateway
+    version: "0.1.0"
+    repository: "file://../apps-charts/jan-api-gateway"
+  - name: jan-inference-model
+    version: "0.1.0"
+    repository: "file://../apps-charts/jan-inference-model"
