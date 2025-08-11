@@ -1,8 +1,9 @@
-FROM python:3.12-slim
+FROM vllm/vllm-openai:latest
 
-WORKDIR /app
-COPY application/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY application/mockserver.py app.py
+RUN pip install --no-cache-dir huggingface_hub \
+ && python3 -c "from huggingface_hub import snapshot_download; \
+                snapshot_download(repo_id='Qwen/Qwen3-4B', local_dir='/models/Qwen3-4B')"
+
 EXPOSE 8101
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8101"]
+
+CMD ["--model", "Qwen/Qwen3-4B", "--host", "0.0.0.0", "--port", "8101"]

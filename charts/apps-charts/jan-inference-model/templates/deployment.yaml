@@ -22,3 +22,6 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - containerPort: {{ .Values.service.port }}
+          resources:
+            limits:
+              nvidia.com/gpu: 1

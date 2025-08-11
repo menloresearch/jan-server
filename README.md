@@ -5,6 +5,7 @@ Self-hosted jan.ai
 - docker
 - minikube
 - helm
+
 # Setup
 - minikube start
 - eval $(minikube docker-env)
