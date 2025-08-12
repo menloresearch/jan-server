@@ -17,7 +17,8 @@ import (
 func CreateApplication() (*Application, error) {
 	completionAPI := chat.NewCompletionAPI()
 	chatRoute := chat.NewChatRoute(completionAPI)
-	v1Route := v1.NewV1Route(chatRoute)
+	modelAPI := v1.NewModelAPI()
+	v1Route := v1.NewV1Route(chatRoute, modelAPI)
 	httpServer := http.NewHttpServer(v1Route)
 	application := &Application{
 		HttpServer: httpServer,

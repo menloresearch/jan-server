@@ -5,6 +5,7 @@ go 1.24.6
 require (
 	github.com/gin-gonic/gin v1.10.1
 	github.com/google/wire v0.6.0
+	github.com/mileusna/crontab v1.2.0
 	resty.dev/v3 v3.0.0-beta.3
 )
 
