@@ -1,9 +1,11 @@
 package chat
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
 )
@@ -29,18 +31,39 @@ func (CompletionAPI *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		return
 	}
 
-	janInferenceClient := janinference.NewJanInferenceClient()
-	response, err := janInferenceClient.CreateChatCompletion(reqCtx, "test-api-key", request)
-	if err != nil {
-		reqCtx.JSON(
-			http.StatusBadRequest,
-			responses.ErrorResponse{
-				Code:  "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",
-				Error: err.Error(),
-			})
+	modelRegistry := inferencemodelregistry.GetInstance()
+	mToE := modelRegistry.GetModelToEndpoints()
+	endpoints, ok := mToE[request.Model]
+	if !ok {
+		reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  "59253517-df33-44bf-9333-c927402e4e2e",
+			Error: fmt.Sprintf("Model: %s does not exist", request.Model),
+		})
 		return
 	}
-	reqCtx.JSON(http.StatusOK, response)
+
+	janInferenceClient := janinference.NewJanInferenceClient()
+	for _, endpoint := range endpoints {
+		if endpoint == janInferenceClient.BaseURL {
+			response, err := janInferenceClient.CreateChatCompletion(reqCtx, "test-api-key", request)
+			if err != nil {
+				reqCtx.JSON(
+					http.StatusBadRequest,
+					responses.ErrorResponse{
+						Code:  "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",
+						Error: err.Error(),
+					})
+				return
+			}
+			reqCtx.JSON(http.StatusOK, response)
+			return
+		}
+	}
+
+	reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+		Code:  "6c6e4ea0-53d2-4c6c-8617-3a645af59f43",
+		Error: "Client does not exist",
+	})
 }
 
 type Message struct {

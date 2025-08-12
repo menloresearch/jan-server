@@ -9,5 +9,6 @@ import (
 var RouteProvider = wire.NewSet(
 	chat.NewCompletionAPI,
 	chat.NewChatRoute,
+	v1.NewModelAPI,
 	v1.NewV1Route,
 )
