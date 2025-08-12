@@ -6,4 +6,4 @@ RUN pip install --no-cache-dir huggingface_hub \
 
 EXPOSE 8101
 
-CMD ["--model", "Qwen/Qwen3-4B", "--host", "0.0.0.0", "--port", "8101"]
+CMD ["--model", "Qwen/Qwen3-4B", "--host", "0.0.0.0", "--port", "8101", "--gpu-memory-utilization", "0.65", "--enforce-eager", "--max_model_len", "32768"]
