@@ -7,9 +7,12 @@
 package main
 
 import (
+	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 )
 
 // Injectors from wire.go:
@@ -18,7 +21,10 @@ func CreateApplication() (*Application, error) {
 	completionAPI := chat.NewCompletionAPI()
 	chatRoute := chat.NewChatRoute(completionAPI)
 	modelAPI := v1.NewModelAPI()
-	v1Route := v1.NewV1Route(chatRoute, modelAPI)
+	serperService := serpermcp.NewSerperService()
+	serperMCP := mcpimpl.NewSerperMCP(serperService)
+	mcpapi := mcp.NewMCPAPI(serperMCP)
+	v1Route := v1.NewV1Route(chatRoute, modelAPI, mcpapi)
 	httpServer := http.NewHttpServer(v1Route)
 	application := &Application{
 		HttpServer: httpServer,
