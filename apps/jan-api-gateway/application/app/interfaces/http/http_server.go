@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
+
 	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 )
 
@@ -13,14 +14,16 @@ type HttpServer struct {
 }
 
 func NewHttpServer(v1Route *v1.V1Route) *HttpServer {
-	gin.SetMode(gin.ReleaseMode)
+	// gin.SetMode(gin.ReleaseMode)
 	server := HttpServer{
 		engine:  gin.New(),
 		v1Route: v1Route,
 	}
+
 	server.engine.GET("/health-check", func(c *gin.Context) {
 		c.JSON(200, "ok")
 	})
+
 	return &server
 }
 

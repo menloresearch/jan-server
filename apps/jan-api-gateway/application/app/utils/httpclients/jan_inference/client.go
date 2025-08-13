@@ -27,6 +27,7 @@ func NewJanInferenceClient() *JanInferenceClient {
 	}
 }
 
+// TODO: add timeout
 func (client *JanInferenceClient) CreateChatCompletion(ctx context.Context, apiKey string, request ChatCompletionRequest) (*ChatCompletionResponse, error) {
 	var chatCompletionResponse ChatCompletionResponse
 	_, err := JanInferenceRestyClient.R().

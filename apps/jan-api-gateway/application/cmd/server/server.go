@@ -8,6 +8,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
 	"menlo.ai/jan-api-gateway/app/utils/httpclients"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
+	"menlo.ai/jan-api-gateway/app/utils/httpclients/serper"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
@@ -25,6 +26,7 @@ func init() {
 	environment_variables.EnvironmentVariables.LoadFromEnv()
 	httpclients.Init()
 	janinference.Init()
+	serper.Init()
 }
 
 func main() {

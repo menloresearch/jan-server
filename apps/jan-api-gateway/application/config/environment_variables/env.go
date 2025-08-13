@@ -8,6 +8,7 @@ import (
 
 type EnvironmentVariable struct {
 	JAN_INFERENCE_MODEL_URL string
+	SERPER_API_KEY          string
 }
 
 func (ev *EnvironmentVariable) LoadFromEnv() {
