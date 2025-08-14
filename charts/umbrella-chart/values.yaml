@@ -9,6 +9,8 @@ jan-api-gateway:
   env:
     - name: JAN_INFERENCE_MODEL_URL
       value: http://jan-server-jan-inference-model:8101
+    - name: SERPER_API_KEY
+      value: your_key_from_serper_api
 
 jan-inference-model:
   replicaCount: 1

@@ -7,4 +7,5 @@
     go mod tidy
     go run ./cmd/server
     ```
-    
+- Swagger
+    http://localhost:8080/api/swagger/index.html#/

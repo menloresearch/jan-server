@@ -22,6 +22,29 @@ func (completionAPI *CompletionAPI) RegisterRouter(router *gin.RouterGroup) {
 	router.POST("/completions", completionAPI.PostCompletion)
 }
 
+// ChatCompletionResponseSwagger is a doc-only version without http.Header
+type ChatCompletionResponseSwagger struct {
+	ID      string                        `json:"id"`
+	Object  string                        `json:"object"`
+	Created int64                         `json:"created"`
+	Model   string                        `json:"model"`
+	Choices []openai.ChatCompletionChoice `json:"choices"`
+	Usage   openai.Usage                  `json:"usage"`
+}
+
+// CreateChatCompletion
+// @Summary Create a chat completion
+// @Description Generates a model response for the given chat conversation.
+// @Tags Chat
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param request body openai.ChatCompletionRequest true "Chat completion request payload"
+// @Success 200 {object} ChatCompletionResponseSwagger "Successful response"
+// @Failure 400 {object} responses.ErrorResponse "Invalid request payload"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized"
+// @Failure 500 {object} responses.ErrorResponse "Internal server error"
+// @Router /v1/chat/completion [post]
 func (CompletionAPI *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	var request openai.ChatCompletionRequest
 	if err := reqCtx.ShouldBindJSON(&request); err != nil {

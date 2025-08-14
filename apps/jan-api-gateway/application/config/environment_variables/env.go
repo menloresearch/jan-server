@@ -19,7 +19,7 @@ func (ev *EnvironmentVariable) LoadFromEnv() {
 		envKey := field.Name
 		envValue := os.Getenv(envKey)
 		if envValue == "" {
-			fmt.Printf("Missing SYSENV: %s", envKey)
+			fmt.Printf("Missing SYSENV: %s\n", envKey)
 		}
 		if envValue != "" {
 			if v.Field(i).Kind() == reflect.String {

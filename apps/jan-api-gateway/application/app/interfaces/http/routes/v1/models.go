@@ -20,6 +20,15 @@ func (modelAPI *ModelAPI) RegisterRouter(router *gin.RouterGroup) {
 	router.GET("models", modelAPI.GetModels)
 }
 
+// ListModels
+// @Summary List available models
+// @Description Retrieves a list of available models that can be used for chat completions or other tasks.
+// @Tags Models
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Success 200 {object} ModelsResponse "Successful response"
+// @Router /v1/models [get]
 func (modelAPI *ModelAPI) GetModels(reqCtx *gin.Context) {
 	registry := inferencemodelregistry.GetInstance()
 	registry.ListModels()
