@@ -32,7 +32,8 @@ type SearchResponse struct {
 }
 
 type FetchWebpageRequest struct {
-	Url string `json:"url"`
+	Url             string `json:"url"`
+	IncludeMarkdown *bool  `json:"includeMarkdown,omitempty"`
 }
 
 type FetchWebpageResponse struct {

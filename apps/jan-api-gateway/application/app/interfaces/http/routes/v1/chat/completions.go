@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	openai "github.com/sashabaranov/go-openai"
 	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
@@ -22,7 +23,7 @@ func (completionAPI *CompletionAPI) RegisterRouter(router *gin.RouterGroup) {
 }
 
 func (CompletionAPI *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
-	var request janinference.ChatCompletionRequest
+	var request openai.ChatCompletionRequest
 	if err := reqCtx.ShouldBindJSON(&request); err != nil {
 		reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  "cf237451-8932-48d1-9cf6-42c4db2d4805",
@@ -42,10 +43,10 @@ func (CompletionAPI *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		return
 	}
 
-	janInferenceClient := janinference.NewJanInferenceClient()
+	janInferenceClient := janinference.NewJanInferenceClient(reqCtx)
 	for _, endpoint := range endpoints {
 		if endpoint == janInferenceClient.BaseURL {
-			response, err := janInferenceClient.CreateChatCompletion(reqCtx, "test-api-key", request)
+			response, err := janInferenceClient.CreateChatCompletion(reqCtx.Request.Context(), "test-api-key", request)
 			if err != nil {
 				reqCtx.JSON(
 					http.StatusBadRequest,
