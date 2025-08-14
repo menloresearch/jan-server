@@ -11,11 +11,6 @@ jobs:
       fail-fast: true
       matrix:
         include:
-          - docker-file: apps/jan-inference-model/Dockerfile
-            context: apps/jan-inference-model
-            registry-url: registry.menlo.ai
-            tags: registry.menlo.ai/jan-server/jan-inference-model:${{ github.ref_name }}
-            is_push: true
           - docker-file: apps/jan-api-gateway/Dockerfile
             context: apps/jan-api-gateway
             registry-url: registry.menlo.ai
