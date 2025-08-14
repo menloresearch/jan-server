@@ -1,9 +1,14 @@
-FROM vllm/vllm-openai:latest
+FROM vllm/vllm-openai:v0.10.0
 
-RUN pip install --no-cache-dir huggingface_hub \
- && python3 -c "from huggingface_hub import snapshot_download; \
-                snapshot_download(repo_id='Qwen/Qwen3-4B', local_dir='/models/Qwen3-4B')"
+RUN hf download janhq/Jan-v1-4B --local-dir /models/Jan-v1-4B
 
 EXPOSE 8101
 
-CMD ["--model", "Qwen/Qwen3-4B", "--host", "0.0.0.0", "--port", "8101", "--gpu-memory-utilization", "0.65", "--enforce-eager", "--max_model_len", "32768"]
+CMD ["--model", "/models/Jan-v1-4B", \
+    "--served-model-name", "jan-v1-4b", \
+    "--host", "0.0.0.0", \
+    "--port", "8101", \
+    "--max-num-batched-tokens", "1024", \
+    "--enable-auto-tool-choice", \
+    "--tool-call-parser", "hermes", \
+    "--reasoning-parser", "qwen3"]
