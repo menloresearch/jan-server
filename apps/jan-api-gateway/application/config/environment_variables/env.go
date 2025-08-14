@@ -19,7 +19,7 @@ func (ev *EnvironmentVariable) LoadFromEnv() {
 		envKey := field.Name
 		envValue := os.Getenv(envKey)
 		if envValue == "" {
-			fmt.Printf("Missing SYSENV: %s", envKey)
+			fmt.Printf("Missing SYSENV: %s\n", envKey)
 		}
 		if envValue != "" {
 			if v.Field(i).Kind() == reflect.String {
@@ -31,3 +31,9 @@ func (ev *EnvironmentVariable) LoadFromEnv() {
 
 // Singleton
 var EnvironmentVariables = EnvironmentVariable{}
+
+// docker run --rm -it \
+//   -p 8080:8080 \
+//   -e JAN_INFERENCE_MODEL_URL="https://inference-dev.jan.ai/" \
+//   -e SERPER_API_KEY="your-serper-key" \
+//   jan-api-gateway:latest

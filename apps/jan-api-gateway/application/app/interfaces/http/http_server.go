@@ -8,11 +8,20 @@ import (
 	"menlo.ai/jan-api-gateway/app/interfaces/http/middleware"
 	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	"menlo.ai/jan-api-gateway/app/utils/logger"
+
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	_ "menlo.ai/jan-api-gateway/docs"
 )
 
 type HttpServer struct {
 	engine  *gin.Engine
 	v1Route *v1.V1Route
+}
+
+func (s *HttpServer) bindSwagger() {
+	g := s.engine.Group("/")
+	g.GET("/api/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 }
 
 func NewHttpServer(v1Route *v1.V1Route) *HttpServer {
@@ -26,7 +35,7 @@ func NewHttpServer(v1Route *v1.V1Route) *HttpServer {
 	server.engine.GET("/health-check", func(c *gin.Context) {
 		c.JSON(200, "ok")
 	})
-
+	server.bindSwagger()
 	return &server
 }
 
