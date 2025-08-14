@@ -5,14 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	mcpserver "github.com/mark3labs/mcp-go/server"
 	mcpimpl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
-
-	mcpgolang "github.com/metoro-io/mcp-golang"
-	mcpHttp "github.com/metoro-io/mcp-golang/transport/http"
 )
 
 func MCPMethodGuard(allowedMethods map[string]bool) gin.HandlerFunc {
@@ -30,9 +27,7 @@ func MCPMethodGuard(allowedMethods map[string]bool) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-
 		var req struct {
 			Method string `json:"method"`
 		}
@@ -49,7 +44,6 @@ func MCPMethodGuard(allowedMethods map[string]bool) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		log.Println("Incoming method:", req.Method)
 
 		if !allowedMethods[req.Method] {
 			c.JSON(http.StatusOK, gin.H{
@@ -68,25 +62,25 @@ func MCPMethodGuard(allowedMethods map[string]bool) gin.HandlerFunc {
 }
 
 type MCPAPI struct {
-	MCPTransport     *mcpHttp.GinTransport
-	MCPServerHandler *mcpgolang.Server
-	SerperMCP        *mcpimpl.SerperMCP
+	SerperMCP *mcpimpl.SerperMCP
+	MCPServer *mcpserver.MCPServer
 }
 
 func NewMCPAPI(serperMCP *mcpimpl.SerperMCP) *MCPAPI {
-	transport := mcpHttp.NewGinTransport()
-	mcpServer := mcpgolang.NewServer(transport)
+	mcpSrv := mcpserver.NewMCPServer("demo", "0.1.0",
+		mcpserver.WithToolCapabilities(true),
+	)
 	return &MCPAPI{
-		MCPTransport:     transport,
-		MCPServerHandler: mcpServer,
-		SerperMCP:        serperMCP,
+		SerperMCP: serperMCP,
+		MCPServer: mcpSrv,
 	}
 }
 
 func (mcpAPI *MCPAPI) RegisterRouter(router *gin.RouterGroup) {
-	mcpAPI.SerperMCP.RegisterTool(mcpAPI.MCPServerHandler)
-	mcpAPI.MCPServerHandler.Serve()
-	router.POST(
+	mcpAPI.SerperMCP.RegisterTool(mcpAPI.MCPServer)
+
+	mcpHttpHandler := mcpserver.NewStreamableHTTPServer(mcpAPI.MCPServer)
+	router.Any(
 		"/mcp",
 		MCPMethodGuard(map[string]bool{
 			// Initialization / handshake
@@ -110,5 +104,5 @@ func (mcpAPI *MCPAPI) RegisterRouter(router *gin.RouterGroup) {
 			// If you support subscription:
 			"resources/subscribe": true,
 		}),
-		mcpAPI.MCPTransport.Handler())
+		gin.WrapH(mcpHttpHandler))
 }

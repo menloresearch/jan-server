@@ -45,7 +45,8 @@ func (s *SerperService) Search(ctx context.Context, query SearchRequest) (*Searc
 
 func (s *SerperService) FetchWebpage(ctx context.Context, query FetchWebpageRequest) (*FetchWebpageResponse, error) {
 	request := serper.FetchWebpageRequest{
-		Url: query.Url,
+		Url:             query.Url,
+		IncludeMarkdown: query.IncludeMarkdown,
 	}
 	resp, err := s.SerperClient.FetchWebpage(ctx, request)
 	if err != nil {

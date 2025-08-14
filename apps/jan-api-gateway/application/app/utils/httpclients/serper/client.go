@@ -12,7 +12,7 @@ import (
 var SerperRestyClient *resty.Client
 
 func Init() {
-	SerperRestyClient = resty.NewWithClient(httpclients.RestyClient.Client())
+	SerperRestyClient = httpclients.NewClient("SerperClient")
 }
 
 type SerperClient struct {
@@ -80,7 +80,8 @@ func (c *SerperClient) Search(ctx context.Context, query SearchRequest) (*Search
 }
 
 type FetchWebpageRequest struct {
-	Url string `json:"url"`
+	Url             string `json:"url"`
+	IncludeMarkdown *bool  `json:"includeMarkdown"`
 }
 
 type FetchWebpageResponse struct {

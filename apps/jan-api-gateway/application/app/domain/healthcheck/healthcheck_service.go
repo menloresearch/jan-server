@@ -29,7 +29,7 @@ func (hs *HealthcheckCrontabService) Start(ctx context.Context, ctab *crontab.Cr
 }
 
 func (hs *HealthcheckCrontabService) CheckInferenceModels(ctx context.Context) {
-	janModelResp, err := hs.JanInferenceClient.GetModels()
+	janModelResp, err := hs.JanInferenceClient.GetModels(ctx)
 	if err != nil {
 		hs.InferenceModelRegistry.RemoveServiceModels(hs.JanInferenceClient.BaseURL)
 	} else {

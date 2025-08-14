@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	mcp_golang "github.com/metoro-io/mcp-golang"
-	mcpgolang "github.com/metoro-io/mcp-golang"
+	"github.com/mark3labs/mcp-go/mcp"
+	mcpserver "github.com/mark3labs/mcp-go/server"
+	mcpservice "menlo.ai/jan-api-gateway/app/domain/mcp"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
 	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
@@ -21,55 +22,51 @@ func NewSerperMCP(serperService *serpermcp.SerperService) *SerperMCP {
 }
 
 type SerperSearchArgs struct {
-	Q           string  `json:"q" jsonschema:"required,description=Search query"`
-	GL          *string `json:"gl,omitempty" jsonschema:"description=Country code, e.g. us, sg"`
-	HL          *string `json:"hl,omitempty" jsonschema:"description=Language code, e.g. en, zh-TW"`
-	Location    *string `json:"location,omitempty" jsonschema:"description=Location"`
-	Num         *int    `json:"num,omitempty" jsonschema:"description=Number of results"`
-	Page        *int    `json:"page,omitempty" jsonschema:"description=Page number"`
-	Autocorrect *bool   `json:"autocorrect,omitempty" jsonschema:"description=Enable autocorrect"`
-	Tbs         *string `json:"tbs,omitempty" jsonschema:"description=Time filter, e.g. qdr:h, qdr:d, qdr:w, qdr:m, qdr:y"`
+	Q           string  `json:"q" jsonschema:"required,description=Search query string"`
+	GL          *string `json:"gl,omitempty" jsonschema:"description=Optional region code for search results in ISO 3166-1 alpha-2 format (e.g., 'us')"`
+	HL          *string `json:"hl,omitempty" jsonschema:"description=Optional language code for search results in ISO 639-1 format (e.g., 'en')"`
+	Location    *string `json:"location,omitempty" jsonschema:"description=Optional location for search results (e.g., 'SoHo, New York, United States', 'California, United States')"`
+	Num         *int    `json:"num,omitempty" jsonschema:"description=Number of results to return (default: 10)"`
+	Tbs         *string `json:"tbs,omitempty" jsonschema:"description=Time-based search filter ('qdr:h' for past hour, 'qdr:d' for past day, 'qdr:w' for past week, 'qdr:m' for past month, 'qdr:y' for past year)"`
+	Page        *int    `json:"page,omitempty" jsonschema:"description=Page number of results to return (default: 1)"`
+	Autocorrect *bool   `json:"autocorrect,omitempty" jsonschema:"description=Whether to autocorrect spelling in query"`
 }
 
 type SerperScrapeArgs struct {
-	Url string `json:"url" jsonschema:"required,description=The full URL of the page to scrape"`
+	Url             string `json:"url" jsonschema:"required,description=The URL of webpage to scrape"`
+	IncludeMarkdown *bool  `json:"includeMarkdown,omitempty" jsonschema:"description=Whether to include markdown content"`
 }
 
-func (s *SerperMCP) RegisterTool(handler *mcpgolang.Server) {
-	handler.RegisterTool(
-		"websearch",
-		"Search Google results",
-		func(args SerperSearchArgs) (*mcp_golang.ToolResponse, error) {
-			req := serpermcp.SearchRequest{
-				Q:           args.Q,
-				GL:          ptr.ToString("us"),
-				Num:         ptr.ToInt(10),
-				Page:        ptr.ToInt(1),
-				Autocorrect: ptr.ToBool(true),
+func (s *SerperMCP) RegisterTool(handler *mcpserver.MCPServer) {
+	handler.AddTool(
+		mcp.NewTool("google_search",
+			mcpservice.ReflectToMCPOptions(
+				"Tool to perform web searches via Serper API and retrieve rich results. It is able to retrieve organic search results, people also ask, related searches, and knowledge graph.",
+				SerperSearchArgs{},
+			)...,
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			q, err := req.RequireString("q")
+			if err != nil {
+				return nil, err
 			}
-			if args.GL != nil {
-				req.GL = args.GL
+			searchReq := serpermcp.SearchRequest{
+				Q:           q,
+				GL:          ptr.ToString(req.GetString("gl", "us")),
+				Num:         ptr.ToInt(req.GetInt("num", 10)),
+				Page:        ptr.ToInt(req.GetInt("page", 1)),
+				Autocorrect: ptr.ToBool(req.GetBool("autocorrect", true)),
 			}
-			if args.HL != nil {
-				req.HL = args.HL
+			hl := req.GetString("hl", "")
+			if hl != "" {
+				searchReq.HL = &hl
 			}
-			if args.Location != nil {
-				req.Location = args.Location
+			location := req.GetString("location", "")
+			if location != "" {
+				searchReq.Location = &location
 			}
-			if args.Num != nil {
-				req.Num = args.Num
-			}
-			if args.Page != nil {
-				req.Page = args.Page
-			}
-			if args.Autocorrect != nil {
-				req.Autocorrect = args.Autocorrect
-			}
-			if args.Tbs != nil {
-				tbs := serpermcp.TBSTimeRange(*args.Tbs)
-				req.TBS = &tbs
-			}
-			searchResp, err := s.SerperService.Search(context.Background(), req)
+
+			searchResp, err := s.SerperService.Search(ctx, searchReq)
 			if err != nil {
 				return nil, err
 			}
@@ -78,31 +75,34 @@ func (s *SerperMCP) RegisterTool(handler *mcpgolang.Server) {
 				return nil, err
 			}
 
-			return mcp_golang.NewToolResponse(
-				mcp_golang.NewTextContent(string(jsonBytes)),
-			), nil
+			return mcp.NewToolResultText(string(jsonBytes)), nil
 		},
 	)
-
-	handler.RegisterTool(
-		"webscrape",
-		"Scrape and return structured web content from a given URL",
-		func(args SerperScrapeArgs) (*mcp_golang.ToolResponse, error) {
-			req := serpermcp.FetchWebpageRequest{
-				Url: args.Url,
-			}
-			scrapeResp, err := s.SerperService.FetchWebpage(context.Background(), req)
+	handler.AddTool(
+		mcp.NewTool("scrape",
+			mcpservice.ReflectToMCPOptions(
+				"This is a tool to scrape a webpage and retrieve the text, with an option to provide the output in Markdown format.",
+				SerperScrapeArgs{},
+			)...,
+		),
+		func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			url, err := req.RequireString("url")
 			if err != nil {
 				return nil, err
 			}
-			jsonBytes, err := json.Marshal(scrapeResp)
+			scrapeReq := serpermcp.FetchWebpageRequest{
+				Url:             url,
+				IncludeMarkdown: ptr.ToBool(req.GetBool("includeMarkdown", false)),
+			}
+			searchResp, err := s.SerperService.FetchWebpage(ctx, scrapeReq)
 			if err != nil {
 				return nil, err
 			}
-
-			return mcp_golang.NewToolResponse(
-				mcp_golang.NewTextContent(string(jsonBytes)),
-			), nil
+			jsonBytes, err := json.Marshal(searchResp)
+			if err != nil {
+				return nil, err
+			}
+			return mcp.NewToolResultText(string(jsonBytes)), nil
 		},
 	)
 }

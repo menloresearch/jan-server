@@ -5,7 +5,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"menlo.ai/jan-api-gateway/app/interfaces/http/middleware"
 	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
+	"menlo.ai/jan-api-gateway/app/utils/logger"
 )
 
 type HttpServer struct {
@@ -14,12 +16,13 @@ type HttpServer struct {
 }
 
 func NewHttpServer(v1Route *v1.V1Route) *HttpServer {
-	// gin.SetMode(gin.ReleaseMode)
+	gin.SetMode(gin.ReleaseMode)
+
 	server := HttpServer{
 		engine:  gin.New(),
 		v1Route: v1Route,
 	}
-
+	server.engine.Use(middleware.LoggerMiddleware(logger.Logger))
 	server.engine.GET("/health-check", func(c *gin.Context) {
 		c.JSON(200, "ok")
 	})
