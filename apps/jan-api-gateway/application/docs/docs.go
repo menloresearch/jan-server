@@ -136,6 +136,29 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/v1/version": {
+            "get": {
+                "description": "Returns the current build version of the API server.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system"
+                ],
+                "summary": "Get API build version",
+                "responses": {
+                    "200": {
+                        "description": "version info",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
