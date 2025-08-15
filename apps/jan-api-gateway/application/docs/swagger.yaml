@@ -598,4 +598,19 @@ paths:
       summary: List available models
       tags:
       - Models
+  /v1/version:
+    get:
+      description: Returns the current build version of the API server.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: version info
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get API build version
+      tags:
+      - system
 swagger: "2.0"
