@@ -25,7 +25,10 @@ func NewClient(clientName string) *resty.Client {
 		startTime, _ := r.Request.Context().Value(contextkeys.HttpClientStartsAt{}).(time.Time)
 		requestBody := r.Request.Context().Value(contextkeys.HttpClientRequestBody{})
 		latency := time.Since(startTime)
-
+		var responseBody any
+		if !r.Request.DoNotParseResponse {
+			responseBody = r.Result()
+		}
 		logger.WithFields(logrus.Fields{
 			"request_id": requestID,
 			"client":     clientName,
@@ -35,7 +38,7 @@ func NewClient(clientName string) *resty.Client {
 			"query":      r.Request.RawRequest.URL.RawQuery,
 			"headers":    r.Request.RawRequest.Header,
 			"req_body":   requestBody,
-			"resp_body":  r.Result(),
+			"resp_body":  responseBody,
 			"latency":    latency.String(),
 			"client_ip":  nil,
 		}).Info("")

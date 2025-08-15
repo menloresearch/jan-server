@@ -69,18 +69,32 @@ func (CompletionAPI *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	janInferenceClient := janinference.NewJanInferenceClient(reqCtx)
 	for _, endpoint := range endpoints {
 		if endpoint == janInferenceClient.BaseURL {
-			response, err := janInferenceClient.CreateChatCompletion(reqCtx.Request.Context(), "test-api-key", request)
-			if err != nil {
-				reqCtx.JSON(
-					http.StatusBadRequest,
-					responses.ErrorResponse{
-						Code:  "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",
-						Error: err.Error(),
-					})
+			if request.Stream {
+				err := janInferenceClient.CreateChatCompletionStream(reqCtx, "test-api-key", request)
+				if err != nil {
+					reqCtx.JSON(
+						http.StatusBadRequest,
+						responses.ErrorResponse{
+							Code:  "c3af973c-eada-4e8b-96d9-e92546588cd3",
+							Error: err.Error(),
+						})
+					return
+				}
+				return
+			} else {
+				response, err := janInferenceClient.CreateChatCompletion(reqCtx.Request.Context(), "test-api-key", request)
+				if err != nil {
+					reqCtx.JSON(
+						http.StatusBadRequest,
+						responses.ErrorResponse{
+							Code:  "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",
+							Error: err.Error(),
+						})
+					return
+				}
+				reqCtx.JSON(http.StatusOK, response)
 				return
 			}
-			reqCtx.JSON(http.StatusOK, response)
-			return
 		}
 	}
 

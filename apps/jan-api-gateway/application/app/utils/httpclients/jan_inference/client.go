@@ -1,8 +1,11 @@
 package janinference
 
 import (
+	"bufio"
 	"context"
+	"fmt"
 
+	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/utils/httpclients"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
@@ -25,6 +28,34 @@ func NewJanInferenceClient(ctx context.Context) *JanInferenceClient {
 	return &JanInferenceClient{
 		BaseURL: environment_variables.EnvironmentVariables.JAN_INFERENCE_MODEL_URL,
 	}
+}
+
+func (client *JanInferenceClient) CreateChatCompletionStream(ctx context.Context, apiKey string, request openai.ChatCompletionRequest) error {
+	reqCtx, ok := ctx.(*gin.Context)
+	if !ok {
+		return fmt.Errorf("invalid context")
+	}
+	reqCtx.Writer.Header().Set("Content-Type", "text/event-stream")
+	reqCtx.Writer.Header().Set("Cache-Control", "no-cache")
+	reqCtx.Writer.Header().Set("Connection", "keep-alive")
+	reqCtx.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+	req := JanInferenceRestyClient.R().SetBody(request)
+	resp, err := req.
+		SetDoNotParseResponse(true).
+		Post("/v1/chat/completions")
+	if err != nil {
+		return err
+	}
+	defer resp.RawResponse.Body.Close()
+	scanner := bufio.NewScanner(resp.RawResponse.Body)
+	for scanner.Scan() {
+		line := scanner.Text()
+		reqCtx.Writer.Write([]byte(line + "\n"))
+		reqCtx.Writer.Flush()
+	}
+	reqCtx.Writer.Flush()
+	return nil
 }
 
 // TODO: add timeout
