@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -41,15 +42,25 @@ func LoggerMiddleware(logger *logrus.Logger) gin.HandlerFunc {
 			c.Request.Body = io.NopCloser(bytes.NewBuffer(reqBody))
 		}
 
-		// Wrap writer to capture response
-		blw := &BodyLogWriter{body: bytes.NewBufferString(""), ResponseWriter: c.Writer}
+		// Wrap writer only if not streaming
+		var blw *BodyLogWriter
+
+		blw = &BodyLogWriter{body: bytes.NewBufferString(""), ResponseWriter: c.Writer}
 		c.Writer = blw
 
 		// Process request
 		c.Next()
+		contentType := c.Writer.Header().Get("Content-Type")
+		isStream := strings.HasPrefix(contentType, "text/event-stream") ||
+			strings.HasPrefix(contentType, "application/octet-stream") ||
+			strings.HasPrefix(contentType, "application/x-ndjson")
 
 		// Log everything
 		duration := time.Since(start)
+		responseBody := ""
+		if !isStream {
+			responseBody = blw.body.String()
+		}
 		logger.WithFields(logrus.Fields{
 			"request_id": requestID,
 			"status":     c.Writer.Status(),
@@ -59,7 +70,7 @@ func LoggerMiddleware(logger *logrus.Logger) gin.HandlerFunc {
 			"query":      c.Request.URL.RawQuery,
 			"headers":    c.Request.Header,
 			"req_body":   string(reqBody),
-			"resp_body":  blw.body.String(),
+			"resp_body":  responseBody,
 			"latency":    duration.String(),
 			"client_ip":  c.ClientIP(),
 		}).Info("")
