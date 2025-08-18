@@ -25,3 +25,5 @@ jobs:
       registry-url: ${{ matrix.registry-url }}
       tags: ${{ matrix.tags }}
       is_push: ${{ matrix.is_push }}
+      build-args: |
+        VERSION_TAG=${{ github.ref_name }}
