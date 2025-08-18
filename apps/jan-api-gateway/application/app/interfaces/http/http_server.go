@@ -2,10 +2,12 @@ package http
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 
 	"menlo.ai/jan-api-gateway/app/interfaces/http/middleware"
+	admin "menlo.ai/jan-api-gateway/app/interfaces/http/routes/admin"
 	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	"menlo.ai/jan-api-gateway/app/utils/logger"
 
@@ -15,24 +17,30 @@ import (
 )
 
 type HttpServer struct {
-	engine  *gin.Engine
-	v1Route *v1.V1Route
+	engine     *gin.Engine
+	v1Route    *v1.V1Route
+	adminRoute *admin.AdminRoute
 }
 
 func (s *HttpServer) bindSwagger() {
 	g := s.engine.Group("/")
 	g.GET("/api/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	g.GET("/google/testcallback", func(c *gin.Context) {
+		code := c.Query("code")
+		state := c.Query("state")
+		c.JSON(http.StatusOK, gin.H{"msg": "Frontend received Google redirect", "code": code, "state": state, "next": "Now frontend should POST /auth/google/callback with code"})
+	})
 }
 
-func NewHttpServer(v1Route *v1.V1Route) *HttpServer {
+func NewHttpServer(v1Route *v1.V1Route, adminRoute *admin.AdminRoute) *HttpServer {
 	gin.SetMode(gin.ReleaseMode)
-
 	server := HttpServer{
-		engine:  gin.New(),
-		v1Route: v1Route,
+		gin.New(),
+		v1Route,
+		adminRoute,
 	}
 	server.engine.Use(middleware.LoggerMiddleware(logger.Logger))
-	server.engine.GET("/health-check", func(c *gin.Context) {
+	server.engine.GET("/healthcheck", func(c *gin.Context) {
 		c.JSON(200, "ok")
 	})
 	server.bindSwagger()
@@ -41,7 +49,9 @@ func NewHttpServer(v1Route *v1.V1Route) *HttpServer {
 
 func (httpServer *HttpServer) Run() error {
 	port := 8080
-	httpServer.v1Route.RegisterRouter(httpServer.engine.Group("/"))
+	root := httpServer.engine.Group("/")
+	httpServer.v1Route.RegisterRouter(root)
+	httpServer.adminRoute.RegisterRouter(root)
 	if err := httpServer.engine.Run(fmt.Sprintf(":%d", port)); err != nil {
 		return err
 	}
