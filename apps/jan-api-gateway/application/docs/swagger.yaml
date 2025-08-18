@@ -612,5 +612,5 @@ paths:
             type: object
       summary: Get API build version
       tags:
-      - system
+      - System
 swagger: "2.0"

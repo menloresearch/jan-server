@@ -144,7 +144,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "system"
+                    "System"
                 ],
                 "summary": "Get API build version",
                 "responses": {
