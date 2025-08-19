@@ -44,7 +44,7 @@ type ChatCompletionResponseSwagger struct {
 // @Failure 400 {object} responses.ErrorResponse "Invalid request payload"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
-// @Router /v1/chat/completion [post]
+// @Router /v1/chat/completions [post]
 func (CompletionAPI *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	var request openai.ChatCompletionRequest
 	if err := reqCtx.ShouldBindJSON(&request); err != nil {

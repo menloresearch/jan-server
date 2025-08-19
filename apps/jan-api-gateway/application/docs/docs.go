@@ -15,7 +15,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/v1/chat/completion": {
+        "/v1/chat/completions": {
             "post": {
                 "security": [
                     {
