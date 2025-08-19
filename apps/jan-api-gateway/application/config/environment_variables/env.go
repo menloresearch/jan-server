@@ -15,6 +15,8 @@ type EnvironmentVariable struct {
 	OAUTH2_GOOGLE_CLIENT_ID     string
 	OAUTH2_GOOGLE_CLIENT_SECRET string
 	OAUTH2_GOOGLE_REDIRECT_URL  string
+	DB_POSTGRESQL_WRITE_DSN     string
+	DB_POSTGRESQL_READ1_DSN     string
 }
 
 func (ev *EnvironmentVariable) LoadFromEnv() {

@@ -9,3 +9,5 @@ type GeneralResponse[T any] struct {
 	Status string `json:"status"`
 	Data   T      `json:"data"`
 }
+
+const ResponseCodeOk = "000000"

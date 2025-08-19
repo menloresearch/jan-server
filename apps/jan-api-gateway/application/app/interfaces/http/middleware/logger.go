@@ -43,9 +43,7 @@ func LoggerMiddleware(logger *logrus.Logger) gin.HandlerFunc {
 		}
 
 		// Wrap writer only if not streaming
-		var blw *BodyLogWriter
-
-		blw = &BodyLogWriter{body: bytes.NewBufferString(""), ResponseWriter: c.Writer}
+		var blw = &BodyLogWriter{body: bytes.NewBufferString(""), ResponseWriter: c.Writer}
 		c.Writer = blw
 
 		// Process request

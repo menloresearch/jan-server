@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/middleware"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/admin/v1/auth/google"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
@@ -24,12 +25,44 @@ func NewAuthRoute(google *google.GoogleAuthAPI) *AuthRoute {
 
 func (authRoute *AuthRoute) RegisterRouter(router gin.IRouter) {
 	authRouter := router.Group("/auth")
+	authRouter.GET("/refresh-token", authRoute.RefreshToken)
+	authRouter.GET("/me", middleware.AuthMiddleware(), authRoute.GetMe)
 	authRoute.google.RegisterRouter(authRouter)
+
 }
 
 type RefreshTokenResponse struct {
 	AccessToken string `json:"access_token"`
 	ExpiresIn   int    `json:"expires_in"`
+}
+
+type GetMeResponse struct {
+	Email string `json:"email"`
+	Name  string `json:"name"`
+}
+
+func (authRoute *AuthRoute) GetMe(reqCtx *gin.Context) {
+	userClaim, ok := reqCtx.Get(auth.ContextUserClaim)
+	if !ok {
+		reqCtx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
+			Code: "fbc49daf-2f73-4778-9362-5680da391190",
+		})
+		return
+	}
+	u, ok := userClaim.(*auth.UserClaim)
+	if !ok {
+		reqCtx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
+			Code: "e8a957c3-e107-4244-8625-3f3a1d29ce5c",
+		})
+		return
+	}
+	reqCtx.JSON(http.StatusOK, responses.GeneralResponse[GetMeResponse]{
+		Status: responses.ResponseCodeOk,
+		Data: GetMeResponse{
+			Email: u.Email,
+			Name:  u.Name,
+		},
+	})
 }
 
 func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
@@ -42,7 +75,7 @@ func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 		return
 	}
 
-	token, err := jwt.Parse(refreshTokenString, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(refreshTokenString, &auth.UserClaim{}, func(token *jwt.Token) (interface{}, error) {
 		return environment_variables.EnvironmentVariables.JWT_SECRET, nil
 	})
 	if err != nil {
@@ -60,7 +93,7 @@ func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 		return
 	}
 
-	claims, ok := token.Claims.(jwt.MapClaims)
+	userClaim, ok := token.Claims.(*auth.UserClaim)
 	if !ok {
 		reqCtx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
 			Code: "c2019018-b71c-4f13-8ac6-854fbd61c9dd",
@@ -69,13 +102,14 @@ func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 	}
 
 	accessTokenExp := time.Now().Add(15 * time.Minute)
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub":   claims["sub"],
-		"email": claims["email"],
-		"exp":   accessTokenExp.Unix(),
+	accessTokenString, err := auth.CreateJwtSignedString(auth.UserClaim{
+		Email: userClaim.Email,
+		Name:  userClaim.Name,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(accessTokenExp),
+			Subject:   userClaim.Email,
+		},
 	})
-
-	accessTokenString, err := accessToken.SignedString(environment_variables.EnvironmentVariables.JWT_SECRET)
 	if err != nil {
 		reqCtx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Code:  "79373f8e-d80e-489c-95ba-9e6099ef7539",
@@ -84,8 +118,35 @@ func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 		return
 	}
 
+	refreshTokenExp := time.Now().Add(7 * 24 * time.Hour)
+	refreshTokenString, err = auth.CreateJwtSignedString(auth.UserClaim{
+		Email: userClaim.Email,
+		Name:  userClaim.Name,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(refreshTokenExp),
+			Subject:   userClaim.Email,
+		},
+	})
+	if err != nil {
+		reqCtx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code:  "0e596742-64bb-4904-8429-4c09ce8434b9",
+			Error: err.Error(),
+		})
+		return
+	}
+
+	http.SetCookie(reqCtx.Writer, &http.Cookie{
+		Name:     auth.RefreshTokenKey,
+		Value:    refreshTokenString,
+		Expires:  refreshTokenExp,
+		HttpOnly: true,
+		Secure:   true,
+		Path:     "/",
+		SameSite: http.SameSiteStrictMode,
+	})
+
 	reqCtx.JSON(http.StatusOK, &responses.GeneralResponse[RefreshTokenResponse]{
-		Status: "000000",
+		Status: responses.ResponseCodeOk,
 		Data: RefreshTokenResponse{
 			accessTokenString,
 			int(time.Until(accessTokenExp).Seconds()),
