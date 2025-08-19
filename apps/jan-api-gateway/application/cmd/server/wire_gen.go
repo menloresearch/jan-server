@@ -8,6 +8,9 @@ package main
 
 import (
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
+	"menlo.ai/jan-api-gateway/app/domain/user"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/admin"
 	v1_2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/admin/v1"
@@ -29,7 +32,13 @@ func CreateApplication() (*Application, error) {
 	serperMCP := mcpimpl.NewSerperMCP(serperService)
 	mcpapi := mcp.NewMCPAPI(serperMCP)
 	v1Route := v1.NewV1Route(chatRoute, modelAPI, mcpapi)
-	googleAuthAPI := google.NewGoogleAuthAPI()
+	db, err := database.NewDB()
+	if err != nil {
+		return nil, err
+	}
+	userRepository := userrepo.NewUserGormRepository(db)
+	userService := user.NewService(userRepository)
+	googleAuthAPI := google.NewGoogleAuthAPI(userService)
 	authRoute := auth.NewAuthRoute(googleAuthAPI)
 	v1V1Route := v1_2.NewV1Route(authRoute)
 	adminRoute := admin.NewAdminRoute(v1V1Route)

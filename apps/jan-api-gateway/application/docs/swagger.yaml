@@ -520,7 +520,7 @@ definitions:
 info:
   contact: {}
 paths:
-  /v1/chat/completion:
+  /v1/chat/completions:
     post:
       consumes:
       - application/json

@@ -9,11 +9,12 @@ import (
 
 	oidc "github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
-	"github.com/golang-jwt/jwt/v5"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
+	"menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
@@ -21,9 +22,10 @@ import (
 type GoogleAuthAPI struct {
 	oAuth2Config *oauth2.Config
 	oidcProvider *oidc.Provider
+	userService  *user.UserService
 }
 
-func NewGoogleAuthAPI() *GoogleAuthAPI {
+func NewGoogleAuthAPI(userService *user.UserService) *GoogleAuthAPI {
 	oauth2Config := &oauth2.Config{
 		ClientID:     environment_variables.EnvironmentVariables.OAUTH2_GOOGLE_CLIENT_ID,
 		ClientSecret: environment_variables.EnvironmentVariables.OAUTH2_GOOGLE_CLIENT_SECRET,
@@ -39,13 +41,14 @@ func NewGoogleAuthAPI() *GoogleAuthAPI {
 	return &GoogleAuthAPI{
 		oauth2Config,
 		provider,
+		userService,
 	}
 }
 
 func (googleAuthAPI *GoogleAuthAPI) RegisterRouter(router *gin.RouterGroup) {
 	googleRouter := router.Group("/google")
 	googleRouter.POST("/callback", googleAuthAPI.HandleGoogleCallback)
-	googleRouter.GET("/login", googleAuthAPI.GetGoogleLogin)
+	googleRouter.GET("/login", googleAuthAPI.GetGoogleLoginUrl)
 }
 
 type GoogleCallbackRequest struct {
@@ -56,8 +59,6 @@ type GoogleCallbackRequest struct {
 type GoogleCallbackResponse struct {
 	AccessToken string `json:"access_token"`
 	ExpiresIn   int    `json:"expires_in"`
-	Email       string `json:"email"`
-	Name        string `json:"name"`
 }
 
 func generateState() (string, error) {
@@ -130,13 +131,40 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 		return
 	}
 
+	userService := googleAuthAPI.userService
+	exists, err := userService.FindByEmail(reqCtx, claims.Email)
+	if err != nil {
+		reqCtx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code:  "ad6e260d-b5ad-447b-8ab0-7e161c932b6a",
+			Error: err.Error(),
+		})
+		return
+	}
+	if exists == nil {
+		exists, err = userService.CreateUser(reqCtx, &user.User{
+			Name:    claims.Name,
+			Email:   claims.Email,
+			Enabled: true,
+		})
+		if err != nil {
+			reqCtx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+				Code:  "45f08e6d-4b0c-4718-9bf3-5974a14d5f25",
+				Error: err.Error(),
+			})
+			return
+		}
+	}
+
 	accessTokenExp := time.Now().Add(15 * time.Minute)
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub":   claims.Sub,
-		"email": claims.Email,
-		"exp":   accessTokenExp.Unix(),
+	accessTokenString, err := auth.CreateJwtSignedString(auth.UserClaim{
+		Email: exists.Email,
+		Name:  exists.Name,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(accessTokenExp),
+			Subject:   exists.Email,
+		},
 	})
-	accessTokenString, err := accessToken.SignedString(environment_variables.EnvironmentVariables.JWT_SECRET)
+
 	if err != nil {
 		reqCtx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Code:  "7b50f7ab-f3a1-4a3c-920a-41e387c2bc12",
@@ -144,33 +172,43 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 		})
 		return
 	}
-
 	refreshTokenExp := time.Now().Add(7 * 24 * time.Hour)
-	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": claims.Sub,
-		"exp": refreshTokenExp.Unix(),
+	refreshTokenString, err := auth.CreateJwtSignedString(auth.UserClaim{
+		Email: exists.Email,
+		Name:  exists.Name,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(refreshTokenExp),
+			Subject:   exists.Email,
+		},
 	})
-	refreshTokenString, err := refreshToken.SignedString(environment_variables.EnvironmentVariables.JWT_SECRET)
 	if err != nil {
 		reqCtx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "de0f019c-2f92-45c6-9698-66f7906f8cdc",
+			Code:  "0e596742-64bb-4904-8429-4c09ce8434b9",
 			Error: err.Error(),
 		})
 		return
 	}
-	reqCtx.SetCookie(auth.RefreshTokenKey, refreshTokenString, int(7*24*time.Hour.Seconds()), "/", "", true, true)
+
+	http.SetCookie(reqCtx.Writer, &http.Cookie{
+		Name:     auth.RefreshTokenKey,
+		Value:    refreshTokenString,
+		Expires:  refreshTokenExp,
+		HttpOnly: true,
+		Secure:   true,
+		Path:     "/",
+		SameSite: http.SameSiteStrictMode,
+	})
+
 	reqCtx.JSON(http.StatusOK, &responses.GeneralResponse[GoogleCallbackResponse]{
-		Status: "000000",
+		Status: responses.ResponseCodeOk,
 		Data: GoogleCallbackResponse{
 			accessTokenString,
 			int(time.Until(accessTokenExp).Seconds()),
-			claims.Email,
-			claims.Name,
 		},
 	})
 }
 
-func (googleAuthAPI *GoogleAuthAPI) GetGoogleLogin(reqCtx *gin.Context) {
+func (googleAuthAPI *GoogleAuthAPI) GetGoogleLoginUrl(reqCtx *gin.Context) {
 	state, err := generateState()
 	if err != nil {
 		reqCtx.JSON(http.StatusInternalServerError, responses.ErrorResponse{

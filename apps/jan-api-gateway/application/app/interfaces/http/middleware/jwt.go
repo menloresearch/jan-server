@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
@@ -29,7 +30,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		tokenString := parts[1]
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		token, err := jwt.ParseWithClaims(tokenString, &auth.UserClaim{}, func(token *jwt.Token) (interface{}, error) {
 			return environment_variables.EnvironmentVariables.JWT_SECRET, nil
 		})
 		if err != nil || !token.Valid {
@@ -39,7 +40,7 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		claims, ok := token.Claims.(jwt.MapClaims)
+		claims, ok := token.Claims.(*auth.UserClaim)
 		if !ok {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 				Code: "6cc0aa26-148d-4b8d-8f53-9d47b2a00ef1",
@@ -47,7 +48,7 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		c.Set("user_claims", claims)
+		c.Set(auth.ContextUserClaim, claims)
 		c.Next()
 	}
 }
