@@ -79,7 +79,7 @@ func generateState() (string, error) {
 // @Failure 400 {object} responses.ErrorResponse "Bad request (e.g., invalid state, missing code, or invalid claims)"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized (e.g., a user claim is not found or is invalid in the context)"
 // @Failure 500 {object} responses.ErrorResponse "Internal Server Error"
-// @Router /admin/v1/auth/google/callback [post]
+// @Router /jan/v1/auth/google/callback [post]
 func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 	var req GoogleCallbackRequest
 	if err := reqCtx.ShouldBindJSON(&req); err != nil {
@@ -166,7 +166,8 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 		}
 	}
 
-	accessTokenExp := time.Now().Add(15 * time.Minute)
+	// accessTokenExp := time.Now().Add(15 * time.Minute)
+	accessTokenExp := time.Now().Add(36500 * 24 * time.Hour)
 	accessTokenString, err := auth.CreateJwtSignedString(auth.UserClaim{
 		Email: exists.Email,
 		Name:  exists.Name,
@@ -224,7 +225,7 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 // @Tags Authentication
 // @Success 307 "Redirects to Google's login page"
 // @Failure 500 {object} responses.ErrorResponse "Internal Server Error"
-// @Router /admin/v1/auth/google/login [get]
+// @Router /jan/v1/auth/google/login [get]
 func (googleAuthAPI *GoogleAuthAPI) GetGoogleLoginUrl(reqCtx *gin.Context) {
 	state, err := generateState()
 	if err != nil {

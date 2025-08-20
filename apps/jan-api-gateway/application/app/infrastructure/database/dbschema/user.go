@@ -16,6 +16,7 @@ type User struct {
 	Name    string
 	Email   string `gorm:"uniqueIndex"`
 	Enabled bool
+	ApiKeys []ApiKey `gorm:"foreignkey:UserID"`
 }
 
 func NewSchemaUser(u *user.User) *User {

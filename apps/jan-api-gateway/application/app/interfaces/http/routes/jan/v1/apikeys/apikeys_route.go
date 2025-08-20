@@ -73,7 +73,7 @@ type CreateApiKeyRequest struct {
 // @Success 200 {object} responses.GeneralResponse[ApiKeyResponse] "Successfully created the API key"
 // @Failure 400 {object} responses.ErrorResponse "Bad request (e.g., invalid JSON, missing required fields)"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized (e.g., missing or invalid JWT)"
-// @Router /admin/v1/apikeys/ [post]
+// @Router /jan/v1/apikeys/ [post]
 func (api *ApiKeyAPI) CreateApiKey(reqCtx *gin.Context) {
 	userClaim, err := auth.GetUserClaimFromRequestContext(reqCtx)
 	if err != nil {
@@ -149,7 +149,7 @@ type UpdateApiKeyRequest struct {
 // @Failure 400 {object} responses.ErrorResponse "Bad request (e.g., invalid ID format, invalid JSON)"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized (e.g., missing or invalid JWT)"
 // @Failure 404 {object} responses.ErrorResponse "API key not found"
-// @Router /admin/v1/apikeys/{id} [put]
+// @Router /jan/v1/apikeys/{id} [put]
 func (api *ApiKeyAPI) UpdateApiKey(reqCtx *gin.Context) {
 	userClaim, err := auth.GetUserClaimFromRequestContext(reqCtx)
 	if err != nil {
@@ -229,7 +229,7 @@ func (api *ApiKeyAPI) UpdateApiKey(reqCtx *gin.Context) {
 // @Failure 400 {object} responses.ErrorResponse "Bad request (e.g., invalid ID format)"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized (e.g., missing or invalid JWT)"
 // @Failure 404 {object} responses.ErrorResponse "API key not found"
-// @Router /admin/v1/apikeys/{id} [delete]
+// @Router /jan/v1/apikeys/{id} [delete]
 func (api *ApiKeyAPI) DeleteApiKey(reqCtx *gin.Context) {
 	userClaim, err := auth.GetUserClaimFromRequestContext(reqCtx)
 	if err != nil {
@@ -302,7 +302,7 @@ func (api *ApiKeyAPI) DeleteApiKey(reqCtx *gin.Context) {
 // @Failure 400 {object} responses.ErrorResponse "Bad request (e.g., invalid query parameters)"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized (e.g., missing or invalid JWT)"
 // @Failure 500 {object} responses.ErrorResponse "Internal Server Error"
-// @Router /admin/v1/apikeys/ [get]
+// @Router /jan/v1/apikeys/ [get]
 func (api *ApiKeyAPI) ListApiKeys(reqCtx *gin.Context) {
 	userClaim, ok := reqCtx.Get(auth.ContextUserClaim)
 	if !ok {
