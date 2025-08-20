@@ -41,6 +41,14 @@ type GetMeResponse struct {
 	Name  string `json:"name"`
 }
 
+// @Summary Get user profile
+// @Description Retrieves the profile of the authenticated user based on the provided JWT.
+// @Tags Authentication
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {object} responses.GeneralResponse[GetMeResponse] "Successfully retrieved user profile"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized (e.g., missing or invalid JWT)"
+// @Router /admin/v1/auth/me [get]
 func (authRoute *AuthRoute) GetMe(reqCtx *gin.Context) {
 	userClaim, ok := reqCtx.Get(auth.ContextUserClaim)
 	if !ok {
@@ -58,13 +66,22 @@ func (authRoute *AuthRoute) GetMe(reqCtx *gin.Context) {
 	}
 	reqCtx.JSON(http.StatusOK, responses.GeneralResponse[GetMeResponse]{
 		Status: responses.ResponseCodeOk,
-		Data: GetMeResponse{
+		Result: GetMeResponse{
 			Email: u.Email,
 			Name:  u.Name,
 		},
 	})
 }
 
+// @Summary Refresh an access token
+// @Description Use a valid refresh token to obtain a new access token. The refresh token is typically sent in a cookie.
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Success 200 {object} responses.GeneralResponse[RefreshTokenResponse] "Successfully refreshed the access token"
+// @Failure 400 {object} responses.ErrorResponse "Bad Request (e.g., invalid refresh token)"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized (e.g., expired or missing refresh token)"
+// @Router /admin/v1/auth/refresh-token [get]
 func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 	refreshTokenString, err := reqCtx.Cookie(auth.RefreshTokenKey)
 	if err != nil {
@@ -147,7 +164,7 @@ func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 
 	reqCtx.JSON(http.StatusOK, &responses.GeneralResponse[RefreshTokenResponse]{
 		Status: responses.ResponseCodeOk,
-		Data: RefreshTokenResponse{
+		Result: RefreshTokenResponse{
 			accessTokenString,
 			int(time.Until(accessTokenExp).Seconds()),
 		},

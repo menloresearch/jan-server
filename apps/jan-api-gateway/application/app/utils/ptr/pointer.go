@@ -8,6 +8,10 @@ func ToInt(i int) *int {
 	return &i
 }
 
+func ToUint(i uint) *uint {
+	return &i
+}
+
 func ToBool(b bool) *bool {
 	return &b
 }

@@ -244,3 +244,5 @@ dist/
 
 # helm
 charts/umbrella-chart/charts/*.tgz
+
+apps/jan-api-gateway/application/cmd/server/__debug_bin*
