@@ -3,19 +3,26 @@ package chat
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
+	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
+	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
 type CompletionAPI struct {
+	apikeyService *apikey.ApiKeyService
 }
 
-func NewCompletionAPI() *CompletionAPI {
-	return &CompletionAPI{}
+func NewCompletionAPI(apikeyService *apikey.ApiKeyService) *CompletionAPI {
+	return &CompletionAPI{
+		apikeyService,
+	}
 }
 
 func (completionAPI *CompletionAPI) RegisterRouter(router *gin.RouterGroup) {
@@ -44,8 +51,8 @@ type ChatCompletionResponseSwagger struct {
 // @Failure 400 {object} responses.ErrorResponse "Invalid request payload"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
-// @Router /v1/chat/completion [post]
-func (CompletionAPI *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
+// @Router /v1/chat/completions [post]
+func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	var request openai.ChatCompletionRequest
 	if err := reqCtx.ShouldBindJSON(&request); err != nil {
 		reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
@@ -53,6 +60,40 @@ func (CompletionAPI *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 			Error: err.Error(),
 		})
 		return
+	}
+
+	key := ""
+	if environment_variables.EnvironmentVariables.ENABLE_ADMIN_API {
+		key, ok := requests.GetTokenFromBearer(reqCtx)
+		if !ok {
+			reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+				Code:  "4284adb3-7af4-428b-8064-7073cb9ca2ca",
+				Error: "invalid apikey",
+			})
+			return
+		}
+		apikeyEntity, err := api.apikeyService.FindByKey(reqCtx, key)
+		if err != nil {
+			reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+				Code:  "d14ab75b-586b-4b55-ba65-e520a76d6559",
+				Error: "invalid apikey",
+			})
+			return
+		}
+		if !apikeyEntity.Enabled {
+			reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+				Code:  "42bd6104-28a1-45bd-a164-8e32d12b0378",
+				Error: "invalid apikey",
+			})
+			return
+		}
+		if apikeyEntity.ExpiresAt != nil && apikeyEntity.ExpiresAt.Before(time.Now()) {
+			reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+				Code:  "f8f2733d-c76f-40e4-95b1-584a5d054225",
+				Error: "apikey expired",
+			})
+			return
+		}
 	}
 
 	modelRegistry := inferencemodelregistry.GetInstance()
@@ -70,7 +111,7 @@ func (CompletionAPI *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	for _, endpoint := range endpoints {
 		if endpoint == janInferenceClient.BaseURL {
 			if request.Stream {
-				err := janInferenceClient.CreateChatCompletionStream(reqCtx, "test-api-key", request)
+				err := janInferenceClient.CreateChatCompletionStream(reqCtx, key, request)
 				if err != nil {
 					reqCtx.JSON(
 						http.StatusBadRequest,
@@ -82,7 +123,7 @@ func (CompletionAPI *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 				}
 				return
 			} else {
-				response, err := janInferenceClient.CreateChatCompletion(reqCtx.Request.Context(), "test-api-key", request)
+				response, err := janInferenceClient.CreateChatCompletion(reqCtx.Request.Context(), key, request)
 				if err != nil {
 					reqCtx.JSON(
 						http.StatusBadRequest,
