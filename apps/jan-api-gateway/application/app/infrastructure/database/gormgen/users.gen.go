@@ -35,6 +35,24 @@ func newUser(db *gorm.DB, opts ...gen.DOOption) user {
 	_user.Name = field.NewString(tableName, "name")
 	_user.Email = field.NewString(tableName, "email")
 	_user.Enabled = field.NewBool(tableName, "enabled")
+	_user.ApiKeys = userHasManyApiKeys{
+		db: db.Session(&gorm.Session{}),
+
+		RelationField: field.NewRelation("ApiKeys", "dbschema.ApiKey"),
+		User: struct {
+			field.RelationField
+			ApiKeys struct {
+				field.RelationField
+			}
+		}{
+			RelationField: field.NewRelation("ApiKeys.User", "dbschema.User"),
+			ApiKeys: struct {
+				field.RelationField
+			}{
+				RelationField: field.NewRelation("ApiKeys.User.ApiKeys", "dbschema.ApiKey"),
+			},
+		},
+	}
 
 	_user.fillFieldMap()
 
@@ -52,6 +70,7 @@ type user struct {
 	Name      field.String
 	Email     field.String
 	Enabled   field.Bool
+	ApiKeys   userHasManyApiKeys
 
 	fieldMap map[string]field.Expr
 }
@@ -91,7 +110,7 @@ func (u *user) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (u *user) fillFieldMap() {
-	u.fieldMap = make(map[string]field.Expr, 7)
+	u.fieldMap = make(map[string]field.Expr, 8)
 	u.fieldMap["id"] = u.ID
 	u.fieldMap["created_at"] = u.CreatedAt
 	u.fieldMap["updated_at"] = u.UpdatedAt
@@ -99,16 +118,108 @@ func (u *user) fillFieldMap() {
 	u.fieldMap["name"] = u.Name
 	u.fieldMap["email"] = u.Email
 	u.fieldMap["enabled"] = u.Enabled
+
 }
 
 func (u user) clone(db *gorm.DB) user {
 	u.userDo.ReplaceConnPool(db.Statement.ConnPool)
+	u.ApiKeys.db = db.Session(&gorm.Session{Initialized: true})
+	u.ApiKeys.db.Statement.ConnPool = db.Statement.ConnPool
 	return u
 }
 
 func (u user) replaceDB(db *gorm.DB) user {
 	u.userDo.ReplaceDB(db)
+	u.ApiKeys.db = db.Session(&gorm.Session{})
 	return u
+}
+
+type userHasManyApiKeys struct {
+	db *gorm.DB
+
+	field.RelationField
+
+	User struct {
+		field.RelationField
+		ApiKeys struct {
+			field.RelationField
+		}
+	}
+}
+
+func (a userHasManyApiKeys) Where(conds ...field.Expr) *userHasManyApiKeys {
+	if len(conds) == 0 {
+		return &a
+	}
+
+	exprs := make([]clause.Expression, 0, len(conds))
+	for _, cond := range conds {
+		exprs = append(exprs, cond.BeCond().(clause.Expression))
+	}
+	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
+	return &a
+}
+
+func (a userHasManyApiKeys) WithContext(ctx context.Context) *userHasManyApiKeys {
+	a.db = a.db.WithContext(ctx)
+	return &a
+}
+
+func (a userHasManyApiKeys) Session(session *gorm.Session) *userHasManyApiKeys {
+	a.db = a.db.Session(session)
+	return &a
+}
+
+func (a userHasManyApiKeys) Model(m *dbschema.User) *userHasManyApiKeysTx {
+	return &userHasManyApiKeysTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a userHasManyApiKeys) Unscoped() *userHasManyApiKeys {
+	a.db = a.db.Unscoped()
+	return &a
+}
+
+type userHasManyApiKeysTx struct{ tx *gorm.Association }
+
+func (a userHasManyApiKeysTx) Find() (result []*dbschema.ApiKey, err error) {
+	return result, a.tx.Find(&result)
+}
+
+func (a userHasManyApiKeysTx) Append(values ...*dbschema.ApiKey) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Append(targetValues...)
+}
+
+func (a userHasManyApiKeysTx) Replace(values ...*dbschema.ApiKey) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Replace(targetValues...)
+}
+
+func (a userHasManyApiKeysTx) Delete(values ...*dbschema.ApiKey) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Delete(targetValues...)
+}
+
+func (a userHasManyApiKeysTx) Clear() error {
+	return a.tx.Clear()
+}
+
+func (a userHasManyApiKeysTx) Count() int64 {
+	return a.tx.Count()
+}
+
+func (a userHasManyApiKeysTx) Unscoped() *userHasManyApiKeysTx {
+	a.tx = a.tx.Unscoped()
+	return &a
 }
 
 type userDo struct{ gen.DO }

@@ -33,6 +33,7 @@ type ApiKey struct {
 	Enabled     bool   `gorm:"default:true;index"`
 	ServiceType uint   `gorm:"index:idx_user_service_type,not null"`
 	ExpiresAt   *time.Time
+	User        User `gorm:"foreignkey:UserID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
 func (a *ApiKey) EtoD() *apikey.ApiKey {

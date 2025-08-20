@@ -9,7 +9,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/middleware"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/admin/v1/auth/google"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth/google"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
@@ -48,7 +48,7 @@ type GetMeResponse struct {
 // @Produce json
 // @Success 200 {object} responses.GeneralResponse[GetMeResponse] "Successfully retrieved user profile"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized (e.g., missing or invalid JWT)"
-// @Router /admin/v1/auth/me [get]
+// @Router /jan/v1/auth/me [get]
 func (authRoute *AuthRoute) GetMe(reqCtx *gin.Context) {
 	userClaim, ok := reqCtx.Get(auth.ContextUserClaim)
 	if !ok {
@@ -81,7 +81,7 @@ func (authRoute *AuthRoute) GetMe(reqCtx *gin.Context) {
 // @Success 200 {object} responses.GeneralResponse[RefreshTokenResponse] "Successfully refreshed the access token"
 // @Failure 400 {object} responses.ErrorResponse "Bad Request (e.g., invalid refresh token)"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized (e.g., expired or missing refresh token)"
-// @Router /admin/v1/auth/refresh-token [get]
+// @Router /jan/v1/auth/refresh-token [get]
 func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 	refreshTokenString, err := reqCtx.Cookie(auth.RefreshTokenKey)
 	if err != nil {
