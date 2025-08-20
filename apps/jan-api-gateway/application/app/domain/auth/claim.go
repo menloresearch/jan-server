@@ -1,7 +1,11 @@
 package auth
 
 import (
+	"fmt"
+
+	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
@@ -18,4 +22,16 @@ type UserClaim struct {
 func CreateJwtSignedString(u UserClaim) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, u)
 	return token.SignedString(environment_variables.EnvironmentVariables.JWT_SECRET)
+}
+
+func GetUserClaimFromRequestContext(reqCtx *gin.Context) (*UserClaim, error) {
+	userClaim, ok := reqCtx.Get(ContextUserClaim)
+	if !ok {
+		return nil, fmt.Errorf("userclaim not found in context")
+	}
+	u, ok := userClaim.(*UserClaim)
+	if !ok {
+		return nil, fmt.Errorf("invalid user claim in context: expected *auth.UserClaim, got %T", userClaim)
+	}
+	return u, nil
 }

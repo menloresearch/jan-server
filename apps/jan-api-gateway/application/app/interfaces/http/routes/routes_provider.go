@@ -4,6 +4,7 @@ import (
 	"github.com/google/wire"
 	admin "menlo.ai/jan-api-gateway/app/interfaces/http/routes/admin"
 	adminV1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/admin/v1"
+	adminV1Apikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/admin/v1/apikeys"
 	adminV1Auth "menlo.ai/jan-api-gateway/app/interfaces/http/routes/admin/v1/auth"
 	adminV1AuthGoogle "menlo.ai/jan-api-gateway/app/interfaces/http/routes/admin/v1/auth/google"
 	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
@@ -13,6 +14,7 @@ import (
 )
 
 var RouteProvider = wire.NewSet(
+	adminV1Apikeys.NewApiKeyAPI,
 	adminV1AuthGoogle.NewGoogleAuthAPI,
 	adminV1Auth.NewAuthRoute,
 	adminV1.NewV1Route,

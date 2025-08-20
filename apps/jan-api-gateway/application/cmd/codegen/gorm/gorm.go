@@ -4,6 +4,8 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gen"
 	"gorm.io/gorm"
+
+	"menlo.ai/jan-api-gateway/cmd/codegen/gorm/models/apikey"
 	"menlo.ai/jan-api-gateway/cmd/codegen/gorm/models/user"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
@@ -23,5 +25,6 @@ func main() {
 
 	g.UseDB(db)
 	user.RegisterUser(g)
+	apikey.RegisterUser(g)
 	g.Execute()
 }

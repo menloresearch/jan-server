@@ -69,6 +69,17 @@ func generateState() (string, error) {
 	return base64.URLEncoding.EncodeToString(b), nil
 }
 
+// @Summary Google OAuth2 Callback
+// @Description Handles the callback from the Google OAuth2 provider to exchange the authorization code for a token, verify the user, and issue access and refresh tokens.
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param request body GoogleCallbackRequest true "Request body containing the authorization code and state"
+// @Success 200 {object} responses.GeneralResponse[GoogleCallbackResponse] "Successfully authenticated and returned tokens"
+// @Failure 400 {object} responses.ErrorResponse "Bad request (e.g., invalid state, missing code, or invalid claims)"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized (e.g., a user claim is not found or is invalid in the context)"
+// @Failure 500 {object} responses.ErrorResponse "Internal Server Error"
+// @Router /admin/v1/auth/google/callback [post]
 func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 	var req GoogleCallbackRequest
 	if err := reqCtx.ShouldBindJSON(&req); err != nil {
@@ -201,13 +212,19 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 
 	reqCtx.JSON(http.StatusOK, &responses.GeneralResponse[GoogleCallbackResponse]{
 		Status: responses.ResponseCodeOk,
-		Data: GoogleCallbackResponse{
+		Result: GoogleCallbackResponse{
 			accessTokenString,
 			int(time.Until(accessTokenExp).Seconds()),
 		},
 	})
 }
 
+// @Summary Google OAuth2 Login
+// @Description Redirects the user to the Google OAuth2 authorization page to initiate the login process.
+// @Tags Authentication
+// @Success 307 "Redirects to Google's login page"
+// @Failure 500 {object} responses.ErrorResponse "Internal Server Error"
+// @Router /admin/v1/auth/google/login [get]
 func (googleAuthAPI *GoogleAuthAPI) GetGoogleLoginUrl(reqCtx *gin.Context) {
 	state, err := generateState()
 	if err != nil {
