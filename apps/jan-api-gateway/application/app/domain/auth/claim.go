@@ -20,7 +20,7 @@ type UserClaim struct {
 }
 
 func CreateJwtSignedString(u UserClaim) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, u)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, u)
 	return token.SignedString(environment_variables.EnvironmentVariables.JWT_SECRET)
 }
 
