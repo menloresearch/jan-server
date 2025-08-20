@@ -15,7 +15,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/admin/v1/apikeys/": {
+        "/jan/v1/apikeys/": {
             "get": {
                 "security": [
                     {
@@ -48,7 +48,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully retrieved the list of API keys",
                         "schema": {
-                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListlResponse-array_app_interfaces_http_routes_admin_v1_apikeys_ApiKeyResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListlResponse-array_app_interfaces_http_routes_jan_v1_apikeys_ApiKeyResponse"
                         }
                     },
                     "400": {
@@ -95,7 +95,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_admin_v1_apikeys.CreateApiKeyRequest"
+                            "$ref": "#/definitions/app_interfaces_http_routes_jan_v1_apikeys.CreateApiKeyRequest"
                         }
                     }
                 ],
@@ -103,7 +103,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully created the API key",
                         "schema": {
-                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_admin_v1_apikeys_ApiKeyResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_apikeys_ApiKeyResponse"
                         }
                     },
                     "400": {
@@ -121,7 +121,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/v1/apikeys/{id}": {
+        "/jan/v1/apikeys/{id}": {
             "put": {
                 "security": [
                     {
@@ -153,7 +153,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_admin_v1_apikeys.UpdateApiKeyRequest"
+                            "$ref": "#/definitions/app_interfaces_http_routes_jan_v1_apikeys.UpdateApiKeyRequest"
                         }
                     }
                 ],
@@ -161,7 +161,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully updated the API key",
                         "schema": {
-                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_admin_v1_apikeys_ApiKeyResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_apikeys_ApiKeyResponse"
                         }
                     },
                     "400": {
@@ -229,7 +229,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/v1/auth/google/callback": {
+        "/jan/v1/auth/google/callback": {
             "post": {
                 "description": "Handles the callback from the Google OAuth2 provider to exchange the authorization code for a token, verify the user, and issue access and refresh tokens.",
                 "consumes": [
@@ -249,7 +249,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_admin_v1_auth_google.GoogleCallbackRequest"
+                            "$ref": "#/definitions/app_interfaces_http_routes_jan_v1_auth_google.GoogleCallbackRequest"
                         }
                     }
                 ],
@@ -257,7 +257,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully authenticated and returned tokens",
                         "schema": {
-                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_admin_v1_auth_google_GoogleCallbackResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_auth_google_GoogleCallbackResponse"
                         }
                     },
                     "400": {
@@ -281,7 +281,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/v1/auth/google/login": {
+        "/jan/v1/auth/google/login": {
             "get": {
                 "description": "Redirects the user to the Google OAuth2 authorization page to initiate the login process.",
                 "tags": [
@@ -301,7 +301,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/v1/auth/me": {
+        "/jan/v1/auth/me": {
             "get": {
                 "security": [
                     {
@@ -320,7 +320,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully retrieved user profile",
                         "schema": {
-                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_admin_v1_auth_GetMeResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_auth_GetMeResponse"
                         }
                     },
                     "401": {
@@ -332,7 +332,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/v1/auth/refresh-token": {
+        "/jan/v1/auth/refresh-token": {
             "get": {
                 "description": "Use a valid refresh token to obtain a new access token. The refresh token is typically sent in a cookie.",
                 "consumes": [
@@ -349,7 +349,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully refreshed the access token",
                         "schema": {
-                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_admin_v1_auth_RefreshTokenResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_auth_RefreshTokenResponse"
                         }
                     },
                     "400": {
@@ -360,6 +360,63 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized (e.g., expired or missing refresh token)",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/jan/v1/chat/completions": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Generates a model response for the given chat conversation.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Chat"
+                ],
+                "summary": "Create a chat completion",
+                "parameters": [
+                    {
+                        "description": "Chat completion request payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/openai.ChatCompletionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_jan_v1_chat.ChatCompletionResponseSwagger"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request payload",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
@@ -514,7 +571,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "app_interfaces_http_routes_admin_v1_apikeys.ApiKeyResponse": {
+        "app_interfaces_http_routes_jan_v1_apikeys.ApiKeyResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -537,7 +594,7 @@ const docTemplate = `{
                 }
             }
         },
-        "app_interfaces_http_routes_admin_v1_apikeys.CreateApiKeyRequest": {
+        "app_interfaces_http_routes_jan_v1_apikeys.CreateApiKeyRequest": {
             "type": "object",
             "properties": {
                 "description": {
@@ -548,7 +605,7 @@ const docTemplate = `{
                 }
             }
         },
-        "app_interfaces_http_routes_admin_v1_apikeys.UpdateApiKeyRequest": {
+        "app_interfaces_http_routes_jan_v1_apikeys.UpdateApiKeyRequest": {
             "type": "object",
             "properties": {
                 "description": {
@@ -562,7 +619,7 @@ const docTemplate = `{
                 }
             }
         },
-        "app_interfaces_http_routes_admin_v1_auth.GetMeResponse": {
+        "app_interfaces_http_routes_jan_v1_auth.GetMeResponse": {
             "type": "object",
             "properties": {
                 "email": {
@@ -573,7 +630,7 @@ const docTemplate = `{
                 }
             }
         },
-        "app_interfaces_http_routes_admin_v1_auth.RefreshTokenResponse": {
+        "app_interfaces_http_routes_jan_v1_auth.RefreshTokenResponse": {
             "type": "object",
             "properties": {
                 "access_token": {
@@ -584,7 +641,7 @@ const docTemplate = `{
                 }
             }
         },
-        "app_interfaces_http_routes_admin_v1_auth_google.GoogleCallbackRequest": {
+        "app_interfaces_http_routes_jan_v1_auth_google.GoogleCallbackRequest": {
             "type": "object",
             "required": [
                 "code"
@@ -598,7 +655,7 @@ const docTemplate = `{
                 }
             }
         },
-        "app_interfaces_http_routes_admin_v1_auth_google.GoogleCallbackResponse": {
+        "app_interfaces_http_routes_jan_v1_auth_google.GoogleCallbackResponse": {
             "type": "object",
             "properties": {
                 "access_token": {
@@ -606,6 +663,32 @@ const docTemplate = `{
                 },
                 "expires_in": {
                     "type": "integer"
+                }
+            }
+        },
+        "app_interfaces_http_routes_jan_v1_chat.ChatCompletionResponseSwagger": {
+            "type": "object",
+            "properties": {
+                "choices": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatCompletionChoice"
+                    }
+                },
+                "created": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "object": {
+                    "type": "string"
+                },
+                "usage": {
+                    "$ref": "#/definitions/openai.Usage"
                 }
             }
         },
@@ -677,51 +760,51 @@ const docTemplate = `{
                 }
             }
         },
-        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_admin_v1_apikeys_ApiKeyResponse": {
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_apikeys_ApiKeyResponse": {
             "type": "object",
             "properties": {
                 "result": {
-                    "$ref": "#/definitions/app_interfaces_http_routes_admin_v1_apikeys.ApiKeyResponse"
+                    "$ref": "#/definitions/app_interfaces_http_routes_jan_v1_apikeys.ApiKeyResponse"
                 },
                 "status": {
                     "type": "string"
                 }
             }
         },
-        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_admin_v1_auth_GetMeResponse": {
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_auth_GetMeResponse": {
             "type": "object",
             "properties": {
                 "result": {
-                    "$ref": "#/definitions/app_interfaces_http_routes_admin_v1_auth.GetMeResponse"
+                    "$ref": "#/definitions/app_interfaces_http_routes_jan_v1_auth.GetMeResponse"
                 },
                 "status": {
                     "type": "string"
                 }
             }
         },
-        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_admin_v1_auth_RefreshTokenResponse": {
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_auth_RefreshTokenResponse": {
             "type": "object",
             "properties": {
                 "result": {
-                    "$ref": "#/definitions/app_interfaces_http_routes_admin_v1_auth.RefreshTokenResponse"
+                    "$ref": "#/definitions/app_interfaces_http_routes_jan_v1_auth.RefreshTokenResponse"
                 },
                 "status": {
                     "type": "string"
                 }
             }
         },
-        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_admin_v1_auth_google_GoogleCallbackResponse": {
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_auth_google_GoogleCallbackResponse": {
             "type": "object",
             "properties": {
                 "result": {
-                    "$ref": "#/definitions/app_interfaces_http_routes_admin_v1_auth_google.GoogleCallbackResponse"
+                    "$ref": "#/definitions/app_interfaces_http_routes_jan_v1_auth_google.GoogleCallbackResponse"
                 },
                 "status": {
                     "type": "string"
                 }
             }
         },
-        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListlResponse-array_app_interfaces_http_routes_admin_v1_apikeys_ApiKeyResponse": {
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListlResponse-array_app_interfaces_http_routes_jan_v1_apikeys_ApiKeyResponse": {
             "type": "object",
             "properties": {
                 "page": {
@@ -735,7 +818,7 @@ const docTemplate = `{
                     "items": {
                         "type": "array",
                         "items": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_admin_v1_apikeys.ApiKeyResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_jan_v1_apikeys.ApiKeyResponse"
                         }
                     }
                 },

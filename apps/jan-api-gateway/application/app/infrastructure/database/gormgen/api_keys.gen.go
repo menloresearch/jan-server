@@ -38,6 +38,24 @@ func newApiKey(db *gorm.DB, opts ...gen.DOOption) apiKey {
 	_apiKey.Enabled = field.NewBool(tableName, "enabled")
 	_apiKey.ServiceType = field.NewUint(tableName, "service_type")
 	_apiKey.ExpiresAt = field.NewTime(tableName, "expires_at")
+	_apiKey.User = apiKeyBelongsToUser{
+		db: db.Session(&gorm.Session{}),
+
+		RelationField: field.NewRelation("User", "dbschema.User"),
+		ApiKeys: struct {
+			field.RelationField
+			User struct {
+				field.RelationField
+			}
+		}{
+			RelationField: field.NewRelation("User.ApiKeys", "dbschema.ApiKey"),
+			User: struct {
+				field.RelationField
+			}{
+				RelationField: field.NewRelation("User.ApiKeys.User", "dbschema.User"),
+			},
+		},
+	}
 
 	_apiKey.fillFieldMap()
 
@@ -58,6 +76,7 @@ type apiKey struct {
 	Enabled     field.Bool
 	ServiceType field.Uint
 	ExpiresAt   field.Time
+	User        apiKeyBelongsToUser
 
 	fieldMap map[string]field.Expr
 }
@@ -100,7 +119,7 @@ func (a *apiKey) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (a *apiKey) fillFieldMap() {
-	a.fieldMap = make(map[string]field.Expr, 10)
+	a.fieldMap = make(map[string]field.Expr, 11)
 	a.fieldMap["id"] = a.ID
 	a.fieldMap["created_at"] = a.CreatedAt
 	a.fieldMap["updated_at"] = a.UpdatedAt
@@ -111,16 +130,108 @@ func (a *apiKey) fillFieldMap() {
 	a.fieldMap["enabled"] = a.Enabled
 	a.fieldMap["service_type"] = a.ServiceType
 	a.fieldMap["expires_at"] = a.ExpiresAt
+
 }
 
 func (a apiKey) clone(db *gorm.DB) apiKey {
 	a.apiKeyDo.ReplaceConnPool(db.Statement.ConnPool)
+	a.User.db = db.Session(&gorm.Session{Initialized: true})
+	a.User.db.Statement.ConnPool = db.Statement.ConnPool
 	return a
 }
 
 func (a apiKey) replaceDB(db *gorm.DB) apiKey {
 	a.apiKeyDo.ReplaceDB(db)
+	a.User.db = db.Session(&gorm.Session{})
 	return a
+}
+
+type apiKeyBelongsToUser struct {
+	db *gorm.DB
+
+	field.RelationField
+
+	ApiKeys struct {
+		field.RelationField
+		User struct {
+			field.RelationField
+		}
+	}
+}
+
+func (a apiKeyBelongsToUser) Where(conds ...field.Expr) *apiKeyBelongsToUser {
+	if len(conds) == 0 {
+		return &a
+	}
+
+	exprs := make([]clause.Expression, 0, len(conds))
+	for _, cond := range conds {
+		exprs = append(exprs, cond.BeCond().(clause.Expression))
+	}
+	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
+	return &a
+}
+
+func (a apiKeyBelongsToUser) WithContext(ctx context.Context) *apiKeyBelongsToUser {
+	a.db = a.db.WithContext(ctx)
+	return &a
+}
+
+func (a apiKeyBelongsToUser) Session(session *gorm.Session) *apiKeyBelongsToUser {
+	a.db = a.db.Session(session)
+	return &a
+}
+
+func (a apiKeyBelongsToUser) Model(m *dbschema.ApiKey) *apiKeyBelongsToUserTx {
+	return &apiKeyBelongsToUserTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a apiKeyBelongsToUser) Unscoped() *apiKeyBelongsToUser {
+	a.db = a.db.Unscoped()
+	return &a
+}
+
+type apiKeyBelongsToUserTx struct{ tx *gorm.Association }
+
+func (a apiKeyBelongsToUserTx) Find() (result *dbschema.User, err error) {
+	return result, a.tx.Find(&result)
+}
+
+func (a apiKeyBelongsToUserTx) Append(values ...*dbschema.User) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Append(targetValues...)
+}
+
+func (a apiKeyBelongsToUserTx) Replace(values ...*dbschema.User) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Replace(targetValues...)
+}
+
+func (a apiKeyBelongsToUserTx) Delete(values ...*dbschema.User) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Delete(targetValues...)
+}
+
+func (a apiKeyBelongsToUserTx) Clear() error {
+	return a.tx.Clear()
+}
+
+func (a apiKeyBelongsToUserTx) Count() int64 {
+	return a.tx.Count()
+}
+
+func (a apiKeyBelongsToUserTx) Unscoped() *apiKeyBelongsToUserTx {
+	a.tx = a.tx.Unscoped()
+	return &a
 }
 
 type apiKeyDo struct{ gen.DO }

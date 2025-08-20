@@ -40,6 +40,7 @@ func NewDB() (*gorm.DB, error) {
 				Fatalf("unable to connect to setup replica: %v", err)
 			return nil, err
 		}
+
 		for _, model := range SchemaRegistry {
 			err = db.AutoMigrate(model)
 			if err != nil {
