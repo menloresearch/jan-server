@@ -8,7 +8,8 @@ ARG VERSION_TAG=dev
 COPY application/. .
 RUN go mod tidy
 RUN go build -o /jan-api-gateway \
-    -ldflags="all=-N -l -X 'menlo.ai/jan-api-gateway/config.Version=${VERSION_TAG}'" \
+    -gcflags="all=-N -l" \
+    -ldflags="-X menlo.ai/jan-api-gateway/config.Version=${VERSION_TAG}" \
     ./cmd/server
 
 FROM alpine:latest
