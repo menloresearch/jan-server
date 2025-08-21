@@ -53,7 +53,7 @@ func main() {
        go func() {
 	       // Default pprof mux is registered on DefaultServeMux by importing net/http/pprof
 	       // Listen on localhost:6060 (or change port as needed)
-	       if err := nethttp.ListenAndServe("localhost:6060", nil); err != nil {
+	       if err := nethttp.ListenAndServe("0.0.0.0:6060", nil); err != nil {
 		       logger.GetLogger().Errorf("pprof server failed: %v", err)
 	       }
        }()
