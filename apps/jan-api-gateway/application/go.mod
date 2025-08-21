@@ -5,8 +5,12 @@ go 1.24.6
 require (
 	github.com/gin-gonic/gin v1.10.1
 	github.com/google/wire v0.6.0
+	github.com/grafana/pyroscope-go/godeltaprof v0.1.8
 	github.com/mileusna/crontab v1.2.0
 	github.com/swaggo/swag v1.16.6
+	gorm.io/gen v0.3.27
+	gorm.io/gorm v1.30.1
+	gorm.io/plugin/dbresolver v1.6.2
 	resty.dev/v3 v3.0.0-beta.3
 )
 
@@ -27,6 +31,7 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
+	github.com/klauspost/compress v1.17.8 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	golang.org/x/mod v0.27.0 // indirect
@@ -34,10 +39,7 @@ require (
 	golang.org/x/tools v0.36.0 // indirect
 	gorm.io/datatypes v1.2.6 // indirect
 	gorm.io/driver/mysql v1.6.0 // indirect
-	gorm.io/gen v0.3.27 // indirect
-	gorm.io/gorm v1.30.1 // indirect
 	gorm.io/hints v1.1.2 // indirect
-	gorm.io/plugin/dbresolver v1.6.2 // indirect
 )
 
 require (
@@ -74,7 +76,7 @@ require (
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	golang.org/x/arch v0.19.0 // indirect
 	golang.org/x/crypto v0.41.0 // indirect
-	golang.org/x/net v0.43.0 // indirect
+	golang.org/x/net v0.43.0
 	golang.org/x/oauth2 v0.30.0
 	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
