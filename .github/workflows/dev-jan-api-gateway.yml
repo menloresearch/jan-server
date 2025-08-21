@@ -10,6 +10,7 @@ on:
   pull_request:
     branches:
       - dev
+      - main
     paths:
       - "apps/jan-api-gateway/**"
       - .github/workflows/dev-jan-api-gateway
