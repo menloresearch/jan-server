@@ -1,4 +1,83 @@
+basePath: /
 definitions:
+  app_interfaces_http_routes_jan_v1_apikeys.ApiKeyResponse:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      enabled:
+        type: boolean
+      expires_at:
+        type: string
+      id:
+        type: integer
+      key:
+        type: string
+    type: object
+  app_interfaces_http_routes_jan_v1_apikeys.CreateApiKeyRequest:
+    properties:
+      description:
+        type: string
+      expires_at:
+        type: string
+    type: object
+  app_interfaces_http_routes_jan_v1_apikeys.UpdateApiKeyRequest:
+    properties:
+      description:
+        type: string
+      enabled:
+        type: boolean
+      expires_at:
+        type: string
+    type: object
+  app_interfaces_http_routes_jan_v1_auth.GetMeResponse:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+    type: object
+  app_interfaces_http_routes_jan_v1_auth.RefreshTokenResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+    type: object
+  app_interfaces_http_routes_jan_v1_auth_google.GoogleCallbackRequest:
+    properties:
+      code:
+        type: string
+      state:
+        type: string
+    required:
+    - code
+    type: object
+  app_interfaces_http_routes_jan_v1_auth_google.GoogleCallbackResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+    type: object
+  app_interfaces_http_routes_jan_v1_chat.ChatCompletionResponseSwagger:
+    properties:
+      choices:
+        items:
+          $ref: '#/definitions/openai.ChatCompletionChoice'
+        type: array
+      created:
+        type: integer
+      id:
+        type: string
+      model:
+        type: string
+      object:
+        type: string
+      usage:
+        $ref: '#/definitions/openai.Usage'
+    type: object
   app_interfaces_http_routes_v1.Model:
     properties:
       created:
@@ -42,6 +121,51 @@ definitions:
         type: string
       error:
         type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_apikeys_ApiKeyResponse:
+    properties:
+      result:
+        $ref: '#/definitions/app_interfaces_http_routes_jan_v1_apikeys.ApiKeyResponse'
+      status:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_auth_GetMeResponse:
+    properties:
+      result:
+        $ref: '#/definitions/app_interfaces_http_routes_jan_v1_auth.GetMeResponse'
+      status:
+        type: string
+    type: object
+  ? menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_auth_RefreshTokenResponse
+  : properties:
+      result:
+        $ref: '#/definitions/app_interfaces_http_routes_jan_v1_auth.RefreshTokenResponse'
+      status:
+        type: string
+    type: object
+  ? menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_auth_google_GoogleCallbackResponse
+  : properties:
+      result:
+        $ref: '#/definitions/app_interfaces_http_routes_jan_v1_auth_google.GoogleCallbackResponse'
+      status:
+        type: string
+    type: object
+  ? menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListlResponse-array_app_interfaces_http_routes_jan_v1_apikeys_ApiKeyResponse
+  : properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      results:
+        items:
+          items:
+            $ref: '#/definitions/app_interfaces_http_routes_jan_v1_apikeys.ApiKeyResponse'
+          type: array
+        type: array
+      status:
+        type: string
+      total:
+        type: integer
     type: object
   openai.ChatCompletionChoice:
     properties:
@@ -519,8 +643,280 @@ definitions:
     type: object
 info:
   contact: {}
+  description: This is the API gateway for Jan Server.
+  title: Jan Server
+  version: "1.0"
 paths:
-  /v1/chat/completion:
+  /jan/v1/apikeys/:
+    get:
+      description: Get a list of API keys for the authenticated user with pagination.
+      parameters:
+      - description: Page number for pagination
+        in: query
+        name: page
+        type: integer
+      - description: Number of items per page
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved the list of API keys
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListlResponse-array_app_interfaces_http_routes_jan_v1_apikeys_ApiKeyResponse'
+        "400":
+          description: Bad request (e.g., invalid query parameters)
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized (e.g., missing or invalid JWT)
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List API keys
+      tags:
+      - API Keys
+    post:
+      consumes:
+      - application/json
+      description: Create a new API key for the authenticated user.
+      parameters:
+      - description: Request body for creating an API key
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/app_interfaces_http_routes_jan_v1_apikeys.CreateApiKeyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully created the API key
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_apikeys_ApiKeyResponse'
+        "400":
+          description: Bad request (e.g., invalid JSON, missing required fields)
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized (e.g., missing or invalid JWT)
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create an API key
+      tags:
+      - API Keys
+  /jan/v1/apikeys/{id}:
+    delete:
+      description: Deletes a specific API key by its ID.
+      parameters:
+      - description: API Key ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad request (e.g., invalid ID format)
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized (e.g., missing or invalid JWT)
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: API key not found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete an API key
+      tags:
+      - API Keys
+    put:
+      consumes:
+      - application/json
+      description: Update the description, expiry date, or enabled status of an existing
+        API key.
+      parameters:
+      - description: API Key ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Request body for updating an API key
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/app_interfaces_http_routes_jan_v1_apikeys.UpdateApiKeyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully updated the API key
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_apikeys_ApiKeyResponse'
+        "400":
+          description: Bad request (e.g., invalid ID format, invalid JSON)
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized (e.g., missing or invalid JWT)
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: API key not found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update an API key
+      tags:
+      - API Keys
+  /jan/v1/auth/google/callback:
+    post:
+      consumes:
+      - application/json
+      description: Handles the callback from the Google OAuth2 provider to exchange
+        the authorization code for a token, verify the user, and issue access and
+        refresh tokens.
+      parameters:
+      - description: Request body containing the authorization code and state
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/app_interfaces_http_routes_jan_v1_auth_google.GoogleCallbackRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully authenticated and returned tokens
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_auth_google_GoogleCallbackResponse'
+        "400":
+          description: Bad request (e.g., invalid state, missing code, or invalid
+            claims)
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized (e.g., a user claim is not found or is invalid
+            in the context)
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      summary: Google OAuth2 Callback
+      tags:
+      - Authentication
+  /jan/v1/auth/google/login:
+    get:
+      description: Redirects the user to the Google OAuth2 authorization page to initiate
+        the login process.
+      responses:
+        "307":
+          description: Redirects to Google's login page
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      summary: Google OAuth2 Login
+      tags:
+      - Authentication
+  /jan/v1/auth/me:
+    get:
+      description: Retrieves the profile of the authenticated user based on the provided
+        JWT.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved user profile
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_auth_GetMeResponse'
+        "401":
+          description: Unauthorized (e.g., missing or invalid JWT)
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user profile
+      tags:
+      - Authentication
+  /jan/v1/auth/refresh-token:
+    get:
+      consumes:
+      - application/json
+      description: Use a valid refresh token to obtain a new access token. The refresh
+        token is typically sent in a cookie.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully refreshed the access token
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_auth_RefreshTokenResponse'
+        "400":
+          description: Bad Request (e.g., invalid refresh token)
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized (e.g., expired or missing refresh token)
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      summary: Refresh an access token
+      tags:
+      - Authentication
+  /jan/v1/chat/completions:
+    post:
+      consumes:
+      - application/json
+      description: Generates a model response for the given chat conversation.
+      parameters:
+      - description: Chat completion request payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/openai.ChatCompletionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_jan_v1_chat.ChatCompletionResponseSwagger'
+        "400":
+          description: Invalid request payload
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a chat completion
+      tags:
+      - Chat
+  /v1/chat/completions:
     post:
       consumes:
       - application/json
@@ -613,4 +1009,10 @@ paths:
       summary: Get API build version
       tags:
       - System
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

@@ -30,6 +30,15 @@ func init() {
 	serper.Init()
 }
 
+// @title Jan Server
+// @version 1.0
+// @description This is the API gateway for Jan Server.
+// @BasePath /
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
 func main() {
 	healthcheckService := healthcheck.NewService(janinference.NewJanInferenceClient(context.Background()))
 	cron := crontab.New()
