@@ -3,6 +3,10 @@ package main
 import (
 	"context"
 
+	_ "net/http/pprof"
+
+	_ "github.com/grafana/pyroscope-go/godeltaprof/http/pprof"
+
 	"github.com/mileusna/crontab"
 	"menlo.ai/jan-api-gateway/app/domain/healthcheck"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
