@@ -2,49 +2,34 @@ package apikey
 
 import (
 	"context"
-	"errors"
 	"time"
 
-	"github.com/google/uuid"
 	"menlo.ai/jan-api-gateway/app/domain/query"
 )
 
+type OwnerType string
+
 const (
-	ApiKeyServiceTypeJanApi   uint = 0
-	ApiKeyServiceTypeJanCloud uint = 1
+	OwnerTypeAdmin        OwnerType = "admin"
+	OwnerTypeProject      OwnerType = "project"
+	OwnerTypeService      OwnerType = "service"
+	OwnerTypeOrganization OwnerType = "organization"
+	OwnerTypeEphemeral    OwnerType = "ephemeral"
 )
 
-func NewApiKey(userID uint, description string, serviceType uint, expiresAt *time.Time) (*ApiKey, error) {
-	if userID == 0 {
-		return nil, errors.New("invalid userID")
-	}
-
-	key, err := uuid.NewRandom()
-	if err != nil {
-		return nil, err
-	}
-	return &ApiKey{
-		Key:         key.String(),
-		UserID:      userID,
-		Description: description,
-		Enabled:     true,
-		ServiceType: serviceType,
-		ExpiresAt:   expiresAt,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-	}, nil
-}
-
 type ApiKey struct {
-	ID          uint
-	Key         string
-	UserID      uint
-	Description string
-	Enabled     bool
-	ServiceType uint
-	ExpiresAt   *time.Time
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID             uint
+	KeyHash        string
+	PlaintextHint  string
+	Description    string
+	Enabled        bool
+	OwnerType      string // "admin","project","service","organization","ephemeral"
+	OwnerID        *uint
+	OrganizationID *uint
+	Permissions    string //json
+	ExpiresAt      *time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 func (k *ApiKey) Revoke() {
@@ -63,9 +48,10 @@ func (k *ApiKey) IsValid() bool {
 }
 
 type ApiKeyFilter struct {
-	Key         *string
-	ServiceType *uint
-	UserID      *uint
+	KeyHash   *string
+	OwnerType *string
+	OwnerID   *uint
+	UserID    *uint
 }
 
 type ApiKeyRepository interface {
@@ -73,7 +59,7 @@ type ApiKeyRepository interface {
 	Update(ctx context.Context, u *ApiKey) error
 	DeleteByID(ctx context.Context, id uint) error
 	FindByID(ctx context.Context, id uint) (*ApiKey, error)
-	FindByKey(ctx context.Context, key string) (*ApiKey, error)
+	FindByKeyHash(ctx context.Context, keyHash string) (*ApiKey, error)
 	FindByFilter(ctx context.Context, filter ApiKeyFilter, pagination *query.Pagination) ([]*ApiKey, error)
 	Count(ctx context.Context, filter ApiKeyFilter) (int64, error)
 }

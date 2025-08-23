@@ -5,26 +5,34 @@ import (
 	"gorm.io/gen"
 	"gorm.io/gorm"
 
-	"menlo.ai/jan-api-gateway/cmd/codegen/gorm/models/apikey"
-	"menlo.ai/jan-api-gateway/cmd/codegen/gorm/models/user"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database"
+	_ "menlo.ai/jan-api-gateway/app/infrastructure/database/dbschema"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
-func main() {
+var GormGenerator *gen.Generator
+
+func init() {
 	environment_variables.EnvironmentVariables.LoadFromEnv()
 	db, err := gorm.Open(postgres.Open(environment_variables.EnvironmentVariables.DB_POSTGRESQL_WRITE_DSN))
 	if err != nil {
 		panic(err)
 	}
 
-	g := gen.NewGenerator(gen.Config{
+	GormGenerator = gen.NewGenerator(gen.Config{
 		OutPath:       "./app/infrastructure/database/gormgen",
 		Mode:          gen.WithDefaultQuery | gen.WithQueryInterface | gen.WithoutContext,
 		FieldNullable: true,
 	})
+	GormGenerator.UseDB(db)
+}
 
-	g.UseDB(db)
-	user.RegisterUser(g)
-	apikey.RegisterUser(g)
-	g.Execute()
+func main() {
+	for _, model := range database.SchemaRegistry {
+		GormGenerator.ApplyBasic(model)
+		type Querier interface {
+		}
+		GormGenerator.ApplyInterface(func(Querier) {}, model)
+	}
+	GormGenerator.Execute()
 }

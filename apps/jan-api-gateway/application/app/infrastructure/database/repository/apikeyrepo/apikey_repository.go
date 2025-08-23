@@ -49,9 +49,9 @@ func (repo *ApiKeyGormRepository) FindByID(ctx context.Context, id uint) (*domai
 	return model.EtoD(), nil
 }
 
-// FindByKey implements apikey.ApiKeyRepository.
-func (repo *ApiKeyGormRepository) FindByKey(ctx context.Context, key string) (*domain.ApiKey, error) {
-	model, err := repo.query.ApiKey.WithContext(ctx).Where(repo.query.ApiKey.Key.Eq(key)).First()
+// FindByKeyHash implements apikey.ApiKeyRepository.
+func (repo *ApiKeyGormRepository) FindByKeyHash(ctx context.Context, keyHash string) (*domain.ApiKey, error) {
+	model, err := repo.query.ApiKey.WithContext(ctx).Where(repo.query.ApiKey.KeyHash.Eq(keyHash)).First()
 	if err != nil {
 		return nil, err
 	}
@@ -81,11 +81,11 @@ func (repo *ApiKeyGormRepository) FindByFilter(ctx context.Context, filter domai
 }
 
 func (repo *ApiKeyGormRepository) applyFilter(query gormgen.IApiKeyDo, filter domain.ApiKeyFilter) gormgen.IApiKeyDo {
-	if filter.ServiceType != nil {
-		query = query.Where(repo.query.ApiKey.ServiceType.Eq(*filter.ServiceType))
+	if filter.OwnerType != nil {
+		query = query.Where(repo.query.ApiKey.OwnerType.Eq(*filter.OwnerType))
 	}
-	if filter.UserID != nil {
-		query = query.Where(repo.query.ApiKey.UserID.Eq(*filter.UserID))
+	if filter.OwnerID != nil {
+		query = query.Where(repo.query.ApiKey.OwnerID.Eq(*filter.OwnerID))
 	}
 	return query
 }

@@ -16,39 +16,59 @@ import (
 )
 
 var (
-	Q      = new(Query)
-	ApiKey *apiKey
-	User   *user
+	Q                  = new(Query)
+	ApiKey             *apiKey
+	Organization       *organization
+	OrganizationMember *organizationMember
+	Project            *project
+	ProjectMember      *projectMember
+	User               *user
 )
 
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	*Q = *Use(db, opts...)
 	ApiKey = &Q.ApiKey
+	Organization = &Q.Organization
+	OrganizationMember = &Q.OrganizationMember
+	Project = &Q.Project
+	ProjectMember = &Q.ProjectMember
 	User = &Q.User
 }
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
-		db:     db,
-		ApiKey: newApiKey(db, opts...),
-		User:   newUser(db, opts...),
+		db:                 db,
+		ApiKey:             newApiKey(db, opts...),
+		Organization:       newOrganization(db, opts...),
+		OrganizationMember: newOrganizationMember(db, opts...),
+		Project:            newProject(db, opts...),
+		ProjectMember:      newProjectMember(db, opts...),
+		User:               newUser(db, opts...),
 	}
 }
 
 type Query struct {
 	db *gorm.DB
 
-	ApiKey apiKey
-	User   user
+	ApiKey             apiKey
+	Organization       organization
+	OrganizationMember organizationMember
+	Project            project
+	ProjectMember      projectMember
+	User               user
 }
 
 func (q *Query) Available() bool { return q.db != nil }
 
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
-		db:     db,
-		ApiKey: q.ApiKey.clone(db),
-		User:   q.User.clone(db),
+		db:                 db,
+		ApiKey:             q.ApiKey.clone(db),
+		Organization:       q.Organization.clone(db),
+		OrganizationMember: q.OrganizationMember.clone(db),
+		Project:            q.Project.clone(db),
+		ProjectMember:      q.ProjectMember.clone(db),
+		User:               q.User.clone(db),
 	}
 }
 
@@ -62,21 +82,33 @@ func (q *Query) WriteDB() *Query {
 
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
-		db:     db,
-		ApiKey: q.ApiKey.replaceDB(db),
-		User:   q.User.replaceDB(db),
+		db:                 db,
+		ApiKey:             q.ApiKey.replaceDB(db),
+		Organization:       q.Organization.replaceDB(db),
+		OrganizationMember: q.OrganizationMember.replaceDB(db),
+		Project:            q.Project.replaceDB(db),
+		ProjectMember:      q.ProjectMember.replaceDB(db),
+		User:               q.User.replaceDB(db),
 	}
 }
 
 type queryCtx struct {
-	ApiKey IApiKeyDo
-	User   IUserDo
+	ApiKey             IApiKeyDo
+	Organization       IOrganizationDo
+	OrganizationMember IOrganizationMemberDo
+	Project            IProjectDo
+	ProjectMember      IProjectMemberDo
+	User               IUserDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
-		ApiKey: q.ApiKey.WithContext(ctx),
-		User:   q.User.WithContext(ctx),
+		ApiKey:             q.ApiKey.WithContext(ctx),
+		Organization:       q.Organization.WithContext(ctx),
+		OrganizationMember: q.OrganizationMember.WithContext(ctx),
+		Project:            q.Project.WithContext(ctx),
+		ProjectMember:      q.ProjectMember.WithContext(ctx),
+		User:               q.User.WithContext(ctx),
 	}
 }
 

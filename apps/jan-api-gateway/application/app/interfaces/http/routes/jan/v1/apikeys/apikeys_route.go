@@ -1,6 +1,7 @@
 package apikeys
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -39,22 +40,23 @@ func (api *ApiKeyAPI) RegisterRouter(router *gin.RouterGroup) {
 }
 
 type ApiKeyResponse struct {
-	ID          uint       `json:"id"`
-	Key         string     `json:"key"`
-	Description string     `json:"description"`
-	ExpiresAt   *time.Time `json:"expires_at"`
-	CreatedAt   time.Time  `json:"created_at"`
-	Enabled     bool       `json:"enabled"`
+	ID            uint       `json:"id"`
+	Key           *string    `json:"key,omitempty"`
+	PlaintextHint string     `json:"plaintext_hint"`
+	Description   string     `json:"description"`
+	ExpiresAt     *time.Time `json:"expires_at"`
+	CreatedAt     time.Time  `json:"created_at"`
+	Enabled       bool       `json:"enabled"`
 }
 
 func domainToApiKeyResponse(entity *apikey.ApiKey) ApiKeyResponse {
 	return ApiKeyResponse{
-		ID:          entity.ID,
-		Key:         entity.Key,
-		Description: entity.Description,
-		Enabled:     entity.Enabled,
-		ExpiresAt:   entity.ExpiresAt,
-		CreatedAt:   entity.CreatedAt,
+		ID:            entity.ID,
+		PlaintextHint: entity.PlaintextHint,
+		Description:   entity.Description,
+		Enabled:       entity.Enabled,
+		ExpiresAt:     entity.ExpiresAt,
+		CreatedAt:     entity.CreatedAt,
 	}
 }
 
@@ -107,7 +109,7 @@ func (api *ApiKeyAPI) CreateApiKey(reqCtx *gin.Context) {
 		return
 	}
 
-	entity, err := apikey.NewApiKey(user.ID, req.Description, apikey.ApiKeyServiceTypeJanApi, req.ExpiresAt)
+	key, hash, err := api.apiKeyService.GenerateKeyAndHash(reqCtx, apikey.OwnerTypeEphemeral)
 	if err != nil {
 		reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  "207373ae-f94a-4b21-bf95-7bbd8d727f84",
@@ -116,7 +118,17 @@ func (api *ApiKeyAPI) CreateApiKey(reqCtx *gin.Context) {
 		return
 	}
 
-	entity, err = api.apiKeyService.CreateApiKey(reqCtx, entity)
+	// TODO: OwnerTypeEphemeral
+	entity, err := api.apiKeyService.CreateApiKey(reqCtx, &apikey.ApiKey{
+		KeyHash:        hash,
+		PlaintextHint:  fmt.Sprintf("sk-..%s", key[len(key)-3:]),
+		Description:    req.Description,
+		Enabled:        true,
+		OwnerType:      string(apikey.OwnerTypeEphemeral),
+		OwnerID:        &user.ID,
+		OrganizationID: nil,
+		Permissions:    "{}",
+	})
 	if err != nil {
 		reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  "9f1e1296-c4e8-43c5-94b5-391906fc12a3",
@@ -124,10 +136,11 @@ func (api *ApiKeyAPI) CreateApiKey(reqCtx *gin.Context) {
 		})
 		return
 	}
-
+	response := domainToApiKeyResponse(entity)
+	response.Key = &key
 	reqCtx.JSON(http.StatusOK, responses.GeneralResponse[ApiKeyResponse]{
 		Status: responses.ResponseCodeOk,
-		Result: domainToApiKeyResponse(entity),
+		Result: response,
 	})
 }
 
@@ -197,6 +210,14 @@ func (api *ApiKeyAPI) UpdateApiKey(reqCtx *gin.Context) {
 		reqCtx.JSON(http.StatusNotFound, responses.ErrorResponse{
 			Code:  "80f6da91-98d9-44ff-99f6-064d5d849976",
 			Error: err.Error(),
+		})
+		return
+	}
+
+	// TODO: check permissions
+	if apikey.OwnerType(entity.OwnerType) != apikey.OwnerTypeEphemeral || entity.OwnerID != &user.ID {
+		reqCtx.JSON(http.StatusNotFound, responses.ErrorResponse{
+			Code: "6f4b4448-4342-4485-8651-50806e91e163",
 		})
 		return
 	}
@@ -272,7 +293,8 @@ func (api *ApiKeyAPI) DeleteApiKey(reqCtx *gin.Context) {
 		return
 	}
 
-	if entity.UserID != user.ID {
+	// TODO: check permissions
+	if *entity.OwnerID != user.ID {
 		reqCtx.JSON(http.StatusNotFound, responses.ErrorResponse{
 			Code: "3a1541ee-3934-4bc6-a620-712318961555",
 		})
@@ -343,8 +365,8 @@ func (api *ApiKeyAPI) ListApiKeys(reqCtx *gin.Context) {
 	}
 
 	filter := apikey.ApiKeyFilter{
-		ServiceType: ptr.ToUint(apikey.ApiKeyServiceTypeJanApi),
-		UserID:      ptr.ToUint(user.ID),
+		OwnerType: ptr.ToString(string(apikey.OwnerTypeEphemeral)),
+		OwnerID:   ptr.ToUint(user.ID),
 	}
 	apiKeysCount, err := api.apiKeyService.Count(reqCtx, filter)
 	if err != nil {

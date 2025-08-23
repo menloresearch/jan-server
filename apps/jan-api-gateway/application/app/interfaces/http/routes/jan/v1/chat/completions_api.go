@@ -69,8 +69,8 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 			return
 		}
 		apikeyEntities, err := api.apikeyService.Find(reqCtx, apikey.ApiKeyFilter{
-			UserID:      &user.ID,
-			ServiceType: ptr.ToUint(apikey.ApiKeyServiceTypeJanCloud),
+			OwnerID:   &user.ID,
+			OwnerType: ptr.ToString(string(apikey.OwnerTypeAdmin)),
 		}, &query.Pagination{PageNumber: 1, PageSize: 1})
 		if err != nil {
 			reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
@@ -79,16 +79,40 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 			})
 			return
 		}
-		if len(apikeyEntities) != 1 {
+		// TODO: Should we provide a default key to user?
+		if len(apikeyEntities) == 0 {
+			key, hash, err := api.apikeyService.GenerateKeyAndHash(reqCtx, apikey.OwnerTypeEphemeral)
 			if err != nil {
 				reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-					Code:  "d24dd0e7-cb46-45e8-9030-c92dee2577b2",
+					Code:  "207373ae-f94a-4b21-bf95-7bbd8d727f84",
 					Error: err.Error(),
 				})
 				return
 			}
+
+			// TODO: OwnerTypeEphemeral
+			entity, err := api.apikeyService.CreateApiKey(reqCtx, &apikey.ApiKey{
+				KeyHash:        hash,
+				PlaintextHint:  fmt.Sprintf("sk-..%s", key[len(key)-3:]),
+				Description:    "Default Key For User",
+				Enabled:        true,
+				OwnerType:      string(apikey.OwnerTypeEphemeral),
+				OwnerID:        &user.ID,
+				OrganizationID: nil,
+				Permissions:    "{}",
+			})
+			if err != nil {
+				reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+					Code:  "cfda552d-ec73-4e12-abfb-963b3c3829e9",
+					Error: err.Error(),
+				})
+				return
+			}
+			apikeyEntities = []*apikey.ApiKey{
+				entity,
+			}
 		}
-		key = apikeyEntities[0].Key
+		key = apikeyEntities[0].KeyHash
 	}
 	var request openai.ChatCompletionRequest
 	if err := reqCtx.ShouldBindJSON(&request); err != nil {

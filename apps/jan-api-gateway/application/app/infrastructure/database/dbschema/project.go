@@ -1,0 +1,56 @@
+package dbschema
+
+import (
+	"time"
+
+	"menlo.ai/jan-api-gateway/app/domain/project"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database"
+)
+
+func init() {
+	database.RegisterSchemaForAutoMigrate(Project{})
+	database.RegisterSchemaForAutoMigrate(ProjectMember{})
+}
+
+type Project struct {
+	BaseModel
+	Name           string          `gorm:"size:128;not null;uniqueIndex"`
+	PublicID       string          `gorm:"size:64;not null;uniqueIndex"`
+	Status         string          `gorm:"type:varchar(20);not null;default:'active';index"`
+	OrganizationID uint            `gorm:"not null;index"`
+	ArchivedAt     *time.Time      `gorm:"column:archived_at;index"`
+	Members        []ProjectMember `gorm:"foreignKey:ProjectID"`
+}
+
+type ProjectMember struct {
+	BaseModel
+	UserID    uint   `gorm:"primaryKey"`
+	ProjectID uint   `gorm:"primaryKey"`
+	Role      string `gorm:"type:varchar(20);not null"`
+}
+
+func NewSchemaProject(p *project.Project) *Project {
+	return &Project{
+		BaseModel: BaseModel{
+			ID: p.ID,
+		},
+		Name:           p.Name,
+		PublicID:       p.PublicID,
+		Status:         p.Status,
+		ArchivedAt:     p.ArchivedAt,
+		OrganizationID: p.OrganizationID,
+	}
+}
+
+func (p *Project) EtoD() *project.Project {
+	return &project.Project{
+		ID:             p.ID,
+		Name:           p.Name,
+		PublicID:       p.PublicID,
+		ArchivedAt:     p.ArchivedAt,
+		Status:         p.Status,
+		OrganizationID: p.OrganizationID,
+		CreatedAt:      p.CreatedAt,
+		UpdatedAt:      p.UpdatedAt,
+	}
+}

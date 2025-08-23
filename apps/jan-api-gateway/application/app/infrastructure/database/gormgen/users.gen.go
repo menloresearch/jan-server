@@ -35,23 +35,16 @@ func newUser(db *gorm.DB, opts ...gen.DOOption) user {
 	_user.Name = field.NewString(tableName, "name")
 	_user.Email = field.NewString(tableName, "email")
 	_user.Enabled = field.NewBool(tableName, "enabled")
-	_user.ApiKeys = userHasManyApiKeys{
+	_user.Organizations = userHasManyOrganizations{
 		db: db.Session(&gorm.Session{}),
 
-		RelationField: field.NewRelation("ApiKeys", "dbschema.ApiKey"),
-		User: struct {
-			field.RelationField
-			ApiKeys struct {
-				field.RelationField
-			}
-		}{
-			RelationField: field.NewRelation("ApiKeys.User", "dbschema.User"),
-			ApiKeys: struct {
-				field.RelationField
-			}{
-				RelationField: field.NewRelation("ApiKeys.User.ApiKeys", "dbschema.ApiKey"),
-			},
-		},
+		RelationField: field.NewRelation("Organizations", "dbschema.OrganizationMember"),
+	}
+
+	_user.Projects = userHasManyProjects{
+		db: db.Session(&gorm.Session{}),
+
+		RelationField: field.NewRelation("Projects", "dbschema.ProjectMember"),
 	}
 
 	_user.fillFieldMap()
@@ -62,15 +55,17 @@ func newUser(db *gorm.DB, opts ...gen.DOOption) user {
 type user struct {
 	userDo
 
-	ALL       field.Asterisk
-	ID        field.Uint
-	CreatedAt field.Time
-	UpdatedAt field.Time
-	DeletedAt field.Field
-	Name      field.String
-	Email     field.String
-	Enabled   field.Bool
-	ApiKeys   userHasManyApiKeys
+	ALL           field.Asterisk
+	ID            field.Uint
+	CreatedAt     field.Time
+	UpdatedAt     field.Time
+	DeletedAt     field.Field
+	Name          field.String
+	Email         field.String
+	Enabled       field.Bool
+	Organizations userHasManyOrganizations
+
+	Projects userHasManyProjects
 
 	fieldMap map[string]field.Expr
 }
@@ -110,7 +105,7 @@ func (u *user) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (u *user) fillFieldMap() {
-	u.fieldMap = make(map[string]field.Expr, 8)
+	u.fieldMap = make(map[string]field.Expr, 9)
 	u.fieldMap["id"] = u.ID
 	u.fieldMap["created_at"] = u.CreatedAt
 	u.fieldMap["updated_at"] = u.UpdatedAt
@@ -123,31 +118,27 @@ func (u *user) fillFieldMap() {
 
 func (u user) clone(db *gorm.DB) user {
 	u.userDo.ReplaceConnPool(db.Statement.ConnPool)
-	u.ApiKeys.db = db.Session(&gorm.Session{Initialized: true})
-	u.ApiKeys.db.Statement.ConnPool = db.Statement.ConnPool
+	u.Organizations.db = db.Session(&gorm.Session{Initialized: true})
+	u.Organizations.db.Statement.ConnPool = db.Statement.ConnPool
+	u.Projects.db = db.Session(&gorm.Session{Initialized: true})
+	u.Projects.db.Statement.ConnPool = db.Statement.ConnPool
 	return u
 }
 
 func (u user) replaceDB(db *gorm.DB) user {
 	u.userDo.ReplaceDB(db)
-	u.ApiKeys.db = db.Session(&gorm.Session{})
+	u.Organizations.db = db.Session(&gorm.Session{})
+	u.Projects.db = db.Session(&gorm.Session{})
 	return u
 }
 
-type userHasManyApiKeys struct {
+type userHasManyOrganizations struct {
 	db *gorm.DB
 
 	field.RelationField
-
-	User struct {
-		field.RelationField
-		ApiKeys struct {
-			field.RelationField
-		}
-	}
 }
 
-func (a userHasManyApiKeys) Where(conds ...field.Expr) *userHasManyApiKeys {
+func (a userHasManyOrganizations) Where(conds ...field.Expr) *userHasManyOrganizations {
 	if len(conds) == 0 {
 		return &a
 	}
@@ -160,32 +151,32 @@ func (a userHasManyApiKeys) Where(conds ...field.Expr) *userHasManyApiKeys {
 	return &a
 }
 
-func (a userHasManyApiKeys) WithContext(ctx context.Context) *userHasManyApiKeys {
+func (a userHasManyOrganizations) WithContext(ctx context.Context) *userHasManyOrganizations {
 	a.db = a.db.WithContext(ctx)
 	return &a
 }
 
-func (a userHasManyApiKeys) Session(session *gorm.Session) *userHasManyApiKeys {
+func (a userHasManyOrganizations) Session(session *gorm.Session) *userHasManyOrganizations {
 	a.db = a.db.Session(session)
 	return &a
 }
 
-func (a userHasManyApiKeys) Model(m *dbschema.User) *userHasManyApiKeysTx {
-	return &userHasManyApiKeysTx{a.db.Model(m).Association(a.Name())}
+func (a userHasManyOrganizations) Model(m *dbschema.User) *userHasManyOrganizationsTx {
+	return &userHasManyOrganizationsTx{a.db.Model(m).Association(a.Name())}
 }
 
-func (a userHasManyApiKeys) Unscoped() *userHasManyApiKeys {
+func (a userHasManyOrganizations) Unscoped() *userHasManyOrganizations {
 	a.db = a.db.Unscoped()
 	return &a
 }
 
-type userHasManyApiKeysTx struct{ tx *gorm.Association }
+type userHasManyOrganizationsTx struct{ tx *gorm.Association }
 
-func (a userHasManyApiKeysTx) Find() (result []*dbschema.ApiKey, err error) {
+func (a userHasManyOrganizationsTx) Find() (result []*dbschema.OrganizationMember, err error) {
 	return result, a.tx.Find(&result)
 }
 
-func (a userHasManyApiKeysTx) Append(values ...*dbschema.ApiKey) (err error) {
+func (a userHasManyOrganizationsTx) Append(values ...*dbschema.OrganizationMember) (err error) {
 	targetValues := make([]interface{}, len(values))
 	for i, v := range values {
 		targetValues[i] = v
@@ -193,7 +184,7 @@ func (a userHasManyApiKeysTx) Append(values ...*dbschema.ApiKey) (err error) {
 	return a.tx.Append(targetValues...)
 }
 
-func (a userHasManyApiKeysTx) Replace(values ...*dbschema.ApiKey) (err error) {
+func (a userHasManyOrganizationsTx) Replace(values ...*dbschema.OrganizationMember) (err error) {
 	targetValues := make([]interface{}, len(values))
 	for i, v := range values {
 		targetValues[i] = v
@@ -201,7 +192,7 @@ func (a userHasManyApiKeysTx) Replace(values ...*dbschema.ApiKey) (err error) {
 	return a.tx.Replace(targetValues...)
 }
 
-func (a userHasManyApiKeysTx) Delete(values ...*dbschema.ApiKey) (err error) {
+func (a userHasManyOrganizationsTx) Delete(values ...*dbschema.OrganizationMember) (err error) {
 	targetValues := make([]interface{}, len(values))
 	for i, v := range values {
 		targetValues[i] = v
@@ -209,15 +200,96 @@ func (a userHasManyApiKeysTx) Delete(values ...*dbschema.ApiKey) (err error) {
 	return a.tx.Delete(targetValues...)
 }
 
-func (a userHasManyApiKeysTx) Clear() error {
+func (a userHasManyOrganizationsTx) Clear() error {
 	return a.tx.Clear()
 }
 
-func (a userHasManyApiKeysTx) Count() int64 {
+func (a userHasManyOrganizationsTx) Count() int64 {
 	return a.tx.Count()
 }
 
-func (a userHasManyApiKeysTx) Unscoped() *userHasManyApiKeysTx {
+func (a userHasManyOrganizationsTx) Unscoped() *userHasManyOrganizationsTx {
+	a.tx = a.tx.Unscoped()
+	return &a
+}
+
+type userHasManyProjects struct {
+	db *gorm.DB
+
+	field.RelationField
+}
+
+func (a userHasManyProjects) Where(conds ...field.Expr) *userHasManyProjects {
+	if len(conds) == 0 {
+		return &a
+	}
+
+	exprs := make([]clause.Expression, 0, len(conds))
+	for _, cond := range conds {
+		exprs = append(exprs, cond.BeCond().(clause.Expression))
+	}
+	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
+	return &a
+}
+
+func (a userHasManyProjects) WithContext(ctx context.Context) *userHasManyProjects {
+	a.db = a.db.WithContext(ctx)
+	return &a
+}
+
+func (a userHasManyProjects) Session(session *gorm.Session) *userHasManyProjects {
+	a.db = a.db.Session(session)
+	return &a
+}
+
+func (a userHasManyProjects) Model(m *dbschema.User) *userHasManyProjectsTx {
+	return &userHasManyProjectsTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a userHasManyProjects) Unscoped() *userHasManyProjects {
+	a.db = a.db.Unscoped()
+	return &a
+}
+
+type userHasManyProjectsTx struct{ tx *gorm.Association }
+
+func (a userHasManyProjectsTx) Find() (result []*dbschema.ProjectMember, err error) {
+	return result, a.tx.Find(&result)
+}
+
+func (a userHasManyProjectsTx) Append(values ...*dbschema.ProjectMember) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Append(targetValues...)
+}
+
+func (a userHasManyProjectsTx) Replace(values ...*dbschema.ProjectMember) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Replace(targetValues...)
+}
+
+func (a userHasManyProjectsTx) Delete(values ...*dbschema.ProjectMember) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Delete(targetValues...)
+}
+
+func (a userHasManyProjectsTx) Clear() error {
+	return a.tx.Clear()
+}
+
+func (a userHasManyProjectsTx) Count() int64 {
+	return a.tx.Count()
+}
+
+func (a userHasManyProjectsTx) Unscoped() *userHasManyProjectsTx {
 	a.tx = a.tx.Unscoped()
 	return &a
 }

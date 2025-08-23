@@ -72,7 +72,8 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 			})
 			return
 		}
-		apikeyEntity, err := api.apikeyService.FindByKey(reqCtx, key)
+		hashed := api.apikeyService.HashKey(reqCtx, key)
+		apikeyEntity, err := api.apikeyService.FindByKeyHash(reqCtx, hashed)
 		if err != nil {
 			reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
 				Code:  "d14ab75b-586b-4b55-ba65-e520a76d6559",
