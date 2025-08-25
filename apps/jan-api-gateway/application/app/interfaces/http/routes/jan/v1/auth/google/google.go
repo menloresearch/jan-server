@@ -15,6 +15,7 @@ import (
 
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/user"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/middleware"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
@@ -47,7 +48,7 @@ func NewGoogleAuthAPI(userService *user.UserService) *GoogleAuthAPI {
 
 func (googleAuthAPI *GoogleAuthAPI) RegisterRouter(router *gin.RouterGroup) {
 	googleRouter := router.Group("/google")
-	googleRouter.POST("/callback", googleAuthAPI.HandleGoogleCallback)
+	googleRouter.POST("/callback", middleware.TransactionMiddleware(), googleAuthAPI.HandleGoogleCallback)
 	googleRouter.GET("/login", googleAuthAPI.GetGoogleLoginUrl)
 }
 
@@ -83,7 +84,7 @@ func generateState() (string, error) {
 func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 	var req GoogleCallbackRequest
 	if err := reqCtx.ShouldBindJSON(&req); err != nil {
-		reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code: "f1ca221e-cc6e-4e31-92b0-7c59dd966536",
 		})
 		return
@@ -91,13 +92,13 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 
 	storedState, err := reqCtx.Cookie(auth.OAuthStateKey)
 	if storedState != req.State {
-		reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code: "f845d325-fe49-4487-978b-543090f2ec42",
 		})
 		return
 	}
 	if err != nil {
-		reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  "2a17e34c-95bd-4d03-95ee-01fd6172348d",
 			Error: err.Error(),
 		})
@@ -106,7 +107,7 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 
 	token, err := googleAuthAPI.oAuth2Config.Exchange(reqCtx, req.Code)
 	if err != nil {
-		reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code: "f9e2d2b5-45b5-4697-bb04-548b4290fdde",
 		})
 		return
@@ -114,7 +115,7 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 
 	rawIDToken, ok := token.Extra("id_token").(string)
 	if !ok {
-		reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code: "69137efa-bf46-456f-ab4c-bda9fa38aff0",
 		})
 		return
@@ -122,7 +123,7 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 	verifier := googleAuthAPI.oidcProvider.Verifier(&oidc.Config{ClientID: googleAuthAPI.oAuth2Config.ClientID})
 	idToken, err := verifier.Verify(reqCtx, rawIDToken)
 	if err != nil {
-		reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  "8ea31139-211e-4282-82de-9664814e6f46",
 			Error: err.Error(),
 		})
@@ -135,7 +136,7 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 		Sub   string `json:"sub"`
 	}
 	if err := idToken.Claims(&claims); err != nil {
-		reqCtx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Code:  "f2ea83a6-36f6-4a87-ae50-e934f984f1c9",
 			Error: err.Error(),
 		})
@@ -143,22 +144,22 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 	}
 
 	userService := googleAuthAPI.userService
-	exists, err := userService.FindByEmail(reqCtx, claims.Email)
+	exists, err := userService.FindByEmail(reqCtx.Request.Context(), claims.Email)
 	if err != nil {
-		reqCtx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Code:  "ad6e260d-b5ad-447b-8ab0-7e161c932b6a",
 			Error: err.Error(),
 		})
 		return
 	}
 	if exists == nil {
-		exists, err = userService.CreateUser(reqCtx, &user.User{
+		exists, err = userService.RegisterUser(reqCtx.Request.Context(), &user.User{
 			Name:    claims.Name,
 			Email:   claims.Email,
 			Enabled: true,
 		})
 		if err != nil {
-			reqCtx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
 				Code:  "45f08e6d-4b0c-4718-9bf3-5974a14d5f25",
 				Error: err.Error(),
 			})
@@ -178,7 +179,7 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 	})
 
 	if err != nil {
-		reqCtx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Code:  "7b50f7ab-f3a1-4a3c-920a-41e387c2bc12",
 			Error: err.Error(),
 		})
@@ -194,7 +195,7 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 		},
 	})
 	if err != nil {
-		reqCtx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Code:  "0e596742-64bb-4904-8429-4c09ce8434b9",
 			Error: err.Error(),
 		})

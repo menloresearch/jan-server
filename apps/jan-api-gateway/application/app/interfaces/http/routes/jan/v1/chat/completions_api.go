@@ -69,8 +69,8 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 			return
 		}
 		apikeyEntities, err := api.apikeyService.Find(reqCtx, apikey.ApiKeyFilter{
-			UserID:      &user.ID,
-			ServiceType: ptr.ToUint(apikey.ApiKeyServiceTypeJanCloud),
+			OwnerID:   &user.ID,
+			OwnerType: ptr.ToString(string(apikey.OwnerTypeAdmin)),
 		}, &query.Pagination{PageNumber: 1, PageSize: 1})
 		if err != nil {
 			reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
@@ -79,20 +79,44 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 			})
 			return
 		}
-		if len(apikeyEntities) != 1 {
+		// TODO: Should we provide a default key to user?
+		if len(apikeyEntities) == 0 {
+			key, hash, err := api.apikeyService.GenerateKeyAndHash(reqCtx, apikey.OwnerTypeEphemeral)
 			if err != nil {
 				reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-					Code:  "d24dd0e7-cb46-45e8-9030-c92dee2577b2",
+					Code:  "207373ae-f94a-4b21-bf95-7bbd8d727f84",
 					Error: err.Error(),
 				})
 				return
 			}
+
+			// TODO: OwnerTypeEphemeral
+			entity, err := api.apikeyService.CreateApiKey(reqCtx, &apikey.ApiKey{
+				KeyHash:        hash,
+				PlaintextHint:  fmt.Sprintf("sk-..%s", key[len(key)-3:]),
+				Description:    "Default Key For User",
+				Enabled:        true,
+				OwnerType:      string(apikey.OwnerTypeEphemeral),
+				OwnerID:        &user.ID,
+				OrganizationID: nil,
+				Permissions:    "{}",
+			})
+			if err != nil {
+				reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+					Code:  "cfda552d-ec73-4e12-abfb-963b3c3829e9",
+					Error: err.Error(),
+				})
+				return
+			}
+			apikeyEntities = []*apikey.ApiKey{
+				entity,
+			}
 		}
-		key = apikeyEntities[0].Key
+		key = apikeyEntities[0].KeyHash
 	}
 	var request openai.ChatCompletionRequest
 	if err := reqCtx.ShouldBindJSON(&request); err != nil {
-		reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  "cf237451-8932-48d1-9cf6-42c4db2d4805",
 			Error: err.Error(),
 		})
@@ -103,7 +127,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	mToE := modelRegistry.GetModelToEndpoints()
 	endpoints, ok := mToE[request.Model]
 	if !ok {
-		reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  "59253517-df33-44bf-9333-c927402e4e2e",
 			Error: fmt.Sprintf("Model: %s does not exist", request.Model),
 		})
@@ -116,7 +140,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 			if request.Stream {
 				err := janInferenceClient.CreateChatCompletionStream(reqCtx, key, request)
 				if err != nil {
-					reqCtx.JSON(
+					reqCtx.AbortWithStatusJSON(
 						http.StatusBadRequest,
 						responses.ErrorResponse{
 							Code:  "c3af973c-eada-4e8b-96d9-e92546588cd3",
@@ -128,7 +152,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 			} else {
 				response, err := janInferenceClient.CreateChatCompletion(reqCtx.Request.Context(), key, request)
 				if err != nil {
-					reqCtx.JSON(
+					reqCtx.AbortWithStatusJSON(
 						http.StatusBadRequest,
 						responses.ErrorResponse{
 							Code:  "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",

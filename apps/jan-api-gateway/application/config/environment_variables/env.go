@@ -17,6 +17,7 @@ type EnvironmentVariable struct {
 	OAUTH2_GOOGLE_REDIRECT_URL  string
 	DB_POSTGRESQL_WRITE_DSN     string
 	DB_POSTGRESQL_READ1_DSN     string
+	APIKEY_SECRET               string
 }
 
 func (ev *EnvironmentVariable) LoadFromEnv() {
