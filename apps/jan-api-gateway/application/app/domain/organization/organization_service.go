@@ -15,18 +15,14 @@ import (
 type OrganizationService struct {
 	// The service has a dependency on the repository interface.
 	repo           OrganizationRepository
-	projectService project.ProjectService
+	projectService *project.ProjectService
 }
 
 // NewService is the constructor for OrganizationService.
 // It injects the repository dependency.
-func NewService() *OrganizationService {
-	return &OrganizationService{}
+func NewService(repo OrganizationRepository, projectService *project.ProjectService) *OrganizationService {
+	return &OrganizationService{repo: repo, projectService: projectService}
 }
-
-// func NewService(repo OrganizationRepository, projectService project.ProjectService) *OrganizationService {
-// 	return &OrganizationService{repo: repo, projectService: projectService}
-// }
 
 func (s *OrganizationService) createPublicID() (string, error) {
 	randomBytes := make([]byte, 16)
@@ -47,7 +43,6 @@ func (s *OrganizationService) CreateOrganizationWithPublicID(ctx context.Context
 		return nil, err
 	}
 	o.PublicID = publicID
-
 	if err := s.repo.Create(ctx, o); err != nil {
 		return nil, err
 	}

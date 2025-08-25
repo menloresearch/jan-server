@@ -34,6 +34,7 @@ func NewSchemaOrganization(o *organization.Organization) *Organization {
 		},
 		Name:     o.Name,
 		PublicID: o.PublicID,
+		OwnerID:  o.OwnerID,
 		Enabled:  o.Enabled,
 	}
 }

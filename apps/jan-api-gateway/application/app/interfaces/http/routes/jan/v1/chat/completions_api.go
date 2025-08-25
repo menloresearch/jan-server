@@ -116,7 +116,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	}
 	var request openai.ChatCompletionRequest
 	if err := reqCtx.ShouldBindJSON(&request); err != nil {
-		reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  "cf237451-8932-48d1-9cf6-42c4db2d4805",
 			Error: err.Error(),
 		})
@@ -127,7 +127,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	mToE := modelRegistry.GetModelToEndpoints()
 	endpoints, ok := mToE[request.Model]
 	if !ok {
-		reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  "59253517-df33-44bf-9333-c927402e4e2e",
 			Error: fmt.Sprintf("Model: %s does not exist", request.Model),
 		})
@@ -140,7 +140,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 			if request.Stream {
 				err := janInferenceClient.CreateChatCompletionStream(reqCtx, key, request)
 				if err != nil {
-					reqCtx.JSON(
+					reqCtx.AbortWithStatusJSON(
 						http.StatusBadRequest,
 						responses.ErrorResponse{
 							Code:  "c3af973c-eada-4e8b-96d9-e92546588cd3",
@@ -152,7 +152,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 			} else {
 				response, err := janInferenceClient.CreateChatCompletion(reqCtx.Request.Context(), key, request)
 				if err != nil {
-					reqCtx.JSON(
+					reqCtx.AbortWithStatusJSON(
 						http.StatusBadRequest,
 						responses.ErrorResponse{
 							Code:  "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",

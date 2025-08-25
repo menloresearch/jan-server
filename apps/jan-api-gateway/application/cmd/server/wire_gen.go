@@ -9,10 +9,13 @@ package main
 import (
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
+	"menlo.ai/jan-api-gateway/app/domain/organization"
+	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/apikeyrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/organizationrepo"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/projectrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
@@ -52,7 +55,10 @@ func CreateApplication() (*Application, error) {
 	transactionDatabase := transaction.NewDatabase(db)
 	userRepository := userrepo.NewUserGormRepository(transactionDatabase)
 	organizationRepository := organizationrepo.NewOrganizationGormRepository(transactionDatabase)
-	userService := user.NewService(userRepository, organizationRepository)
+	projectRepository := projectrepo.NewProjectGormRepository(transactionDatabase)
+	projectService := project.NewService(projectRepository)
+	organizationService := organization.NewService(organizationRepository, projectService)
+	userService := user.NewService(userRepository, organizationService)
 	googleAuthAPI := google.NewGoogleAuthAPI(userService)
 	authRoute := auth.NewAuthRoute(googleAuthAPI)
 	apiKeyAPI := apikeys.NewApiKeyAPI(apiKeyService, userService)
