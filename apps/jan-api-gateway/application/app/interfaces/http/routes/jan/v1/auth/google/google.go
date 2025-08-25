@@ -15,6 +15,7 @@ import (
 
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/user"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/middleware"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
@@ -47,7 +48,7 @@ func NewGoogleAuthAPI(userService *user.UserService) *GoogleAuthAPI {
 
 func (googleAuthAPI *GoogleAuthAPI) RegisterRouter(router *gin.RouterGroup) {
 	googleRouter := router.Group("/google")
-	googleRouter.POST("/callback", googleAuthAPI.HandleGoogleCallback)
+	googleRouter.POST("/callback", middleware.TransactionMiddleware(), googleAuthAPI.HandleGoogleCallback)
 	googleRouter.GET("/login", googleAuthAPI.GetGoogleLoginUrl)
 }
 
@@ -152,7 +153,7 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 		return
 	}
 	if exists == nil {
-		exists, err = userService.CreateUser(reqCtx, &user.User{
+		exists, err = userService.RegisterUser(reqCtx, &user.User{
 			Name:    claims.Name,
 			Email:   claims.Email,
 			Enabled: true,

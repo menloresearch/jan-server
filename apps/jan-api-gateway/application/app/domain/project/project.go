@@ -19,6 +19,7 @@ type Project struct {
 }
 
 type ProjectMember struct {
+	ID        uint
 	UserID    uint
 	ProjectID uint
 	Role      string
@@ -30,6 +31,20 @@ type ProjectFilter struct {
 	OrganizationID *uint
 	Archived       *bool
 }
+
+type ProjectStatus string
+
+const (
+	ProjectStatusActive   ProjectStatus = "active"
+	ProjectStatusArchived ProjectStatus = "archived"
+)
+
+type ProjectMemberRole string
+
+const (
+	ProjectMemberRoleOwner  ProjectMemberRole = "owner"
+	ProjectMemberRoleMember ProjectMemberRole = "member"
+)
 
 type ProjectRepository interface {
 	Create(ctx context.Context, p *Project) error

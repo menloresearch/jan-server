@@ -54,3 +54,14 @@ func (p *Project) EtoD() *project.Project {
 		UpdatedAt:      p.UpdatedAt,
 	}
 }
+
+func NewSchemaProjectMember(p *project.ProjectMember) *ProjectMember {
+	return &ProjectMember{
+		BaseModel: BaseModel{
+			ID: p.ID,
+		},
+		UserID:    p.UserID,
+		ProjectID: p.ProjectID,
+		Role:      p.Role,
+	}
+}

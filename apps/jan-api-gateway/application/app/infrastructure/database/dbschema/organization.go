@@ -16,6 +16,8 @@ type Organization struct {
 	PublicID string               `gorm:"size:64;not null;uniqueIndex"`
 	Enabled  bool                 `gorm:"default:true;index"`
 	Members  []OrganizationMember `gorm:"foreignKey:OrganizationID"`
+	OwnerID  uint                 `gorm:"not null;index"`
+	Owner    User                 `gorm:"foreignKey:OwnerID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 }
 
 type OrganizationMember struct {

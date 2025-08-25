@@ -15,6 +15,8 @@ func RegisterSchemaForAutoMigrate(models ...interface{}) {
 	SchemaRegistry = append(SchemaRegistry, models...)
 }
 
+var DB *gorm.DB
+
 func NewDB() (*gorm.DB, error) {
 	if environment_variables.EnvironmentVariables.ENABLE_ADMIN_API {
 		db, err := gorm.Open(postgres.Open(environment_variables.EnvironmentVariables.DB_POSTGRESQL_WRITE_DSN), &gorm.Config{
@@ -41,16 +43,8 @@ func NewDB() (*gorm.DB, error) {
 			return nil, err
 		}
 
-		for _, model := range SchemaRegistry {
-			err = db.AutoMigrate(model)
-			if err != nil {
-				logger.GetLogger().
-					WithField("error_code", "75333e43-8157-4f0a-8e34-aa34e6e7c285").
-					Fatalf("failed to auto migrate schema: %T, error: %v", model, err)
-				return nil, err
-			}
-		}
-		return db, nil
+		DB = db
+		return DB, nil
 	}
 	return nil, nil
 }

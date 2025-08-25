@@ -7,20 +7,26 @@ import (
 	"fmt"
 	"io"
 
+	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/query"
 )
 
 // OrganizationService provides business logic for managing organizations.
 type OrganizationService struct {
 	// The service has a dependency on the repository interface.
-	repo OrganizationRepository
+	repo           OrganizationRepository
+	projectService project.ProjectService
 }
 
 // NewService is the constructor for OrganizationService.
 // It injects the repository dependency.
-func NewService(repo OrganizationRepository) *OrganizationService {
-	return &OrganizationService{repo: repo}
+func NewService() *OrganizationService {
+	return &OrganizationService{}
 }
+
+// func NewService(repo OrganizationRepository, projectService project.ProjectService) *OrganizationService {
+// 	return &OrganizationService{repo: repo, projectService: projectService}
+// }
 
 func (s *OrganizationService) createPublicID() (string, error) {
 	randomBytes := make([]byte, 16)
@@ -43,7 +49,22 @@ func (s *OrganizationService) CreateOrganizationWithPublicID(ctx context.Context
 	o.PublicID = publicID
 
 	if err := s.repo.Create(ctx, o); err != nil {
-		return nil, fmt.Errorf("failed to create organization in repository: %w", err)
+		return nil, err
+	}
+
+	projectEntity, err := s.projectService.CreateProjectWithPublicID(ctx, &project.Project{
+		Name:           "Default Project",
+		Status:         string(project.ProjectStatusActive),
+		OrganizationID: o.ID,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.projectService.AddMember(ctx, projectEntity.ID, o.OwnerID, string(project.ProjectMemberRoleOwner))
+	if err != nil {
+		return nil, err
 	}
 	return o, nil
 }

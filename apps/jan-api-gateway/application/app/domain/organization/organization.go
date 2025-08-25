@@ -8,17 +8,19 @@ import (
 )
 
 type Organization struct {
-	ID        uint   `gorm:"primaryKey"`
-	Name      string `gorm:"size:128;not null;uniqueIndex"`
-	PublicID  string `gorm:"size:64;not null;uniqueIndex"`
+	ID        uint
+	Name      string
+	PublicID  string
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	Enabled   bool `gorm:"default:true;index"`
+	Enabled   bool
+	OwnerID   uint
 }
 
 type OrganizationFilter struct {
 	PublicID *string
 	Enabled  *bool
+	OwnerID  *uint
 }
 
 type OrganizationRepository interface {
