@@ -52,14 +52,14 @@ type GetMeResponse struct {
 func (authRoute *AuthRoute) GetMe(reqCtx *gin.Context) {
 	userClaim, ok := reqCtx.Get(auth.ContextUserClaim)
 	if !ok {
-		reqCtx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 			Code: "fbc49daf-2f73-4778-9362-5680da391190",
 		})
 		return
 	}
 	u, ok := userClaim.(*auth.UserClaim)
 	if !ok {
-		reqCtx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 			Code: "e8a957c3-e107-4244-8625-3f3a1d29ce5c",
 		})
 		return
@@ -85,7 +85,7 @@ func (authRoute *AuthRoute) GetMe(reqCtx *gin.Context) {
 func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 	refreshTokenString, err := reqCtx.Cookie(auth.RefreshTokenKey)
 	if err != nil {
-		reqCtx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 			Code:  "b95e8123-2590-48ed-bbad-e02d88464513",
 			Error: err.Error(),
 		})
@@ -96,7 +96,7 @@ func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 		return environment_variables.EnvironmentVariables.JWT_SECRET, nil
 	})
 	if err != nil {
-		reqCtx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 			Code:  "7c7b8a48-311c-4beb-a2a1-1c13a87610bb",
 			Error: err.Error(),
 		})
@@ -104,7 +104,7 @@ func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 	}
 
 	if !token.Valid {
-		reqCtx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 			Code: "ec5fa88c-78bb-462a-ab90-b046f269d5eb",
 		})
 		return
@@ -112,7 +112,7 @@ func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 
 	userClaim, ok := token.Claims.(*auth.UserClaim)
 	if !ok {
-		reqCtx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 			Code: "c2019018-b71c-4f13-8ac6-854fbd61c9dd",
 		})
 		return
@@ -128,7 +128,7 @@ func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 		},
 	})
 	if err != nil {
-		reqCtx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Code:  "79373f8e-d80e-489c-95ba-9e6099ef7539",
 			Error: err.Error(),
 		})
@@ -145,7 +145,7 @@ func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 		},
 	})
 	if err != nil {
-		reqCtx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Code:  "0e596742-64bb-4904-8429-4c09ce8434b9",
 			Error: err.Error(),
 		})

@@ -55,7 +55,7 @@ type ChatCompletionResponseSwagger struct {
 func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	var request openai.ChatCompletionRequest
 	if err := reqCtx.ShouldBindJSON(&request); err != nil {
-		reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  "cf237451-8932-48d1-9cf6-42c4db2d4805",
 			Error: err.Error(),
 		})
@@ -66,29 +66,30 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	if environment_variables.EnvironmentVariables.ENABLE_ADMIN_API {
 		key, ok := requests.GetTokenFromBearer(reqCtx)
 		if !ok {
-			reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 				Code:  "4284adb3-7af4-428b-8064-7073cb9ca2ca",
 				Error: "invalid apikey",
 			})
 			return
 		}
-		apikeyEntity, err := api.apikeyService.FindByKey(reqCtx, key)
+		hashed := api.apikeyService.HashKey(reqCtx, key)
+		apikeyEntity, err := api.apikeyService.FindByKeyHash(reqCtx, hashed)
 		if err != nil {
-			reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 				Code:  "d14ab75b-586b-4b55-ba65-e520a76d6559",
 				Error: "invalid apikey",
 			})
 			return
 		}
 		if !apikeyEntity.Enabled {
-			reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 				Code:  "42bd6104-28a1-45bd-a164-8e32d12b0378",
 				Error: "invalid apikey",
 			})
 			return
 		}
 		if apikeyEntity.ExpiresAt != nil && apikeyEntity.ExpiresAt.Before(time.Now()) {
-			reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 				Code:  "f8f2733d-c76f-40e4-95b1-584a5d054225",
 				Error: "apikey expired",
 			})
@@ -100,7 +101,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	mToE := modelRegistry.GetModelToEndpoints()
 	endpoints, ok := mToE[request.Model]
 	if !ok {
-		reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  "59253517-df33-44bf-9333-c927402e4e2e",
 			Error: fmt.Sprintf("Model: %s does not exist", request.Model),
 		})
@@ -113,7 +114,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 			if request.Stream {
 				err := janInferenceClient.CreateChatCompletionStream(reqCtx, key, request)
 				if err != nil {
-					reqCtx.JSON(
+					reqCtx.AbortWithStatusJSON(
 						http.StatusBadRequest,
 						responses.ErrorResponse{
 							Code:  "c3af973c-eada-4e8b-96d9-e92546588cd3",
@@ -125,7 +126,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 			} else {
 				response, err := janInferenceClient.CreateChatCompletion(reqCtx.Request.Context(), key, request)
 				if err != nil {
-					reqCtx.JSON(
+					reqCtx.AbortWithStatusJSON(
 						http.StatusBadRequest,
 						responses.ErrorResponse{
 							Code:  "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",
@@ -139,7 +140,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		}
 	}
 
-	reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+	reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 		Code:  "6c6e4ea0-53d2-4c6c-8617-3a645af59f43",
 		Error: "Client does not exist",
 	})

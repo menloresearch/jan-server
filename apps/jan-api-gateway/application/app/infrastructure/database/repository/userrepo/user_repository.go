@@ -6,36 +6,31 @@ import (
 
 	domain "menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/dbschema"
-	"menlo.ai/jan-api-gateway/app/infrastructure/database/gormgen"
-
-	"gorm.io/gorm"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
 )
 
 type UserGormRepository struct {
-	query *gormgen.Query
-	db    *gorm.DB
+	db *transaction.Database
 }
 
-func NewUserGormRepository(db *gorm.DB) domain.UserRepository {
+func NewUserGormRepository(db *transaction.Database) domain.UserRepository {
 	return &UserGormRepository{
-		query: gormgen.Use(db),
-		db:    db,
+		db: db,
 	}
 }
 
 func (r *UserGormRepository) Create(ctx context.Context, u *domain.User) error {
 	model := dbschema.NewSchemaUser(u)
-
-	if err := r.query.User.WithContext(ctx).Create(model); err != nil {
+	if err := r.db.GetQuery(ctx).User.WithContext(ctx).Create(model); err != nil {
 		return err
 	}
-
 	u.ID = model.ID
 	return nil
 }
 
 func (r *UserGormRepository) FindByID(ctx context.Context, id uint) (*domain.User, error) {
-	model, err := r.query.User.WithContext(ctx).Where(r.query.User.ID.Eq(id)).First()
+	query := r.db.GetQuery(ctx)
+	model, err := query.User.WithContext(ctx).Where(query.User.ID.Eq(id)).First()
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +39,8 @@ func (r *UserGormRepository) FindByID(ctx context.Context, id uint) (*domain.Use
 }
 
 func (r *UserGormRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
-	models, err := r.query.User.WithContext(ctx).Where(r.query.User.Email.Eq(email)).Find()
+	query := r.db.GetQuery(ctx)
+	models, err := query.User.WithContext(ctx).Where(query.User.Email.Eq(email)).Find()
 	if err != nil {
 		return nil, err
 	}

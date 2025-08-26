@@ -9,9 +9,14 @@ package main
 import (
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
+	"menlo.ai/jan-api-gateway/app/domain/organization"
+	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/apikeyrepo"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/organizationrepo"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/projectrepo"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan"
@@ -24,6 +29,11 @@ import (
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
+)
+
+import (
+	_ "github.com/grafana/pyroscope-go/godeltaprof/http/pprof"
+	_ "net/http/pprof"
 )
 
 // Injectors from wire.go:
@@ -42,8 +52,13 @@ func CreateApplication() (*Application, error) {
 	serperMCP := mcpimpl.NewSerperMCP(serperService)
 	mcpapi := mcp.NewMCPAPI(serperMCP)
 	v1Route := v1.NewV1Route(chatRoute, modelAPI, mcpapi)
-	userRepository := userrepo.NewUserGormRepository(db)
-	userService := user.NewService(userRepository)
+	transactionDatabase := transaction.NewDatabase(db)
+	userRepository := userrepo.NewUserGormRepository(transactionDatabase)
+	organizationRepository := organizationrepo.NewOrganizationGormRepository(transactionDatabase)
+	projectRepository := projectrepo.NewProjectGormRepository(transactionDatabase)
+	projectService := project.NewService(projectRepository)
+	organizationService := organization.NewService(organizationRepository, projectService)
+	userService := user.NewService(userRepository, organizationService)
 	googleAuthAPI := google.NewGoogleAuthAPI(userService)
 	authRoute := auth.NewAuthRoute(googleAuthAPI)
 	apiKeyAPI := apikeys.NewApiKeyAPI(apiKeyService, userService)

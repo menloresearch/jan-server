@@ -15,6 +15,8 @@ func RegisterSchemaForAutoMigrate(models ...interface{}) {
 	SchemaRegistry = append(SchemaRegistry, models...)
 }
 
+var DB *gorm.DB
+
 func NewDB() (*gorm.DB, error) {
 	if environment_variables.EnvironmentVariables.ENABLE_ADMIN_API {
 		db, err := gorm.Open(postgres.Open(environment_variables.EnvironmentVariables.DB_POSTGRESQL_WRITE_DSN), &gorm.Config{
@@ -41,6 +43,21 @@ func NewDB() (*gorm.DB, error) {
 			return nil, err
 		}
 
+		// v0.0.5 only
+		err = db.Exec("DROP SCHEMA IF EXISTS public CASCADE;").Error
+		if err != nil {
+			logger.GetLogger().
+				WithField("error_code", "5644d271-be84-4a92-a5af-489d87324758").
+				Fatalf("unable to connect to setup replica: %v", err)
+			return nil, err
+		}
+		err = db.Exec("CREATE SCHEMA public;").Error
+		if err != nil {
+			logger.GetLogger().
+				WithField("error_code", "07217a04-80f1-466f-8d2c-cdd162dd9ccb").
+				Fatalf("unable to connect to setup replica: %v", err)
+			return nil, err
+		}
 		for _, model := range SchemaRegistry {
 			err = db.AutoMigrate(model)
 			if err != nil {
@@ -50,7 +67,9 @@ func NewDB() (*gorm.DB, error) {
 				return nil, err
 			}
 		}
-		return db, nil
+
+		DB = db
+		return DB, nil
 	}
 	return nil, nil
 }
