@@ -248,3 +248,6 @@ dist/
 
 # helm
 charts/umbrella-chart/charts/*.tgz
+
+# Migration
+apps/jan-api-gateway/application/cmd/codegen/dbmigration/tmp/*

@@ -35,6 +35,7 @@ func newOrganization(db *gorm.DB, opts ...gen.DOOption) organization {
 	_organization.Name = field.NewString(tableName, "name")
 	_organization.PublicID = field.NewString(tableName, "public_id")
 	_organization.Enabled = field.NewBool(tableName, "enabled")
+	_organization.TestID = field.NewUint(tableName, "test_id")
 	_organization.OwnerID = field.NewUint(tableName, "owner_id")
 	_organization.Members = organizationHasManyMembers{
 		db: db.Session(&gorm.Session{}),
@@ -74,6 +75,7 @@ type organization struct {
 	Name      field.String
 	PublicID  field.String
 	Enabled   field.Bool
+	TestID    field.Uint
 	OwnerID   field.Uint
 	Members   organizationHasManyMembers
 
@@ -101,6 +103,7 @@ func (o *organization) updateTableName(table string) *organization {
 	o.Name = field.NewString(table, "name")
 	o.PublicID = field.NewString(table, "public_id")
 	o.Enabled = field.NewBool(table, "enabled")
+	o.TestID = field.NewUint(table, "test_id")
 	o.OwnerID = field.NewUint(table, "owner_id")
 
 	o.fillFieldMap()
@@ -118,7 +121,7 @@ func (o *organization) GetFieldByName(fieldName string) (field.OrderExpr, bool) 
 }
 
 func (o *organization) fillFieldMap() {
-	o.fieldMap = make(map[string]field.Expr, 10)
+	o.fieldMap = make(map[string]field.Expr, 11)
 	o.fieldMap["id"] = o.ID
 	o.fieldMap["created_at"] = o.CreatedAt
 	o.fieldMap["updated_at"] = o.UpdatedAt
@@ -126,6 +129,7 @@ func (o *organization) fillFieldMap() {
 	o.fieldMap["name"] = o.Name
 	o.fieldMap["public_id"] = o.PublicID
 	o.fieldMap["enabled"] = o.Enabled
+	o.fieldMap["test_id"] = o.TestID
 	o.fieldMap["owner_id"] = o.OwnerID
 
 }
