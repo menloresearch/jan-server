@@ -39,12 +39,38 @@ func generateHcl(branchName string) {
 				Fatalf("failed to auto migrate schema: %T, error: %v", model, err)
 		}
 	}
-	atlasCmdStr := `atlas schema inspect -u "postgres://migration:migration@localhost:5432/migration?sslmode=disable" > .tmp/` + branchName + `.hcl`
+	atlasCmdStr := `atlas schema inspect -u "postgres://migration:migration@localhost:5432/migration?sslmode=disable" > tmp/` + branchName + `.hcl`
+	atlasCmd := exec.Command("sh", "-c", atlasCmdStr)
+	atlasCmd.Run()
+}
+
+func generateDiffSql() {
+	db, err := gorm.Open(postgres.Open("host=localhost user=migration dbname=migration port=5432 sslmode=disable"))
+	if err != nil {
+		panic(err)
+	}
+	err = db.Exec("DROP SCHEMA IF EXISTS public CASCADE;").Error
+	if err != nil {
+		log.Fatalf("failed to drop schema: %v", err)
+	}
+	err = db.Exec("CREATE SCHEMA public;").Error
+	if err != nil {
+		log.Fatalf("failed to create schema: %v", err)
+	}
+
+	atlasCmdStr := `atlas schema diff --dev-url "postgres://migration:migration@localhost:5432/migration?sslmode=disable" --from file://tmp/main.hcl --to file://tmp/release.hcl > tmp/diff.sql`
 	atlasCmd := exec.Command("sh", "-c", atlasCmdStr)
 	atlasCmd.Run()
 }
 
 func main() {
 	environment_variables.EnvironmentVariables.LoadFromEnv()
-	generateHcl("main")
+
+	// git checkout main
+	// generateHcl("main")
+
+	// git checkout release
+	// generateHcl("release")
+
+	// generateDiffSql()
 }
