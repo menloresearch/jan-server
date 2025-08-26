@@ -1,6 +1,8 @@
 package main
 
 import (
+	"log"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/gen"
 	"gorm.io/gorm"
@@ -42,6 +44,14 @@ func main() {
 		logger.GetLogger().
 			WithField("error_code", "db8499be-ae9d-46dc-ac59-1d2c42520e14").
 			Fatalf("failed to auto migrate schema, error: %v", err)
+	}
+	err = db.Exec("DROP SCHEMA IF EXISTS public CASCADE;").Error
+	if err != nil {
+		log.Fatalf("failed to drop schema: %v", err)
+	}
+	err = db.Exec("CREATE SCHEMA public;").Error
+	if err != nil {
+		log.Fatalf("failed to create schema: %v", err)
 	}
 	for _, model := range database.SchemaRegistry {
 		err = db.AutoMigrate(model)

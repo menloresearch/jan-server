@@ -1,15 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"os"
 	"os/exec"
-
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 
 	"menlo.ai/jan-api-gateway/app/infrastructure/database"
 	_ "menlo.ai/jan-api-gateway/app/infrastructure/database/dbschema"
-	"menlo.ai/jan-api-gateway/app/utils/logger"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
@@ -19,24 +17,24 @@ import (
 // postgres=# CREATE DATABASE migration WITH OWNER = migration;
 
 func generateHcl(branchName string) {
-	db, err := gorm.Open(postgres.Open("host=localhost user=migration dbname=migration port=5432 sslmode=disable"))
+	db, err := database.NewDB()
 	if err != nil {
 		panic(err)
 	}
 	err = db.Exec("DROP SCHEMA IF EXISTS public CASCADE;").Error
 	if err != nil {
 		log.Fatalf("failed to drop schema: %v", err)
+		return
 	}
 	err = db.Exec("CREATE SCHEMA public;").Error
 	if err != nil {
 		log.Fatalf("failed to create schema: %v", err)
+		return
 	}
 	for _, model := range database.SchemaRegistry {
-		err := db.AutoMigrate(model)
+		err = db.AutoMigrate(model)
 		if err != nil {
-			logger.GetLogger().
-				WithField("error_code", "75333e43-8157-4f0a-8e34-aa34e6e7c285").
-				Fatalf("failed to auto migrate schema: %T, error: %v", model, err)
+			panic(err)
 		}
 	}
 	atlasCmdStr := `atlas schema inspect -u "postgres://migration:migration@localhost:5432/migration?sslmode=disable" > tmp/` + branchName + `.hcl`
@@ -45,10 +43,11 @@ func generateHcl(branchName string) {
 }
 
 func generateDiffSql() {
-	db, err := gorm.Open(postgres.Open("host=localhost user=migration dbname=migration port=5432 sslmode=disable"))
+	db, err := database.NewDB()
 	if err != nil {
 		panic(err)
 	}
+
 	err = db.Exec("DROP SCHEMA IF EXISTS public CASCADE;").Error
 	if err != nil {
 		log.Fatalf("failed to drop schema: %v", err)
@@ -58,16 +57,33 @@ func generateDiffSql() {
 		log.Fatalf("failed to create schema: %v", err)
 	}
 
-	atlasCmdStr := `atlas schema diff --dev-url "postgres://migration:migration@localhost:5432/migration?sslmode=disable" --from file://tmp/main.hcl --to file://tmp/release.hcl > tmp/diff.sql`
+	atlasCmdStr := `atlas schema diff --dev-url "postgres://migration:migration@localhost:5432/migration?sslmode=disable" --from file://tmp/release.hcl --to file://tmp/main.hcl > tmp/diff.sql`
 	atlasCmd := exec.Command("sh", "-c", atlasCmdStr)
 	atlasCmd.Run()
 }
 
+func createTmpFolder() error {
+	dir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}
+	dirPath := fmt.Sprintf("%s/%s", dir, "tmp")
+	err = os.MkdirAll(dirPath, 0755)
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}
+	return nil
+}
+
 func main() {
 	environment_variables.EnvironmentVariables.LoadFromEnv()
-
+	if err := createTmpFolder(); err != nil {
+		panic(err)
+	}
 	// git checkout main
-	// generateHcl("main")
+	generateHcl("main")
 
 	// git checkout release
 	// generateHcl("release")
