@@ -17,6 +17,7 @@ __debug_bin*
 
 # Local configuration that shouldn't be shared
 *.local
+*.vscode
 
 ### Vscode ###
 # Visual Studio Code editor settings and workspace files
