@@ -8,12 +8,15 @@ package main
 
 import (
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
+	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/apikeyrepo"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/conversationrepo"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/itemrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/organizationrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/projectrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
@@ -27,6 +30,7 @@ import (
 	chat2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	organization2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
@@ -57,11 +61,15 @@ func CreateApplication() (*Application, error) {
 	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI)
 	completionAPI := chat.NewCompletionAPI(apiKeyService)
 	chatRoute := chat.NewChatRoute(completionAPI)
+	conversationRepository := conversationrepo.NewConversationGormRepository(transactionDatabase)
+	itemRepository := itemrepo.NewItemGormRepository(transactionDatabase)
+	conversationService := conversation.NewService(conversationRepository, itemRepository)
+	conversationAPI := conversations.NewConversationAPI(conversationService, userService)
 	modelAPI := v1.NewModelAPI()
 	serperService := serpermcp.NewSerperService()
 	serperMCP := mcpimpl.NewSerperMCP(serperService)
 	mcpapi := mcp.NewMCPAPI(serperMCP)
-	v1Route := v1.NewV1Route(organizationRoute, chatRoute, modelAPI, mcpapi)
+	v1Route := v1.NewV1Route(organizationRoute, chatRoute, conversationAPI, modelAPI, mcpapi)
 	googleAuthAPI := google.NewGoogleAuthAPI(userService)
 	authRoute := auth.NewAuthRoute(googleAuthAPI)
 	apiKeyAPI := apikeys.NewApiKeyAPI(apiKeyService, userService)

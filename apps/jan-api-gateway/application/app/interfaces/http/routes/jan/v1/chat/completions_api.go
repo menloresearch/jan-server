@@ -56,7 +56,7 @@ type ChatCompletionResponseSwagger struct {
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /jan/v1/chat/completions [post]
 func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
-	userClaim, _ := auth.GetUserClaimFromRequestContext(reqCtx)
+ 	userClaim, _ := auth.GetUserClaimFromRequestContext(reqCtx)
 	key := "AnonymousUserKey"
 	if userClaim != nil {
 		user, err := api.userService.FindByEmail(reqCtx, userClaim.Email)

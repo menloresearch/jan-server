@@ -10,6 +10,7 @@ import (
 	janV1Chat "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/chat"
 	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
 	mcp_impl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
@@ -25,6 +26,7 @@ var RouteProvider = wire.NewSet(
 	jan.NewJanRoute,
 	organization.NewAdminApiKeyAPI,
 	organization.NewOrganizationRoute,
+	conversations.NewConversationAPI,
 	mcp_impl.NewSerperMCP,
 	chat.NewCompletionAPI,
 	chat.NewChatRoute,

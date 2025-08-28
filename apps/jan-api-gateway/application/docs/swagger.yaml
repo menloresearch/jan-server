@@ -117,6 +117,39 @@ definitions:
       usage:
         $ref: '#/definitions/openai.Usage'
     type: object
+  app_interfaces_http_routes_v1_conversations.AddItemRequest:
+    properties:
+      content:
+        items:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.Content'
+        type: array
+      role:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.ItemRole'
+      type:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.ItemType'
+    required:
+    - type
+    type: object
+  app_interfaces_http_routes_v1_conversations.CreateConversationRequest:
+    properties:
+      is_private:
+        type: boolean
+      metadata:
+        additionalProperties:
+          type: string
+        type: object
+      title:
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_conversations.UpdateConversationRequest:
+    properties:
+      metadata:
+        additionalProperties:
+          type: string
+        type: object
+      title:
+        type: string
+    type: object
   app_interfaces_http_routes_v1_organization.AdminAPIKeyDeletedResponse:
     properties:
       deleted:
@@ -195,6 +228,118 @@ definitions:
         type: string
       type:
         example: user
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_domain_conversation.Annotation:
+    properties:
+      end_index:
+        type: integer
+      start_index:
+        type: integer
+      text:
+        type: string
+      type:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_domain_conversation.Content:
+    properties:
+      text:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.Text'
+      type:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_domain_conversation.Conversation:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      is_private:
+        type: boolean
+      items:
+        items:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.Item'
+        type: array
+      metadata:
+        additionalProperties:
+          type: string
+        type: object
+      public_id:
+        type: string
+      status:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.ConversationStatus'
+      title:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  menlo_ai_jan-api-gateway_app_domain_conversation.ConversationStatus:
+    enum:
+    - active
+    - archived
+    - deleted
+    type: string
+    x-enum-varnames:
+    - ConversationStatusActive
+    - ConversationStatusArchived
+    - ConversationStatusDeleted
+  menlo_ai_jan-api-gateway_app_domain_conversation.IncompleteDetails:
+    properties:
+      reason:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_domain_conversation.Item:
+    properties:
+      completed_at:
+        type: integer
+      content:
+        items:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.Content'
+        type: array
+      created_at:
+        type: string
+      id:
+        type: integer
+      incomplete_at:
+        type: integer
+      incomplete_details:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.IncompleteDetails'
+      role:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.ItemRole'
+      status:
+        type: string
+      type:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.ItemType'
+    type: object
+  menlo_ai_jan-api-gateway_app_domain_conversation.ItemRole:
+    enum:
+    - system
+    - user
+    - assistant
+    type: string
+    x-enum-varnames:
+    - ItemRoleSystem
+    - ItemRoleUser
+    - ItemRoleAssistant
+  menlo_ai_jan-api-gateway_app_domain_conversation.ItemType:
+    enum:
+    - message
+    - function_call
+    - function_call_output
+    type: string
+    x-enum-varnames:
+    - ItemTypeMessage
+    - ItemTypeFunction
+    - ItemTypeFunctionCall
+  menlo_ai_jan-api-gateway_app_domain_conversation.Text:
+    properties:
+      annotations:
+        items:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.Annotation'
+        type: array
+      value:
         type: string
     type: object
   menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse:
@@ -1034,6 +1179,309 @@ paths:
       summary: Create a chat completion
       tags:
       - Chat
+  /v1/conversations:
+    get:
+      consumes:
+      - application/json
+      description: Lists all conversations for the authenticated user
+      parameters:
+      - default: 20
+        description: Number of conversations to return
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Number of conversations to skip
+        in: query
+        name: offset
+        type: integer
+      - description: Filter by conversation status
+        in: query
+        name: status
+        type: string
+      - description: Search in conversation titles
+        in: query
+        name: search
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of conversations
+          schema:
+            items:
+              $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.Conversation'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List conversations
+      tags:
+      - Conversations
+    post:
+      consumes:
+      - application/json
+      description: Creates a new conversation for the authenticated user
+      parameters:
+      - description: Create conversation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.CreateConversationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created conversation
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.Conversation'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a conversation
+      tags:
+      - Conversations
+  /v1/conversations/{conversation_id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a conversation and all its messages
+      parameters:
+      - description: Conversation ID
+        in: path
+        name: conversation_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Conversation deleted successfully
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "403":
+          description: Access denied
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Conversation not found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a conversation
+      tags:
+      - Conversations
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a conversation by its ID
+      parameters:
+      - description: Conversation ID
+        in: path
+        name: conversation_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Conversation details
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.Conversation'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "403":
+          description: Access denied
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Conversation not found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a conversation
+      tags:
+      - Conversations
+    patch:
+      consumes:
+      - application/json
+      description: Updates a conversation's title and metadata
+      parameters:
+      - description: Conversation ID
+        in: path
+        name: conversation_id
+        required: true
+        type: string
+      - description: Update conversation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.UpdateConversationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated conversation
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.Conversation'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "403":
+          description: Access denied
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Conversation not found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a conversation
+      tags:
+      - Conversations
+  /v1/conversations/{conversation_id}/items:
+    post:
+      consumes:
+      - application/json
+      description: Adds a new item to an existing conversation
+      parameters:
+      - description: Conversation ID
+        in: path
+        name: conversation_id
+        required: true
+        type: string
+      - description: Add item request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.AddItemRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created item
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.Item'
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "403":
+          description: Access denied
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Conversation not found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Add an item to a conversation
+      tags:
+      - Conversations
+  /v1/conversations/{conversation_id}/items/search:
+    get:
+      consumes:
+      - application/json
+      description: Searches for items containing specific text within a conversation
+      parameters:
+      - description: Conversation ID
+        in: path
+        name: conversation_id
+        required: true
+        type: string
+      - description: Search query
+        in: query
+        name: q
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Matching items
+          schema:
+            items:
+              $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.Item'
+            type: array
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "403":
+          description: Access denied
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Conversation not found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Search items in a conversation
+      tags:
+      - Conversations
   /v1/mcp:
     post:
       consumes:
