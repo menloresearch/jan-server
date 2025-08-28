@@ -3,7 +3,8 @@ package openai
 type ObjectKey string
 
 const (
-	OrganizationAdminApiKey ObjectKey = "organization.admin_api_key"
+	ObjectKeyAdminApiKey ObjectKey = "organization.admin_api_key"
+	ObjectKeyProject     ObjectKey = "organization.project"
 )
 
 type OwnerType string

@@ -80,7 +80,7 @@ func (s *ProjectService) FindProjectByPublicID(ctx context.Context, publicID str
 }
 
 // FindProjects retrieves a list of projects based on a filter and pagination.
-func (s *ProjectService) FindProjects(ctx context.Context, filter ProjectFilter, pagination *query.Pagination) ([]*Project, error) {
+func (s *ProjectService) Find(ctx context.Context, filter ProjectFilter, pagination *query.Pagination) ([]*Project, error) {
 	return s.repo.FindByFilter(ctx, filter, pagination)
 }
 
