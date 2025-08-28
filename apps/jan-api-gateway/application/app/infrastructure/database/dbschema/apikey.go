@@ -13,6 +13,7 @@ func init() {
 
 type ApiKey struct {
 	BaseModel
+	PublicID      string `gorm:"size:128;uniqueIndex;not null"`
 	KeyHash       string `gorm:"size:128;uniqueIndex;not null"`
 	PlaintextHint string `gorm:"size:16"`
 	Description   string `gorm:"size:255"`
@@ -23,7 +24,8 @@ type ApiKey struct {
 	OrganizationID *uint  `gorm:"index"`
 
 	Permissions string     `gorm:"type:json"`
-	ExpiresAt   *time.Time `gorm:"index"`
+	ExpiresAt   *time.Time `gorm:"type:timestamp"`
+	LastUsedAt  *time.Time `gorm:"type:timestamp"`
 }
 
 func NewSchemaApiKey(a *apikey.ApiKey) *ApiKey {
@@ -31,6 +33,7 @@ func NewSchemaApiKey(a *apikey.ApiKey) *ApiKey {
 		BaseModel: BaseModel{
 			ID: a.ID,
 		},
+		PublicID:       a.PublicID,
 		KeyHash:        a.KeyHash,
 		PlaintextHint:  a.PlaintextHint,
 		Description:    a.Description,
@@ -40,12 +43,14 @@ func NewSchemaApiKey(a *apikey.ApiKey) *ApiKey {
 		OrganizationID: a.OrganizationID,
 		Permissions:    a.Permissions,
 		ExpiresAt:      a.ExpiresAt,
+		LastUsedAt:     a.LastUsedAt,
 	}
 }
 
 func (a *ApiKey) EtoD() *apikey.ApiKey {
 	return &apikey.ApiKey{
 		ID:             a.ID,
+		PublicID:       a.PublicID,
 		KeyHash:        a.KeyHash,
 		PlaintextHint:  a.PlaintextHint,
 		Description:    a.Description,
@@ -57,5 +62,6 @@ func (a *ApiKey) EtoD() *apikey.ApiKey {
 		ExpiresAt:      a.ExpiresAt,
 		CreatedAt:      a.CreatedAt,
 		UpdatedAt:      a.UpdatedAt,
+		LastUsedAt:     a.LastUsedAt,
 	}
 }
