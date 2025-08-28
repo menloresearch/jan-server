@@ -19,6 +19,7 @@ const (
 
 type ApiKey struct {
 	ID             uint
+	PublicID       string
 	KeyHash        string
 	PlaintextHint  string
 	Description    string
@@ -30,6 +31,7 @@ type ApiKey struct {
 	ExpiresAt      *time.Time
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+	LastUsedAt     *time.Time
 }
 
 func (k *ApiKey) Revoke() {
@@ -48,10 +50,12 @@ func (k *ApiKey) IsValid() bool {
 }
 
 type ApiKeyFilter struct {
-	KeyHash   *string
-	OwnerType *string
-	OwnerID   *uint
-	UserID    *uint
+	KeyHash        *string
+	PublicID       *string
+	OwnerType      *string
+	OwnerID        *uint
+	UserID         *uint
+	OrganizationID *uint
 }
 
 type ApiKeyRepository interface {

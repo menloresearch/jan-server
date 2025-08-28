@@ -32,6 +32,7 @@ func newApiKey(db *gorm.DB, opts ...gen.DOOption) apiKey {
 	_apiKey.CreatedAt = field.NewTime(tableName, "created_at")
 	_apiKey.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_apiKey.DeletedAt = field.NewField(tableName, "deleted_at")
+	_apiKey.PublicID = field.NewString(tableName, "public_id")
 	_apiKey.KeyHash = field.NewString(tableName, "key_hash")
 	_apiKey.PlaintextHint = field.NewString(tableName, "plaintext_hint")
 	_apiKey.Description = field.NewString(tableName, "description")
@@ -41,6 +42,7 @@ func newApiKey(db *gorm.DB, opts ...gen.DOOption) apiKey {
 	_apiKey.OrganizationID = field.NewUint(tableName, "organization_id")
 	_apiKey.Permissions = field.NewString(tableName, "permissions")
 	_apiKey.ExpiresAt = field.NewTime(tableName, "expires_at")
+	_apiKey.LastUsedAt = field.NewTime(tableName, "last_used_at")
 
 	_apiKey.fillFieldMap()
 
@@ -55,6 +57,7 @@ type apiKey struct {
 	CreatedAt      field.Time
 	UpdatedAt      field.Time
 	DeletedAt      field.Field
+	PublicID       field.String
 	KeyHash        field.String
 	PlaintextHint  field.String
 	Description    field.String
@@ -64,6 +67,7 @@ type apiKey struct {
 	OrganizationID field.Uint
 	Permissions    field.String
 	ExpiresAt      field.Time
+	LastUsedAt     field.Time
 
 	fieldMap map[string]field.Expr
 }
@@ -84,6 +88,7 @@ func (a *apiKey) updateTableName(table string) *apiKey {
 	a.CreatedAt = field.NewTime(table, "created_at")
 	a.UpdatedAt = field.NewTime(table, "updated_at")
 	a.DeletedAt = field.NewField(table, "deleted_at")
+	a.PublicID = field.NewString(table, "public_id")
 	a.KeyHash = field.NewString(table, "key_hash")
 	a.PlaintextHint = field.NewString(table, "plaintext_hint")
 	a.Description = field.NewString(table, "description")
@@ -93,6 +98,7 @@ func (a *apiKey) updateTableName(table string) *apiKey {
 	a.OrganizationID = field.NewUint(table, "organization_id")
 	a.Permissions = field.NewString(table, "permissions")
 	a.ExpiresAt = field.NewTime(table, "expires_at")
+	a.LastUsedAt = field.NewTime(table, "last_used_at")
 
 	a.fillFieldMap()
 
@@ -109,11 +115,12 @@ func (a *apiKey) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (a *apiKey) fillFieldMap() {
-	a.fieldMap = make(map[string]field.Expr, 13)
+	a.fieldMap = make(map[string]field.Expr, 15)
 	a.fieldMap["id"] = a.ID
 	a.fieldMap["created_at"] = a.CreatedAt
 	a.fieldMap["updated_at"] = a.UpdatedAt
 	a.fieldMap["deleted_at"] = a.DeletedAt
+	a.fieldMap["public_id"] = a.PublicID
 	a.fieldMap["key_hash"] = a.KeyHash
 	a.fieldMap["plaintext_hint"] = a.PlaintextHint
 	a.fieldMap["description"] = a.Description
@@ -123,6 +130,7 @@ func (a *apiKey) fillFieldMap() {
 	a.fieldMap["organization_id"] = a.OrganizationID
 	a.fieldMap["permissions"] = a.Permissions
 	a.fieldMap["expires_at"] = a.ExpiresAt
+	a.fieldMap["last_used_at"] = a.LastUsedAt
 }
 
 func (a apiKey) clone(db *gorm.DB) apiKey {

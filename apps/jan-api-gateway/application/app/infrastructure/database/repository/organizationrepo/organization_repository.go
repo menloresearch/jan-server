@@ -79,8 +79,24 @@ func (repo *OrganizationGormRepository) FindByFilter(ctx context.Context, filter
 	sql := query.WithContext(ctx).Organization
 	sql = repo.applyFilter(query, sql, filter)
 	if p != nil {
-		sql = sql.Limit(p.PageSize).Offset(p.PageNumber - 1)
+		if p.Limit != nil && *p.Limit > 0 {
+			sql = sql.Limit(*p.Limit)
+		}
+		if p.After != nil {
+			if p.Order == "desc" {
+				sql = sql.Where(query.Organization.ID.Lt(*p.After))
+			} else {
+				sql = sql.Where(query.Organization.ID.Gt(*p.After))
+			}
+		}
+		if p.Order == "desc" {
+			sql = sql.Order(query.Organization.ID.Desc())
+		} else {
+			// Default to ascending order
+			sql = sql.Order(query.Organization.ID.Asc())
+		}
 	}
+
 	rows, err := sql.Find()
 	if err != nil {
 		return nil, err
