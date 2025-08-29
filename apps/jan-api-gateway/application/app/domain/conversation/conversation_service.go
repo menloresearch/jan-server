@@ -1,14 +1,12 @@
 package conversation
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"golang.org/x/net/context"
+	"menlo.ai/jan-api-gateway/app/utils/idutils"
 )
 
 // Custom errors
@@ -23,18 +21,30 @@ var (
 type ConversationService struct {
 	conversationRepo ConversationRepository
 	itemRepo         ItemRepository
+	validator        *ConversationValidator
 }
 
 func NewService(conversationRepo ConversationRepository, itemRepo ItemRepository) *ConversationService {
+	// Initialize with default validation config
+	validator := NewConversationValidator(DefaultValidationConfig())
 	return &ConversationService{
 		conversationRepo: conversationRepo,
 		itemRepo:         itemRepo,
+		validator:        validator,
+	}
+}
+
+func NewServiceWithValidator(conversationRepo ConversationRepository, itemRepo ItemRepository, validator *ConversationValidator) *ConversationService {
+	return &ConversationService{
+		conversationRepo: conversationRepo,
+		itemRepo:         itemRepo,
+		validator:        validator,
 	}
 }
 
 func (s *ConversationService) CreateConversation(ctx context.Context, userID uint, title *string, isPrivate bool, metadata map[string]string) (*Conversation, error) {
-	// Validate inputs
-	if err := s.validateConversationInput(title, metadata); err != nil {
+	// Validate inputs using enhanced validator
+	if err := s.validator.ValidateConversationInput(title, metadata); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 
@@ -177,8 +187,8 @@ func (s *ConversationService) AddItem(ctx context.Context, conversation *Convers
 		return nil, ErrPrivateConversation
 	}
 
-	// Validate content
-	if err := s.validateItemContent(content); err != nil {
+	// Validate content using enhanced validator
+	if err := s.validator.ValidateItemContent(content); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 
@@ -387,94 +397,12 @@ func (s *ConversationService) SearchItems(ctx context.Context, publicID string, 
 
 // generateConversationPublicID generates a cryptographically secure conversation ID
 func (s *ConversationService) generateConversationPublicID() (string, error) {
-	return s.generateSecureID("conv", 16)
+	return idutils.GenerateConversationID()
 }
 
 // generateItemPublicID generates a cryptographically secure item ID
 func (s *ConversationService) generateItemPublicID() (string, error) {
-	return s.generateSecureID("msg", 16)
-}
-
-// generateSecureID generates a cryptographically secure ID with the given prefix and length
-func (s *ConversationService) generateSecureID(prefix string, length int) (string, error) {
-	// Use larger byte array for better entropy (24 bytes = 32 base64 chars)
-	bytes := make([]byte, 24)
-	_, err := rand.Read(bytes)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate random bytes: %w", err)
-	}
-
-	// Encode to base64 URL-safe format
-	encoded := base64.URLEncoding.EncodeToString(bytes)
-	encoded = strings.TrimRight(encoded, "=") // Remove padding
-
-	// Truncate to desired length
-	if len(encoded) > length {
-		encoded = encoded[:length]
-	}
-
-	return fmt.Sprintf("%s_%s", prefix, encoded), nil
-}
-
-// validateConversationInput validates conversation creation/update inputs
-func (s *ConversationService) validateConversationInput(title *string, metadata map[string]string) error {
-	// Validate title length
-	if title != nil && len(*title) > 255 {
-		return fmt.Errorf("title cannot exceed 255 characters")
-	}
-
-	// Validate metadata
-	if metadata != nil {
-		if len(metadata) > 50 {
-			return fmt.Errorf("metadata cannot have more than 50 keys")
-		}
-		for key, value := range metadata {
-			if len(key) > 100 {
-				return fmt.Errorf("metadata key '%s' cannot exceed 100 characters", key)
-			}
-			if len(value) > 1000 {
-				return fmt.Errorf("metadata value for key '%s' cannot exceed 1000 characters", key)
-			}
-		}
-	}
-
-	return nil
-}
-
-// validateItemContent validates item content structure
-func (s *ConversationService) validateItemContent(content []Content) error {
-	if len(content) == 0 {
-		return fmt.Errorf("item must have at least one content block")
-	}
-
-	if len(content) > 20 {
-		return fmt.Errorf("item cannot have more than 20 content blocks")
-	}
-
-	for i, c := range content {
-		if c.Type == "" {
-			return fmt.Errorf("content block %d must have a type", i)
-		}
-
-		// Validate text content
-		if c.Text != nil {
-			if len(c.Text.Value) > 100000 {
-				return fmt.Errorf("text content in block %d cannot exceed 100,000 characters", i)
-			}
-		}
-
-		// Validate input text content
-		if c.InputText != nil && len(*c.InputText) > 100000 {
-			return fmt.Errorf("input text content in block %d cannot exceed 100,000 characters", i)
-		}
-
-		// Validate output text content
-		if c.OutputText != nil && len(c.OutputText.Text) > 100000 {
-			return fmt.Errorf("output text content in block %d cannot exceed 100,000 characters", i)
-		}
-	}
-
-	return nil
+	return idutils.GenerateItemID()
 }
 
 // AddMultipleItems adds multiple items to a conversation in a single transaction
@@ -501,8 +429,8 @@ func (s *ConversationService) AddMultipleItems(ctx context.Context, conversation
 
 	// Create all items
 	for i, itemData := range items {
-		// Validate content
-		if err := s.validateItemContent(itemData.Content); err != nil {
+		// Validate content using enhanced validator
+		if err := s.validator.ValidateItemContent(itemData.Content); err != nil {
 			return nil, fmt.Errorf("validation failed for item %d: %w", i, err)
 		}
 

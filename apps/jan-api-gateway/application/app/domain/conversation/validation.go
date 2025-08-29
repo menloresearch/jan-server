@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strings"
 	"unicode/utf8"
+
+	"menlo.ai/jan-api-gateway/app/utils/idutils"
 )
 
 // ValidationConfig holds conversation validation rules
@@ -100,8 +102,20 @@ func (v *ConversationValidator) ValidatePublicID(publicID string) error {
 		return fmt.Errorf("public ID must be between 5 and 50 characters")
 	}
 
-	if !v.publicIDPattern.MatchString(publicID) {
-		return fmt.Errorf("public ID contains invalid characters")
+	// Use centralized ID validation logic
+	if strings.HasPrefix(publicID, "conv_") {
+		if !idutils.ValidateConversationID(publicID) {
+			return fmt.Errorf("invalid conversation ID format")
+		}
+	} else if strings.HasPrefix(publicID, "msg_") {
+		if !idutils.ValidateItemID(publicID) {
+			return fmt.Errorf("invalid item ID format")
+		}
+	} else {
+		// Fallback to regex pattern for unknown prefixes
+		if !v.publicIDPattern.MatchString(publicID) {
+			return fmt.Errorf("public ID contains invalid characters")
+		}
 	}
 
 	return nil
