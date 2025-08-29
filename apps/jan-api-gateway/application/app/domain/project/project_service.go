@@ -2,12 +2,10 @@ package project
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
-	"io"
 
 	"menlo.ai/jan-api-gateway/app/domain/query"
+	"menlo.ai/jan-api-gateway/app/utils/stringutils"
 )
 
 // ProjectService provides business logic for managing projects.
@@ -24,14 +22,11 @@ func NewService(repo ProjectRepository) *ProjectService {
 
 // createPublicID generates a unique, URL-safe public ID for the project.
 func (s *ProjectService) createPublicID() (string, error) {
-	randomBytes := make([]byte, 16)
-	_, err := io.ReadFull(rand.Reader, randomBytes)
+	randomStr, err := stringutils.RandomString(16)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate random bytes for public ID: %w", err)
+		return "", err
 	}
-
-	publicID := base64.URLEncoding.EncodeToString(randomBytes)
-	return publicID, nil
+	return fmt.Sprintf("proj_%s", randomStr), nil
 }
 
 // CreateProjectWithPublicID creates a new project and automatically
