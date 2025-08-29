@@ -366,7 +366,7 @@ func domainToOrganizationAdminAPIKeyResponse(entity *apikey.ApiKey) Organization
 		lastUsedAt = ptr.ToInt64(entity.LastUsedAt.Unix())
 	}
 	return OrganizationAdminAPIKeyResponse{
-		Object:        string(openai.OrganizationAdminApiKey),
+		Object:        string(openai.ObjectKeyAdminApiKey),
 		ID:            entity.PublicID,
 		Name:          entity.Description,
 		RedactedValue: entity.PlaintextHint,
