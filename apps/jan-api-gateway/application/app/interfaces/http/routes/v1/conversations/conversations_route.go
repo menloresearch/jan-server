@@ -79,7 +79,7 @@ func (api *ConversationAPI) CreateConversation(ctx *gin.Context) {
 	userClaim, err := auth.GetUserClaimFromRequestContext(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "unauthorized",
+			Code:  "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 			Error: "User not authenticated",
 		})
 		return
@@ -88,7 +88,7 @@ func (api *ConversationAPI) CreateConversation(ctx *gin.Context) {
 	user, err := api.userService.FindByEmail(ctx, userClaim.Email)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "user_not_found",
+			Code:  "b2c3d4e5-f6g7-8901-bcde-f23456789012",
 			Error: err.Error(),
 		})
 		return
@@ -97,7 +97,7 @@ func (api *ConversationAPI) CreateConversation(ctx *gin.Context) {
 	var request CreateConversationRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
 		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "invalid_request",
+			Code:  "c3d4e5f6-g7h8-9012-cdef-345678901234",
 			Error: err.Error(),
 		})
 		return
@@ -112,7 +112,7 @@ func (api *ConversationAPI) CreateConversation(ctx *gin.Context) {
 	conv, err := api.conversationService.CreateConversation(ctx, user.ID, request.Title, isPrivate, request.Metadata)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "create_failed",
+			Code:  "d4e5f6g7-h8i9-0123-defg-456789012345",
 			Error: err.Error(),
 		})
 		return
@@ -140,7 +140,7 @@ func (api *ConversationAPI) ListConversations(ctx *gin.Context) {
 	userClaim, err := auth.GetUserClaimFromRequestContext(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "unauthorized",
+			Code:  "e5f6g7h8-i9j0-1234-efgh-567890123456",
 			Error: "User not authenticated",
 		})
 		return
@@ -149,7 +149,7 @@ func (api *ConversationAPI) ListConversations(ctx *gin.Context) {
 	user, err := api.userService.FindByEmail(ctx, userClaim.Email)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "user_not_found",
+			Code:  "f6g7h8i9-j0k1-2345-fghi-678901234567",
 			Error: err.Error(),
 		})
 		return
@@ -182,7 +182,7 @@ func (api *ConversationAPI) ListConversations(ctx *gin.Context) {
 	conversations, err := api.conversationService.ListConversations(ctx, user.ID, filter, &limit, &offset)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "list_failed",
+			Code:  "g7h8i9j0-k1l2-3456-ghij-789012345678",
 			Error: err.Error(),
 		})
 		return
@@ -209,7 +209,7 @@ func (api *ConversationAPI) GetConversation(ctx *gin.Context) {
 	userClaim, err := auth.GetUserClaimFromRequestContext(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "unauthorized",
+			Code:  "h8i9j0k1-l2m3-4567-hijk-890123456789",
 			Error: "User not authenticated",
 		})
 		return
@@ -218,7 +218,7 @@ func (api *ConversationAPI) GetConversation(ctx *gin.Context) {
 	user, err := api.userService.FindByEmail(ctx, userClaim.Email)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "user_not_found",
+			Code:  "i9j0k1l2-m3n4-5678-ijkl-901234567890",
 			Error: err.Error(),
 		})
 		return
@@ -229,20 +229,20 @@ func (api *ConversationAPI) GetConversation(ctx *gin.Context) {
 	if err != nil {
 		if err.Error() == "conversation not found" {
 			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
-				Code:  "not_found",
+				Code:  "j0k1l2m3-n4o5-6789-jklm-012345678901",
 				Error: err.Error(),
 			})
 			return
 		}
 		if err.Error() == "access denied: conversation is private" {
 			ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
-				Code:  "access_denied",
+				Code:  "k1l2m3n4-o5p6-7890-klmn-123456789012",
 				Error: err.Error(),
 			})
 			return
 		}
 		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "get_failed",
+			Code:  "l2m3n4o5-p6q7-8901-lmno-234567890123",
 			Error: err.Error(),
 		})
 		return
@@ -271,7 +271,7 @@ func (api *ConversationAPI) UpdateConversation(ctx *gin.Context) {
 	userClaim, err := auth.GetUserClaimFromRequestContext(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "unauthorized",
+			Code:  "m3n4o5p6-q7r8-9012-mnop-345678901234",
 			Error: "User not authenticated",
 		})
 		return
@@ -280,7 +280,7 @@ func (api *ConversationAPI) UpdateConversation(ctx *gin.Context) {
 	user, err := api.userService.FindByEmail(ctx, userClaim.Email)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "user_not_found",
+			Code:  "n4o5p6q7-r8s9-0123-nopq-456789012345",
 			Error: err.Error(),
 		})
 		return
@@ -289,7 +289,7 @@ func (api *ConversationAPI) UpdateConversation(ctx *gin.Context) {
 	var request UpdateConversationRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
 		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "invalid_request",
+			Code:  "o5p6q7r8-s9t0-1234-opqr-567890123456",
 			Error: err.Error(),
 		})
 		return
@@ -300,20 +300,20 @@ func (api *ConversationAPI) UpdateConversation(ctx *gin.Context) {
 	if err != nil {
 		if err.Error() == "conversation not found" {
 			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
-				Code:  "not_found",
+				Code:  "p6q7r8s9-t0u1-2345-pqrs-678901234567",
 				Error: err.Error(),
 			})
 			return
 		}
 		if err.Error() == "access denied: not the owner of this conversation" {
 			ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
-				Code:  "access_denied",
+				Code:  "q7r8s9t0-u1v2-3456-qrst-789012345678",
 				Error: err.Error(),
 			})
 			return
 		}
 		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "update_failed",
+			Code:  "r8s9t0u1-v2w3-4567-rstu-890123456789",
 			Error: err.Error(),
 		})
 		return
@@ -340,7 +340,7 @@ func (api *ConversationAPI) DeleteConversation(ctx *gin.Context) {
 	userClaim, err := auth.GetUserClaimFromRequestContext(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "unauthorized",
+			Code:  "s9t0u1v2-w3x4-5678-stuv-901234567890",
 			Error: "User not authenticated",
 		})
 		return
@@ -349,7 +349,7 @@ func (api *ConversationAPI) DeleteConversation(ctx *gin.Context) {
 	user, err := api.userService.FindByEmail(ctx, userClaim.Email)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "user_not_found",
+			Code:  "t0u1v2w3-x4y5-6789-tuvw-012345678901",
 			Error: err.Error(),
 		})
 		return
@@ -360,20 +360,20 @@ func (api *ConversationAPI) DeleteConversation(ctx *gin.Context) {
 	if err != nil {
 		if err.Error() == "conversation not found" {
 			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
-				Code:  "not_found",
+				Code:  "u1v2w3x4-y5z6-7890-uvwx-123456789012",
 				Error: err.Error(),
 			})
 			return
 		}
 		if err.Error() == "access denied: not the owner of this conversation" {
 			ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
-				Code:  "access_denied",
+				Code:  "v2w3x4y5-z6a7-8901-vwxy-234567890123",
 				Error: err.Error(),
 			})
 			return
 		}
 		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "delete_failed",
+			Code:  "w3x4y5z6-a7b8-9012-wxyz-345678901234",
 			Error: err.Error(),
 		})
 		return
@@ -402,7 +402,7 @@ func (api *ConversationAPI) AddItem(ctx *gin.Context) {
 	userClaim, err := auth.GetUserClaimFromRequestContext(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "unauthorized",
+			Code:  "x4y5z6a7-b8c9-0123-xyza-456789012345",
 			Error: "User not authenticated",
 		})
 		return
@@ -411,7 +411,7 @@ func (api *ConversationAPI) AddItem(ctx *gin.Context) {
 	user, err := api.userService.FindByEmail(ctx, userClaim.Email)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "user_not_found",
+			Code:  "y5z6a7b8-c9d0-1234-yzab-567890123456",
 			Error: err.Error(),
 		})
 		return
@@ -420,7 +420,7 @@ func (api *ConversationAPI) AddItem(ctx *gin.Context) {
 	var request AddItemRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
 		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "invalid_request",
+			Code:  "z6a7b8c9-d0e1-2345-zabc-678901234567",
 			Error: err.Error(),
 		})
 		return
@@ -431,20 +431,20 @@ func (api *ConversationAPI) AddItem(ctx *gin.Context) {
 	if err != nil {
 		if err.Error() == "conversation not found" {
 			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
-				Code:  "not_found",
+				Code:  "a7b8c9d0-e1f2-3456-abcd-789012345678",
 				Error: err.Error(),
 			})
 			return
 		}
 		if err.Error() == "access denied: conversation is private" {
 			ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
-				Code:  "access_denied",
+				Code:  "b8c9d0e1-f2g3-4567-bcde-890123456789",
 				Error: err.Error(),
 			})
 			return
 		}
 		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "add_item_failed",
+			Code:  "c9d0e1f2-g3h4-5678-cdef-901234567890",
 			Error: err.Error(),
 		})
 		return
@@ -473,7 +473,7 @@ func (api *ConversationAPI) SearchItems(ctx *gin.Context) {
 	userClaim, err := auth.GetUserClaimFromRequestContext(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "unauthorized",
+			Code:  "d0e1f2g3-h4i5-6789-defg-012345678901",
 			Error: "User not authenticated",
 		})
 		return
@@ -482,7 +482,7 @@ func (api *ConversationAPI) SearchItems(ctx *gin.Context) {
 	user, err := api.userService.FindByEmail(ctx, userClaim.Email)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "user_not_found",
+			Code:  "e1f2g3h4-i5j6-7890-efgh-123456789012",
 			Error: err.Error(),
 		})
 		return
@@ -491,7 +491,7 @@ func (api *ConversationAPI) SearchItems(ctx *gin.Context) {
 	var request SearchItemsRequest
 	if err := ctx.ShouldBindQuery(&request); err != nil {
 		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "invalid_request",
+			Code:  "f2g3h4i5-j6k7-8901-fghi-234567890123",
 			Error: err.Error(),
 		})
 		return
@@ -502,20 +502,20 @@ func (api *ConversationAPI) SearchItems(ctx *gin.Context) {
 	if err != nil {
 		if err.Error() == "conversation not found" {
 			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
-				Code:  "not_found",
+				Code:  "g3h4i5j6-k7l8-9012-ghij-345678901234",
 				Error: err.Error(),
 			})
 			return
 		}
 		if err.Error() == "access denied: conversation is private" {
 			ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
-				Code:  "access_denied",
+				Code:  "h4i5j6k7-l8m9-0123-hijk-456789012345",
 				Error: err.Error(),
 			})
 			return
 		}
 		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "search_failed",
+			Code:  "i5j6k7l8-m9n0-1234-ijkl-567890123456",
 			Error: err.Error(),
 		})
 		return
