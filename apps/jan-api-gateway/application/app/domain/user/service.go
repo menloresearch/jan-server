@@ -27,6 +27,11 @@ func (s *UserService) RegisterUser(ctx context.Context, user *User) (*User, erro
 	if err := s.userrepo.Create(ctx, user); err != nil {
 		return nil, err
 	}
+	s.organizationService.CreateOrganizationWithPublicID(ctx, &organization.Organization{
+		Name:    "Default",
+		Enabled: true,
+		OwnerID: user.ID,
+	})
 	return user, nil
 }
 
