@@ -8,6 +8,7 @@ import (
 	janV1Auth "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth"
 	janV1AuthGoogle "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth/google"
 	janV1Chat "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/chat"
+	janV1Conversations "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/conversations"
 	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
@@ -22,6 +23,7 @@ var RouteProvider = wire.NewSet(
 	janV1Apikeys.NewApiKeyAPI,
 	janV1AuthGoogle.NewGoogleAuthAPI,
 	janV1Auth.NewAuthRoute,
+	janV1Conversations.NewConversationAPI,
 	janV1.NewV1Route,
 	jan.NewJanRoute,
 	organization.NewAdminApiKeyAPI,

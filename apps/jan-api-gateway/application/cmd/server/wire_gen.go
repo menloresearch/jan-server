@@ -28,6 +28,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth/google"
 	chat2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/chat"
+	conversations2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/conversations"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
@@ -75,7 +76,8 @@ func CreateApplication() (*Application, error) {
 	apiKeyAPI := apikeys.NewApiKeyAPI(apiKeyService, userService)
 	chatCompletionAPI := chat2.NewCompletionAPI(userService, apiKeyService)
 	chatChatRoute := chat2.NewChatRoute(chatCompletionAPI)
-	v1V1Route := v1_2.NewV1Route(authRoute, apiKeyAPI, chatChatRoute)
+	conversationsConversationAPI := conversations2.NewConversationAPI(conversationService, userService)
+	v1V1Route := v1_2.NewV1Route(authRoute, apiKeyAPI, chatChatRoute, conversationsConversationAPI)
 	janRoute := jan.NewJanRoute(v1V1Route, chatChatRoute)
 	httpServer := http.NewHttpServer(v1Route, janRoute)
 	application := &Application{
