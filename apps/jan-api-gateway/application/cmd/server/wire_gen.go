@@ -22,7 +22,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
-	conversation3 "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
+	conversation2 "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan"
 	v1_2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/apikeys"
@@ -37,11 +37,11 @@ import (
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	organization2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
-	conversation2 "menlo.ai/jan-api-gateway/app/usecases/conversation"
 )
 
 import (
 	_ "github.com/grafana/pyroscope-go/godeltaprof/http/pprof"
+	_ "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
 	_ "net/http/pprof"
 )
 
@@ -69,8 +69,7 @@ func CreateApplication() (*Application, error) {
 	conversationRepository := conversationrepo.NewConversationGormRepository(transactionDatabase)
 	itemRepository := itemrepo.NewItemGormRepository(transactionDatabase)
 	conversationService := conversation.NewService(conversationRepository, itemRepository)
-	conversationUseCase := conversation2.NewConversationUseCase(conversationService, userService, apiKeyService)
-	conversationHandler := conversation3.NewConversationHandler(conversationUseCase)
+	conversationHandler := conversation2.NewConversationHandler(conversationService, userService, apiKeyService)
 	conversationAPI := conversations.NewConversationAPI(conversationHandler)
 	modelAPI := v1.NewModelAPI()
 	serperService := serpermcp.NewSerperService()

@@ -17,7 +17,6 @@ import (
 	mcp_impl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
-	conversationUseCase "menlo.ai/jan-api-gateway/app/usecases/conversation"
 )
 
 var RouteProvider = wire.NewSet(
@@ -39,7 +38,6 @@ var RouteProvider = wire.NewSet(
 	v1.NewV1Route,
 
 	// Conversation-related dependencies
-	conversationUseCase.NewConversationUseCase,
 	conversationHandler.NewConversationHandler,
 	conversations.NewConversationAPI,
 	janV1Conversations.NewConversationAPI,
