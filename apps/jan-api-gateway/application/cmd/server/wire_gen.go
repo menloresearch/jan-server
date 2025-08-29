@@ -29,6 +29,8 @@ import (
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
+	organization2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
 )
 
 import (
@@ -43,22 +45,25 @@ func CreateApplication() (*Application, error) {
 	if err != nil {
 		return nil, err
 	}
-	apiKeyRepository := apikeyrepo.NewApiKeyGormRepository(db)
+	transactionDatabase := transaction.NewDatabase(db)
+	organizationRepository := organizationrepo.NewOrganizationGormRepository(transactionDatabase)
+	projectRepository := projectrepo.NewProjectGormRepository(transactionDatabase)
+	projectService := project.NewService(projectRepository)
+	organizationService := organization.NewService(organizationRepository, projectService)
+	apiKeyRepository := apikeyrepo.NewApiKeyGormRepository(transactionDatabase)
 	apiKeyService := apikey.NewService(apiKeyRepository)
+	userRepository := userrepo.NewUserGormRepository(transactionDatabase)
+	userService := user.NewService(userRepository, organizationService)
+	adminApiKeyAPI := organization2.NewAdminApiKeyAPI(organizationService, apiKeyService, userService)
+	projectsRoute := projects.NewProjectsRoute(projectService, apiKeyService)
+	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI, projectsRoute)
 	completionAPI := chat.NewCompletionAPI(apiKeyService)
 	chatRoute := chat.NewChatRoute(completionAPI)
 	modelAPI := v1.NewModelAPI()
 	serperService := serpermcp.NewSerperService()
 	serperMCP := mcpimpl.NewSerperMCP(serperService)
 	mcpapi := mcp.NewMCPAPI(serperMCP)
-	v1Route := v1.NewV1Route(chatRoute, modelAPI, mcpapi)
-	transactionDatabase := transaction.NewDatabase(db)
-	userRepository := userrepo.NewUserGormRepository(transactionDatabase)
-	organizationRepository := organizationrepo.NewOrganizationGormRepository(transactionDatabase)
-	projectRepository := projectrepo.NewProjectGormRepository(transactionDatabase)
-	projectService := project.NewService(projectRepository)
-	organizationService := organization.NewService(organizationRepository, projectService)
-	userService := user.NewService(userRepository, organizationService)
+	v1Route := v1.NewV1Route(organizationRoute, chatRoute, modelAPI, mcpapi)
 	googleAuthAPI := google.NewGoogleAuthAPI(userService)
 	authRoute := auth.NewAuthRoute(googleAuthAPI)
 	apiKeyAPI := apikeys.NewApiKeyAPI(apiKeyService, userService)

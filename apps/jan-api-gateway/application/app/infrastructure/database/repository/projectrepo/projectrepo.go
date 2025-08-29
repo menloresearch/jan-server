@@ -110,7 +110,21 @@ func (repo *ProjectGormRepository) FindByFilter(ctx context.Context, filter doma
 	sql := query.Project.WithContext(ctx)
 	sql = repo.applyFilter(query, sql, filter)
 	if p != nil {
-		sql = sql.Limit(p.PageSize).Offset((p.PageNumber - 1) * p.PageSize)
+		if p.Limit != nil && *p.Limit > 0 {
+			sql = sql.Limit(*p.Limit)
+		}
+		if p.After != nil {
+			if p.Order == "desc" {
+				sql = sql.Where(query.Project.ID.Lt(*p.After))
+			} else {
+				sql = sql.Where(query.Project.ID.Gt(*p.After))
+			}
+		}
+		if p.Order == "desc" {
+			sql = sql.Order(query.Project.ID.Desc())
+		} else {
+			sql = sql.Order(query.Project.ID.Asc())
+		}
 	}
 	rows, err := sql.Find()
 	if err != nil {

@@ -1,12 +1,17 @@
 package user
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type User struct {
-	ID      uint
-	Name    string
-	Email   string
-	Enabled bool
+	ID        uint
+	Name      string
+	Email     string
+	Enabled   bool
+	PublicID  string
+	CreatedAt time.Time
 }
 
 type UserRepository interface {

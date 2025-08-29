@@ -9,7 +9,6 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
-	"menlo.ai/jan-api-gateway/app/domain/query"
 	"menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/middleware"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
@@ -71,7 +70,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		apikeyEntities, err := api.apikeyService.Find(reqCtx, apikey.ApiKeyFilter{
 			OwnerID:   &user.ID,
 			OwnerType: ptr.ToString(string(apikey.OwnerTypeAdmin)),
-		}, &query.Pagination{PageNumber: 1, PageSize: 1})
+		}, nil)
 		if err != nil {
 			reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
 				Code:  "7e29d138-8b8e-4895-8edc-c0876ebb1a52",

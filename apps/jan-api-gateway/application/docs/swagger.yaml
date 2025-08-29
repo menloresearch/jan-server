@@ -14,6 +14,8 @@ definitions:
         type: integer
       key:
         type: string
+      plaintext_hint:
+        type: string
     type: object
   app_interfaces_http_routes_jan_v1_apikeys.CreateApiKeyRequest:
     properties:
@@ -114,6 +116,136 @@ definitions:
         type: string
       usage:
         $ref: '#/definitions/openai.Usage'
+    type: object
+  app_interfaces_http_routes_v1_organization.AdminAPIKeyDeletedResponse:
+    properties:
+      deleted:
+        type: boolean
+      id:
+        type: string
+      object:
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_organization.AdminApiKeyListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization.OrganizationAdminAPIKeyResponse'
+        type: array
+      first_id:
+        type: string
+      has_more:
+        type: boolean
+      last_id:
+        type: string
+      object:
+        example: list
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_organization.CreateOrganizationAdminAPIKeyRequest:
+    properties:
+      name:
+        example: My Admin API Key
+        type: string
+    required:
+    - name
+    type: object
+  app_interfaces_http_routes_v1_organization.OrganizationAdminAPIKeyResponse:
+    properties:
+      created_at:
+        example: 1698765432
+        type: integer
+      id:
+        example: key_1234567890
+        type: string
+      last_used_at:
+        example: 1698765432
+        type: integer
+      name:
+        example: My Admin API Key
+        type: string
+      object:
+        example: api_key
+        type: string
+      owner:
+        $ref: '#/definitions/app_interfaces_http_routes_v1_organization.Owner'
+      redacted_value:
+        example: sk-...abcd
+        type: string
+      value:
+        example: sk-abcdef1234567890
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_organization.Owner:
+    properties:
+      created_at:
+        example: 1698765432
+        type: integer
+      id:
+        example: user_1234567890
+        type: string
+      name:
+        example: John Doe
+        type: string
+      object:
+        example: user
+        type: string
+      role:
+        example: admin
+        type: string
+      type:
+        example: user
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_organization_projects.CreateProjectRequest:
+    properties:
+      name:
+        example: New AI Project
+        type: string
+    required:
+    - name
+    type: object
+  app_interfaces_http_routes_v1_organization_projects.ProjectListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_projects.ProjectResponse'
+        type: array
+      first_id:
+        type: string
+      has_more:
+        type: boolean
+      last_id:
+        type: string
+      object:
+        example: list
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_organization_projects.ProjectResponse:
+    properties:
+      archived_at:
+        example: 1698765432
+        type: integer
+      created_at:
+        example: 1698765432
+        type: integer
+      id:
+        example: proj_1234567890
+        type: string
+      name:
+        example: My First Project
+        type: string
+      object:
+        example: project
+        type: string
+      status:
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_organization_projects.UpdateProjectRequest:
+    properties:
+      name:
+        example: Updated AI Project
+        type: string
     type: object
   menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse:
     properties:
@@ -994,6 +1126,347 @@ paths:
       summary: List available models
       tags:
       - Models
+  /v1/organization/admin_api_keys:
+    get:
+      description: Retrieves a paginated list of all admin API keys for the authenticated
+        organization.
+      parameters:
+      - default: '"Bearer <admin_api_key>"'
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - default: 20
+        description: The maximum number of items to return
+        in: query
+        name: limit
+        type: integer
+      - description: A cursor for use in pagination. The ID of the last object from
+          the previous page
+        in: query
+        name: after
+        type: string
+      responses:
+        "200":
+          description: Successfully retrieved the list of admin API keys
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization.AdminApiKeyListResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List Admin API Keys
+      tags:
+      - Admin API Keys
+    post:
+      consumes:
+      - application/json
+      description: Creates a new admin API key for an organization. Requires a valid
+        admin API key in the Authorization header.
+      parameters:
+      - default: '"Bearer <admin_api_key>"'
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: API key creation request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization.CreateOrganizationAdminAPIKeyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully created admin API key
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization.OrganizationAdminAPIKeyResponse'
+        "400":
+          description: Bad request - invalid payload
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create Admin API Key
+      tags:
+      - Admin API Keys
+  /v1/organization/admin_api_keys/{id}:
+    delete:
+      description: Deletes an admin API key by its ID.
+      parameters:
+      - default: '"Bearer <admin_api_key>"'
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: ID of the admin API key to delete
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: Successfully deleted the admin API key
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization.AdminAPIKeyDeletedResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Not Found - API key with the given ID does not exist or does
+            not belong to the organization
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete Admin API Key
+      tags:
+      - Admin API Keys
+    get:
+      description: Retrieves a specific admin API key by its ID.
+      parameters:
+      - default: '"Bearer <admin_api_key>"'
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: ID of the admin API key
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: Successfully retrieved the admin API key
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization.OrganizationAdminAPIKeyResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Not Found - API key with the given ID does not exist or does
+            not belong to the organization
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get Admin API Key
+      tags:
+      - Admin API Keys
+  /v1/organization/projects:
+    get:
+      description: Retrieves a paginated list of all projects for the authenticated
+        organization.
+      parameters:
+      - default: '"Bearer <api_key>"'
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - default: 20
+        description: The maximum number of items to return
+        in: query
+        name: limit
+        type: integer
+      - description: A cursor for use in pagination. The ID of the last object from
+          the previous page
+        in: query
+        name: after
+        type: string
+      - description: Whether to include archived projects.
+        in: query
+        name: include_archived
+        type: string
+      responses:
+        "200":
+          description: Successfully retrieved the list of projects
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_projects.ProjectListResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List Projects
+      tags:
+      - Projects
+    post:
+      consumes:
+      - application/json
+      description: Creates a new project for an organization.
+      parameters:
+      - default: '"Bearer <api_key>"'
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Project creation request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_projects.CreateProjectRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully created project
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_projects.ProjectResponse'
+        "400":
+          description: Bad request - invalid payload
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create Project
+      tags:
+      - Projects
+  /v1/organization/projects/{project_id}:
+    get:
+      description: Retrieves a specific project by its ID.
+      parameters:
+      - default: '"Bearer <api_key>"'
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: ID of the project
+        in: path
+        name: project_id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: Successfully retrieved the project
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_projects.ProjectResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Not Found - project with the given ID does not exist or does
+            not belong to the organization
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get Project
+      tags:
+      - Projects
+    post:
+      consumes:
+      - application/json
+      description: Updates a specific project by its ID.
+      parameters:
+      - default: '"Bearer <api_key>"'
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: ID of the project to update
+        in: path
+        name: project_id
+        required: true
+        type: string
+      - description: Project update request
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_projects.UpdateProjectRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully updated the project
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_projects.ProjectResponse'
+        "400":
+          description: Bad request - invalid payload
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Not Found - project with the given ID does not exist
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update Project
+      tags:
+      - Projects
+  /v1/organization/projects/{project_id}/archive:
+    post:
+      description: Archives a specific project by its ID, making it inactive.
+      parameters:
+      - default: '"Bearer <api_key>"'
+        description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: ID of the project to archive
+        in: path
+        name: project_id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: Successfully archived the project
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_projects.ProjectResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Not Found - project with the given ID does not exist
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Archive Project
+      tags:
+      - Projects
   /v1/version:
     get:
       description: Returns the current build version of the API server.

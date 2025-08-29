@@ -387,10 +387,8 @@ func (api *ApiKeyAPI) ListApiKeys(reqCtx *gin.Context) {
 	}
 
 	reqCtx.JSON(http.StatusOK, responses.ListlResponse[ApiKeyResponse]{
-		Status:   responses.ResponseCodeOk,
-		Page:     pagination.PageNumber,
-		PageSize: pagination.PageSize,
-		Total:    apiKeysCount,
-		Results:  functional.Map(entities, domainToApiKeyResponse),
+		Status:  responses.ResponseCodeOk,
+		Total:   apiKeysCount,
+		Results: functional.Map(entities, domainToApiKeyResponse),
 	})
 }
