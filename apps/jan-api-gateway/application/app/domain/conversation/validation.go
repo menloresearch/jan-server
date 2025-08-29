@@ -147,15 +147,6 @@ func (v *ConversationValidator) validateTitle(title string) error {
 		return fmt.Errorf("title cannot be empty or only whitespace")
 	}
 
-	// Check for potential injection attempts
-	suspiciousPatterns := []string{"<script", "javascript:", "data:", "vbscript:", "onload=", "onerror="}
-	lowerTitle := strings.ToLower(title)
-	for _, pattern := range suspiciousPatterns {
-		if strings.Contains(lowerTitle, pattern) {
-			return fmt.Errorf("title contains potentially unsafe content")
-		}
-	}
-
 	return nil
 }
 
@@ -196,15 +187,6 @@ func (v *ConversationValidator) validateMetadataKey(key string) error {
 func (v *ConversationValidator) validateMetadataValue(key, value string) error {
 	if utf8.RuneCountInString(value) > v.config.MaxMetadataValueLength {
 		return fmt.Errorf("metadata value cannot exceed %d characters", v.config.MaxMetadataValueLength)
-	}
-
-	// Check for potential injection in metadata values
-	suspiciousPatterns := []string{"<script", "javascript:", "data:", "vbscript:"}
-	lowerValue := strings.ToLower(value)
-	for _, pattern := range suspiciousPatterns {
-		if strings.Contains(lowerValue, pattern) {
-			return fmt.Errorf("metadata value contains potentially unsafe content")
-		}
 	}
 
 	return nil
