@@ -33,6 +33,11 @@ func NewService(conversationRepo ConversationRepository, itemRepo ItemRepository
 }
 
 func (s *ConversationService) CreateConversation(ctx context.Context, userID uint, title *string, isPrivate bool, metadata map[string]string) (*Conversation, error) {
+	// Validate inputs
+	if err := s.validateConversationInput(title, metadata); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
 	publicID, err := s.generateConversationPublicID()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate public ID: %w", err)
@@ -57,41 +62,23 @@ func (s *ConversationService) CreateConversation(ctx context.Context, userID uin
 	return conversation, nil
 }
 
-// GetConversationWithAccessAndItems retrieves a conversation by its public ID,
-// checks access permissions based on userID, loads associated items, and
-// populates the Items field on the returned Conversation object.
-func (s *ConversationService) GetConversationWithAccessAndItems(ctx context.Context, publicID string, userID uint) (*Conversation, error) {
-	conversation, err := s.conversationRepo.FindByPublicID(ctx, publicID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find conversation: %w", err)
-	}
-
-	if conversation == nil {
-		return nil, ErrConversationNotFound
-	}
-
-	// Check access permissions
-	if conversation.IsPrivate && conversation.UserID != userID {
-		return nil, ErrPrivateConversation
-	}
-
-	// Load items
-	items, err := s.itemRepo.FindByConversationID(ctx, conversation.ID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load items: %w", err)
-	}
-
-	// Convert []*Item to []Item
-	itemSlice := make([]Item, len(items))
-	for i, item := range items {
-		itemSlice[i] = *item
-	}
-	conversation.Items = itemSlice
-
-	return conversation, nil
+// GetConversation retrieves a conversation by its public ID with access control and items loaded
+func (s *ConversationService) GetConversation(ctx context.Context, publicID string, userID uint) (*Conversation, error) {
+	return s.getConversationWithAccessCheck(ctx, publicID, userID, true)
 }
 
-func (s *ConversationService) GetConversation(ctx context.Context, publicID string, userID uint) (*Conversation, error) {
+// GetConversationWithAccessAndItems is an alias for backward compatibility
+func (s *ConversationService) GetConversationWithAccessAndItems(ctx context.Context, publicID string, userID uint) (*Conversation, error) {
+	return s.GetConversation(ctx, publicID, userID)
+}
+
+// getConversationWithAccessCheck is the internal method that handles conversation retrieval with optional item loading
+func (s *ConversationService) getConversationWithAccessCheck(ctx context.Context, publicID string, userID uint, loadItems bool) (*Conversation, error) {
+	// Validate inputs
+	if publicID == "" {
+		return nil, fmt.Errorf("public ID cannot be empty")
+	}
+
 	conversation, err := s.conversationRepo.FindByPublicID(ctx, publicID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find conversation: %w", err)
@@ -106,18 +93,20 @@ func (s *ConversationService) GetConversation(ctx context.Context, publicID stri
 		return nil, ErrPrivateConversation
 	}
 
-	// Load items
-	items, err := s.itemRepo.FindByConversationID(ctx, conversation.ID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load items: %w", err)
-	}
+	// Load items if requested
+	if loadItems {
+		items, err := s.itemRepo.FindByConversationID(ctx, conversation.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load items: %w", err)
+		}
 
-	// Convert []*Item to []Item
-	itemSlice := make([]Item, len(items))
-	for i, item := range items {
-		itemSlice[i] = *item
+		// Convert []*Item to []Item
+		itemSlice := make([]Item, len(items))
+		for i, item := range items {
+			itemSlice[i] = *item
+		}
+		conversation.Items = itemSlice
 	}
-	conversation.Items = itemSlice
 
 	return conversation, nil
 }
@@ -183,6 +172,11 @@ func (s *ConversationService) AddItem(ctx context.Context, conversation *Convers
 		return nil, ErrPrivateConversation
 	}
 
+	// Validate content
+	if err := s.validateItemContent(content); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
+	}
+
 	itemPublicID, err := s.generateItemPublicID()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate item public ID: %w", err)
@@ -204,7 +198,7 @@ func (s *ConversationService) AddItem(ctx context.Context, conversation *Convers
 	}
 
 	// Update conversation timestamp
-	conversation.UpdatedAt = time.Now().Unix()
+	conversation.UpdatedAt = now
 	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
 		return nil, fmt.Errorf("failed to update conversation timestamp: %w", err)
 	}
@@ -218,7 +212,17 @@ func (s *ConversationService) GetItem(ctx context.Context, conversation *Convers
 		return nil, ErrPrivateConversation
 	}
 
-	// Get the item
+	// More efficient: check if item exists in the already loaded conversation items
+	if len(conversation.Items) > 0 {
+		for _, item := range conversation.Items {
+			if item.ID == itemID {
+				return &item, nil
+			}
+		}
+		return nil, ErrItemNotFound
+	}
+
+	// Fallback: if items aren't loaded, get the item and verify ownership
 	item, err := s.itemRepo.FindByID(ctx, itemID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find item: %w", err)
@@ -228,29 +232,28 @@ func (s *ConversationService) GetItem(ctx context.Context, conversation *Convers
 		return nil, ErrItemNotFound
 	}
 
-	// Verify the item belongs to the conversation
-	// We need to get the conversation ID from the item and compare
-	// For now, let's check if the item was created as part of this conversation
-	// by getting all items from the conversation and checking if our item is there
-	conversationItems, err := s.itemRepo.FindByConversationID(ctx, conversation.ID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to verify item ownership: %w", err)
-	}
-
-	// Check if the item belongs to this conversation
-	itemFound := false
-	for _, convItem := range conversationItems {
-		if convItem.ID == itemID {
-			itemFound = true
-			break
-		}
-	}
-
-	if !itemFound {
-		return nil, ErrItemNotInConversation
+	// Enhanced verification: use a more efficient query to check if item belongs to conversation
+	// This avoids loading all conversation items
+	if err := s.verifyItemBelongsToConversation(ctx, itemID, conversation.ID); err != nil {
+		return nil, err
 	}
 
 	return item, nil
+}
+
+// verifyItemBelongsToConversation efficiently checks if an item belongs to a conversation
+func (s *ConversationService) verifyItemBelongsToConversation(ctx context.Context, itemID uint, conversationID uint) error {
+	// Use the efficient exists check instead of loading all items
+	exists, err := s.itemRepo.ExistsByIDAndConversation(ctx, itemID, conversationID)
+	if err != nil {
+		return fmt.Errorf("failed to verify item ownership: %w", err)
+	}
+
+	if !exists {
+		return ErrItemNotInConversation
+	}
+
+	return nil
 }
 
 func (s *ConversationService) DeleteItem(ctx context.Context, conversation *Conversation, itemID uint, userID uint) (*Conversation, error) {
@@ -331,52 +334,176 @@ func (s *ConversationService) SearchItems(ctx context.Context, publicID string, 
 	return items, nil
 }
 
+// generateConversationPublicID generates a cryptographically secure conversation ID
 func (s *ConversationService) generateConversationPublicID() (string, error) {
-	bytes := make([]byte, 12)
-	_, err := rand.Read(bytes)
-	if err != nil {
-		return "", err
-	}
-
-	key := base64.URLEncoding.EncodeToString(bytes)
-	key = strings.TrimRight(key, "=")
-
-	if len(key) > 16 {
-		key = key[:16]
-	} else if len(key) < 16 {
-		extra := make([]byte, 16-len(key))
-		_, err := rand.Read(extra)
-		if err != nil {
-			return "", err
-		}
-		key += base64.URLEncoding.EncodeToString(extra)[:16-len(key)]
-	}
-
-	return fmt.Sprintf("conv_%s", key), nil
+	return s.generateSecureID("conv", 16)
 }
 
+// generateItemPublicID generates a cryptographically secure item ID
 func (s *ConversationService) generateItemPublicID() (string, error) {
-	bytes := make([]byte, 12)
+	return s.generateSecureID("msg", 16)
+}
+
+// generateSecureID generates a cryptographically secure ID with the given prefix and length
+func (s *ConversationService) generateSecureID(prefix string, length int) (string, error) {
+	// Use larger byte array for better entropy (24 bytes = 32 base64 chars)
+	bytes := make([]byte, 24)
 	_, err := rand.Read(bytes)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
 	}
 
-	key := base64.URLEncoding.EncodeToString(bytes)
-	key = strings.TrimRight(key, "=")
+	// Encode to base64 URL-safe format
+	encoded := base64.URLEncoding.EncodeToString(bytes)
+	encoded = strings.TrimRight(encoded, "=") // Remove padding
 
-	if len(key) > 16 {
-		key = key[:16]
-	} else if len(key) < 16 {
-		extra := make([]byte, 16-len(key))
-		_, err := rand.Read(extra)
-		if err != nil {
-			return "", err
+	// Truncate to desired length
+	if len(encoded) > length {
+		encoded = encoded[:length]
+	}
+
+	return fmt.Sprintf("%s_%s", prefix, encoded), nil
+}
+
+// validateConversationInput validates conversation creation/update inputs
+func (s *ConversationService) validateConversationInput(title *string, metadata map[string]string) error {
+	// Validate title length
+	if title != nil && len(*title) > 255 {
+		return fmt.Errorf("title cannot exceed 255 characters")
+	}
+
+	// Validate metadata
+	if metadata != nil {
+		if len(metadata) > 50 {
+			return fmt.Errorf("metadata cannot have more than 50 keys")
 		}
-		key += base64.URLEncoding.EncodeToString(extra)[:16-len(key)]
+		for key, value := range metadata {
+			if len(key) > 100 {
+				return fmt.Errorf("metadata key '%s' cannot exceed 100 characters", key)
+			}
+			if len(value) > 1000 {
+				return fmt.Errorf("metadata value for key '%s' cannot exceed 1000 characters", key)
+			}
+		}
 	}
 
-	return fmt.Sprintf("msg_%s", key), nil
+	return nil
+}
+
+// validateItemContent validates item content structure
+func (s *ConversationService) validateItemContent(content []Content) error {
+	if len(content) == 0 {
+		return fmt.Errorf("item must have at least one content block")
+	}
+
+	if len(content) > 20 {
+		return fmt.Errorf("item cannot have more than 20 content blocks")
+	}
+
+	for i, c := range content {
+		if c.Type == "" {
+			return fmt.Errorf("content block %d must have a type", i)
+		}
+
+		// Validate text content
+		if c.Text != nil {
+			if len(c.Text.Value) > 100000 {
+				return fmt.Errorf("text content in block %d cannot exceed 100,000 characters", i)
+			}
+		}
+
+		// Validate input text content
+		if c.InputText != nil && len(*c.InputText) > 100000 {
+			return fmt.Errorf("input text content in block %d cannot exceed 100,000 characters", i)
+		}
+
+		// Validate output text content
+		if c.OutputText != nil && len(c.OutputText.Text) > 100000 {
+			return fmt.Errorf("output text content in block %d cannot exceed 100,000 characters", i)
+		}
+	}
+
+	return nil
+}
+
+// AddMultipleItems adds multiple items to a conversation in a single transaction
+func (s *ConversationService) AddMultipleItems(ctx context.Context, conversation *Conversation, userID uint, items []struct {
+	Type    ItemType
+	Role    *ItemRole
+	Content []Content
+}) ([]*Item, error) {
+	// Check access permissions
+	if conversation.IsPrivate && conversation.UserID != userID {
+		return nil, ErrPrivateConversation
+	}
+
+	if len(items) == 0 {
+		return nil, fmt.Errorf("no items provided")
+	}
+
+	if len(items) > 100 {
+		return nil, fmt.Errorf("cannot add more than 100 items at once")
+	}
+
+	now := time.Now().Unix()
+	createdItems := make([]*Item, len(items))
+
+	// Create all items
+	for i, itemData := range items {
+		// Validate content
+		if err := s.validateItemContent(itemData.Content); err != nil {
+			return nil, fmt.Errorf("validation failed for item %d: %w", i, err)
+		}
+
+		itemPublicID, err := s.generateItemPublicID()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate item public ID for item %d: %w", i, err)
+		}
+
+		item := &Item{
+			PublicID:    itemPublicID,
+			Type:        itemData.Type,
+			Role:        itemData.Role,
+			Content:     itemData.Content,
+			Status:      stringPtr("completed"),
+			CreatedAt:   now,
+			CompletedAt: &now,
+		}
+
+		if err := s.conversationRepo.AddItem(ctx, conversation.ID, item); err != nil {
+			return nil, fmt.Errorf("failed to add item %d: %w", i, err)
+		}
+
+		createdItems[i] = item
+	}
+
+	// Update conversation timestamp once
+	conversation.UpdatedAt = now
+	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
+		return nil, fmt.Errorf("failed to update conversation timestamp: %w", err)
+	}
+
+	return createdItems, nil
+}
+
+// GetItemsPaginated retrieves items for a conversation with pagination
+func (s *ConversationService) GetItemsPaginated(ctx context.Context, publicID string, userID uint, opts PaginationOptions) (*PaginatedResult[*Item], error) {
+	conversation, err := s.getConversationWithAccessCheck(ctx, publicID, userID, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.itemRepo.FindByConversationIDPaginated(ctx, conversation.ID, opts)
+}
+
+// SearchItemsPaginated searches items in a conversation with pagination
+func (s *ConversationService) SearchItemsPaginated(ctx context.Context, publicID string, userID uint, query string, opts PaginationOptions) (*PaginatedResult[*Item], error) {
+	conversation, err := s.getConversationWithAccessCheck(ctx, publicID, userID, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.itemRepo.SearchPaginated(ctx, conversation.ID, query, opts)
 }
 
 // Helper function for string pointers

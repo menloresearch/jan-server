@@ -95,3 +95,36 @@ func (r *ConversationGormRepository) SearchItems(ctx context.Context, conversati
 
 	return items, nil
 }
+
+// BulkAddItems adds multiple items to a conversation in a single transaction
+func (r *ConversationGormRepository) BulkAddItems(ctx context.Context, conversationID uint, items []*domain.Item) error {
+	if len(items) == 0 {
+		return nil
+	}
+
+	models := make([]*dbschema.Item, len(items))
+	for i, item := range items {
+		model := dbschema.NewSchemaItem(item)
+		model.ConversationID = conversationID
+		models[i] = model
+	}
+
+	// Use batch insert for better performance
+	query := r.db.GetQuery(ctx)
+	if err := query.Item.WithContext(ctx).CreateInBatches(models, 100); err != nil {
+		return err
+	}
+
+	// Update the items with their assigned IDs
+	for i, model := range models {
+		items[i].ID = model.ID
+	}
+
+	return nil
+}
+
+// CountItemsByConversation counts the number of items in a conversation
+func (r *ConversationGormRepository) CountItemsByConversation(ctx context.Context, conversationID uint) (int64, error) {
+	query := r.db.GetQuery(ctx)
+	return query.Item.WithContext(ctx).Where(query.Item.ConversationID.Eq(conversationID)).Count()
+}

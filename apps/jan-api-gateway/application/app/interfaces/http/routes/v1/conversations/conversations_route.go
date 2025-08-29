@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
@@ -125,13 +126,69 @@ func domainToContentResponse(content []conversation.Content) []ContentResponse {
 
 	response := make([]ContentResponse, len(content))
 	for i, c := range content {
-		response[i] = ContentResponse{
+		contentResp := ContentResponse{
 			Type: c.Type,
 		}
-		if c.Text != nil {
-			response[i].Text = &TextResponse{
-				Value: c.Text.Value,
+
+		// Handle different content types
+		switch c.Type {
+		case "text":
+			if c.Text != nil {
+				contentResp.Text = &TextResponse{
+					Value: c.Text.Value,
+				}
 			}
+		case "input_text":
+			if c.InputText != nil {
+				contentResp.InputText = c.InputText
+			}
+		case "output_text":
+			if c.OutputText != nil {
+				contentResp.OutputText = &OutputTextResponse{
+					Text:        c.OutputText.Text,
+					Annotations: domainToAnnotationResponse(c.OutputText.Annotations),
+				}
+			}
+		case "image":
+			if c.Image != nil {
+				contentResp.Image = &ImageContentResponse{
+					URL:    c.Image.URL,
+					FileID: c.Image.FileID,
+					Detail: c.Image.Detail,
+				}
+			}
+		case "file":
+			if c.File != nil {
+				contentResp.File = &FileContentResponse{
+					FileID:   c.File.FileID,
+					Name:     c.File.Name,
+					MimeType: c.File.MimeType,
+					Size:     c.File.Size,
+				}
+			}
+		}
+
+		response[i] = contentResp
+	}
+	return response
+}
+
+// domainToAnnotationResponse converts domain annotations to response format
+func domainToAnnotationResponse(annotations []conversation.Annotation) []AnnotationResponse {
+	if len(annotations) == 0 {
+		return nil
+	}
+
+	response := make([]AnnotationResponse, len(annotations))
+	for i, a := range annotations {
+		response[i] = AnnotationResponse{
+			Type:       a.Type,
+			Text:       a.Text,
+			FileID:     a.FileID,
+			URL:        a.URL,
+			StartIndex: a.StartIndex,
+			EndIndex:   a.EndIndex,
+			Index:      a.Index,
 		}
 	}
 	return response
@@ -178,13 +235,49 @@ type ConversationItemResponse struct {
 
 // ContentResponse represents content in the response
 type ContentResponse struct {
-	Type string        `json:"type"`
-	Text *TextResponse `json:"text,omitempty"`
+	Type       string                `json:"type"`
+	Text       *TextResponse         `json:"text,omitempty"`
+	InputText  *string               `json:"input_text,omitempty"`
+	OutputText *OutputTextResponse   `json:"output_text,omitempty"`
+	Image      *ImageContentResponse `json:"image,omitempty"`
+	File       *FileContentResponse  `json:"file,omitempty"`
 }
 
 // TextResponse represents text content in the response
 type TextResponse struct {
 	Value string `json:"value"`
+}
+
+// OutputTextResponse represents AI output text with annotations
+type OutputTextResponse struct {
+	Text        string               `json:"text"`
+	Annotations []AnnotationResponse `json:"annotations"`
+}
+
+// ImageContentResponse represents image content
+type ImageContentResponse struct {
+	URL    string `json:"url,omitempty"`
+	FileID string `json:"file_id,omitempty"`
+	Detail string `json:"detail,omitempty"`
+}
+
+// FileContentResponse represents file content
+type FileContentResponse struct {
+	FileID   string `json:"file_id"`
+	Name     string `json:"name,omitempty"`
+	MimeType string `json:"mime_type,omitempty"`
+	Size     int64  `json:"size,omitempty"`
+}
+
+// AnnotationResponse represents annotation in the response
+type AnnotationResponse struct {
+	Type       string `json:"type"`
+	Text       string `json:"text,omitempty"`
+	FileID     string `json:"file_id,omitempty"`
+	URL        string `json:"url,omitempty"`
+	StartIndex int    `json:"start_index"`
+	EndIndex   int    `json:"end_index"`
+	Index      int    `json:"index,omitempty"`
 }
 
 // UpdateConversationRequest represents the request body for updating a conversation (matches OpenAI UpdateConversationBody)
@@ -650,6 +743,42 @@ func (api *ConversationAPI) CreateItems(ctx *gin.Context) {
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id}/items [get]
+
+// validatePaginationParams extracts and validates pagination parameters
+func (api *ConversationAPI) validatePaginationParams(ctx *gin.Context) (conversation.PaginationOptions, error) {
+	opts := conversation.PaginationOptions{
+		Limit: 20,    // Default
+		Order: "asc", // Default
+	}
+
+	// Parse limit
+	if limitStr := ctx.Query("limit"); limitStr != "" {
+		if limit, err := strconv.Atoi(limitStr); err == nil {
+			if limit > 0 && limit <= 100 {
+				opts.Limit = limit
+			} else {
+				return opts, fmt.Errorf("limit must be between 1 and 100")
+			}
+		} else {
+			return opts, fmt.Errorf("invalid limit parameter")
+		}
+	}
+
+	// Parse cursor
+	opts.Cursor = ctx.Query("cursor")
+
+	// Parse order
+	if order := ctx.Query("order"); order != "" {
+		if order == "asc" || order == "desc" {
+			opts.Order = order
+		} else {
+			return opts, fmt.Errorf("order must be 'asc' or 'desc'")
+		}
+	}
+
+	return opts, nil
+}
+
 func (api *ConversationAPI) ListItems(ctx *gin.Context) {
 	ownerID, err := api.validateAPIKey(ctx)
 	if err != nil {
