@@ -6,6 +6,7 @@ package gormgen
 
 import (
 	"context"
+	"database/sql"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -37,6 +38,60 @@ func newConversation(db *gorm.DB, opts ...gen.DOOption) conversation {
 	_conversation.Status = field.NewString(tableName, "status")
 	_conversation.Metadata = field.NewString(tableName, "metadata")
 	_conversation.IsPrivate = field.NewBool(tableName, "is_private")
+	_conversation.Items = conversationHasManyItems{
+		db: db.Session(&gorm.Session{}),
+
+		RelationField: field.NewRelation("Items", "dbschema.Item"),
+		Conversation: struct {
+			field.RelationField
+			User struct {
+				field.RelationField
+				Organizations struct {
+					field.RelationField
+				}
+				Projects struct {
+					field.RelationField
+				}
+			}
+			Items struct {
+				field.RelationField
+			}
+		}{
+			RelationField: field.NewRelation("Items.Conversation", "dbschema.Conversation"),
+			User: struct {
+				field.RelationField
+				Organizations struct {
+					field.RelationField
+				}
+				Projects struct {
+					field.RelationField
+				}
+			}{
+				RelationField: field.NewRelation("Items.Conversation.User", "dbschema.User"),
+				Organizations: struct {
+					field.RelationField
+				}{
+					RelationField: field.NewRelation("Items.Conversation.User.Organizations", "dbschema.OrganizationMember"),
+				},
+				Projects: struct {
+					field.RelationField
+				}{
+					RelationField: field.NewRelation("Items.Conversation.User.Projects", "dbschema.ProjectMember"),
+				},
+			},
+			Items: struct {
+				field.RelationField
+			}{
+				RelationField: field.NewRelation("Items.Conversation.Items", "dbschema.Item"),
+			},
+		},
+	}
+
+	_conversation.User = conversationBelongsToUser{
+		db: db.Session(&gorm.Session{}),
+
+		RelationField: field.NewRelation("User", "dbschema.User"),
+	}
 
 	_conversation.fillFieldMap()
 
@@ -57,6 +112,9 @@ type conversation struct {
 	Status    field.String
 	Metadata  field.String
 	IsPrivate field.Bool
+	Items     conversationHasManyItems
+
+	User conversationBelongsToUser
 
 	fieldMap map[string]field.Expr
 }
@@ -99,7 +157,7 @@ func (c *conversation) GetFieldByName(fieldName string) (field.OrderExpr, bool) 
 }
 
 func (c *conversation) fillFieldMap() {
-	c.fieldMap = make(map[string]field.Expr, 10)
+	c.fieldMap = make(map[string]field.Expr, 12)
 	c.fieldMap["id"] = c.ID
 	c.fieldMap["created_at"] = c.CreatedAt
 	c.fieldMap["updated_at"] = c.UpdatedAt
@@ -110,16 +168,201 @@ func (c *conversation) fillFieldMap() {
 	c.fieldMap["status"] = c.Status
 	c.fieldMap["metadata"] = c.Metadata
 	c.fieldMap["is_private"] = c.IsPrivate
+
 }
 
 func (c conversation) clone(db *gorm.DB) conversation {
 	c.conversationDo.ReplaceConnPool(db.Statement.ConnPool)
+	c.Items.db = db.Session(&gorm.Session{Initialized: true})
+	c.Items.db.Statement.ConnPool = db.Statement.ConnPool
+	c.User.db = db.Session(&gorm.Session{Initialized: true})
+	c.User.db.Statement.ConnPool = db.Statement.ConnPool
 	return c
 }
 
 func (c conversation) replaceDB(db *gorm.DB) conversation {
 	c.conversationDo.ReplaceDB(db)
+	c.Items.db = db.Session(&gorm.Session{})
+	c.User.db = db.Session(&gorm.Session{})
 	return c
+}
+
+type conversationHasManyItems struct {
+	db *gorm.DB
+
+	field.RelationField
+
+	Conversation struct {
+		field.RelationField
+		User struct {
+			field.RelationField
+			Organizations struct {
+				field.RelationField
+			}
+			Projects struct {
+				field.RelationField
+			}
+		}
+		Items struct {
+			field.RelationField
+		}
+	}
+}
+
+func (a conversationHasManyItems) Where(conds ...field.Expr) *conversationHasManyItems {
+	if len(conds) == 0 {
+		return &a
+	}
+
+	exprs := make([]clause.Expression, 0, len(conds))
+	for _, cond := range conds {
+		exprs = append(exprs, cond.BeCond().(clause.Expression))
+	}
+	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
+	return &a
+}
+
+func (a conversationHasManyItems) WithContext(ctx context.Context) *conversationHasManyItems {
+	a.db = a.db.WithContext(ctx)
+	return &a
+}
+
+func (a conversationHasManyItems) Session(session *gorm.Session) *conversationHasManyItems {
+	a.db = a.db.Session(session)
+	return &a
+}
+
+func (a conversationHasManyItems) Model(m *dbschema.Conversation) *conversationHasManyItemsTx {
+	return &conversationHasManyItemsTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a conversationHasManyItems) Unscoped() *conversationHasManyItems {
+	a.db = a.db.Unscoped()
+	return &a
+}
+
+type conversationHasManyItemsTx struct{ tx *gorm.Association }
+
+func (a conversationHasManyItemsTx) Find() (result []*dbschema.Item, err error) {
+	return result, a.tx.Find(&result)
+}
+
+func (a conversationHasManyItemsTx) Append(values ...*dbschema.Item) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Append(targetValues...)
+}
+
+func (a conversationHasManyItemsTx) Replace(values ...*dbschema.Item) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Replace(targetValues...)
+}
+
+func (a conversationHasManyItemsTx) Delete(values ...*dbschema.Item) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Delete(targetValues...)
+}
+
+func (a conversationHasManyItemsTx) Clear() error {
+	return a.tx.Clear()
+}
+
+func (a conversationHasManyItemsTx) Count() int64 {
+	return a.tx.Count()
+}
+
+func (a conversationHasManyItemsTx) Unscoped() *conversationHasManyItemsTx {
+	a.tx = a.tx.Unscoped()
+	return &a
+}
+
+type conversationBelongsToUser struct {
+	db *gorm.DB
+
+	field.RelationField
+}
+
+func (a conversationBelongsToUser) Where(conds ...field.Expr) *conversationBelongsToUser {
+	if len(conds) == 0 {
+		return &a
+	}
+
+	exprs := make([]clause.Expression, 0, len(conds))
+	for _, cond := range conds {
+		exprs = append(exprs, cond.BeCond().(clause.Expression))
+	}
+	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
+	return &a
+}
+
+func (a conversationBelongsToUser) WithContext(ctx context.Context) *conversationBelongsToUser {
+	a.db = a.db.WithContext(ctx)
+	return &a
+}
+
+func (a conversationBelongsToUser) Session(session *gorm.Session) *conversationBelongsToUser {
+	a.db = a.db.Session(session)
+	return &a
+}
+
+func (a conversationBelongsToUser) Model(m *dbschema.Conversation) *conversationBelongsToUserTx {
+	return &conversationBelongsToUserTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a conversationBelongsToUser) Unscoped() *conversationBelongsToUser {
+	a.db = a.db.Unscoped()
+	return &a
+}
+
+type conversationBelongsToUserTx struct{ tx *gorm.Association }
+
+func (a conversationBelongsToUserTx) Find() (result *dbschema.User, err error) {
+	return result, a.tx.Find(&result)
+}
+
+func (a conversationBelongsToUserTx) Append(values ...*dbschema.User) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Append(targetValues...)
+}
+
+func (a conversationBelongsToUserTx) Replace(values ...*dbschema.User) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Replace(targetValues...)
+}
+
+func (a conversationBelongsToUserTx) Delete(values ...*dbschema.User) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Delete(targetValues...)
+}
+
+func (a conversationBelongsToUserTx) Clear() error {
+	return a.tx.Clear()
+}
+
+func (a conversationBelongsToUserTx) Count() int64 {
+	return a.tx.Count()
+}
+
+func (a conversationBelongsToUserTx) Unscoped() *conversationBelongsToUserTx {
+	a.tx = a.tx.Unscoped()
+	return &a
 }
 
 type conversationDo struct{ gen.DO }
@@ -179,6 +422,8 @@ type IConversationDo interface {
 	FirstOrCreate() (*dbschema.Conversation, error)
 	FindByPage(offset int, limit int) (result []*dbschema.Conversation, count int64, err error)
 	ScanByPage(result interface{}, offset int, limit int) (count int64, err error)
+	Rows() (*sql.Rows, error)
+	Row() *sql.Row
 	Scan(result interface{}) (err error)
 	Returning(value interface{}, columns ...string) IConversationDo
 	UnderlyingDB() *gorm.DB
@@ -288,6 +533,8 @@ func (c conversationDo) CreateInBatches(values []*dbschema.Conversation, batchSi
 	return c.DO.CreateInBatches(values, batchSize)
 }
 
+// Save : !!! underlying implementation is different with GORM
+// The method is equivalent to executing the statement: db.Clauses(clause.OnConflict{UpdateAll: true}).Create(values)
 func (c conversationDo) Save(values ...*dbschema.Conversation) error {
 	if len(values) == 0 {
 		return nil

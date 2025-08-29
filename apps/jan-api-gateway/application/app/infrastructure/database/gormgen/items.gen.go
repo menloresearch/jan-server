@@ -6,6 +6,7 @@ package gormgen
 
 import (
 	"context"
+	"database/sql"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -31,14 +32,54 @@ func newItem(db *gorm.DB, opts ...gen.DOOption) item {
 	_item.CreatedAt = field.NewTime(tableName, "created_at")
 	_item.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_item.DeletedAt = field.NewField(tableName, "deleted_at")
+	_item.PublicID = field.NewString(tableName, "public_id")
 	_item.ConversationID = field.NewUint(tableName, "conversation_id")
 	_item.Type = field.NewString(tableName, "type")
 	_item.Role = field.NewString(tableName, "role")
 	_item.Content = field.NewString(tableName, "content")
 	_item.Status = field.NewString(tableName, "status")
-	_item.IncompleteAt = field.NewField(tableName, "incomplete_at")
+	_item.IncompleteAt = field.NewInt64(tableName, "incomplete_at")
 	_item.IncompleteDetails = field.NewString(tableName, "incomplete_details")
-	_item.CompletedAt = field.NewField(tableName, "completed_at")
+	_item.CompletedAt = field.NewInt64(tableName, "completed_at")
+	_item.Conversation = itemBelongsToConversation{
+		db: db.Session(&gorm.Session{}),
+
+		RelationField: field.NewRelation("Conversation", "dbschema.Conversation"),
+		User: struct {
+			field.RelationField
+			Organizations struct {
+				field.RelationField
+			}
+			Projects struct {
+				field.RelationField
+			}
+		}{
+			RelationField: field.NewRelation("Conversation.User", "dbschema.User"),
+			Organizations: struct {
+				field.RelationField
+			}{
+				RelationField: field.NewRelation("Conversation.User.Organizations", "dbschema.OrganizationMember"),
+			},
+			Projects: struct {
+				field.RelationField
+			}{
+				RelationField: field.NewRelation("Conversation.User.Projects", "dbschema.ProjectMember"),
+			},
+		},
+		Items: struct {
+			field.RelationField
+			Conversation struct {
+				field.RelationField
+			}
+		}{
+			RelationField: field.NewRelation("Conversation.Items", "dbschema.Item"),
+			Conversation: struct {
+				field.RelationField
+			}{
+				RelationField: field.NewRelation("Conversation.Items.Conversation", "dbschema.Conversation"),
+			},
+		},
+	}
 
 	_item.fillFieldMap()
 
@@ -53,14 +94,16 @@ type item struct {
 	CreatedAt         field.Time
 	UpdatedAt         field.Time
 	DeletedAt         field.Field
+	PublicID          field.String
 	ConversationID    field.Uint
 	Type              field.String
 	Role              field.String
 	Content           field.String
 	Status            field.String
-	IncompleteAt      field.Field
+	IncompleteAt      field.Int64
 	IncompleteDetails field.String
-	CompletedAt       field.Field
+	CompletedAt       field.Int64
+	Conversation      itemBelongsToConversation
 
 	fieldMap map[string]field.Expr
 }
@@ -81,14 +124,15 @@ func (i *item) updateTableName(table string) *item {
 	i.CreatedAt = field.NewTime(table, "created_at")
 	i.UpdatedAt = field.NewTime(table, "updated_at")
 	i.DeletedAt = field.NewField(table, "deleted_at")
+	i.PublicID = field.NewString(table, "public_id")
 	i.ConversationID = field.NewUint(table, "conversation_id")
 	i.Type = field.NewString(table, "type")
 	i.Role = field.NewString(table, "role")
 	i.Content = field.NewString(table, "content")
 	i.Status = field.NewString(table, "status")
-	i.IncompleteAt = field.NewField(table, "incomplete_at")
+	i.IncompleteAt = field.NewInt64(table, "incomplete_at")
 	i.IncompleteDetails = field.NewString(table, "incomplete_details")
-	i.CompletedAt = field.NewField(table, "completed_at")
+	i.CompletedAt = field.NewInt64(table, "completed_at")
 
 	i.fillFieldMap()
 
@@ -105,11 +149,12 @@ func (i *item) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (i *item) fillFieldMap() {
-	i.fieldMap = make(map[string]field.Expr, 13)
+	i.fieldMap = make(map[string]field.Expr, 14)
 	i.fieldMap["id"] = i.ID
 	i.fieldMap["created_at"] = i.CreatedAt
 	i.fieldMap["updated_at"] = i.UpdatedAt
 	i.fieldMap["deleted_at"] = i.DeletedAt
+	i.fieldMap["public_id"] = i.PublicID
 	i.fieldMap["conversation_id"] = i.ConversationID
 	i.fieldMap["type"] = i.Type
 	i.fieldMap["role"] = i.Role
@@ -118,16 +163,117 @@ func (i *item) fillFieldMap() {
 	i.fieldMap["incomplete_at"] = i.IncompleteAt
 	i.fieldMap["incomplete_details"] = i.IncompleteDetails
 	i.fieldMap["completed_at"] = i.CompletedAt
+
 }
 
 func (i item) clone(db *gorm.DB) item {
 	i.itemDo.ReplaceConnPool(db.Statement.ConnPool)
+	i.Conversation.db = db.Session(&gorm.Session{Initialized: true})
+	i.Conversation.db.Statement.ConnPool = db.Statement.ConnPool
 	return i
 }
 
 func (i item) replaceDB(db *gorm.DB) item {
 	i.itemDo.ReplaceDB(db)
+	i.Conversation.db = db.Session(&gorm.Session{})
 	return i
+}
+
+type itemBelongsToConversation struct {
+	db *gorm.DB
+
+	field.RelationField
+
+	User struct {
+		field.RelationField
+		Organizations struct {
+			field.RelationField
+		}
+		Projects struct {
+			field.RelationField
+		}
+	}
+	Items struct {
+		field.RelationField
+		Conversation struct {
+			field.RelationField
+		}
+	}
+}
+
+func (a itemBelongsToConversation) Where(conds ...field.Expr) *itemBelongsToConversation {
+	if len(conds) == 0 {
+		return &a
+	}
+
+	exprs := make([]clause.Expression, 0, len(conds))
+	for _, cond := range conds {
+		exprs = append(exprs, cond.BeCond().(clause.Expression))
+	}
+	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
+	return &a
+}
+
+func (a itemBelongsToConversation) WithContext(ctx context.Context) *itemBelongsToConversation {
+	a.db = a.db.WithContext(ctx)
+	return &a
+}
+
+func (a itemBelongsToConversation) Session(session *gorm.Session) *itemBelongsToConversation {
+	a.db = a.db.Session(session)
+	return &a
+}
+
+func (a itemBelongsToConversation) Model(m *dbschema.Item) *itemBelongsToConversationTx {
+	return &itemBelongsToConversationTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a itemBelongsToConversation) Unscoped() *itemBelongsToConversation {
+	a.db = a.db.Unscoped()
+	return &a
+}
+
+type itemBelongsToConversationTx struct{ tx *gorm.Association }
+
+func (a itemBelongsToConversationTx) Find() (result *dbschema.Conversation, err error) {
+	return result, a.tx.Find(&result)
+}
+
+func (a itemBelongsToConversationTx) Append(values ...*dbschema.Conversation) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Append(targetValues...)
+}
+
+func (a itemBelongsToConversationTx) Replace(values ...*dbschema.Conversation) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Replace(targetValues...)
+}
+
+func (a itemBelongsToConversationTx) Delete(values ...*dbschema.Conversation) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Delete(targetValues...)
+}
+
+func (a itemBelongsToConversationTx) Clear() error {
+	return a.tx.Clear()
+}
+
+func (a itemBelongsToConversationTx) Count() int64 {
+	return a.tx.Count()
+}
+
+func (a itemBelongsToConversationTx) Unscoped() *itemBelongsToConversationTx {
+	a.tx = a.tx.Unscoped()
+	return &a
 }
 
 type itemDo struct{ gen.DO }
@@ -187,6 +333,8 @@ type IItemDo interface {
 	FirstOrCreate() (*dbschema.Item, error)
 	FindByPage(offset int, limit int) (result []*dbschema.Item, count int64, err error)
 	ScanByPage(result interface{}, offset int, limit int) (count int64, err error)
+	Rows() (*sql.Rows, error)
+	Row() *sql.Row
 	Scan(result interface{}) (err error)
 	Returning(value interface{}, columns ...string) IItemDo
 	UnderlyingDB() *gorm.DB
@@ -296,6 +444,8 @@ func (i itemDo) CreateInBatches(values []*dbschema.Item, batchSize int) error {
 	return i.DO.CreateInBatches(values, batchSize)
 }
 
+// Save : !!! underlying implementation is different with GORM
+// The method is equivalent to executing the statement: db.Clauses(clause.OnConflict{UpdateAll: true}).Create(values)
 func (i itemDo) Save(values ...*dbschema.Item) error {
 	if len(values) == 0 {
 		return nil
