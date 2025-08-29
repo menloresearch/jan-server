@@ -35,7 +35,6 @@ func DefaultValidationConfig() *ValidationConfig {
 	}
 }
 
-// Enhanced validation with security considerations
 type ConversationValidator struct {
 	config *ValidationConfig
 	// Compiled regex patterns for performance

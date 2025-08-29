@@ -361,10 +361,3 @@ func (h *ConversationHandler) DeleteItem(ctx *gin.Context) {
 
 	ctx.JSON(statusCode, response)
 }
-
-// PaginationOptions represents pagination parameters (temporary until we use domain types)
-type PaginationOptions struct {
-	Limit  int    `json:"limit"`
-	Cursor string `json:"cursor,omitempty"`
-	Order  string `json:"order"`
-}

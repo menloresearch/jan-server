@@ -56,7 +56,6 @@ type Text struct {
 	Annotations []Annotation `json:"annotations,omitempty"`
 }
 
-// Enhanced AI output text with annotations and logprobs
 type OutputText struct {
 	Text        string       `json:"text"`
 	Annotations []Annotation `json:"annotations"`        // Required for OpenAI compatibility
@@ -78,7 +77,6 @@ type FileContent struct {
 	Size     int64  `json:"size,omitempty"`
 }
 
-// Enhanced annotation with more types
 type Annotation struct {
 	Type       string `json:"type"`              // "file_citation", "url_citation", etc.
 	Text       string `json:"text,omitempty"`    // Display text
@@ -120,20 +118,6 @@ type Conversation struct {
 	UpdatedAt int64              `json:"updated_at"` // Unix timestamp for OpenAI compatibility
 }
 
-// PaginationOptions represents pagination parameters
-type PaginationOptions struct {
-	Limit  int    `json:"limit"`
-	Cursor string `json:"cursor,omitempty"`
-	Order  string `json:"order"` // "asc" or "desc"
-}
-
-// PaginatedResult represents a paginated result set
-type PaginatedResult[T any] struct {
-	Data       []T    `json:"data"`
-	HasMore    bool   `json:"has_more"`
-	NextCursor string `json:"next_cursor,omitempty"`
-}
-
 type ConversationRepository interface {
 	Create(ctx context.Context, conversation *Conversation) error
 	FindByID(ctx context.Context, id uint) (*Conversation, error)
@@ -144,7 +128,6 @@ type ConversationRepository interface {
 	AddItem(ctx context.Context, conversationID uint, item *Item) error
 	SearchItems(ctx context.Context, conversationID uint, query string) ([]*Item, error)
 
-	// Enhanced methods
 	BulkAddItems(ctx context.Context, conversationID uint, items []*Item) error
 	CountItemsByConversation(ctx context.Context, conversationID uint) (int64, error)
 }
@@ -158,9 +141,6 @@ type ItemRepository interface {
 	Delete(ctx context.Context, id uint) error
 	DeleteByPublicID(ctx context.Context, publicID string) error // Delete by OpenAI-compatible string ID
 
-	// Enhanced methods
-	FindByConversationIDPaginated(ctx context.Context, conversationID uint, opts PaginationOptions) (*PaginatedResult[*Item], error)
-	SearchPaginated(ctx context.Context, conversationID uint, query string, opts PaginationOptions) (*PaginatedResult[*Item], error)
 	BulkCreate(ctx context.Context, items []*Item) error
 	CountByConversation(ctx context.Context, conversationID uint) (int64, error)
 	ExistsByIDAndConversation(ctx context.Context, itemID uint, conversationID uint) (bool, error)

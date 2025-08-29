@@ -7,6 +7,7 @@ import (
 
 	"golang.org/x/net/context"
 	"menlo.ai/jan-api-gateway/app/utils/idutils"
+	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
 // Custom errors
@@ -43,7 +44,6 @@ func NewServiceWithValidator(conversationRepo ConversationRepository, itemRepo I
 }
 
 func (s *ConversationService) CreateConversation(ctx context.Context, userID uint, title *string, isPrivate bool, metadata map[string]string) (*Conversation, error) {
-	// Validate inputs using enhanced validator
 	if err := s.validator.ValidateConversationInput(title, metadata); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
@@ -187,7 +187,6 @@ func (s *ConversationService) AddItem(ctx context.Context, conversation *Convers
 		return nil, ErrPrivateConversation
 	}
 
-	// Validate content using enhanced validator
 	if err := s.validator.ValidateItemContent(content); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
@@ -203,7 +202,7 @@ func (s *ConversationService) AddItem(ctx context.Context, conversation *Convers
 		Type:        itemType,
 		Role:        role,
 		Content:     content,
-		Status:      stringPtr("completed"), // Default status
+		Status:      ptr.ToString("completed"), // Default status
 		CreatedAt:   now,
 		CompletedAt: &now,
 	}
@@ -247,8 +246,6 @@ func (s *ConversationService) GetItem(ctx context.Context, conversation *Convers
 		return nil, ErrItemNotFound
 	}
 
-	// Enhanced verification: use a more efficient query to check if item belongs to conversation
-	// This avoids loading all conversation items
 	if err := s.verifyItemBelongsToConversation(ctx, itemID, conversation.ID); err != nil {
 		return nil, err
 	}
@@ -347,7 +344,7 @@ func (s *ConversationService) DeleteItemByPublicID(ctx context.Context, conversa
 		return nil, ErrItemNotFound
 	}
 
-	// ✅ Use efficient existence check instead of loading all items
+	// Use efficient existence check instead of loading all items
 	exists, err := s.itemRepo.ExistsByIDAndConversation(ctx, item.ID, conversation.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify item ownership: %w", err)
@@ -429,7 +426,6 @@ func (s *ConversationService) AddMultipleItems(ctx context.Context, conversation
 
 	// Create all items
 	for i, itemData := range items {
-		// Validate content using enhanced validator
 		if err := s.validator.ValidateItemContent(itemData.Content); err != nil {
 			return nil, fmt.Errorf("validation failed for item %d: %w", i, err)
 		}
@@ -444,7 +440,7 @@ func (s *ConversationService) AddMultipleItems(ctx context.Context, conversation
 			Type:        itemData.Type,
 			Role:        itemData.Role,
 			Content:     itemData.Content,
-			Status:      stringPtr("completed"),
+			Status:      ptr.ToString("completed"),
 			CreatedAt:   now,
 			CompletedAt: &now,
 		}
@@ -463,29 +459,4 @@ func (s *ConversationService) AddMultipleItems(ctx context.Context, conversation
 	}
 
 	return createdItems, nil
-}
-
-// GetItemsPaginated retrieves items for a conversation with pagination
-func (s *ConversationService) GetItemsPaginated(ctx context.Context, publicID string, userID uint, opts PaginationOptions) (*PaginatedResult[*Item], error) {
-	conversation, err := s.getConversationWithAccessCheck(ctx, publicID, userID, false)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.itemRepo.FindByConversationIDPaginated(ctx, conversation.ID, opts)
-}
-
-// SearchItemsPaginated searches items in a conversation with pagination
-func (s *ConversationService) SearchItemsPaginated(ctx context.Context, publicID string, userID uint, query string, opts PaginationOptions) (*PaginatedResult[*Item], error) {
-	conversation, err := s.getConversationWithAccessCheck(ctx, publicID, userID, false)
-	if err != nil {
-		return nil, err
-	}
-
-	return s.itemRepo.SearchPaginated(ctx, conversation.ID, query, opts)
-}
-
-// Helper function for string pointers
-func stringPtr(s string) *string {
-	return &s
 }
