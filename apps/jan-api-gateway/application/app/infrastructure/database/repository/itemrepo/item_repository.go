@@ -80,8 +80,9 @@ func (r *ItemGormRepository) Search(ctx context.Context, conversationID uint, se
 }
 
 func (r *ItemGormRepository) FindByPublicID(ctx context.Context, publicID string) (*domain.Item, error) {
-	query := r.db.GetQuery(ctx)
-	model, err := query.Item.WithContext(ctx).Where(query.Item.PublicID.Eq(publicID)).First()
+	// Temporary implementation using raw GORM until generated code is updated
+	var model dbschema.Item
+	err := r.db.GetTx(ctx).WithContext(ctx).Where("public_id = ?", publicID).First(&model).Error
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +97,7 @@ func (r *ItemGormRepository) Delete(ctx context.Context, id uint) error {
 }
 
 func (r *ItemGormRepository) DeleteByPublicID(ctx context.Context, publicID string) error {
-	query := r.db.GetQuery(ctx)
-	_, err := query.Item.WithContext(ctx).Where(query.Item.PublicID.Eq(publicID)).Delete()
+	// Temporary implementation using raw GORM until generated code is updated
+	err := r.db.GetTx(ctx).WithContext(ctx).Where("public_id = ?", publicID).Delete(&dbschema.Item{}).Error
 	return err
 }
