@@ -79,8 +79,24 @@ func (r *ItemGormRepository) Search(ctx context.Context, conversationID uint, se
 	return items, nil
 }
 
+func (r *ItemGormRepository) FindByPublicID(ctx context.Context, publicID string) (*domain.Item, error) {
+	query := r.db.GetQuery(ctx)
+	model, err := query.Item.WithContext(ctx).Where(query.Item.PublicID.Eq(publicID)).First()
+	if err != nil {
+		return nil, err
+	}
+
+	return model.EtoD(), nil
+}
+
 func (r *ItemGormRepository) Delete(ctx context.Context, id uint) error {
 	query := r.db.GetQuery(ctx)
 	_, err := query.Item.WithContext(ctx).Where(query.Item.ID.Eq(id)).Delete()
+	return err
+}
+
+func (r *ItemGormRepository) DeleteByPublicID(ctx context.Context, publicID string) error {
+	query := r.db.GetQuery(ctx)
+	_, err := query.Item.WithContext(ctx).Where(query.Item.PublicID.Eq(publicID)).Delete()
 	return err
 }

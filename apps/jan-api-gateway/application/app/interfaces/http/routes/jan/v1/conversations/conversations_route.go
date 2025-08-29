@@ -75,7 +75,7 @@ func domainToConversationResponse(entity *conversation.Conversation) Conversatio
 	return ConversationResponse{
 		ID:        entity.PublicID,
 		Object:    "conversation",
-		CreatedAt: entity.CreatedAt.Unix(),
+		CreatedAt: entity.CreatedAt, // Already Unix timestamp
 		Metadata:  metadata,
 	}
 }
@@ -102,11 +102,11 @@ func domainToConversationItemsResponse(items []conversation.Item) []Conversation
 
 func domainToConversationItemResponse(entity conversation.Item) ConversationItemResponse {
 	response := ConversationItemResponse{
-		ID:        fmt.Sprintf("item_%d", entity.ID),
+		ID:        entity.PublicID, // Use the generated public ID
 		Object:    "conversation.item",
 		Type:      string(entity.Type),
 		Status:    entity.Status,
-		CreatedAt: entity.CreatedAt.Unix(),
+		CreatedAt: entity.CreatedAt, // Already Unix timestamp
 		Content:   domainToContentResponse(entity.Content),
 	}
 
@@ -258,29 +258,31 @@ func (api *ConversationAPI) CreateConversation(ctx *gin.Context) {
 	}
 
 	// Add items to the conversation if provided
-	for _, item := range request.Items {
-		itemType := conversation.ItemType(item.Type)
-		var role *conversation.ItemRole
-		if item.Role != "" {
-			r := conversation.ItemRole(item.Role)
-			role = &r
-		}
+	if len(request.Items) > 0 {
+		for _, item := range request.Items {
+			itemType := conversation.ItemType(item.Type)
+			var role *conversation.ItemRole
+			if item.Role != "" {
+				r := conversation.ItemRole(item.Role)
+				role = &r
+			}
 
-		// Convert string content to Content slice
-		content := []conversation.Content{{
-			Type: "text",
-			Text: &conversation.Text{
-				Value: item.Content,
-			},
-		}}
+			// Convert string content to Content slice
+			content := []conversation.Content{{
+				Type: "text",
+				Text: &conversation.Text{
+					Value: item.Content,
+				},
+			}}
 
-		_, err := api.conversationService.AddItem(ctx, conv.PublicID, user.ID, itemType, role, content)
-		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:  "e5f6g7h8-i9j0-1234-efgh-567890123456",
-				Error: fmt.Sprintf("Failed to add item: %s", err.Error()),
-			})
-			return
+			_, err := api.conversationService.AddItem(ctx, conv, user.ID, itemType, role, content)
+			if err != nil {
+				ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+					Code:  "e5f6g7h8-i9j0-1234-efgh-567890123456",
+					Error: fmt.Sprintf("Failed to add item: %s", err.Error()),
+				})
+				return
+			}
 		}
 	}
 
@@ -393,7 +395,7 @@ func (api *ConversationAPI) UpdateConversation(ctx *gin.Context) {
 		return
 	}
 
-	conv, err := api.conversationService.UpdateConversation(ctx, conversationID, user.ID, nil, request.Metadata)
+	conv, err := api.conversationService.UpdateAndAuthorizeConversation(ctx, conversationID, user.ID, nil, request.Metadata)
 	if err != nil {
 		if errors.Is(err, conversation.ErrConversationNotFound) {
 			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
@@ -524,7 +526,7 @@ func (api *ConversationAPI) CreateItems(ctx *gin.Context) {
 	ownerID, err := api.validateAPIKey(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "create-items-unauthorized",
+			Code:  "0198f4cd-53b1-754b-9c20-f1039f15448e",
 			Error: "Invalid or missing API key",
 		})
 		return
@@ -533,7 +535,7 @@ func (api *ConversationAPI) CreateItems(ctx *gin.Context) {
 	user, err := api.userService.FindByID(ctx, *ownerID)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "create-items-user-not-found",
+			Code:  "0198f4cd-64e6-72cb-92dc-5bebea0b88d2",
 			Error: "User not found",
 		})
 		return
@@ -544,7 +546,31 @@ func (api *ConversationAPI) CreateItems(ctx *gin.Context) {
 	var request CreateItemsRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
 		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "create-items-invalid-request",
+			Code:  "0198f4cd-a149-734d-a733-7c0f94ebb179",
+			Error: err.Error(),
+		})
+		return
+	}
+
+	// Get conversation first to avoid N+1 queries
+	conv, err := api.conversationService.GetConversation(ctx, conversationID, user.ID)
+	if err != nil {
+		if errors.Is(err, conversation.ErrConversationNotFound) {
+			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
+				Code:  "create-items-conversation-not-found",
+				Error: "Conversation not found",
+			})
+			return
+		}
+		if errors.Is(err, conversation.ErrPrivateConversation) {
+			ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
+				Code:  "create-items-private-conversation",
+				Error: "Access denied: conversation is private",
+			})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code:  "create-items-get-conversation-error",
 			Error: err.Error(),
 		})
 		return
@@ -552,47 +578,35 @@ func (api *ConversationAPI) CreateItems(ctx *gin.Context) {
 
 	var createdItems []conversation.Item
 
-	// Create each item
-	for _, itemRequest := range request.Items {
-		itemType := conversation.ItemType(itemRequest.Type)
-		var role *conversation.ItemRole
-		if itemRequest.Role != "" {
-			r := conversation.ItemRole(itemRequest.Role)
-			role = &r
-		}
+	if len(request.Items) > 0 {
+		// Create each item
+		for _, itemRequest := range request.Items {
+			itemType := conversation.ItemType(itemRequest.Type)
+			var role *conversation.ItemRole
+			if itemRequest.Role != "" {
+				r := conversation.ItemRole(itemRequest.Role)
+				role = &r
+			}
 
-		// Convert string content to Content slice
-		content := []conversation.Content{{
-			Type: "text",
-			Text: &conversation.Text{
-				Value: itemRequest.Content,
-			},
-		}}
+			// Convert string content to Content slice
+			content := []conversation.Content{{
+				Type: "text",
+				Text: &conversation.Text{
+					Value: itemRequest.Content,
+				},
+			}}
 
-		item, err := api.conversationService.AddItem(ctx, conversationID, user.ID, itemType, role, content)
-		if err != nil {
-			if errors.Is(err, conversation.ErrConversationNotFound) {
-				ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
-					Code:  "create-items-conversation-not-found",
-					Error: "Conversation not found",
+			item, err := api.conversationService.AddItem(ctx, conv, user.ID, itemType, role, content)
+			if err != nil {
+				ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+					Code:  "create-items-add-item-error",
+					Error: err.Error(),
 				})
 				return
 			}
-			if errors.Is(err, conversation.ErrAccessDenied) {
-				ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
-					Code:  "create-items-access-denied",
-					Error: "Access denied: not the owner of this conversation",
-				})
-				return
-			}
-			ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:  "create-items-internal-error",
-				Error: err.Error(),
-			})
-			return
-		}
 
-		createdItems = append(createdItems, *item)
+			createdItems = append(createdItems, *item)
+		}
 	}
 
 	// Convert to response format (matching OpenAI ConversationItemList)
@@ -638,7 +652,7 @@ func (api *ConversationAPI) ListItems(ctx *gin.Context) {
 	ownerID, err := api.validateAPIKey(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "list-items-unauthorized",
+			Code:  "0198f4cd-f7af-7138-9223-7e7624b7e17f",
 			Error: "Invalid or missing API key",
 		})
 		return
@@ -647,7 +661,7 @@ func (api *ConversationAPI) ListItems(ctx *gin.Context) {
 	user, err := api.userService.FindByID(ctx, *ownerID)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "list-items-user-not-found",
+			Code:  "0198f4ce-07f0-70fa-9a5a-23e9c4a16079",
 			Error: "User not found",
 		})
 		return
@@ -660,20 +674,20 @@ func (api *ConversationAPI) ListItems(ctx *gin.Context) {
 	if err != nil {
 		if errors.Is(err, conversation.ErrConversationNotFound) {
 			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
-				Code:  "list-items-conversation-not-found",
+				Code:  "0198f4ce-1ac0-75df-91e7-2e03eb3f9d22",
 				Error: "Conversation not found",
 			})
 			return
 		}
 		if errors.Is(err, conversation.ErrPrivateConversation) {
 			ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
-				Code:  "list-items-private-conversation",
+				Code:  "0198f4ce-281c-719f-adc4-1785e8e2d3a4",
 				Error: "Access denied: conversation is private",
 			})
 			return
 		}
 		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "list-items-internal-error",
+			Code:  "0198f4ce-385e-709c-add4-6b545b5ab35d",
 			Error: err.Error(),
 		})
 		return
@@ -720,7 +734,7 @@ func (api *ConversationAPI) GetItem(ctx *gin.Context) {
 	ownerID, err := api.validateAPIKey(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "get-item-unauthorized",
+			Code:  "0198f4ce-534e-77c3-942a-8029fd131d47",
 			Error: "Invalid or missing API key",
 		})
 		return
@@ -729,7 +743,7 @@ func (api *ConversationAPI) GetItem(ctx *gin.Context) {
 	user, err := api.userService.FindByID(ctx, *ownerID)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "get-item-user-not-found",
+			Code:  "0198f4ce-634d-710e-993b-168f0498c336",
 			Error: "User not found",
 		})
 		return
@@ -745,30 +759,29 @@ func (api *ConversationAPI) GetItem(ctx *gin.Context) {
 	if err != nil {
 		if errors.Is(err, conversation.ErrConversationNotFound) {
 			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
-				Code:  "get-item-conversation-not-found",
+				Code:  "0198f4ce-7445-77be-bde1-faea27de2e2d",
 				Error: "Conversation not found",
 			})
 			return
 		}
 		if errors.Is(err, conversation.ErrPrivateConversation) {
 			ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
-				Code:  "get-item-private-conversation",
+				Code:  "0198f4ce-8f2a-71f3-b54e-8709c95feabf",
 				Error: "Access denied: conversation is private",
 			})
 			return
 		}
 		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "get-item-internal-error",
+			Code:  "0198f4ce-a020-732e-a618-ad3fa352835d",
 			Error: err.Error(),
 		})
 		return
 	}
 
-	// Find item by ID (our current implementation uses "item_<id>" format)
+	// Find item by public ID
 	var foundItem *conversation.Item
 	for _, item := range conv.Items {
-		itemResponseID := fmt.Sprintf("item_%d", item.ID)
-		if itemResponseID == itemIDStr {
+		if item.PublicID == itemIDStr {
 			foundItem = &item
 			break
 		}
@@ -776,7 +789,7 @@ func (api *ConversationAPI) GetItem(ctx *gin.Context) {
 
 	if foundItem == nil {
 		ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  "get-item-not-found",
+			Code:  "0198f4ce-c1f6-725a-959c-9bd9ee58eaf1",
 			Error: "Item not found",
 		})
 		return
@@ -804,7 +817,7 @@ func (api *ConversationAPI) DeleteItem(ctx *gin.Context) {
 	ownerID, err := api.validateAPIKey(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "delete-item-unauthorized",
+			Code:  "0198f4ce-da7c-759b-bf96-d5b072dc9be9",
 			Error: "Invalid or missing API key",
 		})
 		return
@@ -813,26 +826,17 @@ func (api *ConversationAPI) DeleteItem(ctx *gin.Context) {
 	user, err := api.userService.FindByID(ctx, *ownerID)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "delete-item-user-not-found",
+			Code:  "0198f4ce-e957-7130-baf5-6a6d0e0edf59",
 			Error: "User not found",
 		})
 		return
 	}
 
 	conversationID := ctx.Param("conversation_id")
-	itemIDStr := ctx.Param("item_id")
+	itemPublicID := ctx.Param("item_id")
 
-	// Extract numeric ID from string ID (e.g., "item_123" -> 123)
-	var itemID uint
-	if _, err := fmt.Sscanf(itemIDStr, "item_%d", &itemID); err != nil {
-		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "delete-item-invalid-id",
-			Error: "Invalid item ID format",
-		})
-		return
-	}
-
-	updatedConversation, err := api.conversationService.DeleteItem(ctx, conversationID, itemID, user.ID)
+	// Get conversation first to avoid N+1 queries
+	conv, err := api.conversationService.GetConversation(ctx, conversationID, user.ID)
 	if err != nil {
 		if errors.Is(err, conversation.ErrConversationNotFound) {
 			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
@@ -841,6 +845,41 @@ func (api *ConversationAPI) DeleteItem(ctx *gin.Context) {
 			})
 			return
 		}
+		if errors.Is(err, conversation.ErrPrivateConversation) {
+			ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
+				Code:  "delete-item-private-conversation",
+				Error: "Access denied: conversation is private",
+			})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code:  "delete-item-get-conversation-error",
+			Error: err.Error(),
+		})
+		return
+	}
+
+	// Find item by public ID to get internal ID
+	var itemID uint
+	found := false
+	for _, item := range conv.Items {
+		if item.PublicID == itemPublicID {
+			itemID = item.ID
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
+			Code:  "delete-item-not-found",
+			Error: "Item not found",
+		})
+		return
+	}
+
+	updatedConversation, err := api.conversationService.DeleteItem(ctx, conv, itemID, user.ID)
+	if err != nil {
 		if errors.Is(err, conversation.ErrAccessDenied) {
 			ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
 				Code:  "delete-item-access-denied",

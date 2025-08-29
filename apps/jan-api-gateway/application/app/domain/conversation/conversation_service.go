@@ -33,11 +33,12 @@ func NewService(conversationRepo ConversationRepository, itemRepo ItemRepository
 }
 
 func (s *ConversationService) CreateConversation(ctx context.Context, userID uint, title *string, isPrivate bool, metadata map[string]string) (*Conversation, error) {
-	publicID, err := s.generatePublicID()
+	publicID, err := s.generateConversationPublicID()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate public ID: %w", err)
 	}
 
+	now := time.Now().Unix()
 	conversation := &Conversation{
 		PublicID:  publicID,
 		Title:     title,
@@ -45,13 +46,47 @@ func (s *ConversationService) CreateConversation(ctx context.Context, userID uin
 		Status:    ConversationStatusActive,
 		IsPrivate: isPrivate,
 		Metadata:  metadata,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 
 	if err := s.conversationRepo.Create(ctx, conversation); err != nil {
 		return nil, fmt.Errorf("failed to create conversation: %w", err)
 	}
+
+	return conversation, nil
+}
+
+// GetConversationWithAccessAndItems retrieves a conversation by its public ID,
+// checks access permissions based on userID, loads associated items, and
+// populates the Items field on the returned Conversation object.
+func (s *ConversationService) GetConversationWithAccessAndItems(ctx context.Context, publicID string, userID uint) (*Conversation, error) {
+	conversation, err := s.conversationRepo.FindByPublicID(ctx, publicID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find conversation: %w", err)
+	}
+
+	if conversation == nil {
+		return nil, ErrConversationNotFound
+	}
+
+	// Check access permissions
+	if conversation.IsPrivate && conversation.UserID != userID {
+		return nil, ErrPrivateConversation
+	}
+
+	// Load items
+	items, err := s.itemRepo.FindByConversationID(ctx, conversation.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load items: %w", err)
+	}
+
+	// Convert []*Item to []Item
+	itemSlice := make([]Item, len(items))
+	for i, item := range items {
+		itemSlice[i] = *item
+	}
+	conversation.Items = itemSlice
 
 	return conversation, nil
 }
@@ -87,7 +122,9 @@ func (s *ConversationService) GetConversation(ctx context.Context, publicID stri
 	return conversation, nil
 }
 
-func (s *ConversationService) UpdateConversation(ctx context.Context, publicID string, userID uint, title *string, metadata map[string]string) (*Conversation, error) {
+// UpdateAndAuthorizeConversation retrieves a conversation by its public ID, checks access permissions,
+// updates the conversation fields, and persists the changes.
+func (s *ConversationService) UpdateAndAuthorizeConversation(ctx context.Context, publicID string, userID uint, title *string, metadata map[string]string) (*Conversation, error) {
 	conversation, err := s.conversationRepo.FindByPublicID(ctx, publicID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find conversation: %w", err)
@@ -109,7 +146,7 @@ func (s *ConversationService) UpdateConversation(ctx context.Context, publicID s
 	if metadata != nil {
 		conversation.Metadata = metadata
 	}
-	conversation.UpdatedAt = time.Now()
+	conversation.UpdatedAt = time.Now().Unix()
 
 	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
 		return nil, fmt.Errorf("failed to update conversation: %w", err)
@@ -140,26 +177,26 @@ func (s *ConversationService) DeleteConversation(ctx context.Context, publicID s
 	return nil
 }
 
-func (s *ConversationService) AddItem(ctx context.Context, publicID string, userID uint, itemType ItemType, role *ItemRole, content []Content) (*Item, error) {
-	conversation, err := s.conversationRepo.FindByPublicID(ctx, publicID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find conversation: %w", err)
-	}
-
-	if conversation == nil {
-		return nil, ErrConversationNotFound
-	}
-
+func (s *ConversationService) AddItem(ctx context.Context, conversation *Conversation, userID uint, itemType ItemType, role *ItemRole, content []Content) (*Item, error) {
 	// Check access permissions
 	if conversation.IsPrivate && conversation.UserID != userID {
 		return nil, ErrPrivateConversation
 	}
 
+	itemPublicID, err := s.generateItemPublicID()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate item public ID: %w", err)
+	}
+
+	now := time.Now().Unix()
 	item := &Item{
-		Type:      itemType,
-		Role:      role,
-		Content:   content,
-		CreatedAt: time.Now(),
+		PublicID:    itemPublicID,
+		Type:        itemType,
+		Role:        role,
+		Content:     content,
+		Status:      stringPtr("completed"), // Default status
+		CreatedAt:   now,
+		CompletedAt: &now,
 	}
 
 	if err := s.conversationRepo.AddItem(ctx, conversation.ID, item); err != nil {
@@ -167,7 +204,7 @@ func (s *ConversationService) AddItem(ctx context.Context, publicID string, user
 	}
 
 	// Update conversation timestamp
-	conversation.UpdatedAt = time.Now()
+	conversation.UpdatedAt = time.Now().Unix()
 	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
 		return nil, fmt.Errorf("failed to update conversation timestamp: %w", err)
 	}
@@ -175,17 +212,7 @@ func (s *ConversationService) AddItem(ctx context.Context, publicID string, user
 	return item, nil
 }
 
-func (s *ConversationService) GetItem(ctx context.Context, conversationPublicID string, itemID uint, userID uint) (*Item, error) {
-	// First verify the conversation exists and user has access
-	conversation, err := s.conversationRepo.FindByPublicID(ctx, conversationPublicID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find conversation: %w", err)
-	}
-
-	if conversation == nil {
-		return nil, ErrConversationNotFound
-	}
-
+func (s *ConversationService) GetItem(ctx context.Context, conversation *Conversation, itemID uint, userID uint) (*Item, error) {
 	// Check access permissions
 	if conversation.IsPrivate && conversation.UserID != userID {
 		return nil, ErrPrivateConversation
@@ -226,17 +253,7 @@ func (s *ConversationService) GetItem(ctx context.Context, conversationPublicID 
 	return item, nil
 }
 
-func (s *ConversationService) DeleteItem(ctx context.Context, conversationPublicID string, itemID uint, userID uint) (*Conversation, error) {
-	// First verify the conversation exists and user has access
-	conversation, err := s.conversationRepo.FindByPublicID(ctx, conversationPublicID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find conversation: %w", err)
-	}
-
-	if conversation == nil {
-		return nil, ErrConversationNotFound
-	}
-
+func (s *ConversationService) DeleteItem(ctx context.Context, conversation *Conversation, itemID uint, userID uint) (*Conversation, error) {
 	// Check access permissions - only owner can delete items
 	if conversation.UserID != userID {
 		return nil, ErrAccessDenied
@@ -277,13 +294,13 @@ func (s *ConversationService) DeleteItem(ctx context.Context, conversationPublic
 	}
 
 	// Update conversation timestamp
-	conversation.UpdatedAt = time.Now()
+	conversation.UpdatedAt = time.Now().Unix()
 	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
 		return nil, fmt.Errorf("failed to update conversation timestamp: %w", err)
 	}
 
 	// Load the updated conversation with remaining items
-	updatedConversation, err := s.GetConversation(ctx, conversationPublicID, userID)
+	updatedConversation, err := s.GetConversation(ctx, conversation.PublicID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load updated conversation: %w", err)
 	}
@@ -314,7 +331,7 @@ func (s *ConversationService) SearchItems(ctx context.Context, publicID string, 
 	return items, nil
 }
 
-func (s *ConversationService) generatePublicID() (string, error) {
+func (s *ConversationService) generateConversationPublicID() (string, error) {
 	bytes := make([]byte, 12)
 	_, err := rand.Read(bytes)
 	if err != nil {
@@ -336,4 +353,33 @@ func (s *ConversationService) generatePublicID() (string, error) {
 	}
 
 	return fmt.Sprintf("conv_%s", key), nil
+}
+
+func (s *ConversationService) generateItemPublicID() (string, error) {
+	bytes := make([]byte, 12)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return "", err
+	}
+
+	key := base64.URLEncoding.EncodeToString(bytes)
+	key = strings.TrimRight(key, "=")
+
+	if len(key) > 16 {
+		key = key[:16]
+	} else if len(key) < 16 {
+		extra := make([]byte, 16-len(key))
+		_, err := rand.Read(extra)
+		if err != nil {
+			return "", err
+		}
+		key += base64.URLEncoding.EncodeToString(extra)[:16-len(key)]
+	}
+
+	return fmt.Sprintf("msg_%s", key), nil
+}
+
+// Helper function for string pointers
+func stringPtr(s string) *string {
+	return &s
 }

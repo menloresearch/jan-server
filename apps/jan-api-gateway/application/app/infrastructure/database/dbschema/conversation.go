@@ -27,6 +27,7 @@ type Conversation struct {
 
 type Item struct {
 	BaseModel
+	PublicID          string       `gorm:"type:varchar(50);uniqueIndex;not null"` // OpenAI-compatible string ID
 	ConversationID    uint         `gorm:"not null;index"`
 	Type              string       `gorm:"type:varchar(50);not null"`
 	Role              string       `gorm:"type:varchar(20)"`
@@ -78,8 +79,8 @@ func (c *Conversation) EtoD() *conversation.Conversation {
 		Status:    conversation.ConversationStatus(c.Status),
 		Metadata:  metadata,
 		IsPrivate: c.IsPrivate,
-		CreatedAt: c.CreatedAt,
-		UpdatedAt: c.UpdatedAt,
+		CreatedAt: c.CreatedAt.Unix(), // Convert time.Time to Unix timestamp
+		UpdatedAt: c.UpdatedAt.Unix(), // Convert time.Time to Unix timestamp
 	}
 }
 
@@ -102,6 +103,7 @@ func NewSchemaItem(i *conversation.Item) *Item {
 		BaseModel: BaseModel{
 			ID: i.ID,
 		},
+		PublicID:          i.PublicID, // Add PublicID field
 		Type:              string(i.Type),
 		Role:              stringPtrToString((*string)(i.Role)),
 		Content:           contentJSON,
@@ -128,6 +130,7 @@ func (i *Item) EtoD() *conversation.Item {
 
 	return &conversation.Item{
 		ID:                i.ID,
+		PublicID:          i.PublicID, // Add PublicID field
 		Type:              conversation.ItemType(i.Type),
 		Role:              (*conversation.ItemRole)(ptr.ToString(i.Role)),
 		Content:           content,
@@ -135,7 +138,7 @@ func (i *Item) EtoD() *conversation.Item {
 		IncompleteAt:      i.IncompleteAt,
 		IncompleteDetails: incompleteDetails,
 		CompletedAt:       i.CompletedAt,
-		CreatedAt:         i.CreatedAt,
+		CreatedAt:         i.CreatedAt.Unix(), // Convert time.Time to Unix timestamp
 	}
 }
 
