@@ -2,6 +2,7 @@ package routes
 
 import (
 	"github.com/google/wire"
+	conversationHandler "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
 	jan "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan"
 	janV1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1"
 	janV1Apikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/apikeys"
@@ -16,6 +17,7 @@ import (
 	mcp_impl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
+	conversationUseCase "menlo.ai/jan-api-gateway/app/usecases/conversation"
 )
 
 var RouteProvider = wire.NewSet(
@@ -24,17 +26,21 @@ var RouteProvider = wire.NewSet(
 	janV1Apikeys.NewApiKeyAPI,
 	janV1AuthGoogle.NewGoogleAuthAPI,
 	janV1Auth.NewAuthRoute,
-	janV1Conversations.NewConversationAPI,
 	janV1.NewV1Route,
 	jan.NewJanRoute,
 	projects.NewProjectsRoute,
 	organization.NewAdminApiKeyAPI,
 	organization.NewOrganizationRoute,
-	conversations.NewConversationAPI,
 	mcp_impl.NewSerperMCP,
 	chat.NewCompletionAPI,
 	chat.NewChatRoute,
 	mcp.NewMCPAPI,
 	v1.NewModelAPI,
 	v1.NewV1Route,
+
+	// Conversation-related dependencies
+	conversationUseCase.NewConversationUseCase,
+	conversationHandler.NewConversationHandler,
+	conversations.NewConversationAPI,
+	janV1Conversations.NewConversationAPI,
 )

@@ -22,6 +22,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
+	conversation3 "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan"
 	v1_2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/apikeys"
@@ -36,6 +37,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	organization2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
+	conversation2 "menlo.ai/jan-api-gateway/app/usecases/conversation"
 )
 
 import (
@@ -67,7 +69,9 @@ func CreateApplication() (*Application, error) {
 	conversationRepository := conversationrepo.NewConversationGormRepository(transactionDatabase)
 	itemRepository := itemrepo.NewItemGormRepository(transactionDatabase)
 	conversationService := conversation.NewService(conversationRepository, itemRepository)
-	conversationAPI := conversations.NewConversationAPI(conversationService, userService, apiKeyService)
+	conversationUseCase := conversation2.NewConversationUseCase(conversationService, userService, apiKeyService)
+	conversationHandler := conversation3.NewConversationHandler(conversationUseCase)
+	conversationAPI := conversations.NewConversationAPI(conversationHandler)
 	modelAPI := v1.NewModelAPI()
 	serperService := serpermcp.NewSerperService()
 	serperMCP := mcpimpl.NewSerperMCP(serperService)
@@ -78,7 +82,7 @@ func CreateApplication() (*Application, error) {
 	apiKeyAPI := apikeys.NewApiKeyAPI(apiKeyService, userService)
 	chatCompletionAPI := chat2.NewCompletionAPI(userService, apiKeyService)
 	chatChatRoute := chat2.NewChatRoute(chatCompletionAPI)
-	conversationsConversationAPI := conversations2.NewConversationAPI(conversationService, userService, apiKeyService)
+	conversationsConversationAPI := conversations2.NewConversationAPI(conversationHandler)
 	v1V1Route := v1_2.NewV1Route(authRoute, apiKeyAPI, chatChatRoute, conversationsConversationAPI)
 	janRoute := jan.NewJanRoute(v1V1Route, chatChatRoute)
 	httpServer := http.NewHttpServer(v1Route, janRoute)

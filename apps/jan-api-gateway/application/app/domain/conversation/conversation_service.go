@@ -72,6 +72,11 @@ func (s *ConversationService) GetConversationWithAccessAndItems(ctx context.Cont
 	return s.GetConversation(ctx, publicID, userID)
 }
 
+// GetConversationWithoutItems retrieves a conversation without loading items for performance
+func (s *ConversationService) GetConversationWithoutItems(ctx context.Context, publicID string, userID uint) (*Conversation, error) {
+	return s.getConversationWithAccessCheck(ctx, publicID, userID, false)
+}
+
 // getConversationWithAccessCheck is the internal method that handles conversation retrieval with optional item loading
 func (s *ConversationService) getConversationWithAccessCheck(ctx context.Context, publicID string, userID uint, loadItems bool) (*Conversation, error) {
 	// Validate inputs
@@ -309,6 +314,52 @@ func (s *ConversationService) DeleteItem(ctx context.Context, conversation *Conv
 	}
 
 	return updatedConversation, nil
+}
+
+// DeleteItemByPublicID deletes an item by its public ID with efficient verification
+func (s *ConversationService) DeleteItemByPublicID(ctx context.Context, conversation *Conversation, itemPublicID string, userID uint) (*Conversation, error) {
+	// Check access permissions
+	if conversation.IsPrivate && conversation.UserID != userID {
+		return nil, ErrPrivateConversation
+	}
+
+	if conversation.UserID != userID {
+		return nil, ErrAccessDenied
+	}
+
+	// Find item by public ID
+	item, err := s.itemRepo.FindByPublicID(ctx, itemPublicID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find item: %w", err)
+	}
+
+	if item == nil {
+		return nil, ErrItemNotFound
+	}
+
+	// ✅ Use efficient existence check instead of loading all items
+	exists, err := s.itemRepo.ExistsByIDAndConversation(ctx, item.ID, conversation.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify item ownership: %w", err)
+	}
+
+	if !exists {
+		return nil, ErrItemNotInConversation
+	}
+
+	// Delete the item
+	if err := s.itemRepo.DeleteByPublicID(ctx, itemPublicID); err != nil {
+		return nil, fmt.Errorf("failed to delete item: %w", err)
+	}
+
+	// Update conversation timestamp
+	conversation.UpdatedAt = time.Now().Unix()
+	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
+		return nil, fmt.Errorf("failed to update conversation: %w", err)
+	}
+
+	// Return updated conversation with items loaded
+	return s.GetConversation(ctx, conversation.PublicID, userID)
 }
 
 func (s *ConversationService) SearchItems(ctx context.Context, publicID string, userID uint, query string) ([]*Item, error) {
