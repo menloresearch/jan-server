@@ -33,7 +33,6 @@ func NewConversationHandler(useCase *conversationUseCase.ConversationUseCase) *C
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations [post]
-// @Router /jan/v1/conversations [post]
 func (h *ConversationHandler) CreateConversation(ctx *gin.Context) {
 	// Authenticate user
 	user, err := h.useCase.AuthenticateAPIKey(ctx)
@@ -81,7 +80,6 @@ func (h *ConversationHandler) CreateConversation(ctx *gin.Context) {
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id} [get]
-// @Router /jan/v1/conversations/{conversation_id} [get]
 func (h *ConversationHandler) GetConversation(ctx *gin.Context) {
 	// Authenticate user
 	user, err := h.useCase.AuthenticateAPIKey(ctx)
@@ -124,7 +122,6 @@ func (h *ConversationHandler) GetConversation(ctx *gin.Context) {
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id} [patch]
-// @Router /jan/v1/conversations/{conversation_id} [patch]
 func (h *ConversationHandler) UpdateConversation(ctx *gin.Context) {
 	// Authenticate user
 	user, err := h.useCase.AuthenticateAPIKey(ctx)
@@ -174,7 +171,6 @@ func (h *ConversationHandler) UpdateConversation(ctx *gin.Context) {
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id} [delete]
-// @Router /jan/v1/conversations/{conversation_id} [delete]
 func (h *ConversationHandler) DeleteConversation(ctx *gin.Context) {
 	// Authenticate user
 	user, err := h.useCase.AuthenticateAPIKey(ctx)
@@ -217,7 +213,6 @@ func (h *ConversationHandler) DeleteConversation(ctx *gin.Context) {
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id}/items [post]
-// @Router /jan/v1/conversations/{conversation_id}/items [post]
 func (h *ConversationHandler) CreateItems(ctx *gin.Context) {
 	// Authenticate user
 	user, err := h.useCase.AuthenticateAPIKey(ctx)
@@ -270,7 +265,6 @@ func (h *ConversationHandler) CreateItems(ctx *gin.Context) {
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id}/items [get]
-// @Router /jan/v1/conversations/{conversation_id}/items [get]
 func (h *ConversationHandler) ListItems(ctx *gin.Context) {
 	// Authenticate user
 	user, err := h.useCase.AuthenticateAPIKey(ctx)
@@ -312,7 +306,6 @@ func (h *ConversationHandler) ListItems(ctx *gin.Context) {
 // @Failure 404 {object} responses.ErrorResponse "Item not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id}/items/{item_id} [get]
-// @Router /jan/v1/conversations/{conversation_id}/items/{item_id} [get]
 func (h *ConversationHandler) GetItem(ctx *gin.Context) {
 	// Authenticate user
 	user, err := h.useCase.AuthenticateAPIKey(ctx)
@@ -354,7 +347,6 @@ func (h *ConversationHandler) GetItem(ctx *gin.Context) {
 // @Failure 404 {object} responses.ErrorResponse "Item not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id}/items/{item_id} [delete]
-// @Router /jan/v1/conversations/{conversation_id}/items/{item_id} [delete]
 func (h *ConversationHandler) DeleteItem(ctx *gin.Context) {
 	// Authenticate user
 	user, err := h.useCase.AuthenticateAPIKey(ctx)
