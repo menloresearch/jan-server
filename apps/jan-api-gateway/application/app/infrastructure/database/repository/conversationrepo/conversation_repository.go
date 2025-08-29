@@ -67,6 +67,8 @@ func (r *ConversationGormRepository) Find(ctx context.Context, filter domain.Con
 	}
 
 	// Apply pagination
+	// Note: OFFSET-based pagination can lead to performance issues with large datasets
+	// Consider implementing cursor-based pagination using WHERE ID > lastID for better performance
 	if offset != nil {
 		query = query.Offset(*offset)
 	}
@@ -76,6 +78,51 @@ func (r *ConversationGormRepository) Find(ctx context.Context, filter domain.Con
 
 	// Order by updated_at desc
 	query = query.Order(r.db.GetQuery(ctx).Conversation.UpdatedAt.Desc())
+
+	models, err := query.Find()
+	if err != nil {
+		return nil, err
+	}
+
+	conversations := make([]*domain.Conversation, len(models))
+	for i, model := range models {
+		conversations[i] = model.EtoD()
+	}
+
+	return conversations, nil
+}
+
+// FindWithCursor implements cursor-based pagination for better performance
+func (r *ConversationGormRepository) FindWithCursor(ctx context.Context, filter domain.ConversationFilter, limit *int, cursor *uint) ([]*domain.Conversation, error) {
+	query := r.db.GetQuery(ctx).Conversation.WithContext(ctx)
+
+	// Apply filters
+	if filter.UserID != nil {
+		query = query.Where(r.db.GetQuery(ctx).Conversation.UserID.Eq(*filter.UserID))
+	}
+	if filter.Status != nil {
+		query = query.Where(r.db.GetQuery(ctx).Conversation.Status.Eq(string(*filter.Status)))
+	}
+	if filter.IsPrivate != nil {
+		query = query.Where(r.db.GetQuery(ctx).Conversation.IsPrivate.Is(*filter.IsPrivate))
+	}
+	if filter.Search != nil && *filter.Search != "" {
+		searchTerm := "%" + strings.ToLower(*filter.Search) + "%"
+		query = query.Where(r.db.GetQuery(ctx).Conversation.Title.Like(searchTerm))
+	}
+
+	// Apply cursor-based pagination (more efficient for large datasets)
+	if cursor != nil {
+		query = query.Where(r.db.GetQuery(ctx).Conversation.ID.Lt(*cursor))
+	}
+
+	// Apply limit
+	if limit != nil {
+		query = query.Limit(*limit)
+	}
+
+	// Order by ID desc for cursor-based pagination
+	query = query.Order(r.db.GetQuery(ctx).Conversation.ID.Desc())
 
 	models, err := query.Find()
 	if err != nil {

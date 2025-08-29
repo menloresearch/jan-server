@@ -96,6 +96,7 @@ type ConversationRepository interface {
 
 type ItemRepository interface {
 	Create(ctx context.Context, item *Item) error
+	FindByID(ctx context.Context, id uint) (*Item, error)
 	FindByConversationID(ctx context.Context, conversationID uint) ([]*Item, error)
 	Search(ctx context.Context, conversationID uint, query string) ([]*Item, error)
 	Delete(ctx context.Context, id uint) error

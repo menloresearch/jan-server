@@ -5,6 +5,7 @@ import (
 
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database"
+	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
 func init() {
@@ -40,8 +41,12 @@ type Item struct {
 func NewSchemaConversation(c *conversation.Conversation) *Conversation {
 	var metadataJSON string
 	if c.Metadata != nil {
-		metadataBytes, _ := json.Marshal(c.Metadata)
-		metadataJSON = string(metadataBytes)
+		metadataBytes, err := json.Marshal(c.Metadata)
+		if err != nil {
+			metadataJSON = "{}"
+		} else {
+			metadataJSON = string(metadataBytes)
+		}
 	}
 
 	return &Conversation{
@@ -63,10 +68,7 @@ func (c *Conversation) EtoD() *conversation.Conversation {
 		json.Unmarshal([]byte(c.Metadata), &metadata)
 	}
 
-	var title *string
-	if c.Title != "" {
-		title = &c.Title
-	}
+	title := ptr.ToString(c.Title)
 
 	return &conversation.Conversation{
 		ID:        c.ID,
@@ -127,9 +129,9 @@ func (i *Item) EtoD() *conversation.Item {
 	return &conversation.Item{
 		ID:                i.ID,
 		Type:              conversation.ItemType(i.Type),
-		Role:              (*conversation.ItemRole)(stringToStringPtr(i.Role)),
+		Role:              (*conversation.ItemRole)(ptr.ToString(i.Role)),
 		Content:           content,
-		Status:            stringToStringPtr(i.Status),
+		Status:            ptr.ToString(i.Status),
 		IncompleteAt:      i.IncompleteAt,
 		IncompleteDetails: incompleteDetails,
 		CompletedAt:       i.CompletedAt,
@@ -143,11 +145,4 @@ func stringPtrToString(s *string) string {
 		return ""
 	}
 	return *s
-}
-
-func stringToStringPtr(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
 }

@@ -65,7 +65,7 @@ func CreateApplication() (*Application, error) {
 	conversationRepository := conversationrepo.NewConversationGormRepository(transactionDatabase)
 	itemRepository := itemrepo.NewItemGormRepository(transactionDatabase)
 	conversationService := conversation.NewService(conversationRepository, itemRepository)
-	conversationAPI := conversations.NewConversationAPI(conversationService, userService)
+	conversationAPI := conversations.NewConversationAPI(conversationService, userService, apiKeyService)
 	modelAPI := v1.NewModelAPI()
 	serperService := serpermcp.NewSerperService()
 	serperMCP := mcpimpl.NewSerperMCP(serperService)

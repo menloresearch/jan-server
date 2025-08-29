@@ -28,6 +28,16 @@ func (r *ItemGormRepository) Create(ctx context.Context, item *domain.Item) erro
 	return nil
 }
 
+func (r *ItemGormRepository) FindByID(ctx context.Context, id uint) (*domain.Item, error) {
+	query := r.db.GetQuery(ctx)
+	model, err := query.Item.WithContext(ctx).Where(query.Item.ID.Eq(id)).First()
+	if err != nil {
+		return nil, err
+	}
+
+	return model.EtoD(), nil
+}
+
 func (r *ItemGormRepository) FindByConversationID(ctx context.Context, conversationID uint) ([]*domain.Item, error) {
 	query := r.db.GetQuery(ctx)
 	models, err := query.Item.WithContext(ctx).
