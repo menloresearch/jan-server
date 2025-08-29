@@ -30,6 +30,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	organization2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
 )
 
 import (
@@ -54,7 +55,8 @@ func CreateApplication() (*Application, error) {
 	userRepository := userrepo.NewUserGormRepository(transactionDatabase)
 	userService := user.NewService(userRepository, organizationService)
 	adminApiKeyAPI := organization2.NewAdminApiKeyAPI(organizationService, apiKeyService, userService)
-	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI)
+	projectsRoute := projects.NewProjectsRoute(projectService, apiKeyService)
+	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI, projectsRoute)
 	completionAPI := chat.NewCompletionAPI(apiKeyService)
 	chatRoute := chat.NewChatRoute(completionAPI)
 	modelAPI := v1.NewModelAPI()

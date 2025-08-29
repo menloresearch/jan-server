@@ -1,5 +1,7 @@
 package ptr
 
+import "time"
+
 func ToString(s string) *string {
 	return &s
 }
@@ -17,5 +19,9 @@ func ToUint(i uint) *uint {
 }
 
 func ToBool(b bool) *bool {
+	return &b
+}
+
+func ToTime(b time.Time) *time.Time {
 	return &b
 }
