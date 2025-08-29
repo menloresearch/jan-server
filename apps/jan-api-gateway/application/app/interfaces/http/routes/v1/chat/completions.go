@@ -3,16 +3,13 @@ package chat
 import (
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
-	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
 type CompletionAPI struct {
@@ -63,39 +60,39 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	}
 
 	key := ""
-	if environment_variables.EnvironmentVariables.ENABLE_ADMIN_API {
-		key, ok := requests.GetTokenFromBearer(reqCtx)
-		if !ok {
-			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-				Code:  "4284adb3-7af4-428b-8064-7073cb9ca2ca",
-				Error: "invalid apikey",
-			})
-			return
-		}
-		hashed := api.apikeyService.HashKey(reqCtx, key)
-		apikeyEntity, err := api.apikeyService.FindByKeyHash(reqCtx, hashed)
-		if err != nil {
-			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-				Code:  "d14ab75b-586b-4b55-ba65-e520a76d6559",
-				Error: "invalid apikey",
-			})
-			return
-		}
-		if !apikeyEntity.Enabled {
-			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-				Code:  "42bd6104-28a1-45bd-a164-8e32d12b0378",
-				Error: "invalid apikey",
-			})
-			return
-		}
-		if apikeyEntity.ExpiresAt != nil && apikeyEntity.ExpiresAt.Before(time.Now()) {
-			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-				Code:  "f8f2733d-c76f-40e4-95b1-584a5d054225",
-				Error: "apikey expired",
-			})
-			return
-		}
-	}
+	// if environment_variables.EnvironmentVariables.ENABLE_ADMIN_API {
+	// 	key, ok := requests.GetTokenFromBearer(reqCtx)
+	// 	if !ok {
+	// 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+	// 			Code:  "4284adb3-7af4-428b-8064-7073cb9ca2ca",
+	// 			Error: "invalid apikey",
+	// 		})
+	// 		return
+	// 	}
+	// 	hashed := api.apikeyService.HashKey(reqCtx, key)
+	// 	apikeyEntity, err := api.apikeyService.FindByKeyHash(reqCtx, hashed)
+	// 	if err != nil {
+	// 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+	// 			Code:  "d14ab75b-586b-4b55-ba65-e520a76d6559",
+	// 			Error: "invalid apikey",
+	// 		})
+	// 		return
+	// 	}
+	// 	if !apikeyEntity.Enabled {
+	// 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+	// 			Code:  "42bd6104-28a1-45bd-a164-8e32d12b0378",
+	// 			Error: "invalid apikey",
+	// 		})
+	// 		return
+	// 	}
+	// 	if apikeyEntity.ExpiresAt != nil && apikeyEntity.ExpiresAt.Before(time.Now()) {
+	// 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+	// 			Code:  "f8f2733d-c76f-40e4-95b1-584a5d054225",
+	// 			Error: "apikey expired",
+	// 		})
+	// 		return
+	// 	}
+	// }
 
 	modelRegistry := inferencemodelregistry.GetInstance()
 	mToE := modelRegistry.GetModelToEndpoints()
