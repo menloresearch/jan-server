@@ -75,23 +75,15 @@ type Conversation struct {
 	UpdatedAt time.Time          `json:"updated_at"`
 }
 
-type ConversationFilter struct {
-	UserID    *uint               `json:"user_id,omitempty"`
-	Status    *ConversationStatus `json:"status,omitempty"`
-	IsPrivate *bool               `json:"is_private,omitempty"`
-	Search    *string             `json:"search,omitempty"`
-}
-
 type ConversationRepository interface {
 	Create(ctx context.Context, conversation *Conversation) error
 	FindByID(ctx context.Context, id uint) (*Conversation, error)
 	FindByPublicID(ctx context.Context, publicID string) (*Conversation, error)
-	Find(ctx context.Context, filter ConversationFilter, limit *int, offset *int) ([]*Conversation, error)
+
 	Update(ctx context.Context, conversation *Conversation) error
 	Delete(ctx context.Context, id uint) error
 	AddItem(ctx context.Context, conversationID uint, item *Item) error
 	SearchItems(ctx context.Context, conversationID uint, query string) ([]*Item, error)
-	Count(ctx context.Context, filter ConversationFilter) (int64, error)
 }
 
 type ItemRepository interface {

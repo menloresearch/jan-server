@@ -87,18 +87,6 @@ func (s *ConversationService) GetConversation(ctx context.Context, publicID stri
 	return conversation, nil
 }
 
-func (s *ConversationService) ListConversations(ctx context.Context, userID uint, filter ConversationFilter, limit *int, offset *int) ([]*Conversation, error) {
-	// Always filter by user for privacy
-	filter.UserID = &userID
-
-	conversations, err := s.conversationRepo.Find(ctx, filter, limit, offset)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list conversations: %w", err)
-	}
-
-	return conversations, nil
-}
-
 func (s *ConversationService) UpdateConversation(ctx context.Context, publicID string, userID uint, title *string, metadata map[string]string) (*Conversation, error) {
 	conversation, err := s.conversationRepo.FindByPublicID(ctx, publicID)
 	if err != nil {
@@ -324,18 +312,6 @@ func (s *ConversationService) SearchItems(ctx context.Context, publicID string, 
 	}
 
 	return items, nil
-}
-
-func (s *ConversationService) CountConversations(ctx context.Context, userID uint, filter ConversationFilter) (int64, error) {
-	// Always filter by user for privacy
-	filter.UserID = &userID
-
-	count, err := s.conversationRepo.Count(ctx, filter)
-	if err != nil {
-		return 0, fmt.Errorf("failed to count conversations: %w", err)
-	}
-
-	return count, nil
 }
 
 func (s *ConversationService) generatePublicID() (string, error) {
