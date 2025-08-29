@@ -1,11 +1,14 @@
 package database
 
 import (
+	"strings"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 	"gorm.io/plugin/dbresolver"
 	"menlo.ai/jan-api-gateway/app/utils/logger"
+	"menlo.ai/jan-api-gateway/config"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
@@ -43,28 +46,29 @@ func NewDB() (*gorm.DB, error) {
 			return nil, err
 		}
 
-		// v0.0.6 only
-		err = db.Exec("DROP SCHEMA IF EXISTS public CASCADE;").Error
-		if err != nil {
-			logger.GetLogger().
-				WithField("error_code", "5644d271-be84-4a92-a5af-489d87324758").
-				Fatalf("unable to connect to setup replica: %v", err)
-			return nil, err
-		}
-		err = db.Exec("CREATE SCHEMA public;").Error
-		if err != nil {
-			logger.GetLogger().
-				WithField("error_code", "07217a04-80f1-466f-8d2c-cdd162dd9ccb").
-				Fatalf("unable to connect to setup replica: %v", err)
-			return nil, err
-		}
-		for _, model := range SchemaRegistry {
-			err = db.AutoMigrate(model)
+		if !strings.Contains(config.Version, "dev") {
+			err = db.Exec("DROP SCHEMA IF EXISTS public CASCADE;").Error
 			if err != nil {
 				logger.GetLogger().
-					WithField("error_code", "75333e43-8157-4f0a-8e34-aa34e6e7c285").
-					Fatalf("failed to auto migrate schema: %T, error: %v", model, err)
+					WithField("error_code", "5644d271-be84-4a92-a5af-489d87324758").
+					Fatalf("unable to connect to setup replica: %v", err)
 				return nil, err
+			}
+			err = db.Exec("CREATE SCHEMA public;").Error
+			if err != nil {
+				logger.GetLogger().
+					WithField("error_code", "07217a04-80f1-466f-8d2c-cdd162dd9ccb").
+					Fatalf("unable to connect to setup replica: %v", err)
+				return nil, err
+			}
+			for _, model := range SchemaRegistry {
+				err = db.AutoMigrate(model)
+				if err != nil {
+					logger.GetLogger().
+						WithField("error_code", "75333e43-8157-4f0a-8e34-aa34e6e7c285").
+						Fatalf("failed to auto migrate schema: %T, error: %v", model, err)
+					return nil, err
+				}
 			}
 		}
 
