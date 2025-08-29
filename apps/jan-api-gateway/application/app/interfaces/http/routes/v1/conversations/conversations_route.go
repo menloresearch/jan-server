@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
@@ -31,12 +30,15 @@ func NewConversationAPI(conversationService *conversation.ConversationService, u
 func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 	conversationsRouter := router.Group("/conversations")
 
+	// OpenAI-compatible endpoints only
 	conversationsRouter.POST("", api.CreateConversation)
 	conversationsRouter.GET("/:conversation_id", api.GetConversation)
-	conversationsRouter.PATCH("/:conversation_id", api.UpdateConversation)
+	conversationsRouter.POST("/:conversation_id", api.UpdateConversation) // OpenAI uses POST for updates
 	conversationsRouter.DELETE("/:conversation_id", api.DeleteConversation)
-	conversationsRouter.GET("/:conversation_id/items/:item_id", api.GetItem)
-	conversationsRouter.DELETE("/:conversation_id/items/:item_id", api.DeleteItem)
+	conversationsRouter.POST("/:conversation_id/items", api.CreateItems)           // OpenAI creates multiple items
+	conversationsRouter.GET("/:conversation_id/items", api.ListItems)              // OpenAI list items
+	conversationsRouter.GET("/:conversation_id/items/:item_id", api.GetItem)       // OpenAI get single item
+	conversationsRouter.DELETE("/:conversation_id/items/:item_id", api.DeleteItem) // OpenAI delete single item
 }
 
 // validateAPIKey validates the API key from request and returns the owner ID
@@ -64,12 +66,25 @@ func (api *ConversationAPI) validateAPIKey(ctx *gin.Context) (*uint, error) {
 }
 
 func domainToConversationResponse(entity *conversation.Conversation) ConversationResponse {
+	// Initialize metadata as empty map if nil (required by OpenAI spec)
+	metadata := entity.Metadata
+	if metadata == nil {
+		metadata = make(map[string]string)
+	}
+
 	return ConversationResponse{
-		ID:       entity.PublicID,
-		Object:   "conversation",
-		Created:  entity.CreatedAt.Unix(),
-		Metadata: entity.Metadata,
-		Items:    domainToConversationItemsResponse(entity.Items),
+		ID:        entity.PublicID,
+		Object:    "conversation",
+		CreatedAt: entity.CreatedAt.Unix(),
+		Metadata:  metadata,
+	}
+}
+
+func domainToDeletedConversationResponse(entity *conversation.Conversation) DeletedConversationResponse {
+	return DeletedConversationResponse{
+		ID:      entity.PublicID,
+		Object:  "conversation.deleted",
+		Deleted: true,
 	}
 }
 
@@ -122,7 +137,7 @@ func domainToContentResponse(content []conversation.Content) []ContentResponse {
 	return response
 }
 
-// CreateConversationRequest represents the request body for creating a conversation
+// CreateConversationRequest represents the request body for creating a conversation (matches OpenAI schema)
 type CreateConversationRequest struct {
 	Metadata map[string]string         `json:"metadata,omitempty"`
 	Items    []ConversationItemRequest `json:"items,omitempty"`
@@ -135,13 +150,19 @@ type ConversationItemRequest struct {
 	Content string `json:"content,omitempty"`
 }
 
-// ConversationResponse represents the response body for conversation operations
+// ConversationResponse represents the response body for conversation operations (matches OpenAI ConversationResource)
 type ConversationResponse struct {
-	ID       string                     `json:"id"`
-	Object   string                     `json:"object"`
-	Created  int64                      `json:"created"`
-	Metadata map[string]string          `json:"metadata,omitempty"`
-	Items    []ConversationItemResponse `json:"items,omitempty"`
+	ID        string            `json:"id"`
+	Object    string            `json:"object"`
+	CreatedAt int64             `json:"created_at"`
+	Metadata  map[string]string `json:"metadata"`
+}
+
+// DeletedConversationResponse represents the response body for deleted conversations (matches OpenAI DeletedConversationResource)
+type DeletedConversationResponse struct {
+	ID      string `json:"id"`
+	Object  string `json:"object"`
+	Deleted bool   `json:"deleted"`
 }
 
 // ConversationItemResponse represents an item in the conversation response
@@ -166,10 +187,23 @@ type TextResponse struct {
 	Value string `json:"value"`
 }
 
-// UpdateConversationRequest represents the request body for updating a conversation
+// UpdateConversationRequest represents the request body for updating a conversation (matches OpenAI UpdateConversationBody)
 type UpdateConversationRequest struct {
-	Title    *string           `json:"title,omitempty"`
-	Metadata map[string]string `json:"metadata,omitempty"`
+	Metadata map[string]string `json:"metadata" binding:"required"`
+}
+
+// CreateItemsRequest represents the request body for creating items (matches OpenAI schema)
+type CreateItemsRequest struct {
+	Items []ConversationItemRequest `json:"items" binding:"required"`
+}
+
+// ConversationItemListResponse represents the response for item lists (matches OpenAI ConversationItemList)
+type ConversationItemListResponse struct {
+	Object  string                     `json:"object"`
+	Data    []ConversationItemResponse `json:"data"`
+	HasMore bool                       `json:"has_more"`
+	FirstID string                     `json:"first_id"`
+	LastID  string                     `json:"last_id"`
 }
 
 // CreateConversation creates a new conversation
@@ -180,7 +214,7 @@ type UpdateConversationRequest struct {
 // @Accept json
 // @Produce json
 // @Param request body CreateConversationRequest true "Create conversation request"
-// @Success 201 {object} conversation.Conversation "Created conversation"
+// @Success 200 {object} ConversationResponse "Created conversation"
 // @Failure 400 {object} responses.ErrorResponse "Invalid request"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
@@ -250,7 +284,7 @@ func (api *ConversationAPI) CreateConversation(ctx *gin.Context) {
 		}
 	}
 
-	ctx.JSON(http.StatusCreated, domainToConversationResponse(conv))
+	ctx.JSON(http.StatusOK, domainToConversationResponse(conv))
 }
 
 // GetConversation retrieves a specific conversation
@@ -261,7 +295,7 @@ func (api *ConversationAPI) CreateConversation(ctx *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
-// @Success 200 {object} conversation.Conversation "Conversation details"
+// @Success 200 {object} ConversationResponse "Conversation details"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
@@ -315,20 +349,20 @@ func (api *ConversationAPI) GetConversation(ctx *gin.Context) {
 
 // UpdateConversation updates a conversation
 // @Summary Update a conversation
-// @Description Updates a conversation's title and metadata
+// @Description Updates a conversation's metadata
 // @Tags Conversations
 // @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
 // @Param request body UpdateConversationRequest true "Update conversation request"
-// @Success 200 {object} conversation.Conversation "Updated conversation"
+// @Success 200 {object} ConversationResponse "Updated conversation"
 // @Failure 400 {object} responses.ErrorResponse "Invalid request"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
-// @Router /v1/conversations/{conversation_id} [patch]
+// @Router /v1/conversations/{conversation_id} [post]
 func (api *ConversationAPI) UpdateConversation(ctx *gin.Context) {
 	ownerID, err := api.validateAPIKey(ctx)
 	if err != nil {
@@ -358,7 +392,7 @@ func (api *ConversationAPI) UpdateConversation(ctx *gin.Context) {
 	}
 
 	conversationID := ctx.Param("conversation_id")
-	conv, err := api.conversationService.UpdateConversation(ctx, conversationID, user.ID, request.Title, request.Metadata)
+	conv, err := api.conversationService.UpdateConversation(ctx, conversationID, user.ID, nil, request.Metadata)
 	if err != nil {
 		if errors.Is(err, conversation.ErrConversationNotFound) {
 			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
@@ -392,7 +426,7 @@ func (api *ConversationAPI) UpdateConversation(ctx *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
-// @Success 204 "Conversation deleted successfully"
+// @Success 200 {object} DeletedConversationResponse "Conversation deleted successfully"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
@@ -418,6 +452,32 @@ func (api *ConversationAPI) DeleteConversation(ctx *gin.Context) {
 	}
 
 	conversationID := ctx.Param("conversation_id")
+
+	// Get conversation before deleting for response
+	conv, err := api.conversationService.GetConversation(ctx, conversationID, user.ID)
+	if err != nil {
+		if errors.Is(err, conversation.ErrConversationNotFound) {
+			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
+				Code:  "delete-conversation-not-found",
+				Error: "Conversation not found",
+			})
+			return
+		}
+		if errors.Is(err, conversation.ErrPrivateConversation) {
+			ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
+				Code:  "delete-conversation-access-denied",
+				Error: "Access denied: conversation is private",
+			})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code:  "delete-conversation-get-error",
+			Error: err.Error(),
+		})
+		return
+	}
+
+	// Now delete the conversation
 	err = api.conversationService.DeleteConversation(ctx, conversationID, user.ID)
 	if err != nil {
 		if errors.Is(err, conversation.ErrConversationNotFound) {
@@ -441,19 +501,217 @@ func (api *ConversationAPI) DeleteConversation(ctx *gin.Context) {
 		return
 	}
 
-	ctx.Status(http.StatusNoContent)
+	ctx.JSON(http.StatusOK, domainToDeletedConversationResponse(conv))
+}
+
+// CreateItems creates items in a conversation
+// @Summary Create items
+// @Description Creates multiple items in a conversation
+// @Tags Conversations
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param conversation_id path string true "Conversation ID"
+// @Param request body CreateItemsRequest true "Create items request"
+// @Success 200 {object} ConversationItemListResponse "Created items"
+// @Failure 400 {object} responses.ErrorResponse "Invalid request"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized"
+// @Failure 403 {object} responses.ErrorResponse "Access denied"
+// @Failure 404 {object} responses.ErrorResponse "Conversation not found"
+// @Failure 500 {object} responses.ErrorResponse "Internal server error"
+// @Router /v1/conversations/{conversation_id}/items [post]
+func (api *ConversationAPI) CreateItems(ctx *gin.Context) {
+	ownerID, err := api.validateAPIKey(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
+			Code:  "create-items-unauthorized",
+			Error: "Invalid or missing API key",
+		})
+		return
+	}
+
+	user, err := api.userService.FindByID(ctx, *ownerID)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  "create-items-user-not-found",
+			Error: "User not found",
+		})
+		return
+	}
+
+	var request CreateItemsRequest
+	if err := ctx.ShouldBindJSON(&request); err != nil {
+		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  "create-items-invalid-request",
+			Error: err.Error(),
+		})
+		return
+	}
+
+	conversationID := ctx.Param("conversation_id")
+
+	// Convert request items to conversation content format and add them
+	var createdItems []conversation.Item
+	for _, reqItem := range request.Items {
+		// Convert string content to []conversation.Content
+		content := []conversation.Content{{
+			Type: "text",
+			Text: &conversation.Text{
+				Value: reqItem.Content,
+			},
+		}}
+
+		// Convert role string to ItemRole
+		var role *conversation.ItemRole
+		if reqItem.Role != "" {
+			itemRole := conversation.ItemRole(reqItem.Role)
+			role = &itemRole
+		}
+
+		// Convert type string to ItemType
+		itemType := conversation.ItemType(reqItem.Type)
+
+		item, err := api.conversationService.AddItem(ctx, conversationID, user.ID, itemType, role, content)
+		if err != nil {
+			if errors.Is(err, conversation.ErrConversationNotFound) {
+				ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
+					Code:  "create-items-conversation-not-found",
+					Error: "Conversation not found",
+				})
+				return
+			}
+			if errors.Is(err, conversation.ErrPrivateConversation) {
+				ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
+					Code:  "create-items-private-conversation",
+					Error: "Access denied: conversation is private",
+				})
+				return
+			}
+			ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+				Code:  "create-items-internal-error",
+				Error: err.Error(),
+			})
+			return
+		}
+
+		createdItems = append(createdItems, *item)
+	}
+
+	// Convert to response format (matching OpenAI ConversationItemList)
+	data := make([]ConversationItemResponse, len(createdItems))
+	for i, item := range createdItems {
+		data[i] = domainToConversationItemResponse(item)
+	}
+
+	response := ConversationItemListResponse{
+		Object:  "list",
+		Data:    data,
+		HasMore: false,
+		FirstID: "",
+		LastID:  "",
+	}
+
+	if len(data) > 0 {
+		response.FirstID = data[0].ID
+		response.LastID = data[len(data)-1].ID
+	}
+
+	ctx.JSON(http.StatusOK, response)
+}
+
+// ListItems lists items in a conversation
+// @Summary List items
+// @Description List all items for a conversation with the given ID
+// @Tags Conversations
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param conversation_id path string true "Conversation ID"
+// @Param limit query int false "A limit on the number of objects to be returned" default(20)
+// @Param order query string false "The order to return the input items in" Enums(asc, desc) default(desc)
+// @Param after query string false "An item ID to list items after, used in pagination"
+// @Success 200 {object} ConversationItemListResponse "List of items"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized"
+// @Failure 403 {object} responses.ErrorResponse "Access denied"
+// @Failure 404 {object} responses.ErrorResponse "Conversation not found"
+// @Failure 500 {object} responses.ErrorResponse "Internal server error"
+// @Router /v1/conversations/{conversation_id}/items [get]
+func (api *ConversationAPI) ListItems(ctx *gin.Context) {
+	ownerID, err := api.validateAPIKey(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
+			Code:  "list-items-unauthorized",
+			Error: "Invalid or missing API key",
+		})
+		return
+	}
+
+	user, err := api.userService.FindByID(ctx, *ownerID)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  "list-items-user-not-found",
+			Error: "User not found",
+		})
+		return
+	}
+
+	conversationID := ctx.Param("conversation_id")
+
+	// Get conversation first to check access
+	conv, err := api.conversationService.GetConversation(ctx, conversationID, user.ID)
+	if err != nil {
+		if errors.Is(err, conversation.ErrConversationNotFound) {
+			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
+				Code:  "list-items-conversation-not-found",
+				Error: "Conversation not found",
+			})
+			return
+		}
+		if errors.Is(err, conversation.ErrPrivateConversation) {
+			ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
+				Code:  "list-items-private-conversation",
+				Error: "Access denied: conversation is private",
+			})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code:  "list-items-internal-error",
+			Error: err.Error(),
+		})
+		return
+	}
+
+	// Convert items to response format
+	data := make([]ConversationItemResponse, len(conv.Items))
+	for i, item := range conv.Items {
+		data[i] = domainToConversationItemResponse(item)
+	}
+
+	response := ConversationItemListResponse{
+		Object:  "list",
+		Data:    data,
+		HasMore: false, // For now, we don't implement pagination
+		FirstID: "",
+		LastID:  "",
+	}
+
+	if len(data) > 0 {
+		response.FirstID = data[0].ID
+		response.LastID = data[len(data)-1].ID
+	}
+
+	ctx.JSON(http.StatusOK, response)
 }
 
 // GetItem retrieves a specific item from a conversation
-// @Summary Get an item from a conversation
-// @Description Retrieves a specific item from a conversation by conversation ID and item ID
+// @Summary Retrieve an item
+// @Description Get a single item from a conversation with the given IDs
 // @Tags Conversations
 // @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
 // @Param item_id path string true "Item ID"
-// @Param include query array false "Additional fields to include in the response"
 // @Success 200 {object} ConversationItemResponse "Item details"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
@@ -464,7 +722,7 @@ func (api *ConversationAPI) GetItem(ctx *gin.Context) {
 	ownerID, err := api.validateAPIKey(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "item-unauthorized",
+			Code:  "get-item-unauthorized",
 			Error: "Invalid or missing API key",
 		})
 		return
@@ -473,7 +731,7 @@ func (api *ConversationAPI) GetItem(ctx *gin.Context) {
 	user, err := api.userService.FindByID(ctx, *ownerID)
 	if err != nil {
 		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "item-user-not-found",
+			Code:  "get-item-user-not-found",
 			Error: "User not found",
 		})
 		return
@@ -482,53 +740,56 @@ func (api *ConversationAPI) GetItem(ctx *gin.Context) {
 	conversationID := ctx.Param("conversation_id")
 	itemIDStr := ctx.Param("item_id")
 
-	// Convert item_id from string to uint
-	itemIDParsed, err := strconv.ParseUint(itemIDStr, 10, 32)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "item-invalid-id",
-			Error: "Invalid item ID format",
-		})
-		return
-	}
-	itemID := uint(itemIDParsed)
-
-	item, err := api.conversationService.GetItem(ctx, conversationID, itemID, user.ID)
+	// For OpenAI compatibility, item_id should be a string like "msg_abc"
+	// We need to extract the numeric ID or implement string-based IDs
+	// For now, let's try to find the item by string ID directly
+	conv, err := api.conversationService.GetConversation(ctx, conversationID, user.ID)
 	if err != nil {
 		if errors.Is(err, conversation.ErrConversationNotFound) {
 			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
-				Code:  "conversation-not-found",
+				Code:  "get-item-conversation-not-found",
 				Error: "Conversation not found",
 			})
 			return
 		}
 		if errors.Is(err, conversation.ErrPrivateConversation) {
 			ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
-				Code:  "conversation-private",
+				Code:  "get-item-private-conversation",
 				Error: "Access denied: conversation is private",
 			})
 			return
 		}
-		if errors.Is(err, conversation.ErrItemNotFound) || errors.Is(err, conversation.ErrItemNotInConversation) {
-			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
-				Code:  "item-not-found",
-				Error: "Item not found",
-			})
-			return
-		}
 		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "item-internal-error",
+			Code:  "get-item-internal-error",
 			Error: err.Error(),
 		})
 		return
 	}
 
-	ctx.JSON(http.StatusOK, domainToConversationItemResponse(*item))
+	// Find item by ID (our current implementation uses "item_<id>" format)
+	var foundItem *conversation.Item
+	for _, item := range conv.Items {
+		itemResponseID := fmt.Sprintf("item_%d", item.ID)
+		if itemResponseID == itemIDStr {
+			foundItem = &item
+			break
+		}
+	}
+
+	if foundItem == nil {
+		ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
+			Code:  "get-item-not-found",
+			Error: "Item not found",
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, domainToConversationItemResponse(*foundItem))
 }
 
 // DeleteItem deletes a specific item from a conversation
-// @Summary Delete an item from a conversation
-// @Description Deletes a specific item from a conversation by conversation ID and item ID. Returns the updated conversation.
+// @Summary Delete an item
+// @Description Delete an item from a conversation with the given IDs
 // @Tags Conversations
 // @Security BearerAuth
 // @Accept json
@@ -563,16 +824,15 @@ func (api *ConversationAPI) DeleteItem(ctx *gin.Context) {
 	conversationID := ctx.Param("conversation_id")
 	itemIDStr := ctx.Param("item_id")
 
-	// Convert item_id from string to uint
-	itemIDParsed, err := strconv.ParseUint(itemIDStr, 10, 32)
-	if err != nil {
+	// Extract numeric ID from string ID (e.g., "item_123" -> 123)
+	var itemID uint
+	if _, err := fmt.Sscanf(itemIDStr, "item_%d", &itemID); err != nil {
 		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  "delete-item-invalid-id",
 			Error: "Invalid item ID format",
 		})
 		return
 	}
-	itemID := uint(itemIDParsed)
 
 	updatedConversation, err := api.conversationService.DeleteItem(ctx, conversationID, itemID, user.ID)
 	if err != nil {

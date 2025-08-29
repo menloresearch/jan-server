@@ -76,7 +76,7 @@ func CreateApplication() (*Application, error) {
 	apiKeyAPI := apikeys.NewApiKeyAPI(apiKeyService, userService)
 	chatCompletionAPI := chat2.NewCompletionAPI(userService, apiKeyService)
 	chatChatRoute := chat2.NewChatRoute(chatCompletionAPI)
-	conversationsConversationAPI := conversations2.NewConversationAPI(conversationService, userService)
+	conversationsConversationAPI := conversations2.NewConversationAPI(conversationService, userService, apiKeyService)
 	v1V1Route := v1_2.NewV1Route(authRoute, apiKeyAPI, chatChatRoute, conversationsConversationAPI)
 	janRoute := jan.NewJanRoute(v1V1Route, chatChatRoute)
 	httpServer := http.NewHttpServer(v1Route, janRoute)
