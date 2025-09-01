@@ -41,6 +41,14 @@ type Item struct {
 	CreatedAt         int64              `json:"created_at"` // Unix timestamp for OpenAI compatibility
 }
 
+// ItemCreationData represents the data needed to create a new conversation item
+// This excludes system-generated fields like ID, PublicID, CreatedAt, etc.
+type ItemCreationData struct {
+	Type    ItemType  `json:"type"`
+	Role    *ItemRole `json:"role,omitempty"`
+	Content []Content `json:"content"`
+}
+
 type Content struct {
 	Type       string        `json:"type"`
 	Text       *Text         `json:"text,omitempty"`        // Generic text content

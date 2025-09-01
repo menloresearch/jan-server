@@ -12,6 +12,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/project"
+	"menlo.ai/jan-api-gateway/app/domain/shared/id"
 	"menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/apikeyrepo"
@@ -55,12 +56,13 @@ func CreateApplication() (*Application, error) {
 	transactionDatabase := transaction.NewDatabase(db)
 	organizationRepository := organizationrepo.NewOrganizationGormRepository(transactionDatabase)
 	projectRepository := projectrepo.NewProjectGormRepository(transactionDatabase)
-	projectService := project.NewService(projectRepository)
-	organizationService := organization.NewService(organizationRepository, projectService)
+	idService := id.NewIDService()
+	projectService := project.NewService(projectRepository, idService)
+	organizationService := organization.NewService(organizationRepository, projectService, idService)
 	apiKeyRepository := apikeyrepo.NewApiKeyGormRepository(transactionDatabase)
-	apiKeyService := apikey.NewService(apiKeyRepository)
+	apiKeyService := apikey.NewService(apiKeyRepository, idService)
 	userRepository := userrepo.NewUserGormRepository(transactionDatabase)
-	userService := user.NewService(userRepository, organizationService)
+	userService := user.NewService(userRepository, organizationService, idService)
 	adminApiKeyAPI := organization2.NewAdminApiKeyAPI(organizationService, apiKeyService, userService)
 	projectsRoute := projects.NewProjectsRoute(projectService, apiKeyService)
 	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI, projectsRoute)
@@ -68,7 +70,7 @@ func CreateApplication() (*Application, error) {
 	chatRoute := chat.NewChatRoute(completionAPI)
 	conversationRepository := conversationrepo.NewConversationGormRepository(transactionDatabase)
 	itemRepository := itemrepo.NewItemGormRepository(transactionDatabase)
-	conversationService := conversation.NewService(conversationRepository, itemRepository)
+	conversationService := conversation.NewService(conversationRepository, itemRepository, idService)
 	conversationHandler := conversation2.NewConversationHandler(conversationService, userService, apiKeyService)
 	conversationAPI := conversations.NewConversationAPI(conversationHandler)
 	modelAPI := v1.NewModelAPI()

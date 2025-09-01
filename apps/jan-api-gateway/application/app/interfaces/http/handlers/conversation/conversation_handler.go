@@ -205,14 +205,17 @@ func (h *ConversationHandler) CreateConversation(ctx *gin.Context) {
 		return
 	}
 
+	if len(request.Items) > 20 {
+		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  "e5f6g7h8-i9j0-1234-efgh-567890123456",
+			Error: "Cannot create more than 20 items in a single conversation creation request",
+		})
+		return
+	}
 	// Add items if provided using batch operation
 	if len(request.Items) > 0 {
 		// Convert all items at once for batch processing
-		itemsToCreate := make([]struct {
-			Type    conversation.ItemType
-			Role    *conversation.ItemRole
-			Content []conversation.Content
-		}, len(request.Items))
+		itemsToCreate := make([]conversation.ItemCreationData, len(request.Items))
 
 		for i, itemReq := range request.Items {
 			// Convert request to domain types
@@ -234,11 +237,7 @@ func (h *ConversationHandler) CreateConversation(ctx *gin.Context) {
 				}
 			}
 
-			itemsToCreate[i] = struct {
-				Type    conversation.ItemType
-				Role    *conversation.ItemRole
-				Content []conversation.Content
-			}{
+			itemsToCreate[i] = conversation.ItemCreationData{
 				Type:    itemType,
 				Role:    role,
 				Content: content,
@@ -256,7 +255,7 @@ func (h *ConversationHandler) CreateConversation(ctx *gin.Context) {
 		}
 
 		// Reload conversation with items
-		conv, err = h.conversationService.GetConversation(ctx, conv.PublicID, user.ID)
+		conv, err = h.conversationService.GetConversationByPublicIDAndUserID(ctx, conv.PublicID, user.ID)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
 				Code:  "e5f6g7h8-i9j0-1234-efgh-567890123456",
@@ -284,7 +283,7 @@ func (h *ConversationHandler) GetConversation(ctx *gin.Context) {
 
 	conversationID := ctx.Param("conversation_id")
 
-	conv, err := h.conversationService.GetConversation(ctx, conversationID, user.ID)
+	conv, err := h.conversationService.GetConversationByPublicIDAndUserID(ctx, conversationID, user.ID)
 	if err != nil {
 		if errors.Is(err, conversation.ErrConversationNotFound) {
 			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
@@ -377,7 +376,7 @@ func (h *ConversationHandler) DeleteConversation(ctx *gin.Context) {
 	conversationID := ctx.Param("conversation_id")
 
 	// Get conversation first to get the public ID for response
-	conv, err := h.conversationService.GetConversation(ctx, conversationID, user.ID)
+	conv, err := h.conversationService.GetConversationByPublicIDAndUserID(ctx, conversationID, user.ID)
 	if err != nil {
 		if errors.Is(err, conversation.ErrConversationNotFound) {
 			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
@@ -452,7 +451,7 @@ func (h *ConversationHandler) CreateItems(ctx *gin.Context) {
 	}
 
 	// Get conversation first to avoid N+1 queries
-	conv, err := h.conversationService.GetConversation(ctx, conversationID, user.ID)
+	conv, err := h.conversationService.GetConversationByPublicIDAndUserID(ctx, conversationID, user.ID)
 	if err != nil {
 		if errors.Is(err, conversation.ErrConversationNotFound) {
 			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
@@ -476,11 +475,7 @@ func (h *ConversationHandler) CreateItems(ctx *gin.Context) {
 	}
 
 	// Convert all items at once for batch processing
-	itemsToCreate := make([]struct {
-		Type    conversation.ItemType
-		Role    *conversation.ItemRole
-		Content []conversation.Content
-	}, len(request.Items))
+	itemsToCreate := make([]conversation.ItemCreationData, len(request.Items))
 
 	for i, itemReq := range request.Items {
 		// Convert request to domain types
@@ -502,11 +497,7 @@ func (h *ConversationHandler) CreateItems(ctx *gin.Context) {
 			}
 		}
 
-		itemsToCreate[i] = struct {
-			Type    conversation.ItemType
-			Role    *conversation.ItemRole
-			Content []conversation.Content
-		}{
+		itemsToCreate[i] = conversation.ItemCreationData{
 			Type:    itemType,
 			Role:    role,
 			Content: content,
@@ -542,7 +533,7 @@ func (h *ConversationHandler) ListItems(ctx *gin.Context) {
 	conversationID := ctx.Param("conversation_id")
 
 	// Get conversation first to check access
-	conv, err := h.conversationService.GetConversation(ctx, conversationID, user.ID)
+	conv, err := h.conversationService.GetConversationByPublicIDAndUserID(ctx, conversationID, user.ID)
 	if err != nil {
 		if errors.Is(err, conversation.ErrConversationNotFound) {
 			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
@@ -591,7 +582,7 @@ func (h *ConversationHandler) GetItem(ctx *gin.Context) {
 	itemID := ctx.Param("item_id")
 
 	// Get conversation first to avoid N+1 queries
-	conv, err := h.conversationService.GetConversation(ctx, conversationID, user.ID)
+	conv, err := h.conversationService.GetConversationByPublicIDAndUserID(ctx, conversationID, user.ID)
 	if err != nil {
 		if errors.Is(err, conversation.ErrConversationNotFound) {
 			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{

@@ -1,24 +1,22 @@
 package user
 
 import (
-	"crypto/rand"
-	"encoding/base64"
-	"fmt"
-	"strings"
-
 	"golang.org/x/net/context"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
+	"menlo.ai/jan-api-gateway/app/domain/shared/id"
 )
 
 type UserService struct {
 	userrepo            UserRepository
 	organizationService *organization.OrganizationService
+	idService           *id.IDService
 }
 
-func NewService(userrepo UserRepository, organizationService *organization.OrganizationService) *UserService {
+func NewService(userrepo UserRepository, organizationService *organization.OrganizationService, idService *id.IDService) *UserService {
 	return &UserService{
 		userrepo:            userrepo,
 		organizationService: organizationService,
+		idService:           idService,
 	}
 }
 
@@ -43,25 +41,5 @@ func (s *UserService) FindByID(ctx context.Context, id uint) (*User, error) {
 }
 
 func (s *UserService) generatePublicID() (string, error) {
-	bytes := make([]byte, 12)
-	_, err := rand.Read(bytes)
-	if err != nil {
-		return "", err
-	}
-
-	key := base64.URLEncoding.EncodeToString(bytes)
-	key = strings.TrimRight(key, "=")
-
-	if len(key) > 16 {
-		key = key[:16]
-	} else if len(key) < 16 {
-		extra := make([]byte, 16-len(key))
-		_, err := rand.Read(extra)
-		if err != nil {
-			return "", err
-		}
-		key += base64.URLEncoding.EncodeToString(extra)[:16-len(key)]
-	}
-
-	return fmt.Sprintf("user-%s", key), nil
+	return s.idService.GenerateUserID()
 }

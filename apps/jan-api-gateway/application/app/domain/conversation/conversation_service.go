@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
-	"menlo.ai/jan-api-gateway/app/utils/idutils"
+	"menlo.ai/jan-api-gateway/app/domain/shared/id"
 	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
@@ -23,23 +23,26 @@ type ConversationService struct {
 	conversationRepo ConversationRepository
 	itemRepo         ItemRepository
 	validator        *ConversationValidator
+	idService        *id.IDService
 }
 
-func NewService(conversationRepo ConversationRepository, itemRepo ItemRepository) *ConversationService {
+func NewService(conversationRepo ConversationRepository, itemRepo ItemRepository, idService *id.IDService) *ConversationService {
 	// Initialize with default validation config
 	validator := NewConversationValidator(DefaultValidationConfig())
 	return &ConversationService{
 		conversationRepo: conversationRepo,
 		itemRepo:         itemRepo,
 		validator:        validator,
+		idService:        idService,
 	}
 }
 
-func NewServiceWithValidator(conversationRepo ConversationRepository, itemRepo ItemRepository, validator *ConversationValidator) *ConversationService {
+func NewServiceWithValidator(conversationRepo ConversationRepository, itemRepo ItemRepository, validator *ConversationValidator, idService *id.IDService) *ConversationService {
 	return &ConversationService{
 		conversationRepo: conversationRepo,
 		itemRepo:         itemRepo,
 		validator:        validator,
+		idService:        idService,
 	}
 }
 
@@ -73,13 +76,13 @@ func (s *ConversationService) CreateConversation(ctx context.Context, userID uin
 }
 
 // GetConversation retrieves a conversation by its public ID with access control and items loaded
-func (s *ConversationService) GetConversation(ctx context.Context, publicID string, userID uint) (*Conversation, error) {
+func (s *ConversationService) GetConversationByPublicIDAndUserID(ctx context.Context, publicID string, userID uint) (*Conversation, error) {
 	return s.getConversationWithAccessCheck(ctx, publicID, userID, true)
 }
 
 // GetConversationWithAccessAndItems is an alias for backward compatibility
 func (s *ConversationService) GetConversationWithAccessAndItems(ctx context.Context, publicID string, userID uint) (*Conversation, error) {
-	return s.GetConversation(ctx, publicID, userID)
+	return s.GetConversationByPublicIDAndUserID(ctx, publicID, userID)
 }
 
 // GetConversationWithoutItems retrieves a conversation without loading items for performance
@@ -315,7 +318,7 @@ func (s *ConversationService) DeleteItem(ctx context.Context, conversation *Conv
 	}
 
 	// Load the updated conversation with remaining items
-	updatedConversation, err := s.GetConversation(ctx, conversation.PublicID, userID)
+	updatedConversation, err := s.GetConversationByPublicIDAndUserID(ctx, conversation.PublicID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load updated conversation: %w", err)
 	}
@@ -366,7 +369,7 @@ func (s *ConversationService) DeleteItemByPublicID(ctx context.Context, conversa
 	}
 
 	// Return updated conversation with items loaded
-	return s.GetConversation(ctx, conversation.PublicID, userID)
+	return s.GetConversationByPublicIDAndUserID(ctx, conversation.PublicID, userID)
 }
 
 func (s *ConversationService) SearchItems(ctx context.Context, publicID string, userID uint, query string) ([]*Item, error) {
@@ -394,20 +397,16 @@ func (s *ConversationService) SearchItems(ctx context.Context, publicID string, 
 
 // generateConversationPublicID generates a cryptographically secure conversation ID
 func (s *ConversationService) generateConversationPublicID() (string, error) {
-	return idutils.GenerateConversationID()
+	return s.idService.GenerateConversationID()
 }
 
 // generateItemPublicID generates a cryptographically secure item ID
 func (s *ConversationService) generateItemPublicID() (string, error) {
-	return idutils.GenerateItemID()
+	return s.idService.GenerateItemID()
 }
 
 // AddMultipleItems adds multiple items to a conversation in a single transaction
-func (s *ConversationService) AddMultipleItems(ctx context.Context, conversation *Conversation, userID uint, items []struct {
-	Type    ItemType
-	Role    *ItemRole
-	Content []Content
-}) ([]*Item, error) {
+func (s *ConversationService) AddMultipleItems(ctx context.Context, conversation *Conversation, userID uint, items []ItemCreationData) ([]*Item, error) {
 	// Check access permissions
 	if conversation.IsPrivate && conversation.UserID != userID {
 		return nil, ErrPrivateConversation

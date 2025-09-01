@@ -2,61 +2,43 @@ package apikey
 
 import (
 	"crypto/hmac"
-	"crypto/rand"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"io"
-	"strings"
 
 	"golang.org/x/net/context"
 	"menlo.ai/jan-api-gateway/app/domain/query"
+	"menlo.ai/jan-api-gateway/app/domain/shared/id"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
 type ApiKeyService struct {
-	repo ApiKeyRepository
+	repo      ApiKeyRepository
+	idService *id.IDService
 }
 
-func NewService(repo ApiKeyRepository) *ApiKeyService {
-	return &ApiKeyService{repo: repo}
+func NewService(repo ApiKeyRepository, idService *id.IDService) *ApiKeyService {
+	return &ApiKeyService{
+		repo:      repo,
+		idService: idService,
+	}
 }
 
 func (s *ApiKeyService) GenerateKeyAndHash(ctx context.Context, ownerType OwnerType) (string, string, error) {
-	randomBytes := make([]byte, 117)
-	_, err := io.ReadFull(rand.Reader, randomBytes)
+	// Generate the base API key ID using centralized service
+	baseKey, err := s.idService.GenerateAPIKeyID()
 	if err != nil {
 		return "", "", err
 	}
-	randomString := base64.URLEncoding.EncodeToString(randomBytes)
-	apikey := fmt.Sprintf("sk-%s-%s", ownerType, randomString)
+
+	// Format as: sk-<ownerType>-<random>
+	apikey := fmt.Sprintf("%s-%s", baseKey, ownerType)
 	hash := s.HashKey(ctx, apikey)
 	return apikey, hash, nil
 }
 
 func (s *ApiKeyService) generatePublicID() (string, error) {
-	bytes := make([]byte, 12)
-	_, err := rand.Read(bytes)
-	if err != nil {
-		return "", err
-	}
-
-	key := base64.URLEncoding.EncodeToString(bytes)
-	key = strings.TrimRight(key, "=")
-
-	if len(key) > 16 {
-		key = key[:16]
-	} else if len(key) < 16 {
-		extra := make([]byte, 16-len(key))
-		_, err := rand.Read(extra)
-		if err != nil {
-			return "", err
-		}
-		key += base64.URLEncoding.EncodeToString(extra)[:16-len(key)]
-	}
-
-	return fmt.Sprintf("key_%s", key), nil
+	return s.idService.GenerateAPIKeyPublicID()
 }
 
 func (s *ApiKeyService) HashKey(ctx context.Context, key string) string {
