@@ -25,8 +25,6 @@ func NewService(repo OrganizationRepository, projectService *project.ProjectServ
 	}
 }
 
-// createPublicID generates an organization ID with business rules
-// Business rule: organizations use "org" prefix with 16 character length for consistency
 func (s *OrganizationService) createPublicID() (string, error) {
 	return idgen.GenerateSecureID("org", 16)
 }

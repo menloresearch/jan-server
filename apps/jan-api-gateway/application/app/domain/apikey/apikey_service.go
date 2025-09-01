@@ -23,7 +23,6 @@ func NewService(repo ApiKeyRepository) *ApiKeyService {
 }
 
 func (s *ApiKeyService) GenerateKeyAndHash(ctx context.Context, ownerType OwnerType) (string, string, error) {
-	// Business rule: API keys use "sk" prefix with 24 character length for OpenAI compatibility
 	baseKey, err := idgen.GenerateSecureID("sk", 24)
 	if err != nil {
 		return "", "", err
@@ -35,8 +34,6 @@ func (s *ApiKeyService) GenerateKeyAndHash(ctx context.Context, ownerType OwnerT
 	return apikey, hash, nil
 }
 
-// generatePublicID generates an API key public ID with business rules
-// Business rule: API key public IDs use "key" prefix with 16 character length for UI display
 func (s *ApiKeyService) generatePublicID() (string, error) {
 	return idgen.GenerateSecureID("key", 16)
 }

@@ -38,8 +38,6 @@ func (s *UserService) FindByID(ctx context.Context, id uint) (*User, error) {
 	return s.userrepo.FindByID(ctx, id)
 }
 
-// generatePublicID generates a user ID with business rules
-// Business rule: users use "user" prefix with 16 character length for consistency with other entities
 func (s *UserService) generatePublicID() (string, error) {
 	return idgen.GenerateSecureID("user", 16)
 }

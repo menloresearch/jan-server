@@ -22,8 +22,6 @@ func NewService(repo ProjectRepository) *ProjectService {
 	}
 }
 
-// createPublicID generates a project ID with business rules
-// Business rule: projects use "proj" prefix with 16 character length for consistency
 func (s *ProjectService) createPublicID() (string, error) {
 	return idgen.GenerateSecureID("proj", 16)
 }
