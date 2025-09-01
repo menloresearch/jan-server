@@ -2,13 +2,11 @@ package organization
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
-	"io"
 
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/query"
+	"menlo.ai/jan-api-gateway/app/utils/idgen"
 )
 
 // OrganizationService provides business logic for managing organizations.
@@ -21,18 +19,14 @@ type OrganizationService struct {
 // NewService is the constructor for OrganizationService.
 // It injects the repository dependency.
 func NewService(repo OrganizationRepository, projectService *project.ProjectService) *OrganizationService {
-	return &OrganizationService{repo: repo, projectService: projectService}
+	return &OrganizationService{
+		repo:           repo,
+		projectService: projectService,
+	}
 }
 
 func (s *OrganizationService) createPublicID() (string, error) {
-	randomBytes := make([]byte, 16)
-	_, err := io.ReadFull(rand.Reader, randomBytes)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate random bytes for public ID: %w", err)
-	}
-
-	publicID := base64.URLEncoding.EncodeToString(randomBytes)
-	return publicID, nil
+	return idgen.GenerateSecureID("org", 16)
 }
 
 // CreateOrganizationWithPublicID creates a new organization and automatically

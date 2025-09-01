@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"menlo.ai/jan-api-gateway/app/domain/query"
-	"menlo.ai/jan-api-gateway/app/utils/stringutils"
+	"menlo.ai/jan-api-gateway/app/utils/idgen"
 )
 
 // ProjectService provides business logic for managing projects.
@@ -17,16 +17,13 @@ type ProjectService struct {
 // NewService is the constructor for ProjectService.
 // It injects the repository dependency.
 func NewService(repo ProjectRepository) *ProjectService {
-	return &ProjectService{repo: repo}
+	return &ProjectService{
+		repo: repo,
+	}
 }
 
-// createPublicID generates a unique, URL-safe public ID for the project.
 func (s *ProjectService) createPublicID() (string, error) {
-	randomStr, err := stringutils.RandomString(16)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("proj_%s", randomStr), nil
+	return idgen.GenerateSecureID("proj", 16)
 }
 
 // CreateProjectWithPublicID creates a new project and automatically
