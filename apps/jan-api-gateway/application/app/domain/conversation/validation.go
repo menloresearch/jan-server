@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"menlo.ai/jan-api-gateway/app/domain/shared/id"
+	"menlo.ai/jan-api-gateway/app/utils/idgen"
 )
 
 // ValidationConfig holds conversation validation rules
@@ -40,7 +40,6 @@ type ConversationValidator struct {
 	// Compiled regex patterns for performance
 	publicIDPattern    *regexp.Regexp
 	metadataKeyPattern *regexp.Regexp
-	idService          *id.IDService
 }
 
 // NewConversationValidator creates a new validator with security patterns
@@ -51,7 +50,6 @@ func NewConversationValidator(config *ValidationConfig) *ConversationValidator {
 		publicIDPattern: regexp.MustCompile(`^[a-zA-Z0-9_-]+$`),
 		// Validate metadata keys (alphanumeric + underscore only)
 		metadataKeyPattern: regexp.MustCompile(`^[a-zA-Z0-9_]+$`),
-		idService:          id.NewIDService(),
 	}
 }
 
@@ -103,13 +101,15 @@ func (v *ConversationValidator) ValidatePublicID(publicID string) error {
 		return fmt.Errorf("public ID must be between 5 and 50 characters")
 	}
 
-	// Use centralized ID validation logic
+	// Use domain-specific ID validation with business rules
 	if strings.HasPrefix(publicID, "conv_") {
-		if !v.idService.ValidateConversationID(publicID) {
+		// Business rule: conversation IDs must follow "conv_" prefix format
+		if !idgen.ValidateIDFormat(publicID, "conv") {
 			return fmt.Errorf("invalid conversation ID format")
 		}
 	} else if strings.HasPrefix(publicID, "msg_") {
-		if !v.idService.ValidateItemID(publicID) {
+		// Business rule: message/item IDs must follow "msg_" prefix format
+		if !idgen.ValidateIDFormat(publicID, "msg") {
 			return fmt.Errorf("invalid item ID format")
 		}
 	} else {

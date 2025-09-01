@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
-	"menlo.ai/jan-api-gateway/app/domain/shared/id"
+	"menlo.ai/jan-api-gateway/app/utils/idgen"
 	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
@@ -23,26 +23,23 @@ type ConversationService struct {
 	conversationRepo ConversationRepository
 	itemRepo         ItemRepository
 	validator        *ConversationValidator
-	idService        *id.IDService
 }
 
-func NewService(conversationRepo ConversationRepository, itemRepo ItemRepository, idService *id.IDService) *ConversationService {
+func NewService(conversationRepo ConversationRepository, itemRepo ItemRepository) *ConversationService {
 	// Initialize with default validation config
 	validator := NewConversationValidator(DefaultValidationConfig())
 	return &ConversationService{
 		conversationRepo: conversationRepo,
 		itemRepo:         itemRepo,
 		validator:        validator,
-		idService:        idService,
 	}
 }
 
-func NewServiceWithValidator(conversationRepo ConversationRepository, itemRepo ItemRepository, validator *ConversationValidator, idService *id.IDService) *ConversationService {
+func NewServiceWithValidator(conversationRepo ConversationRepository, itemRepo ItemRepository, validator *ConversationValidator) *ConversationService {
 	return &ConversationService{
 		conversationRepo: conversationRepo,
 		itemRepo:         itemRepo,
 		validator:        validator,
-		idService:        idService,
 	}
 }
 
@@ -395,14 +392,16 @@ func (s *ConversationService) SearchItems(ctx context.Context, publicID string, 
 	return items, nil
 }
 
-// generateConversationPublicID generates a cryptographically secure conversation ID
+// generateConversationPublicID generates a conversation ID with business rules
+// Business rule: conversations use "conv" prefix with 16 character length for OpenAI compatibility
 func (s *ConversationService) generateConversationPublicID() (string, error) {
-	return s.idService.GenerateConversationID()
+	return idgen.GenerateSecureID("conv", 16)
 }
 
-// generateItemPublicID generates a cryptographically secure item ID
+// generateItemPublicID generates an item/message ID with business rules
+// Business rule: items/messages use "msg" prefix with 16 character length for OpenAI compatibility
 func (s *ConversationService) generateItemPublicID() (string, error) {
-	return s.idService.GenerateItemID()
+	return idgen.GenerateSecureID("msg", 16)
 }
 
 // AddMultipleItems adds multiple items to a conversation in a single transaction

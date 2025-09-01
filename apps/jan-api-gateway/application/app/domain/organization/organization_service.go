@@ -6,7 +6,7 @@ import (
 
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/query"
-	"menlo.ai/jan-api-gateway/app/domain/shared/id"
+	"menlo.ai/jan-api-gateway/app/utils/idgen"
 )
 
 // OrganizationService provides business logic for managing organizations.
@@ -14,21 +14,21 @@ type OrganizationService struct {
 	// The service has a dependency on the repository interface.
 	repo           OrganizationRepository
 	projectService *project.ProjectService
-	idService      *id.IDService
 }
 
 // NewService is the constructor for OrganizationService.
 // It injects the repository dependency.
-func NewService(repo OrganizationRepository, projectService *project.ProjectService, idService *id.IDService) *OrganizationService {
+func NewService(repo OrganizationRepository, projectService *project.ProjectService) *OrganizationService {
 	return &OrganizationService{
 		repo:           repo,
 		projectService: projectService,
-		idService:      idService,
 	}
 }
 
+// createPublicID generates an organization ID with business rules
+// Business rule: organizations use "org" prefix with 16 character length for consistency
 func (s *OrganizationService) createPublicID() (string, error) {
-	return s.idService.GenerateOrganizationID()
+	return idgen.GenerateSecureID("org", 16)
 }
 
 // CreateOrganizationWithPublicID creates a new organization and automatically

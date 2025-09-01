@@ -5,28 +5,27 @@ import (
 	"fmt"
 
 	"menlo.ai/jan-api-gateway/app/domain/query"
-	"menlo.ai/jan-api-gateway/app/domain/shared/id"
+	"menlo.ai/jan-api-gateway/app/utils/idgen"
 )
 
 // ProjectService provides business logic for managing projects.
 type ProjectService struct {
 	// The service has a dependency on the repository interface.
-	repo      ProjectRepository
-	idService *id.IDService
+	repo ProjectRepository
 }
 
 // NewService is the constructor for ProjectService.
 // It injects the repository dependency.
-func NewService(repo ProjectRepository, idService *id.IDService) *ProjectService {
+func NewService(repo ProjectRepository) *ProjectService {
 	return &ProjectService{
-		repo:      repo,
-		idService: idService,
+		repo: repo,
 	}
 }
 
-// createPublicID generates a unique, URL-safe public ID for the project.
+// createPublicID generates a project ID with business rules
+// Business rule: projects use "proj" prefix with 16 character length for consistency
 func (s *ProjectService) createPublicID() (string, error) {
-	return s.idService.GenerateProjectID()
+	return idgen.GenerateSecureID("proj", 16)
 }
 
 // CreateProjectWithPublicID creates a new project and automatically

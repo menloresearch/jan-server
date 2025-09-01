@@ -8,37 +8,37 @@ import (
 
 	"golang.org/x/net/context"
 	"menlo.ai/jan-api-gateway/app/domain/query"
-	"menlo.ai/jan-api-gateway/app/domain/shared/id"
+	"menlo.ai/jan-api-gateway/app/utils/idgen"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
 type ApiKeyService struct {
-	repo      ApiKeyRepository
-	idService *id.IDService
+	repo ApiKeyRepository
 }
 
-func NewService(repo ApiKeyRepository, idService *id.IDService) *ApiKeyService {
+func NewService(repo ApiKeyRepository) *ApiKeyService {
 	return &ApiKeyService{
-		repo:      repo,
-		idService: idService,
+		repo: repo,
 	}
 }
 
 func (s *ApiKeyService) GenerateKeyAndHash(ctx context.Context, ownerType OwnerType) (string, string, error) {
-	// Generate the base API key ID using centralized service
-	baseKey, err := s.idService.GenerateAPIKeyID()
+	// Business rule: API keys use "sk" prefix with 24 character length for OpenAI compatibility
+	baseKey, err := idgen.GenerateSecureID("sk", 24)
 	if err != nil {
 		return "", "", err
 	}
 
-	// Format as: sk-<ownerType>-<random>
+	// Business rule: Format as sk_<random>-<ownerType> for identification
 	apikey := fmt.Sprintf("%s-%s", baseKey, ownerType)
 	hash := s.HashKey(ctx, apikey)
 	return apikey, hash, nil
 }
 
+// generatePublicID generates an API key public ID with business rules
+// Business rule: API key public IDs use "key" prefix with 16 character length for UI display
 func (s *ApiKeyService) generatePublicID() (string, error) {
-	return s.idService.GenerateAPIKeyPublicID()
+	return idgen.GenerateSecureID("key", 16)
 }
 
 func (s *ApiKeyService) HashKey(ctx context.Context, key string) string {
