@@ -4,14 +4,15 @@ import (
 	"github.com/google/wire"
 	conversationHandler "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
 	jan "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan"
+	janPlatformV1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan-platform/v1"
+	janPlatformV1Organization "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan-platform/v1/organization"
+	janPlatformV1OrganizationProject "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan-platform/v1/organization/projects"
 	janV1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1"
 	janV1Apikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/apikeys"
 	janV1Auth "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth"
 	janV1AuthGoogle "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth/google"
 	janV1Chat "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/chat"
 	janV1Conversations "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/conversations"
-	janV1Organization "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization"
-	janV1OrganizationProject "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects"
 	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
@@ -22,8 +23,9 @@ import (
 )
 
 var RouteProvider = wire.NewSet(
-	janV1OrganizationProject.NewProjectsRoute,
-	janV1Organization.NewOrganizationRoute,
+	janPlatformV1.NewV1Route,
+	janPlatformV1OrganizationProject.NewProjectsRoute,
+	janPlatformV1Organization.NewOrganizationRoute,
 	janV1Chat.NewCompletionAPI,
 	janV1Chat.NewChatRoute,
 	janV1Apikeys.NewApiKeyAPI,

@@ -85,7 +85,7 @@ func (api *ApiKeyAPI) CreateApiKey(reqCtx *gin.Context) {
 		})
 		return
 	}
-	user, err := api.userService.FindByEmail(reqCtx, userClaim.Email)
+	user, err := api.userService.FindByEmailAndPlatform(reqCtx, userClaim.Email, string(user.UserPlatformTypeAskJanAI))
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 			Code:  "edf9dd05-aad4-4c1e-9795-98bf60ecf57c",
@@ -172,7 +172,7 @@ func (api *ApiKeyAPI) UpdateApiKey(reqCtx *gin.Context) {
 		})
 		return
 	}
-	user, err := api.userService.FindByEmail(reqCtx, userClaim.Email)
+	user, err := api.userService.FindByEmailAndPlatform(reqCtx, userClaim.Email, string(user.UserPlatformTypePlatform))
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 			Code:  "edf9dd05-aad4-4c1e-9795-98bf60ecf57c",
@@ -260,7 +260,7 @@ func (api *ApiKeyAPI) DeleteApiKey(reqCtx *gin.Context) {
 		})
 		return
 	}
-	user, err := api.userService.FindByEmail(reqCtx, userClaim.Email)
+	user, err := api.userService.FindByEmailAndPlatform(reqCtx, userClaim.Email, string(user.UserPlatformTypePlatform))
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 			Code:  "edf9dd05-aad4-4c1e-9795-98bf60ecf57c",
@@ -320,7 +320,7 @@ func (api *ApiKeyAPI) DeleteApiKey(reqCtx *gin.Context) {
 // @Produce json
 // @Param page query int false "Page number for pagination"
 // @Param pageSize query int false "Number of items per page"
-// @Success 200 {object} responses.ListlResponse[[]ApiKeyResponse] "Successfully retrieved the list of API keys"
+// @Success 200 {object} responses.ListResponse[[]ApiKeyResponse] "Successfully retrieved the list of API keys"
 // @Failure 400 {object} responses.ErrorResponse "Bad request (e.g., invalid query parameters)"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized (e.g., missing or invalid JWT)"
 // @Failure 500 {object} responses.ErrorResponse "Internal Server Error"
@@ -340,7 +340,7 @@ func (api *ApiKeyAPI) ListApiKeys(reqCtx *gin.Context) {
 		})
 		return
 	}
-	user, err := api.userService.FindByEmail(reqCtx, u.Email)
+	user, err := api.userService.FindByEmailAndPlatform(reqCtx, u.Email, string(user.UserPlatformTypePlatform))
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 			Code:  "e8a957c3-e107-4244-8625-3f3a1d29ce5c",
@@ -386,7 +386,7 @@ func (api *ApiKeyAPI) ListApiKeys(reqCtx *gin.Context) {
 		return
 	}
 
-	reqCtx.JSON(http.StatusOK, responses.ListlResponse[ApiKeyResponse]{
+	reqCtx.JSON(http.StatusOK, responses.ListResponse[ApiKeyResponse]{
 		Status:  responses.ResponseCodeOk,
 		Total:   apiKeysCount,
 		Results: functional.Map(entities, domainToApiKeyResponse),

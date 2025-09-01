@@ -24,6 +24,7 @@ func (s *UserService) RegisterUser(ctx context.Context, user *User) (*User, erro
 		return nil, err
 	}
 	user.PublicID = publicId
+	user.PlatformType = string(UserPlatformTypeAskJanAI)
 	if err := s.userrepo.Create(ctx, user); err != nil {
 		return nil, err
 	}
@@ -35,8 +36,29 @@ func (s *UserService) RegisterUser(ctx context.Context, user *User) (*User, erro
 	return user, nil
 }
 
-func (s *UserService) FindByEmail(ctx context.Context, email string) (*User, error) {
-	return s.userrepo.FindByEmail(ctx, email)
+func (s *UserService) RegisterPlatformUser(ctx context.Context, user *User) (*User, error) {
+	publicId, err := s.generatePublicID()
+	if err != nil {
+		return nil, err
+	}
+	user.PublicID = publicId
+	user.PlatformType = string(UserPlatformTypePlatform)
+	if err := s.userrepo.Create(ctx, user); err != nil {
+		return nil, err
+	}
+	s.organizationService.CreateOrganizationWithPublicID(ctx, &organization.Organization{
+		Name:    "Default",
+		Enabled: true,
+		OwnerID: user.ID,
+	})
+	return user, nil
+}
+
+func (s *UserService) FindByEmailAndPlatform(ctx context.Context, email string, platform string) (*User, error) {
+	return s.userrepo.FindFirst(ctx, UserFilter{
+		Email:        &email,
+		PlatformType: &platform,
+	})
 }
 
 func (s *UserService) FindByID(ctx context.Context, id uint) (*User, error) {

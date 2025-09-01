@@ -26,6 +26,7 @@ type ApiKey struct {
 	Enabled        bool
 	OwnerType      string // "admin","project","service","organization","ephemeral"
 	OwnerID        *uint
+	ProjectID      *uint
 	OrganizationID *uint
 	Permissions    string //json
 	ExpiresAt      *time.Time

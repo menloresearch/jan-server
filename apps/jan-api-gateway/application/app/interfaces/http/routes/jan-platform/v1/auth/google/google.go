@@ -144,7 +144,7 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 	}
 
 	userService := googleAuthAPI.userService
-	exists, err := userService.FindByEmailAndPlatform(reqCtx.Request.Context(), claims.Email, string(user.UserPlatformTypeAskJanAI))
+	exists, err := userService.FindByEmailAndPlatform(reqCtx.Request.Context(), claims.Email, string(user.UserPlatformTypePlatform))
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Code:  "ad6e260d-b5ad-447b-8ab0-7e161c932b6a",
@@ -153,7 +153,7 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 		return
 	}
 	if exists == nil {
-		exists, err = userService.RegisterUser(reqCtx.Request.Context(), &user.User{
+		exists, err = userService.RegisterPlatformUser(reqCtx.Request.Context(), &user.User{
 			Name:    claims.Name,
 			Email:   claims.Email,
 			Enabled: true,

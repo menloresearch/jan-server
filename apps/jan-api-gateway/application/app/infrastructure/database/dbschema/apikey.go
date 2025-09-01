@@ -22,6 +22,7 @@ type ApiKey struct {
 	OwnerType      string `gorm:"size:32;index;not null"` // "admin","project","service","organization","ephemeral"
 	OwnerID        *uint  `gorm:"index"`
 	OrganizationID *uint  `gorm:"index"`
+	ProjectID      *uint  `gorm:"index"`
 
 	Permissions string     `gorm:"type:json"`
 	ExpiresAt   *time.Time `gorm:"type:timestamp"`
@@ -40,6 +41,7 @@ func NewSchemaApiKey(a *apikey.ApiKey) *ApiKey {
 		Enabled:        a.Enabled,
 		OwnerType:      a.OwnerType,
 		OwnerID:        a.OwnerID,
+		ProjectID:      a.ProjectID,
 		OrganizationID: a.OrganizationID,
 		Permissions:    a.Permissions,
 		ExpiresAt:      a.ExpiresAt,
@@ -57,6 +59,7 @@ func (a *ApiKey) EtoD() *apikey.ApiKey {
 		Enabled:        a.Enabled,
 		OwnerType:      a.OwnerType,
 		OwnerID:        a.OwnerID,
+		ProjectID:      a.ProjectID,
 		OrganizationID: a.OrganizationID,
 		Permissions:    a.Permissions,
 		ExpiresAt:      a.ExpiresAt,

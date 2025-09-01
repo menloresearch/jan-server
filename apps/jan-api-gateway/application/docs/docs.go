@@ -48,7 +48,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully retrieved the list of API keys",
                         "schema": {
-                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListlResponse-array_app_interfaces_http_routes_jan_v1_apikeys_ApiKeyResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListResponse-array_app_interfaces_http_routes_jan_v1_apikeys_ApiKeyResponse"
                         }
                     },
                     "400": {
@@ -2553,15 +2553,9 @@ const docTemplate = `{
                 }
             }
         },
-        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListlResponse-array_app_interfaces_http_routes_jan_v1_apikeys_ApiKeyResponse": {
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListResponse-array_app_interfaces_http_routes_jan_v1_apikeys_ApiKeyResponse": {
             "type": "object",
             "properties": {
-                "page": {
-                    "type": "integer"
-                },
-                "page_size": {
-                    "type": "integer"
-                },
                 "results": {
                     "type": "array",
                     "items": {

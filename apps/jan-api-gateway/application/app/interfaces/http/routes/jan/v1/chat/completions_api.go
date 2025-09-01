@@ -59,7 +59,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
  	userClaim, _ := auth.GetUserClaimFromRequestContext(reqCtx)
 	key := "AnonymousUserKey"
 	if userClaim != nil {
-		user, err := api.userService.FindByEmail(reqCtx, userClaim.Email)
+		user, err := api.userService.FindByEmailAndPlatform(reqCtx, userClaim.Email, string(user.UserPlatformTypeAskJanAI))
 		if err != nil {
 			reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
 				Code:  "62a772b9-58ec-4332-b669-920c7f4a8821",

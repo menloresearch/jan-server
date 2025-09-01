@@ -2,16 +2,20 @@ package userrepo
 
 import (
 	"context"
-	"fmt"
 
+	"menlo.ai/jan-api-gateway/app/domain/query"
 	domain "menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/dbschema"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/gormgen"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
+	"menlo.ai/jan-api-gateway/app/utils/functional"
 )
 
 type UserGormRepository struct {
 	db *transaction.Database
 }
+
+var _ domain.UserRepository = (*UserGormRepository)(nil)
 
 func NewUserGormRepository(db *transaction.Database) domain.UserRepository {
 	return &UserGormRepository{
@@ -38,20 +42,61 @@ func (r *UserGormRepository) FindByID(ctx context.Context, id uint) (*domain.Use
 	return model.EtoD(), nil
 }
 
-func (r *UserGormRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
-	query := r.db.GetQuery(ctx)
-	models, err := query.User.WithContext(ctx).Where(query.User.Email.Eq(email)).Find()
+func (repo *UserGormRepository) FindFirst(ctx context.Context, filter domain.UserFilter) (*domain.User, error) {
+	query := repo.db.GetQuery(ctx)
+	sql := query.User.WithContext(ctx)
+	sql = repo.applyFilter(query, sql, filter)
+	item, err := sql.First()
 	if err != nil {
 		return nil, err
 	}
+	return item.EtoD(), nil
+}
 
-	if len(models) == 0 {
-		return nil, nil
+func (repo *UserGormRepository) FindByFilter(ctx context.Context, filter domain.UserFilter, p *query.Pagination) ([]*domain.User, error) {
+	query := repo.db.GetQuery(ctx)
+	sql := query.User.WithContext(ctx)
+	sql = repo.applyFilter(query, sql, filter)
+	if p != nil {
+		if p.Limit != nil && *p.Limit > 0 {
+			sql = sql.Limit(*p.Limit)
+		}
+		if p.After != nil {
+			if p.Order == "desc" {
+				sql = sql.Where(query.Project.ID.Lt(*p.After))
+			} else {
+				sql = sql.Where(query.Project.ID.Gt(*p.After))
+			}
+		}
+		if p.Order == "desc" {
+			sql = sql.Order(query.Project.ID.Desc())
+		} else {
+			sql = sql.Order(query.Project.ID.Asc())
+		}
 	}
+	rows, err := sql.Find()
+	if err != nil {
+		return nil, err
+	}
+	result := functional.Map(rows, func(item *dbschema.User) *domain.User {
+		return item.EtoD()
+	})
+	return result, nil
+}
 
-	if len(models) != 1 {
-		return nil, fmt.Errorf("duplicated user email")
+// applyFilter applies conditions dynamically to the query.
+func (repo *UserGormRepository) applyFilter(query *gormgen.Query, sql gormgen.IUserDo, filter domain.UserFilter) gormgen.IUserDo {
+	if filter.PublicID != nil {
+		sql = sql.Where(query.User.PublicID.Eq(*filter.PublicID))
 	}
-	model := models[0]
-	return model.EtoD(), nil
+	if filter.Email != nil {
+		sql = sql.Where(query.User.Email.Eq(*filter.Email))
+	}
+	if filter.Enabled != nil {
+		sql = sql.Where(query.User.Enabled.Is(*filter.Enabled))
+	}
+	if filter.PlatformType == nil {
+		sql = sql.Where(query.User.PlatformType.Eq(*filter.PlatformType))
+	}
+	return sql
 }
