@@ -35,3 +35,15 @@ func GetUserClaimFromRequestContext(reqCtx *gin.Context) (*UserClaim, error) {
 	}
 	return u, nil
 }
+
+func GetUserFromRequestContext(reqCtx *gin.Context) (*UserClaim, error) {
+	userClaim, ok := reqCtx.Get(ContextUserClaim)
+	if !ok {
+		return nil, fmt.Errorf("userclaim not found in context")
+	}
+	u, ok := userClaim.(*UserClaim)
+	if !ok {
+		return nil, fmt.Errorf("invalid user claim in context: expected *auth.UserClaim, got %T", userClaim)
+	}
+	return u, nil
+}

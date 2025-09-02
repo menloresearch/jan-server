@@ -167,8 +167,7 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 		}
 	}
 
-	// accessTokenExp := time.Now().Add(15 * time.Minute)
-	accessTokenExp := time.Now().Add(36500 * 24 * time.Hour)
+	accessTokenExp := time.Now().Add(15 * time.Minute)
 	accessTokenString, err := auth.CreateJwtSignedString(auth.UserClaim{
 		Email: exists.Email,
 		Name:  exists.Name,

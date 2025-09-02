@@ -56,7 +56,7 @@ type ChatCompletionResponseSwagger struct {
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /jan/v1/chat/completions [post]
 func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
- 	userClaim, _ := auth.GetUserClaimFromRequestContext(reqCtx)
+	userClaim, _ := auth.GetUserClaimFromRequestContext(reqCtx)
 	key := "AnonymousUserKey"
 	if userClaim != nil {
 		user, err := api.userService.FindByEmail(reqCtx, userClaim.Email)
@@ -68,8 +68,8 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 			return
 		}
 		apikeyEntities, err := api.apikeyService.Find(reqCtx, apikey.ApiKeyFilter{
-			OwnerID:   &user.ID,
-			OwnerType: ptr.ToString(string(apikey.OwnerTypeAdmin)),
+			OwnerID:    &user.ID,
+			ApikeyType: ptr.ToString(string(apikey.ApikeyTypeAdmin)),
 		}, nil)
 		if err != nil {
 			reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
@@ -80,7 +80,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		}
 		// TODO: Should we provide a default key to user?
 		if len(apikeyEntities) == 0 {
-			key, hash, err := api.apikeyService.GenerateKeyAndHash(reqCtx, apikey.OwnerTypeEphemeral)
+			key, hash, err := api.apikeyService.GenerateKeyAndHash(reqCtx, apikey.ApikeyTypeEphemeral)
 			if err != nil {
 				reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
 					Code:  "207373ae-f94a-4b21-bf95-7bbd8d727f84",
@@ -89,13 +89,13 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 				return
 			}
 
-			// TODO: OwnerTypeEphemeral
+			// TODO: ApikeyTypeEphemeral
 			entity, err := api.apikeyService.CreateApiKey(reqCtx, &apikey.ApiKey{
 				KeyHash:        hash,
 				PlaintextHint:  fmt.Sprintf("sk-..%s", key[len(key)-3:]),
 				Description:    "Default Key For User",
 				Enabled:        true,
-				OwnerType:      string(apikey.OwnerTypeEphemeral),
+				ApikeyType:     string(apikey.ApikeyTypeEphemeral),
 				OwnerID:        &user.ID,
 				OrganizationID: nil,
 				Permissions:    "{}",

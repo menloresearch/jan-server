@@ -47,5 +47,6 @@ func (o *Organization) EtoD() *organization.Organization {
 		Enabled:   o.Enabled,
 		CreatedAt: o.CreatedAt,
 		UpdatedAt: o.UpdatedAt,
+		OwnerID:   o.OwnerID,
 	}
 }

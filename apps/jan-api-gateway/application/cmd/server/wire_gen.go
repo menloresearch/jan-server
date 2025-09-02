@@ -25,11 +25,14 @@ import (
 	conversation2 "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan"
 	v1_2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/apikeys"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth/google"
 	chat2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/chat"
 	conversations2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/conversations"
+	organization3 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization"
+	apikeys2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/api_keys"
+	projects2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects/api_keys"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
@@ -78,11 +81,14 @@ func CreateApplication() (*Application, error) {
 	v1Route := v1.NewV1Route(organizationRoute, chatRoute, conversationAPI, modelAPI, mcpapi)
 	googleAuthAPI := google.NewGoogleAuthAPI(userService)
 	authRoute := auth.NewAuthRoute(googleAuthAPI)
-	apiKeyAPI := apikeys.NewApiKeyAPI(apiKeyService, userService)
 	chatCompletionAPI := chat2.NewCompletionAPI(userService, apiKeyService)
 	chatChatRoute := chat2.NewChatRoute(chatCompletionAPI)
 	conversationsConversationAPI := conversations2.NewConversationAPI(conversationHandler)
-	v1V1Route := v1_2.NewV1Route(authRoute, apiKeyAPI, chatChatRoute, conversationsConversationAPI)
+	projectApiKeyRoute := apikeys.NewProjectApiKeyRoute(organizationService, projectService, apiKeyService, userService)
+	projectsProjectsRoute := projects2.NewProjectsRoute(userService, projectService, organizationService, projectApiKeyRoute)
+	organizationApiKeyRoute := apikeys2.NewOrganizationApiKeyRouteRoute(organizationService, apiKeyService, userService)
+	organizationOrganizationRoute := organization3.NewOrganizationRoute(organizationService, userService, projectsProjectsRoute, organizationApiKeyRoute)
+	v1V1Route := v1_2.NewV1Route(authRoute, chatChatRoute, conversationsConversationAPI, organizationOrganizationRoute)
 	janRoute := jan.NewJanRoute(v1V1Route, chatChatRoute)
 	httpServer := http.NewHttpServer(v1Route, janRoute)
 	application := &Application{
