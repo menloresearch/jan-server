@@ -37,9 +37,10 @@ func newApiKey(db *gorm.DB, opts ...gen.DOOption) apiKey {
 	_apiKey.PlaintextHint = field.NewString(tableName, "plaintext_hint")
 	_apiKey.Description = field.NewString(tableName, "description")
 	_apiKey.Enabled = field.NewBool(tableName, "enabled")
-	_apiKey.OwnerType = field.NewString(tableName, "owner_type")
+	_apiKey.ApikeyType = field.NewString(tableName, "apikey_type")
 	_apiKey.OwnerID = field.NewUint(tableName, "owner_id")
 	_apiKey.OrganizationID = field.NewUint(tableName, "organization_id")
+	_apiKey.ProjectID = field.NewUint(tableName, "project_id")
 	_apiKey.Permissions = field.NewString(tableName, "permissions")
 	_apiKey.ExpiresAt = field.NewTime(tableName, "expires_at")
 	_apiKey.LastUsedAt = field.NewTime(tableName, "last_used_at")
@@ -62,9 +63,10 @@ type apiKey struct {
 	PlaintextHint  field.String
 	Description    field.String
 	Enabled        field.Bool
-	OwnerType      field.String
+	ApikeyType     field.String
 	OwnerID        field.Uint
 	OrganizationID field.Uint
+	ProjectID      field.Uint
 	Permissions    field.String
 	ExpiresAt      field.Time
 	LastUsedAt     field.Time
@@ -93,9 +95,10 @@ func (a *apiKey) updateTableName(table string) *apiKey {
 	a.PlaintextHint = field.NewString(table, "plaintext_hint")
 	a.Description = field.NewString(table, "description")
 	a.Enabled = field.NewBool(table, "enabled")
-	a.OwnerType = field.NewString(table, "owner_type")
+	a.ApikeyType = field.NewString(table, "apikey_type")
 	a.OwnerID = field.NewUint(table, "owner_id")
 	a.OrganizationID = field.NewUint(table, "organization_id")
+	a.ProjectID = field.NewUint(table, "project_id")
 	a.Permissions = field.NewString(table, "permissions")
 	a.ExpiresAt = field.NewTime(table, "expires_at")
 	a.LastUsedAt = field.NewTime(table, "last_used_at")
@@ -115,7 +118,7 @@ func (a *apiKey) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (a *apiKey) fillFieldMap() {
-	a.fieldMap = make(map[string]field.Expr, 15)
+	a.fieldMap = make(map[string]field.Expr, 16)
 	a.fieldMap["id"] = a.ID
 	a.fieldMap["created_at"] = a.CreatedAt
 	a.fieldMap["updated_at"] = a.UpdatedAt
@@ -125,9 +128,10 @@ func (a *apiKey) fillFieldMap() {
 	a.fieldMap["plaintext_hint"] = a.PlaintextHint
 	a.fieldMap["description"] = a.Description
 	a.fieldMap["enabled"] = a.Enabled
-	a.fieldMap["owner_type"] = a.OwnerType
+	a.fieldMap["apikey_type"] = a.ApikeyType
 	a.fieldMap["owner_id"] = a.OwnerID
 	a.fieldMap["organization_id"] = a.OrganizationID
+	a.fieldMap["project_id"] = a.ProjectID
 	a.fieldMap["permissions"] = a.Permissions
 	a.fieldMap["expires_at"] = a.ExpiresAt
 	a.fieldMap["last_used_at"] = a.LastUsedAt

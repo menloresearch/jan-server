@@ -412,7 +412,7 @@ func (api *ProjectsRoute) validateAdminKey(reqCtx *gin.Context) (*apikey.ApiKey,
 		return nil, err
 	}
 
-	if adminKeyEntity.OwnerType != string(apikey.OwnerTypeAdmin) {
+	if adminKeyEntity.ApikeyType != string(apikey.ApikeyTypeAdmin) {
 		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 			Code:  "2f83ee2f-3054-40de-afd0-82f06d3fb6cb",
 			Error: "invalid or missing API key",

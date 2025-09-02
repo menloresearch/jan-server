@@ -95,8 +95,5 @@ func (repo *UserGormRepository) applyFilter(query *gormgen.Query, sql gormgen.IU
 	if filter.Enabled != nil {
 		sql = sql.Where(query.User.Enabled.Is(*filter.Enabled))
 	}
-	if filter.PlatformType == nil {
-		sql = sql.Where(query.User.PlatformType.Eq(*filter.PlatformType))
-	}
 	return sql
 }

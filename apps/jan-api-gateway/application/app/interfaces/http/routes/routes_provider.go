@@ -4,15 +4,15 @@ import (
 	"github.com/google/wire"
 	conversationHandler "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
 	jan "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan"
-	janPlatformV1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan-platform/v1"
-	janPlatformV1Organization "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan-platform/v1/organization"
-	janPlatformV1OrganizationProject "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan-platform/v1/organization/projects"
 	janV1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1"
-	janV1Apikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/apikeys"
 	janV1Auth "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth"
 	janV1AuthGoogle "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth/google"
 	janV1Chat "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/chat"
 	janV1Conversations "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/conversations"
+	janV1Organization "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization"
+	janV1OrganizationApikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/api_keys"
+	janV1OrganizationProject "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects"
+	janV1OrganizationProjectApikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects/api_keys"
 	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
@@ -23,15 +23,15 @@ import (
 )
 
 var RouteProvider = wire.NewSet(
-	janPlatformV1.NewV1Route,
-	janPlatformV1OrganizationProject.NewProjectsRoute,
-	janPlatformV1Organization.NewOrganizationRoute,
+	janV1OrganizationApikeys.NewOrganizationApiKeyRouteRoute,
+	janV1OrganizationProjectApikeys.NewProjectApiKeyRoute,
+	janV1.NewV1Route,
+	janV1OrganizationProject.NewProjectsRoute,
+	janV1Organization.NewOrganizationRoute,
 	janV1Chat.NewCompletionAPI,
 	janV1Chat.NewChatRoute,
-	janV1Apikeys.NewApiKeyAPI,
 	janV1AuthGoogle.NewGoogleAuthAPI,
 	janV1Auth.NewAuthRoute,
-	janV1.NewV1Route,
 	jan.NewJanRoute,
 	projects.NewProjectsRoute,
 	organization.NewAdminApiKeyAPI,

@@ -7,14 +7,14 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/query"
 )
 
-type OwnerType string
+type ApikeyType string
 
 const (
-	OwnerTypeAdmin        OwnerType = "admin"
-	OwnerTypeProject      OwnerType = "project"
-	OwnerTypeService      OwnerType = "service"
-	OwnerTypeOrganization OwnerType = "organization"
-	OwnerTypeEphemeral    OwnerType = "ephemeral"
+	ApikeyTypeAdmin        ApikeyType = "admin"
+	ApikeyTypeProject      ApikeyType = "project"
+	ApikeyTypeService      ApikeyType = "service"
+	ApikeyTypeOrganization ApikeyType = "organization"
+	ApikeyTypeEphemeral    ApikeyType = "ephemeral"
 )
 
 type ApiKey struct {
@@ -24,7 +24,7 @@ type ApiKey struct {
 	PlaintextHint  string
 	Description    string
 	Enabled        bool
-	OwnerType      string // "admin","project","service","organization","ephemeral"
+	ApikeyType     string // "admin","project","service","organization","ephemeral"
 	OwnerID        *uint
 	ProjectID      *uint
 	OrganizationID *uint
@@ -53,8 +53,9 @@ func (k *ApiKey) IsValid() bool {
 type ApiKeyFilter struct {
 	KeyHash        *string
 	PublicID       *string
-	OwnerType      *string
+	ApikeyType     *string
 	OwnerID        *uint
+	ProjectID      *uint
 	UserID         *uint
 	OrganizationID *uint
 }

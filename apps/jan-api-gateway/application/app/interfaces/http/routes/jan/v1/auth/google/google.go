@@ -144,7 +144,7 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 	}
 
 	userService := googleAuthAPI.userService
-	exists, err := userService.FindByEmailAndPlatform(reqCtx.Request.Context(), claims.Email, string(user.UserPlatformTypeAskJanAI))
+	exists, err := userService.FindByEmail(reqCtx.Request.Context(), claims.Email)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Code:  "ad6e260d-b5ad-447b-8ab0-7e161c932b6a",
@@ -167,8 +167,7 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 		}
 	}
 
-	// accessTokenExp := time.Now().Add(15 * time.Minute)
-	accessTokenExp := time.Now().Add(36500 * 24 * time.Hour)
+	accessTokenExp := time.Now().Add(15 * time.Minute)
 	accessTokenString, err := auth.CreateJwtSignedString(auth.UserClaim{
 		Email: exists.Email,
 		Name:  exists.Name,

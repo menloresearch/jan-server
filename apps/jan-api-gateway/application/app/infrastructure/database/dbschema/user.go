@@ -14,7 +14,6 @@ type User struct {
 	Name          string `gorm:"type:varchar(100);not null"`
 	Email         string `gorm:"type:varchar(255);uniqueIndex;not null"`
 	PublicID      string `gorm:"type:varchar(50);uniqueIndex"`
-	PlatformType  string `gorm:"type:varchar(20);"`
 	Enabled       bool
 	Organizations []OrganizationMember `gorm:"foreignKey:UserID"`
 	Projects      []ProjectMember      `gorm:"foreignKey:UserID"`
@@ -25,22 +24,20 @@ func NewSchemaUser(u *user.User) *User {
 		BaseModel: BaseModel{
 			ID: u.ID,
 		},
-		Name:         u.Name,
-		Email:        u.Email,
-		Enabled:      u.Enabled,
-		PublicID:     u.PublicID,
-		PlatformType: u.PlatformType,
+		Name:     u.Name,
+		Email:    u.Email,
+		Enabled:  u.Enabled,
+		PublicID: u.PublicID,
 	}
 }
 
 func (u *User) EtoD() *user.User {
 	return &user.User{
-		ID:           u.ID,
-		Name:         u.Name,
-		Email:        u.Email,
-		Enabled:      u.Enabled,
-		PlatformType: u.PlatformType,
-		PublicID:     u.PublicID,
-		CreatedAt:    u.CreatedAt,
+		ID:        u.ID,
+		Name:      u.Name,
+		Email:     u.Email,
+		Enabled:   u.Enabled,
+		PublicID:  u.PublicID,
+		CreatedAt: u.CreatedAt,
 	}
 }

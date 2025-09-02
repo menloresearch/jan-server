@@ -6,14 +6,13 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/query"
 	"menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/middleware"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
-	apikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan-platform/v1/organization/api_keys"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan-platform/v1/organization/projects"
+	apikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/api_keys"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects"
 	"menlo.ai/jan-api-gateway/app/utils/functional"
 )
 
@@ -38,34 +37,32 @@ func NewOrganizationRoute(
 }
 
 func (o *OrganizationRoute) RegisterRouter(router gin.IRouter) {
-	organizationRouter := router.Group("/organizations", middleware.AuthMiddleware())
+	organizationRouter := router.Group("/organizations", middleware.AuthMiddleware(), o.userService.RegisteredUserMiddleware())
 	organizationIdRouter := organizationRouter.Group(fmt.Sprintf("/:%s", organization.OrganizationContextKeyPublicID), o.organizationService.OrganizationMiddleware())
 	o.projectsRoute.RegisterRouter(organizationIdRouter)
-	o.apiKeyRoute.RegisterRouter(organizationRouter)
+	o.apiKeyRoute.RegisterRouter(organizationIdRouter)
 	organizationRouter.GET("", o.ListOrganization)
 }
 
+// @Summary List organizations
+// @Description Retrieves a list of organizations owned by the authenticated user.
+// @Tags organizations
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param limit query int false "Number of organizations to return" default(10)
+// @Param offset query int false "Offset for pagination" default(0)
+// @Success 200 {object} responses.ListResponse[OrganizationResponse] "Successfully retrieved organizations."
+// @Failure 400 {object} responses.ErrorResponse "Bad request, e.g., invalid pagination parameters."
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized, e.g., invalid or missing token."
+// @Failure 500 {object} responses.ErrorResponse "Internal server error."
+// @Router /jan/v1/organizations [get]
 func (o *OrganizationRoute) ListOrganization(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
-	userClaim, err := auth.GetUserClaimFromRequestContext(reqCtx)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "9715151d-02ab-4759-bfb7-89d717f05cd3",
-			Error: err.Error(),
-		})
-		return
-	}
-	user, err := o.userService.FindByEmailAndPlatform(ctx, userClaim.Email, string(user.UserPlatformTypePlatform))
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "edf9dd05-aad4-4c1e-9795-98bf60ecf57c",
-			Error: err.Error(),
-		})
-		return
-	}
-	if user == nil {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code: "417cff16-0325-45f7-9826-8ab24d2fef29",
+	user, ok := o.userService.GetUserFromContext(reqCtx)
+	if !ok {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code: "746ca453-519f-453e-8855-f523379ab306",
 		})
 		return
 	}
@@ -108,7 +105,6 @@ func (o *OrganizationRoute) ListOrganization(reqCtx *gin.Context) {
 }
 
 type OrganizationResponse struct {
-	ID        uint
 	Name      string
 	PublicID  string
 	CreatedAt time.Time
@@ -118,7 +114,6 @@ type OrganizationResponse struct {
 
 func convertDomainToOrganizationResponse(entity *organization.Organization) *OrganizationResponse {
 	return &OrganizationResponse{
-		ID:        entity.ID,
 		Name:      entity.Name,
 		PublicID:  entity.PublicID,
 		CreatedAt: entity.CreatedAt,
