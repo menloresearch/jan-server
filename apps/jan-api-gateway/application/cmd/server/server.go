@@ -10,6 +10,7 @@ import (
 	"github.com/mileusna/crontab"
 	"menlo.ai/jan-api-gateway/app/domain/healthcheck"
 	apphttp "menlo.ai/jan-api-gateway/app/interfaces/http"
+	_ "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation" // Import handler for Swagger types
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
 	"menlo.ai/jan-api-gateway/app/utils/httpclients/serper"
 	"menlo.ai/jan-api-gateway/app/utils/logger"
@@ -44,23 +45,23 @@ func init() {
 // @name Authorization
 // @description Type "Bearer" followed by a space and JWT token.
 func main() {
-       healthcheckService := healthcheck.NewService(janinference.NewJanInferenceClient(context.Background()))
-       cron := crontab.New()
-       crontabContext := context.Background()
-       healthcheckService.Start(crontabContext, cron)
+	healthcheckService := healthcheck.NewService(janinference.NewJanInferenceClient(context.Background()))
+	cron := crontab.New()
+	crontabContext := context.Background()
+	healthcheckService.Start(crontabContext, cron)
 
-       // Expose pprof endpoints for profiling (for Grafana Alloy/Pyroscope Go pull mode)
-       go func() {
-	       // Default pprof mux is registered on DefaultServeMux by importing net/http/pprof
-	       // Listen on localhost:6060 (or change port as needed)
-	       if err := nethttp.ListenAndServe("0.0.0.0:6060", nil); err != nil {
-		       logger.GetLogger().Errorf("pprof server failed: %v", err)
-	       }
-       }()
+	// Expose pprof endpoints for profiling (for Grafana Alloy/Pyroscope Go pull mode)
+	go func() {
+		// Default pprof mux is registered on DefaultServeMux by importing net/http/pprof
+		// Listen on localhost:6060 (or change port as needed)
+		if err := nethttp.ListenAndServe("0.0.0.0:6060", nil); err != nil {
+			logger.GetLogger().Errorf("pprof server failed: %v", err)
+		}
+	}()
 
-       application, err := CreateApplication()
-       if err != nil {
-	       panic(err)
-       }
-       application.Start()
+	application, err := CreateApplication()
+	if err != nil {
+		panic(err)
+	}
+	application.Start()
 }

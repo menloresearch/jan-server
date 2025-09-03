@@ -2,13 +2,14 @@ package organization
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
-	"io"
+	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/query"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
+	"menlo.ai/jan-api-gateway/app/utils/idgen"
 )
 
 // OrganizationService provides business logic for managing organizations.
@@ -21,18 +22,14 @@ type OrganizationService struct {
 // NewService is the constructor for OrganizationService.
 // It injects the repository dependency.
 func NewService(repo OrganizationRepository, projectService *project.ProjectService) *OrganizationService {
-	return &OrganizationService{repo: repo, projectService: projectService}
+	return &OrganizationService{
+		repo:           repo,
+		projectService: projectService,
+	}
 }
 
 func (s *OrganizationService) createPublicID() (string, error) {
-	randomBytes := make([]byte, 16)
-	_, err := io.ReadFull(rand.Reader, randomBytes)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate random bytes for public ID: %w", err)
-	}
-
-	publicID := base64.URLEncoding.EncodeToString(randomBytes)
-	return publicID, nil
+	return idgen.GenerateSecureID("org", 16)
 }
 
 // CreateOrganizationWithPublicID creates a new organization and automatically
@@ -102,4 +99,45 @@ func (s *OrganizationService) FindOrganizations(ctx context.Context, filter Orga
 // CountOrganizations counts the number of organizations matching a given filter.
 func (s *OrganizationService) CountOrganizations(ctx context.Context, filter OrganizationFilter) (int64, error) {
 	return s.repo.Count(ctx, filter)
+}
+
+type OrganizationContextKey string
+
+const (
+	OrganizationContextKeyPublicID OrganizationContextKey = "org_public_id"
+	OrganizationContextKeyEntity   OrganizationContextKey = "OrganizationContextKeyEntity"
+)
+
+func (s *OrganizationService) OrganizationMiddleware() gin.HandlerFunc {
+	return func(reqCtx *gin.Context) {
+		ctx := reqCtx.Request.Context()
+		orgPublicID := reqCtx.Param(string(OrganizationContextKeyPublicID))
+
+		if orgPublicID == "" {
+			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+				Code:  "ada5a8f9-d5e1-4761-9af1-a176473ff7eb",
+				Error: "missing organization public ID",
+			})
+			return
+		}
+
+		org, err := s.FindOrganizationByPublicID(ctx, orgPublicID)
+		if err != nil || org == nil {
+			reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
+				Code:  "67a03e01-2797-4a5e-b2cd-f2893d4a14b2",
+				Error: "organization not found",
+			})
+			return
+		}
+		reqCtx.Set(string(OrganizationContextKeyEntity), org)
+		reqCtx.Next()
+	}
+}
+
+func (s *OrganizationService) GetOrganizationFromContext(reqCtx *gin.Context) (*Organization, bool) {
+	org, ok := reqCtx.Get(string(OrganizationContextKeyEntity))
+	if !ok {
+		return nil, false
+	}
+	return org.(*Organization), true
 }

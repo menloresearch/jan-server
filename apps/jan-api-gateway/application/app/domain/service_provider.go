@@ -3,6 +3,7 @@ package domain
 import (
 	"github.com/google/wire"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
+	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/project"
@@ -14,5 +15,6 @@ var ServiceProvider = wire.NewSet(
 	project.NewService,
 	apikey.NewService,
 	user.NewService,
+	conversation.NewService,
 	serpermcp.NewSerperService,
 )

@@ -18,6 +18,8 @@ import (
 var (
 	Q                  = new(Query)
 	ApiKey             *apiKey
+	Conversation       *conversation
+	Item               *item
 	Organization       *organization
 	OrganizationMember *organizationMember
 	Project            *project
@@ -28,6 +30,8 @@ var (
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	*Q = *Use(db, opts...)
 	ApiKey = &Q.ApiKey
+	Conversation = &Q.Conversation
+	Item = &Q.Item
 	Organization = &Q.Organization
 	OrganizationMember = &Q.OrganizationMember
 	Project = &Q.Project
@@ -39,6 +43,8 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
 		db:                 db,
 		ApiKey:             newApiKey(db, opts...),
+		Conversation:       newConversation(db, opts...),
+		Item:               newItem(db, opts...),
 		Organization:       newOrganization(db, opts...),
 		OrganizationMember: newOrganizationMember(db, opts...),
 		Project:            newProject(db, opts...),
@@ -51,6 +57,8 @@ type Query struct {
 	db *gorm.DB
 
 	ApiKey             apiKey
+	Conversation       conversation
+	Item               item
 	Organization       organization
 	OrganizationMember organizationMember
 	Project            project
@@ -64,6 +72,8 @@ func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
 		db:                 db,
 		ApiKey:             q.ApiKey.clone(db),
+		Conversation:       q.Conversation.clone(db),
+		Item:               q.Item.clone(db),
 		Organization:       q.Organization.clone(db),
 		OrganizationMember: q.OrganizationMember.clone(db),
 		Project:            q.Project.clone(db),
@@ -84,6 +94,8 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
 		db:                 db,
 		ApiKey:             q.ApiKey.replaceDB(db),
+		Conversation:       q.Conversation.replaceDB(db),
+		Item:               q.Item.replaceDB(db),
 		Organization:       q.Organization.replaceDB(db),
 		OrganizationMember: q.OrganizationMember.replaceDB(db),
 		Project:            q.Project.replaceDB(db),
@@ -94,6 +106,8 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 
 type queryCtx struct {
 	ApiKey             IApiKeyDo
+	Conversation       IConversationDo
+	Item               IItemDo
 	Organization       IOrganizationDo
 	OrganizationMember IOrganizationMemberDo
 	Project            IProjectDo
@@ -104,6 +118,8 @@ type queryCtx struct {
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
 		ApiKey:             q.ApiKey.WithContext(ctx),
+		Conversation:       q.Conversation.WithContext(ctx),
+		Item:               q.Item.WithContext(ctx),
 		Organization:       q.Organization.WithContext(ctx),
 		OrganizationMember: q.OrganizationMember.WithContext(ctx),
 		Project:            q.Project.WithContext(ctx),

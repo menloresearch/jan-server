@@ -3,9 +3,12 @@ package project
 import (
 	"context"
 	"fmt"
+	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/query"
-	"menlo.ai/jan-api-gateway/app/utils/stringutils"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
+	"menlo.ai/jan-api-gateway/app/utils/idgen"
 )
 
 // ProjectService provides business logic for managing projects.
@@ -17,16 +20,13 @@ type ProjectService struct {
 // NewService is the constructor for ProjectService.
 // It injects the repository dependency.
 func NewService(repo ProjectRepository) *ProjectService {
-	return &ProjectService{repo: repo}
+	return &ProjectService{
+		repo: repo,
+	}
 }
 
-// createPublicID generates a unique, URL-safe public ID for the project.
 func (s *ProjectService) createPublicID() (string, error) {
-	randomStr, err := stringutils.RandomString(16)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("proj_%s", randomStr), nil
+	return idgen.GenerateSecureID("proj", 16)
 }
 
 // CreateProjectWithPublicID creates a new project and automatically
@@ -90,4 +90,45 @@ func (s *ProjectService) AddMember(ctx context.Context, projectID, userID uint, 
 		ProjectID: projectID,
 		Role:      role,
 	})
+}
+
+type ProjectContextKey string
+
+const (
+	ProjectContextKeyPublicID ProjectContextKey = "proj_public_id"
+	ProjectContextKeyEntity   ProjectContextKey = "ProjectContextKeyEntity"
+)
+
+func (s *ProjectService) ProjectMiddleware() gin.HandlerFunc {
+	return func(reqCtx *gin.Context) {
+		ctx := reqCtx.Request.Context()
+		publicID := reqCtx.Param(string(ProjectContextKeyPublicID))
+
+		if publicID == "" {
+			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+				Code:  "5cbdb58e-6228-4d9a-9893-7f744608a9e8",
+				Error: "missing project public ID",
+			})
+			return
+		}
+
+		proj, err := s.FindProjectByPublicID(ctx, publicID)
+		if err != nil || proj == nil {
+			reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
+				Code:  "121ef112-cb39-4235-9500-b116adb69984",
+				Error: "proj not found",
+			})
+			return
+		}
+		reqCtx.Set(string(ProjectContextKeyEntity), proj)
+		reqCtx.Next()
+	}
+}
+
+func (s *ProjectService) GetProjectFromContext(reqCtx *gin.Context) (*Project, bool) {
+	proj, ok := reqCtx.Get(string(ProjectContextKeyEntity))
+	if !ok {
+		return nil, false
+	}
+	return proj.(*Project), true
 }

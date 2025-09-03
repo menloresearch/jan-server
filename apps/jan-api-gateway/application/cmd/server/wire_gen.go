@@ -8,25 +8,34 @@ package main
 
 import (
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
+	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/apikeyrepo"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/conversationrepo"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/itemrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/organizationrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/projectrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
+	conversation2 "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan"
 	v1_2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/apikeys"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth/google"
 	chat2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/chat"
+	conversations2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/conversations"
+	organization3 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization"
+	apikeys2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/api_keys"
+	projects2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects/api_keys"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	organization2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
@@ -35,6 +44,7 @@ import (
 
 import (
 	_ "github.com/grafana/pyroscope-go/godeltaprof/http/pprof"
+	_ "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
 	_ "net/http/pprof"
 )
 
@@ -59,17 +69,26 @@ func CreateApplication() (*Application, error) {
 	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI, projectsRoute)
 	completionAPI := chat.NewCompletionAPI(apiKeyService)
 	chatRoute := chat.NewChatRoute(completionAPI)
+	conversationRepository := conversationrepo.NewConversationGormRepository(transactionDatabase)
+	itemRepository := itemrepo.NewItemGormRepository(transactionDatabase)
+	conversationService := conversation.NewService(conversationRepository, itemRepository)
+	conversationHandler := conversation2.NewConversationHandler(conversationService, userService, apiKeyService)
+	conversationAPI := conversations.NewConversationAPI(conversationHandler)
 	modelAPI := v1.NewModelAPI()
 	serperService := serpermcp.NewSerperService()
 	serperMCP := mcpimpl.NewSerperMCP(serperService)
 	mcpapi := mcp.NewMCPAPI(serperMCP)
-	v1Route := v1.NewV1Route(organizationRoute, chatRoute, modelAPI, mcpapi)
+	v1Route := v1.NewV1Route(organizationRoute, chatRoute, conversationAPI, modelAPI, mcpapi)
 	googleAuthAPI := google.NewGoogleAuthAPI(userService)
 	authRoute := auth.NewAuthRoute(googleAuthAPI)
-	apiKeyAPI := apikeys.NewApiKeyAPI(apiKeyService, userService)
 	chatCompletionAPI := chat2.NewCompletionAPI(userService, apiKeyService)
 	chatChatRoute := chat2.NewChatRoute(chatCompletionAPI)
-	v1V1Route := v1_2.NewV1Route(authRoute, apiKeyAPI, chatChatRoute)
+	conversationsConversationAPI := conversations2.NewConversationAPI(conversationHandler)
+	projectApiKeyRoute := apikeys.NewProjectApiKeyRoute(organizationService, projectService, apiKeyService, userService)
+	projectsProjectsRoute := projects2.NewProjectsRoute(userService, projectService, organizationService, projectApiKeyRoute)
+	organizationApiKeyRoute := apikeys2.NewOrganizationApiKeyRouteRoute(organizationService, apiKeyService, userService)
+	organizationOrganizationRoute := organization3.NewOrganizationRoute(organizationService, userService, projectsProjectsRoute, organizationApiKeyRoute)
+	v1V1Route := v1_2.NewV1Route(authRoute, chatChatRoute, conversationsConversationAPI, organizationOrganizationRoute)
 	janRoute := jan.NewJanRoute(v1V1Route, chatChatRoute)
 	httpServer := http.NewHttpServer(v1Route, janRoute)
 	application := &Application{
