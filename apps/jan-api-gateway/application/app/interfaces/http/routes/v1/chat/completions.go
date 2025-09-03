@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"bufio"
 	"fmt"
 	"net/http"
 
@@ -109,16 +110,36 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	for _, endpoint := range endpoints {
 		if endpoint == janInferenceClient.BaseURL {
 			if request.Stream {
-				err := janInferenceClient.CreateChatCompletionStream(reqCtx, key, request)
+				reqCtx.Writer.Header().Set("Content-Type", "text/event-stream")
+				reqCtx.Writer.Header().Set("Cache-Control", "no-cache")
+				reqCtx.Writer.Header().Set("Connection", "keep-alive")
+				reqCtx.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+				req := janinference.JanInferenceRestyClient.R().SetBody(request)
+				resp, err := req.
+					SetDoNotParseResponse(true).
+					Post("/v1/chat/completions")
 				if err != nil {
-					reqCtx.AbortWithStatusJSON(
-						http.StatusBadRequest,
-						responses.ErrorResponse{
-							Code:  "c3af973c-eada-4e8b-96d9-e92546588cd3",
-							Error: err.Error(),
-						})
-					return
+					return err
 				}
+				defer resp.RawResponse.Body.Close()
+				scanner := bufio.NewScanner(resp.RawResponse.Body)
+				for scanner.Scan() {
+					line := scanner.Text()
+					reqCtx.Writer.Write([]byte(line + "\n"))
+					reqCtx.Writer.Flush()
+				}
+				reqCtx.Writer.Flush()
+				// err := janInferenceClient.CreateChatCompletionStream(reqCtx, key, request)
+				// if err != nil {
+				// 	reqCtx.AbortWithStatusJSON(
+				// 		http.StatusBadRequest,
+				// 		responses.ErrorResponse{
+				// 			Code:  "c3af973c-eada-4e8b-96d9-e92546588cd3",
+				// 			Error: err.Error(),
+				// 		})
+				// 	return
+				// }
 				return
 			} else {
 				response, err := janInferenceClient.CreateChatCompletion(reqCtx.Request.Context(), key, request)
