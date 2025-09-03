@@ -11,6 +11,20 @@ jan-api-gateway:
       value: http://jan-server-jan-inference-model:8101
     - name: SERPER_API_KEY
       value: your_key_from_serper_api
+    - name: JWT_SECRET
+      value: 41/YJHCG4kP5uln/YGK5pFHAzY3skF+6yYWDiYqc8WuoOcw51VV0aUhNo3Ueva572ASWmkxpkF+B5gPBLMOPzQ==
+    - name: OAUTH2_GOOGLE_CLIENT_ID
+      value: your_oauth2_google_client_id
+    - name: OAUTH2_GOOGLE_CLIENT_SECRET
+      value: your_oauth2_google_client_secret
+    - name: OAUTH2_GOOGLE_REDIRECT_URL
+      value: your_oauth2_google_redirect_url
+    - name: DB_POSTGRESQL_WRITE_DSN
+      value: host=jan-server-postgresql user=jan-user password=jan-password dbname=jan port=5432 sslmode=disable
+    - name: DB_POSTGRESQL_READ1_DSN
+      value: host=jan-server-postgresql user=jan-user password=jan-password dbname=jan port=5432 sslmode=disable
+    - name: APIKEY_SECRET
+      value: fhWMCXu29gKRcs6//I0HwaQgvTgv0uMdLRshU5cyC+4=
 
 jan-inference-model:
   replicaCount: 1
@@ -20,3 +34,9 @@ jan-inference-model:
   service:
     type: ClusterIP
     port: 8101
+
+postgresql:
+  auth:
+    database: jan
+    username: jan-user
+    password: jan-password
