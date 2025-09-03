@@ -80,7 +80,7 @@ func CreateApplication() (*Application, error) {
 	mcpapi := mcp.NewMCPAPI(serperMCP)
 	v1Route := v1.NewV1Route(organizationRoute, chatRoute, conversationAPI, modelAPI, mcpapi)
 	googleAuthAPI := google.NewGoogleAuthAPI(userService)
-	authRoute := auth.NewAuthRoute(googleAuthAPI)
+	authRoute := auth.NewAuthRoute(googleAuthAPI, userService)
 	chatCompletionAPI := chat2.NewCompletionAPI(userService, apiKeyService)
 	chatChatRoute := chat2.NewChatRoute(chatCompletionAPI)
 	conversationsConversationAPI := conversations2.NewConversationAPI(conversationHandler)
