@@ -11,3 +11,4 @@ helm install jan-server ./charts/umbrella-chart
 
 kubectl port-forward svc/jan-server-jan-api-gateway 8080:8080
 # helm uninstall jan-server
+# check http://localhost:8080/api/swagger/index.html#/
