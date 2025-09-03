@@ -31,7 +31,6 @@ func NewV1Route(
 func (v1Route *V1Route) RegisterRouter(router gin.IRouter) {
 	v1Router := router.Group("/v1")
 	v1Route.auth.RegisterRouter(v1Router)
-	v1Route.apikeys.RegisterRouter(v1Router)
 	v1Route.chat.RegisterRouter(v1Router)
 	v1Route.conversations.RegisterRouter(v1Router)
 	v1Route.organizations.RegisterRouter(v1Router)
