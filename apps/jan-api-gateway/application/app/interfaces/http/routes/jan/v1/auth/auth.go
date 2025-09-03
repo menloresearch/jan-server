@@ -181,7 +181,6 @@ func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 // @Summary Guest Login
 // @Description JWT-base Guest Login.
 // @Tags Jan, Jan-Authentication
-// @Security BearerAuth
 // @Produce json
 // @Success 200 {object} responses.GeneralResponse[RefreshTokenResponse] "Successfully refreshed the access token"
 // @Failure 400 {object} responses.ErrorResponse "Bad Request (e.g., invalid refresh token)"

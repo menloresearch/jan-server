@@ -1099,8 +1099,6 @@ paths:
           description: Unauthorized (e.g., expired or missing refresh token)
           schema:
             $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
-      security:
-      - BearerAuth: []
       summary: Guest Login
       tags:
       - Jan

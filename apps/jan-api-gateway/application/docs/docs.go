@@ -91,11 +91,6 @@ const docTemplate = `{
         },
         "/jan/v1/auth/guest-login": {
             "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
                 "description": "JWT-base Guest Login.",
                 "produces": [
                     "application/json"
