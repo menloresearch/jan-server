@@ -1,14 +1,11 @@
 package database
 
 import (
-	"strings"
-
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 	"gorm.io/plugin/dbresolver"
 	"menlo.ai/jan-api-gateway/app/utils/logger"
-	"menlo.ai/jan-api-gateway/config"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
@@ -21,7 +18,6 @@ func RegisterSchemaForAutoMigrate(models ...interface{}) {
 var DB *gorm.DB
 
 func NewDB() (*gorm.DB, error) {
-
 	db, err := gorm.Open(postgres.Open(environment_variables.EnvironmentVariables.DB_POSTGRESQL_WRITE_DSN), &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{
 			SingularTable: true,
@@ -46,7 +42,7 @@ func NewDB() (*gorm.DB, error) {
 		return nil, err
 	}
 
-	if !strings.Contains(config.Version, "dev") {
+	if !db.Migrator().HasTable("database_migration") {
 		err = db.Exec("DROP SCHEMA IF EXISTS public CASCADE;").Error
 		if err != nil {
 			logger.GetLogger().
@@ -70,9 +66,7 @@ func NewDB() (*gorm.DB, error) {
 				return nil, err
 			}
 		}
-
-		DB = db
-		return DB, nil
 	}
-	return nil, nil
+	DB = db
+	return DB, nil
 }

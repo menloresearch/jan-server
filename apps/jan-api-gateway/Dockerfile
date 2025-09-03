@@ -10,7 +10,7 @@ ARG VERSION_TAG=dev
 COPY application/. .
 RUN go mod tidy
 
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+RUN CGO_ENABLED=1 GOOS=linux \
     go build -o /jan-api-gateway \
       -gcflags="all=-N -l" \
       -ldflags="-linkmode=external -X menlo.ai/jan-api-gateway/config.Version=${VERSION_TAG}" \
