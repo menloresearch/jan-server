@@ -46,7 +46,7 @@ func (o *OrganizationRoute) RegisterRouter(router gin.IRouter) {
 
 // @Summary List organizations
 // @Description Retrieves a list of organizations owned by the authenticated user.
-// @Tags organizations
+// @Tags Jan, Jan-Organizations
 // @Security BearerAuth
 // @Accept json
 // @Produce json

@@ -46,7 +46,7 @@ func (api *ProjectsRoute) RegisterRouter(router gin.IRouter) {
 // @Summary List projects
 // @Description List all projects within a given organization.
 // @Security BearerAuth
-// @Tags projects
+// @Tags Jan, Jan-Organizations
 // @Accept json
 // @Produce json
 // @Param org_public_id path string true "Organization Public ID"

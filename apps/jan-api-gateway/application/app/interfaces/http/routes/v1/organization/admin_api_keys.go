@@ -42,7 +42,7 @@ func (adminApiKeyAPI *AdminApiKeyAPI) RegisterRouter(router *gin.RouterGroup) {
 // GetAdminApiKey godoc
 // @Summary Get Admin API Key
 // @Description Retrieves a specific admin API key by its ID.
-// @Tags Admin API Keys
+// @Tags Platform, Platform-Organizations
 // @Security BearerAuth
 // @Param Authorization header string true "Bearer token" default("Bearer <admin_api_key>")
 // @Param id path string true "ID of the admin API key"
@@ -86,7 +86,7 @@ func (api *AdminApiKeyAPI) GetAdminApiKey(reqCtx *gin.Context) {
 // GetAdminApiKeys godoc
 // @Summary List Admin API Keys
 // @Description Retrieves a paginated list of all admin API keys for the authenticated organization.
-// @Tags Admin API Keys
+// @Tags Platform, Platform-Organizations
 // @Security BearerAuth
 // @Param Authorization header string true "Bearer token" default("Bearer <admin_api_key>")
 // @Param limit query int false "The maximum number of items to return" default(20)
@@ -189,7 +189,7 @@ func (api *AdminApiKeyAPI) GetAdminApiKeys(reqCtx *gin.Context) {
 // DeleteAdminApiKey godoc
 // @Summary Delete Admin API Key
 // @Description Deletes an admin API key by its ID.
-// @Tags Admin API Keys
+// @Tags Platform, Platform-Organizations
 // @Security BearerAuth
 // @Param Authorization header string true "Bearer token" default("Bearer <admin_api_key>")
 // @Param id path string true "ID of the admin API key to delete"
@@ -257,7 +257,7 @@ func (api *AdminApiKeyAPI) DeleteAdminApiKey(reqCtx *gin.Context) {
 // CreateAdminApiKey creates a new admin API key for an organization.
 // @Summary Create Admin API Key
 // @Description Creates a new admin API key for an organization. Requires a valid admin API key in the Authorization header.
-// @Tags Admin API Keys
+// @Tags Platform, Platform-Organizations
 // @Accept json
 // @Produce json
 // @Security BearerAuth

@@ -25,7 +25,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Authentication"
+                    "Jan",
+                    "Jan-Authentication"
                 ],
                 "summary": "Google OAuth2 Callback",
                 "parameters": [
@@ -71,7 +72,8 @@ const docTemplate = `{
             "get": {
                 "description": "Redirects the user to the Google OAuth2 authorization page to initiate the login process.",
                 "tags": [
-                    "Authentication"
+                    "Jan",
+                    "Jan-Authentication"
                 ],
                 "summary": "Google OAuth2 Login",
                 "responses": {
@@ -99,7 +101,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Authentication"
+                    "Jan",
+                    "Jan-Authentication"
                 ],
                 "summary": "Get user profile",
                 "responses": {
@@ -128,7 +131,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Authentication"
+                    "Jan",
+                    "Jan-Authentication"
                 ],
                 "summary": "Refresh an access token",
                 "responses": {
@@ -168,7 +172,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Chat"
+                    "Jan",
+                    "Jan-Chat"
                 ],
                 "summary": "Create a chat completion",
                 "parameters": [
@@ -225,7 +230,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Jan",
+                    "Jan-Conversations"
                 ],
                 "summary": "Create a conversation",
                 "parameters": [
@@ -279,7 +285,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Jan",
+                    "Jan-Conversations"
                 ],
                 "summary": "Get a conversation",
                 "parameters": [
@@ -335,7 +342,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Jan",
+                    "Jan-Conversations"
                 ],
                 "summary": "Delete a conversation",
                 "parameters": [
@@ -394,7 +402,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Jan",
+                    "Jan-Conversations"
                 ],
                 "summary": "Update a conversation",
                 "parameters": [
@@ -467,7 +476,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Jan",
+                    "Jan-Conversations"
                 ],
                 "summary": "List items in a conversation",
                 "parameters": [
@@ -544,7 +554,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Jan",
+                    "Jan-Conversations"
                 ],
                 "summary": "Create items in a conversation",
                 "parameters": [
@@ -617,7 +628,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Jan",
+                    "Jan-Conversations"
                 ],
                 "summary": "Get an item from a conversation",
                 "parameters": [
@@ -680,7 +692,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Jan",
+                    "Jan-Conversations"
                 ],
                 "summary": "Delete an item from a conversation",
                 "parameters": [
@@ -748,7 +761,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "organizations"
+                    "Jan",
+                    "Jan-Organizations"
                 ],
                 "summary": "List organizations",
                 "parameters": [
@@ -810,7 +824,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "organization-api-keys"
+                    "Jan",
+                    "Jan-Organizations"
                 ],
                 "summary": "List API keys for a specific organization",
                 "parameters": [
@@ -883,7 +898,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "organization-api-keys"
+                    "Jan",
+                    "Jan-Organizations"
                 ],
                 "summary": "Create a new organization-level admin key",
                 "parameters": [
@@ -953,7 +969,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "projects"
+                    "Jan",
+                    "Jan-Organizations"
                 ],
                 "summary": "List projects",
                 "parameters": [
@@ -1028,7 +1045,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "project-api-keys"
+                    "Jan",
+                    "Jan-Organizations"
                 ],
                 "summary": "List new project API key",
                 "parameters": [
@@ -1094,7 +1112,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "project-api-keys"
+                    "Jan",
+                    "Jan-Organizations"
                 ],
                 "summary": "Create a new project API key",
                 "parameters": [
@@ -1171,7 +1190,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Chat"
+                    "Platform",
+                    "Platform-Chat"
                 ],
                 "summary": "Create a chat completion",
                 "parameters": [
@@ -1228,7 +1248,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Platform",
+                    "Platform-Conversations"
                 ],
                 "summary": "Create a conversation",
                 "parameters": [
@@ -1282,7 +1303,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Platform",
+                    "Platform-Conversations"
                 ],
                 "summary": "Get a conversation",
                 "parameters": [
@@ -1338,7 +1360,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Platform",
+                    "Platform-Conversations"
                 ],
                 "summary": "Delete a conversation",
                 "parameters": [
@@ -1397,7 +1420,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Platform",
+                    "Platform-Conversations"
                 ],
                 "summary": "Update a conversation",
                 "parameters": [
@@ -1470,7 +1494,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Platform",
+                    "Platform-Conversations"
                 ],
                 "summary": "List items in a conversation",
                 "parameters": [
@@ -1547,7 +1572,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Platform",
+                    "Platform-Conversations"
                 ],
                 "summary": "Create items in a conversation",
                 "parameters": [
@@ -1620,7 +1646,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Platform",
+                    "Platform-Conversations"
                 ],
                 "summary": "Get an item from a conversation",
                 "parameters": [
@@ -1683,7 +1710,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Platform",
+                    "Platform-Conversations"
                 ],
                 "summary": "Delete an item from a conversation",
                 "parameters": [
@@ -1788,7 +1816,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Models"
+                    "Platform",
+                    "Platform-Models"
                 ],
                 "summary": "List available models",
                 "responses": {
@@ -1810,7 +1839,8 @@ const docTemplate = `{
                 ],
                 "description": "Retrieves a paginated list of all admin API keys for the authenticated organization.",
                 "tags": [
-                    "Admin API Keys"
+                    "Platform",
+                    "Platform-Organizations"
                 ],
                 "summary": "List Admin API Keys",
                 "parameters": [
@@ -1871,7 +1901,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Admin API Keys"
+                    "Platform",
+                    "Platform-Organizations"
                 ],
                 "summary": "Create Admin API Key",
                 "parameters": [
@@ -1924,7 +1955,8 @@ const docTemplate = `{
                 ],
                 "description": "Retrieves a specific admin API key by its ID.",
                 "tags": [
-                    "Admin API Keys"
+                    "Platform",
+                    "Platform-Organizations"
                 ],
                 "summary": "Get Admin API Key",
                 "parameters": [
@@ -1973,7 +2005,8 @@ const docTemplate = `{
                 ],
                 "description": "Deletes an admin API key by its ID.",
                 "tags": [
-                    "Admin API Keys"
+                    "Platform",
+                    "Platform-Organizations"
                 ],
                 "summary": "Delete Admin API Key",
                 "parameters": [
@@ -2024,7 +2057,8 @@ const docTemplate = `{
                 ],
                 "description": "Retrieves a paginated list of all projects for the authenticated organization.",
                 "tags": [
-                    "Projects"
+                    "Platform",
+                    "Platform-Organizations"
                 ],
                 "summary": "List Projects",
                 "parameters": [
@@ -2091,7 +2125,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Projects"
+                    "Platform",
+                    "Platform-Organizations"
                 ],
                 "summary": "Create Project",
                 "parameters": [
@@ -2150,7 +2185,8 @@ const docTemplate = `{
                 ],
                 "description": "Retrieves a specific project by its ID.",
                 "tags": [
-                    "Projects"
+                    "Platform",
+                    "Platform-Organizations"
                 ],
                 "summary": "Get Project",
                 "parameters": [
@@ -2205,7 +2241,8 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Projects"
+                    "Platform",
+                    "Platform-Organizations"
                 ],
                 "summary": "Update Project",
                 "parameters": [
@@ -2271,7 +2308,8 @@ const docTemplate = `{
                 ],
                 "description": "Archives a specific project by its ID, making it inactive.",
                 "tags": [
-                    "Projects"
+                    "Platform",
+                    "Platform-Organizations"
                 ],
                 "summary": "Archive Project",
                 "parameters": [
@@ -2320,7 +2358,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "System"
+                    "Jan Server"
                 ],
                 "summary": "Get API build version",
                 "responses": {

@@ -43,7 +43,7 @@ type GetMeResponse struct {
 
 // @Summary Get user profile
 // @Description Retrieves the profile of the authenticated user based on the provided JWT.
-// @Tags Authentication
+// @Tags Jan, Jan-Authentication
 // @Security BearerAuth
 // @Produce json
 // @Success 200 {object} responses.GeneralResponse[GetMeResponse] "Successfully retrieved user profile"
@@ -75,7 +75,7 @@ func (authRoute *AuthRoute) GetMe(reqCtx *gin.Context) {
 
 // @Summary Refresh an access token
 // @Description Use a valid refresh token to obtain a new access token. The refresh token is typically sent in a cookie.
-// @Tags Authentication
+// @Tags Jan, Jan-Authentication
 // @Accept json
 // @Produce json
 // @Success 200 {object} responses.GeneralResponse[RefreshTokenResponse] "Successfully refreshed the access token"
