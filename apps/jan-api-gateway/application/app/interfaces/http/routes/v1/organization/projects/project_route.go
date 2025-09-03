@@ -41,7 +41,7 @@ func (projectsRoute *ProjectsRoute) RegisterRouter(router gin.IRouter) {
 // GetProjects godoc
 // @Summary List Projects
 // @Description Retrieves a paginated list of all projects for the authenticated organization.
-// @Tags Projects
+// @Tags Platform, Platform-Organizations
 // @Security BearerAuth
 // @Param Authorization header string true "Bearer token" default("Bearer <api_key>")
 // @Param limit query int false "The maximum number of items to return" default(20)
@@ -157,7 +157,7 @@ func (api *ProjectsRoute) GetProjects(reqCtx *gin.Context) {
 // CreateProject godoc
 // @Summary Create Project
 // @Description Creates a new project for an organization.
-// @Tags Projects
+// @Tags Platform, Platform-Organizations
 // @Accept json
 // @Produce json
 // @Security BearerAuth
@@ -206,7 +206,7 @@ func (api *ProjectsRoute) CreateProject(reqCtx *gin.Context) {
 // GetProject godoc
 // @Summary Get Project
 // @Description Retrieves a specific project by its ID.
-// @Tags Projects
+// @Tags Platform, Platform-Organizations
 // @Security BearerAuth
 // @Param Authorization header string true "Bearer token" default("Bearer <api_key>")
 // @Param project_id path string true "ID of the project"
@@ -255,7 +255,7 @@ func (api *ProjectsRoute) GetProject(reqCtx *gin.Context) {
 // UpdateProject godoc
 // @Summary Update Project
 // @Description Updates a specific project by its ID.
-// @Tags Projects
+// @Tags Platform, Platform-Organizations
 // @Accept json
 // @Produce json
 // @Security BearerAuth
@@ -331,7 +331,7 @@ func (api *ProjectsRoute) UpdateProject(reqCtx *gin.Context) {
 // ArchiveProject godoc
 // @Summary Archive Project
 // @Description Archives a specific project by its ID, making it inactive.
-// @Tags Projects
+// @Tags Platform, Platform-Organizations
 // @Security BearerAuth
 // @Param Authorization header string true "Bearer token" default("Bearer <api_key>")
 // @Param project_id path string true "ID of the project to archive"

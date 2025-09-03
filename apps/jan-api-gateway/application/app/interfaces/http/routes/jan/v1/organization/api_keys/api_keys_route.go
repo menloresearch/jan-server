@@ -44,7 +44,7 @@ type CreateAdminKeyRequest struct {
 
 // @Summary Create a new organization-level admin key
 // @Description Creates a new API key with administrative permissions for a specific organization.
-// @Tags organization-api-keys
+// @Tags Jan, Jan-Organizations
 // @Accept json
 // @Produce json
 // @Security BearerAuth
@@ -138,7 +138,7 @@ func (api *OrganizationApiKeyRoute) CreateAdminKey(reqCtx *gin.Context) {
 
 // @Summary List API keys for a specific organization
 // @Description Retrieves a list of all API keys associated with an organization.
-// @Tags organization-api-keys
+// @Tags Jan, Jan-Organizations
 // @Accept json
 // @Produce json
 // @Security BearerAuth

@@ -72,7 +72,7 @@ func generateState() (string, error) {
 
 // @Summary Google OAuth2 Callback
 // @Description Handles the callback from the Google OAuth2 provider to exchange the authorization code for a token, verify the user, and issue access and refresh tokens.
-// @Tags Authentication
+// @Tags Jan, Jan-Authentication
 // @Accept json
 // @Produce json
 // @Param request body GoogleCallbackRequest true "Request body containing the authorization code and state"
@@ -222,7 +222,7 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 
 // @Summary Google OAuth2 Login
 // @Description Redirects the user to the Google OAuth2 authorization page to initiate the login process.
-// @Tags Authentication
+// @Tags Jan, Jan-Authentication
 // @Success 307 "Redirects to Google's login page"
 // @Failure 500 {object} responses.ErrorResponse "Internal Server Error"
 // @Router /jan/v1/auth/google/login [get]

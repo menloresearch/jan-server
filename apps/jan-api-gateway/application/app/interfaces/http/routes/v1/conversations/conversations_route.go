@@ -37,7 +37,7 @@ func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 // createConversation handles conversation creation
 // @Summary Create a conversation
 // @Description Creates a new conversation for the authenticated user
-// @Tags Conversations
+// @Tags Platform, Platform-Conversations
 // @Security BearerAuth
 // @Accept json
 // @Produce json
@@ -54,7 +54,7 @@ func (api *ConversationAPI) createConversation(ctx *gin.Context) {
 // getConversation handles conversation retrieval
 // @Summary Get a conversation
 // @Description Retrieves a conversation by its ID
-// @Tags Conversations
+// @Tags Platform, Platform-Conversations
 // @Security BearerAuth
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
@@ -71,7 +71,7 @@ func (api *ConversationAPI) getConversation(ctx *gin.Context) {
 // updateConversation handles conversation updates
 // @Summary Update a conversation
 // @Description Updates conversation metadata
-// @Tags Conversations
+// @Tags Platform, Platform-Conversations
 // @Security BearerAuth
 // @Accept json
 // @Produce json
@@ -91,7 +91,7 @@ func (api *ConversationAPI) updateConversation(ctx *gin.Context) {
 // deleteConversation handles conversation deletion
 // @Summary Delete a conversation
 // @Description Deletes a conversation and all its items
-// @Tags Conversations
+// @Tags Platform, Platform-Conversations
 // @Security BearerAuth
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
@@ -108,7 +108,7 @@ func (api *ConversationAPI) deleteConversation(ctx *gin.Context) {
 // createItems handles item creation
 // @Summary Create items in a conversation
 // @Description Adds multiple items to a conversation
-// @Tags Conversations
+// @Tags Platform, Platform-Conversations
 // @Security BearerAuth
 // @Accept json
 // @Produce json
@@ -128,7 +128,7 @@ func (api *ConversationAPI) createItems(ctx *gin.Context) {
 // listItems handles item listing with optional pagination
 // @Summary List items in a conversation
 // @Description Lists all items in a conversation
-// @Tags Conversations
+// @Tags Platform, Platform-Conversations
 // @Security BearerAuth
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
@@ -148,7 +148,7 @@ func (api *ConversationAPI) listItems(ctx *gin.Context) {
 // getItem handles single item retrieval
 // @Summary Get an item from a conversation
 // @Description Retrieves a specific item from a conversation
-// @Tags Conversations
+// @Tags Platform, Platform-Conversations
 // @Security BearerAuth
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
@@ -166,7 +166,7 @@ func (api *ConversationAPI) getItem(ctx *gin.Context) {
 // deleteItem handles item deletion
 // @Summary Delete an item from a conversation
 // @Description Deletes a specific item from a conversation
-// @Tags Conversations
+// @Tags Platform, Platform-Conversations
 // @Security BearerAuth
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"

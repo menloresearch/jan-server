@@ -48,7 +48,7 @@ func (v1Route *V1Route) RegisterRouter(router gin.IRouter) {
 // GetVersion godoc
 // @Summary     Get API build version
 // @Description Returns the current build version of the API server.
-// @Tags        System
+// @Tags        Jan Server
 // @Produce     json
 // @Success     200 {object} map[string]string "version info"
 // @Router      /v1/version [get]
