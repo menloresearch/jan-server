@@ -89,6 +89,39 @@ const docTemplate = `{
                 }
             }
         },
+        "/jan/v1/auth/guest-login": {
+            "post": {
+                "description": "JWT-base Guest Login.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jan",
+                    "Jan-Authentication"
+                ],
+                "summary": "Guest Login",
+                "responses": {
+                    "200": {
+                        "description": "Successfully refreshed the access token",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_auth_RefreshTokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request (e.g., invalid refresh token)",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized (e.g., expired or missing refresh token)",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/jan/v1/auth/me": {
             "get": {
                 "security": [
