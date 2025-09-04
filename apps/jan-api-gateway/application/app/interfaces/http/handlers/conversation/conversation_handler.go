@@ -6,10 +6,8 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/user"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 )
 
@@ -17,19 +15,16 @@ import (
 type ConversationHandler struct {
 	conversationService *conversation.ConversationService
 	userService         *user.UserService
-	apiKeyService       *apikey.ApiKeyService
 }
 
 // NewConversationHandler creates a new conversation handler
 func NewConversationHandler(
 	conversationService *conversation.ConversationService,
 	userService *user.UserService,
-	apiKeyService *apikey.ApiKeyService,
 ) *ConversationHandler {
 	return &ConversationHandler{
 		conversationService: conversationService,
 		userService:         userService,
-		apiKeyService:       apiKeyService,
 	}
 }
 
@@ -149,42 +144,8 @@ type CreateItemsRequest struct {
 	Items []ConversationItemRequest `json:"items" binding:"required"`
 }
 
-// authenticateAPIKey validates API key and returns authenticated user
-func (h *ConversationHandler) authenticateAPIKey(ctx *gin.Context) (*AuthenticatedUser, error) {
-	apiKey, ok := requests.GetTokenFromBearer(ctx)
-	if !ok {
-		return nil, fmt.Errorf("invalid or missing API key")
-	}
-
-	apiKeyEntity, err := h.apiKeyService.FindByKey(ctx, apiKey)
-	if err != nil {
-		return nil, fmt.Errorf("invalid API key")
-	}
-
-	if apiKeyEntity == nil {
-		return nil, fmt.Errorf("API key not found")
-	}
-
-	user, err := h.userService.FindByID(ctx, *apiKeyEntity.OwnerID)
-	if err != nil {
-		return nil, fmt.Errorf("user not found")
-	}
-
-	return &AuthenticatedUser{ID: user.ID}, nil
-}
-
 // CreateConversation handles conversation creation
-func (h *ConversationHandler) CreateConversation(ctx *gin.Context) {
-	// Authenticate user
-	user, err := h.authenticateAPIKey(ctx)
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-			Error: "Invalid or missing API key",
-		})
-		return
-	}
-
+func (h *ConversationHandler) CreateConversation(ctx *gin.Context, user *AuthenticatedUser) {
 	// Parse request
 	var request CreateConversationRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
@@ -270,17 +231,7 @@ func (h *ConversationHandler) CreateConversation(ctx *gin.Context) {
 }
 
 // GetConversation handles conversation retrieval
-func (h *ConversationHandler) GetConversation(ctx *gin.Context) {
-	// Authenticate user
-	user, err := h.authenticateAPIKey(ctx)
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "f6g7h8i9-j0k1-2345-fghi-678901234567",
-			Error: "Invalid or missing API key",
-		})
-		return
-	}
-
+func (h *ConversationHandler) GetConversation(ctx *gin.Context, user *AuthenticatedUser) {
 	conversationID := ctx.Param("conversation_id")
 
 	conv, err := h.conversationService.GetConversationByPublicIDAndUserID(ctx, conversationID, user.ID)
@@ -311,17 +262,7 @@ func (h *ConversationHandler) GetConversation(ctx *gin.Context) {
 }
 
 // UpdateConversation handles conversation updates
-func (h *ConversationHandler) UpdateConversation(ctx *gin.Context) {
-	// Authenticate user
-	user, err := h.authenticateAPIKey(ctx)
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "j0k1l2m3-n4o5-6789-jklm-012345678901",
-			Error: "Invalid or missing API key",
-		})
-		return
-	}
-
+func (h *ConversationHandler) UpdateConversation(ctx *gin.Context, user *AuthenticatedUser) {
 	conversationID := ctx.Param("conversation_id")
 
 	// Parse request
@@ -362,17 +303,7 @@ func (h *ConversationHandler) UpdateConversation(ctx *gin.Context) {
 }
 
 // DeleteConversation handles conversation deletion
-func (h *ConversationHandler) DeleteConversation(ctx *gin.Context) {
-	// Authenticate user
-	user, err := h.authenticateAPIKey(ctx)
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "o5p6q7r8-s9t0-1234-opqr-567890123456",
-			Error: "Invalid or missing API key",
-		})
-		return
-	}
-
+func (h *ConversationHandler) DeleteConversation(ctx *gin.Context, user *AuthenticatedUser) {
 	conversationID := ctx.Param("conversation_id")
 
 	// Get conversation first to get the public ID for response
@@ -427,17 +358,7 @@ func (h *ConversationHandler) DeleteConversation(ctx *gin.Context) {
 }
 
 // CreateItems handles item creation
-func (h *ConversationHandler) CreateItems(ctx *gin.Context) {
-	// Authenticate user
-	user, err := h.authenticateAPIKey(ctx)
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "v2w3x4y5-z6a7-8901-vwxy-234567890123",
-			Error: "Invalid or missing API key",
-		})
-		return
-	}
-
+func (h *ConversationHandler) CreateItems(ctx *gin.Context, user *AuthenticatedUser) {
 	conversationID := ctx.Param("conversation_id")
 
 	// Parse request
@@ -519,17 +440,7 @@ func (h *ConversationHandler) CreateItems(ctx *gin.Context) {
 }
 
 // ListItems handles item listing
-func (h *ConversationHandler) ListItems(ctx *gin.Context) {
-	// Authenticate user
-	user, err := h.authenticateAPIKey(ctx)
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "b8c9d0e1-f2g3-4567-bcde-890123456789",
-			Error: "Invalid or missing API key",
-		})
-		return
-	}
-
+func (h *ConversationHandler) ListItems(ctx *gin.Context, user *AuthenticatedUser) {
 	conversationID := ctx.Param("conversation_id")
 
 	// Get conversation first to check access
@@ -567,17 +478,7 @@ func (h *ConversationHandler) ListItems(ctx *gin.Context) {
 }
 
 // GetItem handles single item retrieval
-func (h *ConversationHandler) GetItem(ctx *gin.Context) {
-	// Authenticate user
-	user, err := h.authenticateAPIKey(ctx)
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "f2g3h4i5-j6k7-8901-fghi-234567890123",
-			Error: "Invalid or missing API key",
-		})
-		return
-	}
-
+func (h *ConversationHandler) GetItem(ctx *gin.Context, user *AuthenticatedUser) {
 	conversationID := ctx.Param("conversation_id")
 	itemID := ctx.Param("item_id")
 
@@ -627,17 +528,7 @@ func (h *ConversationHandler) GetItem(ctx *gin.Context) {
 }
 
 // DeleteItem handles item deletion
-func (h *ConversationHandler) DeleteItem(ctx *gin.Context) {
-	// Authenticate user
-	user, err := h.authenticateAPIKey(ctx)
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "k7l8m9n0-o1p2-3456-klmn-789012345678",
-			Error: "Invalid or missing API key",
-		})
-		return
-	}
-
+func (h *ConversationHandler) DeleteItem(ctx *gin.Context, user *AuthenticatedUser) {
 	conversationID := ctx.Param("conversation_id")
 	itemID := ctx.Param("item_id")
 

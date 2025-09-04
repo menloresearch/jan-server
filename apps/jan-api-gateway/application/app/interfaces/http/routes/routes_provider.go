@@ -25,6 +25,8 @@ var RouteProvider = wire.NewSet(
 	janV1Apikeys.NewApiKeyAPI,
 	janV1AuthGoogle.NewGoogleAuthAPI,
 	janV1Auth.NewAuthRoute,
+	conversationHandler.NewConversationHandler,
+	janV1Conversations.NewConversationAPI,
 	janV1.NewV1Route,
 	jan.NewJanRoute,
 	projects.NewProjectsRoute,
@@ -33,12 +35,8 @@ var RouteProvider = wire.NewSet(
 	mcp_impl.NewSerperMCP,
 	chat.NewCompletionAPI,
 	chat.NewChatRoute,
+	conversations.NewConversationAPI,
 	mcp.NewMCPAPI,
 	v1.NewModelAPI,
 	v1.NewV1Route,
-
-	// Conversation-related dependencies
-	conversationHandler.NewConversationHandler,
-	conversations.NewConversationAPI,
-	janV1Conversations.NewConversationAPI,
 )

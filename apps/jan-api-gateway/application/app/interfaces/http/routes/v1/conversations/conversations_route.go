@@ -1,22 +1,57 @@
 package conversations
 
 import (
+	"fmt"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
+	"menlo.ai/jan-api-gateway/app/domain/apikey"
+	"menlo.ai/jan-api-gateway/app/domain/user"
 	_ "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation" // Import for Swagger types
 	conversationHandler "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/requests"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	_ "menlo.ai/jan-api-gateway/app/interfaces/http/responses" // Import for Swagger types
 )
 
 // ConversationAPI handles route registration for V1 conversations
 type ConversationAPI struct {
-	handler *conversationHandler.ConversationHandler
+	handler       *conversationHandler.ConversationHandler
+	userService   *user.UserService
+	apiKeyService *apikey.ApiKeyService
 }
 
 // NewConversationAPI creates a new conversation API instance
-func NewConversationAPI(handler *conversationHandler.ConversationHandler) *ConversationAPI {
+func NewConversationAPI(handler *conversationHandler.ConversationHandler, userService *user.UserService, apiKeyService *apikey.ApiKeyService) *ConversationAPI {
 	return &ConversationAPI{
-		handler: handler,
+		handler:       handler,
+		userService:   userService,
+		apiKeyService: apiKeyService,
 	}
+}
+
+// getAuthenticatedUser gets the authenticated user from V1 route context (API key)
+func (api *ConversationAPI) getAuthenticatedUser(ctx *gin.Context) (*conversationHandler.AuthenticatedUser, error) {
+	apiKey, ok := requests.GetTokenFromBearer(ctx)
+	if !ok {
+		return nil, fmt.Errorf("invalid or missing API key")
+	}
+
+	apiKeyEntity, err := api.apiKeyService.FindByKey(ctx, apiKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid API key")
+	}
+
+	if apiKeyEntity == nil {
+		return nil, fmt.Errorf("API key not found")
+	}
+
+	user, err := api.userService.FindByID(ctx, *apiKeyEntity.OwnerID)
+	if err != nil {
+		return nil, fmt.Errorf("user not found")
+	}
+
+	return &conversationHandler.AuthenticatedUser{ID: user.ID}, nil
 }
 
 // RegisterRouter registers OpenAI-compatible conversation routes
@@ -48,7 +83,15 @@ func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 // @Failure 500 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations [post]
 func (api *ConversationAPI) createConversation(ctx *gin.Context) {
-	api.handler.CreateConversation(ctx)
+	user, err := api.getAuthenticatedUser(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
+			Code:  "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+			Error: "Invalid or missing API key",
+		})
+		return
+	}
+	api.handler.CreateConversation(ctx, user)
 }
 
 // getConversation handles conversation retrieval
@@ -65,7 +108,15 @@ func (api *ConversationAPI) createConversation(ctx *gin.Context) {
 // @Failure 500 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id} [get]
 func (api *ConversationAPI) getConversation(ctx *gin.Context) {
-	api.handler.GetConversation(ctx)
+	user, err := api.getAuthenticatedUser(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
+			Code:  "f6g7h8i9-j0k1-2345-fghi-678901234567",
+			Error: "Invalid or missing API key",
+		})
+		return
+	}
+	api.handler.GetConversation(ctx, user)
 }
 
 // updateConversation handles conversation updates
@@ -85,7 +136,15 @@ func (api *ConversationAPI) getConversation(ctx *gin.Context) {
 // @Failure 500 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id} [patch]
 func (api *ConversationAPI) updateConversation(ctx *gin.Context) {
-	api.handler.UpdateConversation(ctx)
+	user, err := api.getAuthenticatedUser(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
+			Code:  "j0k1l2m3-n4o5-6789-jklm-012345678901",
+			Error: "Invalid or missing API key",
+		})
+		return
+	}
+	api.handler.UpdateConversation(ctx, user)
 }
 
 // deleteConversation handles conversation deletion
@@ -102,7 +161,15 @@ func (api *ConversationAPI) updateConversation(ctx *gin.Context) {
 // @Failure 500 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id} [delete]
 func (api *ConversationAPI) deleteConversation(ctx *gin.Context) {
-	api.handler.DeleteConversation(ctx)
+	user, err := api.getAuthenticatedUser(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
+			Code:  "o5p6q7r8-s9t0-1234-opqr-567890123456",
+			Error: "Invalid or missing API key",
+		})
+		return
+	}
+	api.handler.DeleteConversation(ctx, user)
 }
 
 // createItems handles item creation
@@ -122,7 +189,15 @@ func (api *ConversationAPI) deleteConversation(ctx *gin.Context) {
 // @Failure 500 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id}/items [post]
 func (api *ConversationAPI) createItems(ctx *gin.Context) {
-	api.handler.CreateItems(ctx)
+	user, err := api.getAuthenticatedUser(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
+			Code:  "v2w3x4y5-z6a7-8901-vwxy-234567890123",
+			Error: "Invalid or missing API key",
+		})
+		return
+	}
+	api.handler.CreateItems(ctx, user)
 }
 
 // listItems handles item listing with optional pagination
@@ -142,7 +217,15 @@ func (api *ConversationAPI) createItems(ctx *gin.Context) {
 // @Failure 500 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id}/items [get]
 func (api *ConversationAPI) listItems(ctx *gin.Context) {
-	api.handler.ListItems(ctx)
+	user, err := api.getAuthenticatedUser(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
+			Code:  "b8c9d0e1-f2g3-4567-bcde-890123456789",
+			Error: "Invalid or missing API key",
+		})
+		return
+	}
+	api.handler.ListItems(ctx, user)
 }
 
 // getItem handles single item retrieval
@@ -160,7 +243,15 @@ func (api *ConversationAPI) listItems(ctx *gin.Context) {
 // @Failure 500 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id}/items/{item_id} [get]
 func (api *ConversationAPI) getItem(ctx *gin.Context) {
-	api.handler.GetItem(ctx)
+	user, err := api.getAuthenticatedUser(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
+			Code:  "f2g3h4i5-j6k7-8901-fghi-234567890123",
+			Error: "Invalid or missing API key",
+		})
+		return
+	}
+	api.handler.GetItem(ctx, user)
 }
 
 // deleteItem handles item deletion
@@ -178,5 +269,13 @@ func (api *ConversationAPI) getItem(ctx *gin.Context) {
 // @Failure 500 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id}/items/{item_id} [delete]
 func (api *ConversationAPI) deleteItem(ctx *gin.Context) {
-	api.handler.DeleteItem(ctx)
+	user, err := api.getAuthenticatedUser(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
+			Code:  "k7l8m9n0-o1p2-3456-klmn-789012345678",
+			Error: "Invalid or missing API key",
+		})
+		return
+	}
+	api.handler.DeleteItem(ctx, user)
 }

@@ -68,20 +68,32 @@ type ChatCompletionResponseSwagger struct {
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /jan/v1/chat/completions [post]
 func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
-	userClaim, _ := auth.GetUserClaimFromRequestContext(reqCtx)
+	userClaim, err := auth.GetUserClaimFromRequestContext(reqCtx)
 	key := "AnonymousUserKey"
 	var currentUser *user.User
 
-	if userClaim != nil {
+	if err != nil {
+		// Log the error for debugging=
+		fmt.Printf("DEBUG: Failed to get user claim: %v\n", err)
+	} else if userClaim != nil {
+		fmt.Printf("DEBUG: User claim found: %+v\n", userClaim)
 		user, err := api.userService.FindByEmail(reqCtx, userClaim.Email)
 		if err != nil {
 			reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
 				Code:  "62a772b9-58ec-4332-b669-920c7f4a8821",
-				Error: err.Error(),
+				Error: fmt.Sprintf("User lookup failed: %v", err.Error()),
+			})
+			return
+		}
+		if user == nil {
+			reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+				Code:  "62a772b9-58ec-4332-b669-920c7f4a8821",
+				Error: fmt.Sprintf("User not found for email: %s", userClaim.Email),
 			})
 			return
 		}
 		currentUser = user
+		fmt.Printf("DEBUG: Current user found: %+v\n", currentUser)
 		key, err = api.getOrCreateUserKey(reqCtx, user)
 		if err != nil {
 			reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
@@ -90,6 +102,8 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 			})
 			return
 		}
+	} else {
+		fmt.Printf("DEBUG: No user claim found\n")
 	}
 
 	// Parse as extended OpenAI format
@@ -159,6 +173,7 @@ func (api *CompletionAPI) handleStreamingCompletion(reqCtx *gin.Context, key str
 	var userID uint
 	if currentUser != nil {
 		userID = currentUser.ID
+		fmt.Printf("DEBUG: Looking for conversation with parent_message_id: %s, userID: %d\n", parentMessageID, userID)
 
 		// Check if this is a new conversation or continuation
 		if parentMessageID == "client-created-root" {
@@ -166,9 +181,11 @@ func (api *CompletionAPI) handleStreamingCompletion(reqCtx *gin.Context, key str
 			conv, _ = api.conversationService.CreateConversation(reqCtx, userID, nil, true, map[string]string{
 				"model": request.Model,
 			})
+			fmt.Printf("DEBUG: Created new conversation: %+v\n", conv)
 		} else {
 			// Find existing conversation by parent_message_id
-			conv, err := api.conversationService.GetConversationByPublicIDAndUserID(reqCtx, parentMessageID, userID)
+			var err error
+			conv, err = api.conversationService.GetConversationByPublicIDAndUserID(reqCtx, parentMessageID, userID)
 			if err != nil {
 				reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
 					Code:  "8f7a2b1c-9d3e-4f5a-8b2c-1e4f5a8b2c3d",
@@ -184,7 +201,10 @@ func (api *CompletionAPI) handleStreamingCompletion(reqCtx *gin.Context, key str
 				})
 				return
 			}
+			fmt.Printf("DEBUG: Found existing conversation: %+v\n", conv)
 		}
+	} else {
+		fmt.Printf("DEBUG: No current user, cannot handle conversation\n")
 	}
 
 	// Create wait groups for parallel processing
@@ -192,13 +212,6 @@ func (api *CompletionAPI) handleStreamingCompletion(reqCtx *gin.Context, key str
 	var titleGenerated bool
 	var titleMutex sync.Mutex
 
-	if conv == nil {
-		reqCtx.JSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  "9e8b7a6c-5d4e-3f2a-1b0c-9e8b7a6c5d4e",
-			Error: fmt.Sprintf("Conversation with ID '%s' not found", parentMessageID),
-		})
-		return
-	}
 	// Generate conversation ID for response
 	conversationID := conv.PublicID
 
