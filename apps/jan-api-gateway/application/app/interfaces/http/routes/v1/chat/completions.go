@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
@@ -25,6 +26,25 @@ func NewCompletionAPI(apikeyService *apikey.ApiKeyService) *CompletionAPI {
 
 func (completionAPI *CompletionAPI) RegisterRouter(router *gin.RouterGroup) {
 	router.POST("/completions", completionAPI.PostCompletion)
+}
+
+func streamResponseToChannel(request openai.ChatCompletionRequest, lines chan<- string, errs chan<- error, wg *sync.WaitGroup) {
+	defer wg.Done()
+	req := janinference.JanInferenceRestyClient.R().SetBody(request)
+	resp, err := req.
+		SetDoNotParseResponse(true).
+		Post("/v1/chat/completions")
+	if err != nil {
+		errs <- err
+		return
+	}
+
+	defer resp.RawResponse.Body.Close()
+	scanner := bufio.NewScanner(resp.RawResponse.Body)
+	for scanner.Scan() {
+		line := scanner.Text()
+		lines <- line
+	}
 }
 
 // ChatCompletionResponseSwagger is a doc-only version without http.Header
@@ -61,39 +81,6 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	}
 
 	key := ""
-	// if environment_variables.EnvironmentVariables.ENABLE_ADMIN_API {
-	// 	key, ok := requests.GetTokenFromBearer(reqCtx)
-	// 	if !ok {
-	// 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-	// 			Code:  "4284adb3-7af4-428b-8064-7073cb9ca2ca",
-	// 			Error: "invalid apikey",
-	// 		})
-	// 		return
-	// 	}
-	// 	hashed := api.apikeyService.HashKey(reqCtx, key)
-	// 	apikeyEntity, err := api.apikeyService.FindByKeyHash(reqCtx, hashed)
-	// 	if err != nil {
-	// 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-	// 			Code:  "d14ab75b-586b-4b55-ba65-e520a76d6559",
-	// 			Error: "invalid apikey",
-	// 		})
-	// 		return
-	// 	}
-	// 	if !apikeyEntity.Enabled {
-	// 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-	// 			Code:  "42bd6104-28a1-45bd-a164-8e32d12b0378",
-	// 			Error: "invalid apikey",
-	// 		})
-	// 		return
-	// 	}
-	// 	if apikeyEntity.ExpiresAt != nil && apikeyEntity.ExpiresAt.Before(time.Now()) {
-	// 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-	// 			Code:  "f8f2733d-c76f-40e4-95b1-584a5d054225",
-	// 			Error: "apikey expired",
-	// 		})
-	// 		return
-	// 	}
-	// }
 
 	modelRegistry := inferencemodelregistry.GetInstance()
 	mToE := modelRegistry.GetModelToEndpoints()
@@ -111,50 +98,52 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		if endpoint == janInferenceClient.BaseURL {
 			if request.Stream {
 				dataChan := make(chan string)
+				errChan := make(chan error)
+
+				var wg sync.WaitGroup
+				wg.Add(2)
 
 				reqCtx.Writer.Header().Set("Content-Type", "text/event-stream")
 				reqCtx.Writer.Header().Set("Cache-Control", "no-cache")
 				reqCtx.Writer.Header().Set("Connection", "keep-alive")
 				reqCtx.Writer.Header().Set("Transfer-Encoding", "chunked")
 
-				func() error {
-					req := janinference.JanInferenceRestyClient.R().SetBody(request)
-				resp, err := req.
-					SetDoNotParseResponse(true).
-					Post("/v1/chat/completions")
+				go streamResponseToChannel(request, dataChan, errChan, &wg)
+				go streamResponseToChannel(request, dataChan, errChan, &wg)
 
-				defer resp.RawResponse.Body.Close()
-				scanner := bufio.NewScanner(resp.RawResponse.Body)
-				for scanner.Scan() {
-					line := scanner.Text()
-					reqCtx.Writer.Write([]byte(line + "\n"))
-					reqCtx.Writer.Flush()
+				go func() {
+					wg.Wait()
+					close(dataChan)
+					close(errChan)
+				}()
+				for {
+					select {
+					case line, ok := <-dataChan:
+						if !ok {
+							return
+						}
+						_, err := reqCtx.Writer.Write([]byte(line + "\n"))
+						if err != nil {
+							reqCtx.AbortWithStatusJSON(
+								http.StatusBadRequest,
+								responses.ErrorResponse{
+									Code:  "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",
+									Error: err.Error(),
+								})
+							return
+						}
+						reqCtx.Writer.Flush()
+					case err := <-errChan:
+						reqCtx.AbortWithStatusJSON(
+							http.StatusBadRequest,
+							responses.ErrorResponse{
+								Code:  "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",
+								Error: err.Error(),
+							})
+						return
+					}
 				}
-				}
-				req := janinference.JanInferenceRestyClient.R().SetBody(request)
-				resp, err := req.
-					SetDoNotParseResponse(true).
-					Post("/v1/chat/completions")
 
-				defer resp.RawResponse.Body.Close()
-				scanner := bufio.NewScanner(resp.RawResponse.Body)
-				for scanner.Scan() {
-					line := scanner.Text()
-					reqCtx.Writer.Write([]byte(line + "\n"))
-					reqCtx.Writer.Flush()
-				}
-				reqCtx.Writer.Flush()
-				// err := janInferenceClient.CreateChatCompletionStream(reqCtx, key, request)
-				// if err != nil {
-				// 	reqCtx.AbortWithStatusJSON(
-				// 		http.StatusBadRequest,
-				// 		responses.ErrorResponse{
-				// 			Code:  "c3af973c-eada-4e8b-96d9-e92546588cd3",
-				// 			Error: err.Error(),
-				// 		})
-				// 	return
-				// }
-				return
 			} else {
 				response, err := janInferenceClient.CreateChatCompletion(reqCtx.Request.Context(), key, request)
 				if err != nil {
