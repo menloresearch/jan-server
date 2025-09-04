@@ -1,12 +1,15 @@
 package chat
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"slices"
 
 	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
@@ -21,10 +24,127 @@ import (
 	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
+// Constants for magic values
+const (
+	DefaultTemperature = 0.7
+	DefaultMaxTokens   = 1000
+	AnonymousUserKey   = ""
+	ClientCreatedRoot  = "client-created-root"
+	RequestTimeout     = 120 * time.Second
+)
+
 // ExtendedChatCompletionRequest extends OpenAI's request with additional fields
 type ExtendedChatCompletionRequest struct {
 	openai.ChatCompletionRequest
 	ParentMessageID string `json:"parent_message_id,omitempty"`
+}
+
+// FunctionCallAccumulator handles streaming function call accumulation
+type FunctionCallAccumulator struct {
+	Name      string
+	Arguments string
+	Complete  bool
+}
+
+func (fca *FunctionCallAccumulator) AddChunk(functionCall *openai.FunctionCall) {
+	if functionCall.Name != "" {
+		fca.Name = functionCall.Name
+	}
+	if functionCall.Arguments != "" {
+		fca.Arguments += functionCall.Arguments
+	}
+
+	// Check if complete
+	if fca.Name != "" && fca.Arguments != "" && strings.HasSuffix(fca.Arguments, "}") {
+		fca.Complete = true
+	}
+}
+
+// SSEResponseBuilder handles building SSE responses
+type SSEResponseBuilder struct {
+	conversationID string
+}
+
+func (b *SSEResponseBuilder) SendUserMessage(reqCtx *gin.Context, messageID string, content string) {
+	userDelta := map[string]interface{}{
+		"v": map[string]interface{}{
+			"message": map[string]interface{}{
+				"id":          messageID,
+				"author":      map[string]interface{}{"role": "user"},
+				"create_time": float64(time.Now().Unix()),
+				"content":     map[string]interface{}{"content_type": "text", "parts": []string{content}},
+				"status":      "finished_successfully",
+				"end_turn":    nil,
+				"weight":      1.0,
+				"metadata":    map[string]interface{}{},
+				"recipient":   "all",
+				"channel":     nil,
+			},
+			"conversation_id": b.conversationID,
+			"error":           nil,
+		},
+		"c": 1,
+	}
+	sendSSEEvent(reqCtx, "delta", userDelta)
+}
+
+func (b *SSEResponseBuilder) SendContentChunk(reqCtx *gin.Context, chunk string) {
+	delta := map[string]interface{}{
+		"p": "/message/content/parts/0",
+		"o": "append",
+		"v": chunk,
+	}
+	sendSSEEvent(reqCtx, "delta", delta)
+}
+
+func (b *SSEResponseBuilder) SendFunctionCall(reqCtx *gin.Context, functionCall *openai.FunctionCall) {
+	functionCallDelta := map[string]interface{}{
+		"p": "/message/function_call",
+		"o": "replace",
+		"v": map[string]interface{}{
+			"name":      functionCall.Name,
+			"arguments": functionCall.Arguments,
+		},
+	}
+	sendSSEEvent(reqCtx, "delta", functionCallDelta)
+}
+
+func (b *SSEResponseBuilder) SendCompletion(reqCtx *gin.Context) {
+	completionDelta := map[string]interface{}{
+		"p": "",
+		"o": "patch",
+		"v": []map[string]interface{}{
+			{"p": "/message/status", "o": "replace", "v": "finished_successfully"},
+			{"p": "/message/end_turn", "o": "replace", "v": true},
+			{"p": "/message/metadata", "o": "append", "v": map[string]interface{}{
+				"finish_details": map[string]interface{}{
+					"type":        "stop",
+					"stop_tokens": []int{200002},
+				},
+				"is_complete": true,
+			}},
+		},
+	}
+	sendSSEEvent(reqCtx, "delta", completionDelta)
+}
+
+func (b *SSEResponseBuilder) SendStreamComplete(reqCtx *gin.Context) {
+	streamComplete := map[string]interface{}{
+		"type":            "message_stream_complete",
+		"conversation_id": b.conversationID,
+	}
+	sendSSEData(reqCtx, streamComplete)
+}
+
+func (b *SSEResponseBuilder) SendConversationMetadata(reqCtx *gin.Context, model string) {
+	conversationMetadata := map[string]interface{}{
+		"type":               "conversation_detail_metadata",
+		"banner_info":        nil,
+		"model_limits":       []interface{}{},
+		"default_model_slug": model,
+		"conversation_id":    b.conversationID,
+	}
+	sendSSEData(reqCtx, conversationMetadata)
 }
 
 type CompletionAPI struct {
@@ -55,6 +175,57 @@ type ChatCompletionResponseSwagger struct {
 	Usage   openai.Usage                  `json:"usage"`
 }
 
+// validateChatRequest validates the chat completion request
+func (api *CompletionAPI) validateChatRequest(request *ExtendedChatCompletionRequest) error {
+	if len(request.Messages) == 0 {
+		return fmt.Errorf("messages cannot be empty")
+	}
+
+	if request.Model == "" {
+		return fmt.Errorf("model is required")
+	}
+
+	return nil
+}
+
+// validateModelAndClient validates that the model exists and client is available
+func (api *CompletionAPI) validateModelAndClient(model string) error {
+	modelRegistry := inferencemodelregistry.GetInstance()
+	mToE := modelRegistry.GetModelToEndpoints()
+	endpoints, ok := mToE[model]
+	if !ok {
+		return fmt.Errorf("model: %s does not exist", model)
+	}
+
+	janInferenceClient := janinference.NewJanInferenceClient(context.Background())
+	clientExists := slices.Contains(endpoints, janInferenceClient.BaseURL)
+	if !clientExists {
+		return fmt.Errorf("client does not exist")
+	}
+
+	return nil
+}
+
+// getOrCreateConversation handles conversation retrieval or creation
+func (api *CompletionAPI) getOrCreateConversation(reqCtx *gin.Context, userID uint, parentMessageID string, model string) (*conversation.Conversation, error) {
+	if parentMessageID == ClientCreatedRoot {
+		return api.conversationService.CreateConversation(reqCtx, userID, nil, true, map[string]string{
+			"model": model,
+		})
+	}
+
+	conv, err := api.conversationService.GetConversationByPublicIDAndUserID(reqCtx, parentMessageID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("error finding conversation: %w", err)
+	}
+
+	if conv == nil {
+		return nil, fmt.Errorf("conversation with ID '%s' not found", parentMessageID)
+	}
+
+	return conv, nil
+}
+
 // CreateChatCompletion
 // @Summary Create a chat completion
 // @Description Generates a model response for the given chat conversation.
@@ -69,16 +240,21 @@ type ChatCompletionResponseSwagger struct {
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /jan/v1/chat/completions [post]
 func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
+	// Add timeout context
+	ctx, cancel := context.WithTimeout(reqCtx.Request.Context(), RequestTimeout)
+	defer cancel()
+
+	// Use ctx for long-running operations
 	userClaim, err := auth.GetUserClaimFromRequestContext(reqCtx)
-	key := "AnonymousUserKey"
+	key := AnonymousUserKey
 	var currentUser *user.User
 
 	if err != nil {
-		// Log the error for debugging=
+		// Log the error for debugging
 		fmt.Printf("DEBUG: Failed to get user claim: %v\n", err)
 	} else if userClaim != nil {
 		fmt.Printf("DEBUG: User claim found: %+v\n", userClaim)
-		user, err := api.userService.FindByEmail(reqCtx, userClaim.Email)
+		user, err := api.userService.FindByEmail(ctx, userClaim.Email)
 		if err != nil {
 			reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
 				Code:  "62a772b9-58ec-4332-b669-920c7f4a8821",
@@ -117,42 +293,31 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		return
 	}
 
+	// Validate request
+	if err := api.validateChatRequest(&extendedRequest); err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+			Error: err.Error(),
+		})
+		return
+	}
+
 	// Set default values for web interface compatibility
 	if !extendedRequest.Stream {
 		extendedRequest.Stream = true
 	}
 	if extendedRequest.Temperature == 0 {
-		extendedRequest.Temperature = 0.7
+		extendedRequest.Temperature = DefaultTemperature
 	}
 	if extendedRequest.MaxTokens == 0 {
-		extendedRequest.MaxTokens = 1000
+		extendedRequest.MaxTokens = DefaultMaxTokens
 	}
 
-	// Validate model exists
-	modelRegistry := inferencemodelregistry.GetInstance()
-	mToE := modelRegistry.GetModelToEndpoints()
-	endpoints, ok := mToE[extendedRequest.Model]
-	if !ok {
+	// Validate model and client
+	if err := api.validateModelAndClient(extendedRequest.Model); err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  "59253517-df33-44bf-9333-c927402e4e2e",
-			Error: fmt.Sprintf("Model: %s does not exist", extendedRequest.Model),
-		})
-		return
-	}
-
-	// Validate client exists
-	janInferenceClient := janinference.NewJanInferenceClient(reqCtx)
-	clientExists := false
-	for _, endpoint := range endpoints {
-		if endpoint == janInferenceClient.BaseURL {
-			clientExists = true
-			break
-		}
-	}
-	if !clientExists {
-		reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "6c6e4ea0-53d2-4c6c-8617-3a645af59f43",
-			Error: "Client does not exist",
+			Error: err.Error(),
 		})
 		return
 	}
@@ -176,34 +341,23 @@ func (api *CompletionAPI) handleStreamingCompletion(reqCtx *gin.Context, key str
 		userID = currentUser.ID
 		fmt.Printf("DEBUG: Looking for conversation with parent_message_id: %s, userID: %d\n", parentMessageID, userID)
 
-		// Check if this is a new conversation or continuation
-		if parentMessageID == "client-created-root" {
-			// Create new conversation for first message
-			conv, _ = api.conversationService.CreateConversation(reqCtx, userID, nil, true, map[string]string{
-				"model": request.Model,
-			})
-			fmt.Printf("DEBUG: Created new conversation: %+v\n", conv)
-		} else {
-			// Find existing conversation by parent_message_id
-			var err error
-			conv, err = api.conversationService.GetConversationByPublicIDAndUserID(reqCtx, parentMessageID, userID)
-			if err != nil {
-				reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-					Code:  "8f7a2b1c-9d3e-4f5a-8b2c-1e4f5a8b2c3d",
-					Error: fmt.Sprintf("Error finding conversation: %s", err.Error()),
-				})
-				return
-			}
-			if conv == nil {
-				// If conversation not found, throw error
+		var err error
+		conv, err = api.getOrCreateConversation(reqCtx, userID, parentMessageID, request.Model)
+		if err != nil {
+			if strings.Contains(err.Error(), "not found") {
 				reqCtx.JSON(http.StatusNotFound, responses.ErrorResponse{
 					Code:  "9e8b7a6c-5d4e-3f2a-1b0c-9e8b7a6c5d4e",
-					Error: fmt.Sprintf("Conversation with ID '%s' not found", parentMessageID),
+					Error: err.Error(),
 				})
-				return
+			} else {
+				reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+					Code:  "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+					Error: err.Error(),
+				})
 			}
-			fmt.Printf("DEBUG: Found existing conversation: %+v\n", conv)
+			return
 		}
+		fmt.Printf("DEBUG: Conversation handled: %+v\n", conv)
 	} else {
 		fmt.Printf("DEBUG: No current user, cannot handle conversation\n")
 	}
@@ -215,6 +369,9 @@ func (api *CompletionAPI) handleStreamingCompletion(reqCtx *gin.Context, key str
 
 	// Generate conversation ID for response
 	conversationID := conv.PublicID
+
+	// Initialize SSE response builder
+	sseBuilder := &SSEResponseBuilder{conversationID: conversationID}
 
 	// Add user message to conversation
 	userMessageID := "user-" + fmt.Sprintf("%d", time.Now().Unix())
@@ -230,26 +387,7 @@ func (api *CompletionAPI) handleStreamingCompletion(reqCtx *gin.Context, key str
 	api.conversationService.AddItem(reqCtx, conv, userID, conversation.ItemTypeMessage, &userRole, userContent)
 
 	// Send user message delta
-	userDelta := map[string]interface{}{
-		"v": map[string]interface{}{
-			"message": map[string]interface{}{
-				"id":          userMessageID,
-				"author":      map[string]interface{}{"role": "user"},
-				"create_time": float64(time.Now().Unix()),
-				"content":     map[string]interface{}{"content_type": "text", "parts": []string{request.Messages[len(request.Messages)-1].Content}},
-				"status":      "finished_successfully",
-				"end_turn":    nil,
-				"weight":      1.0,
-				"metadata":    map[string]interface{}{},
-				"recipient":   "all",
-				"channel":     nil,
-			},
-			"conversation_id": conversationID,
-			"error":           nil,
-		},
-		"c": 1,
-	}
-	api.sendSSEEvent(reqCtx, "delta", userDelta)
+	sseBuilder.SendUserMessage(reqCtx, userMessageID, request.Messages[len(request.Messages)-1].Content)
 
 	// Start title generation in background (for all responses)
 	wg.Add(1)
@@ -264,24 +402,11 @@ func (api *CompletionAPI) handleStreamingCompletion(reqCtx *gin.Context, key str
 	streamErr := api.streamCompletion(reqCtx, key, request, func(chunk string) {
 		fullResponse += chunk
 		// Send delta events for each chunk
-		delta := map[string]interface{}{
-			"p": "/message/content/parts/0",
-			"o": "append",
-			"v": chunk,
-		}
-		api.sendSSEEvent(reqCtx, "delta", delta)
+		sseBuilder.SendContentChunk(reqCtx, chunk)
 	}, func(fc *openai.FunctionCall) {
 		functionCall = fc
 		// Send function call delta
-		functionCallDelta := map[string]interface{}{
-			"p": "/message/function_call",
-			"o": "replace",
-			"v": map[string]interface{}{
-				"name":      fc.Name,
-				"arguments": fc.Arguments,
-			},
-		}
-		api.sendSSEEvent(reqCtx, "delta", functionCallDelta)
+		sseBuilder.SendFunctionCall(reqCtx, fc)
 	})
 
 	if streamErr != nil {
@@ -296,42 +421,16 @@ func (api *CompletionAPI) handleStreamingCompletion(reqCtx *gin.Context, key str
 	wg.Wait()
 
 	// Send completion status
-	completionDelta := map[string]interface{}{
-		"p": "",
-		"o": "patch",
-		"v": []map[string]interface{}{
-			{"p": "/message/status", "o": "replace", "v": "finished_successfully"},
-			{"p": "/message/end_turn", "o": "replace", "v": true},
-			{"p": "/message/metadata", "o": "append", "v": map[string]interface{}{
-				"finish_details": map[string]interface{}{
-					"type":        "stop",
-					"stop_tokens": []int{200002},
-				},
-				"is_complete": true,
-			}},
-		},
-	}
-	api.sendSSEEvent(reqCtx, "delta", completionDelta)
+	sseBuilder.SendCompletion(reqCtx)
 
 	// Send stream complete
-	streamComplete := map[string]interface{}{
-		"type":            "message_stream_complete",
-		"conversation_id": conversationID,
-	}
-	api.sendSSEData(reqCtx, streamComplete)
+	sseBuilder.SendStreamComplete(reqCtx)
 
 	// Send conversation detail metadata
-	conversationMetadata := map[string]interface{}{
-		"type":               "conversation_detail_metadata",
-		"banner_info":        nil,
-		"model_limits":       []interface{}{},
-		"default_model_slug": request.Model,
-		"conversation_id":    conversationID,
-	}
-	api.sendSSEData(reqCtx, conversationMetadata)
+	sseBuilder.SendConversationMetadata(reqCtx, request.Model)
 
 	// Send [DONE]
-	api.sendSSEData(reqCtx, "[DONE]")
+	sendSSEData(reqCtx, "[DONE]")
 
 	// Save assistant message to conversation
 	assistantContent := []conversation.Content{
@@ -387,7 +486,7 @@ func (api *CompletionAPI) generateTitle(reqCtx *gin.Context, userMessage string,
 		"title":           title,
 		"conversation_id": conversationID,
 	}
-	api.sendSSEData(reqCtx, titleEvent)
+	sendSSEData(reqCtx, titleEvent)
 }
 
 // generateTitleFromMessage generates a title from the user message
@@ -407,9 +506,8 @@ func (api *CompletionAPI) streamCompletion(reqCtx *gin.Context, key string, requ
 		return err
 	}
 
-	// Track accumulated function call data
-	var accumulatedFunctionCall *openai.FunctionCall
-	var functionCallComplete bool
+	// Use FunctionCallAccumulator for better function call handling
+	accumulator := &FunctionCallAccumulator{}
 
 	// Process chunks
 	for chunk := range chunkChan {
@@ -427,35 +525,16 @@ func (api *CompletionAPI) streamCompletion(reqCtx *gin.Context, key string, requ
 		}
 
 		// Handle function call if present
-		if functionCall != nil && !functionCallComplete {
-			// Initialize or update accumulated function call
-			if accumulatedFunctionCall == nil {
-				accumulatedFunctionCall = &openai.FunctionCall{
-					Name:      functionCall.Name,
-					Arguments: functionCall.Arguments,
-				}
-			} else {
-				// Accumulate arguments if name is empty (streaming arguments)
-				if functionCall.Name == "" && functionCall.Arguments != "" {
-					accumulatedFunctionCall.Arguments += functionCall.Arguments
-				} else if functionCall.Name != "" {
-					// Update name if provided
-					accumulatedFunctionCall.Name = functionCall.Name
-					if functionCall.Arguments != "" {
-						accumulatedFunctionCall.Arguments = functionCall.Arguments
-					}
-				}
-			}
+		if functionCall != nil && !accumulator.Complete {
+			accumulator.AddChunk(functionCall)
 
-			// Check if function call is complete (has both name and complete arguments)
-			if accumulatedFunctionCall.Name != "" && accumulatedFunctionCall.Arguments != "" {
-				// Check if arguments are complete JSON
-				if strings.HasSuffix(accumulatedFunctionCall.Arguments, "}") {
-					functionCallComplete = true
-					if onFunctionCall != nil {
-						onFunctionCall(accumulatedFunctionCall)
-					}
+			// If function call is complete, call the callback
+			if accumulator.Complete && onFunctionCall != nil {
+				completeFunctionCall := &openai.FunctionCall{
+					Name:      accumulator.Name,
+					Arguments: accumulator.Arguments,
 				}
+				onFunctionCall(completeFunctionCall)
 			}
 		}
 	}
@@ -609,53 +688,15 @@ func (api *CompletionAPI) getOrCreateUserKey(reqCtx *gin.Context, user *user.Use
 }
 
 // sendSSEEvent sends a Server-Sent Event
-func (api *CompletionAPI) sendSSEEvent(reqCtx *gin.Context, event string, data interface{}) {
+func sendSSEEvent(reqCtx *gin.Context, event string, data interface{}) {
 	jsonData, _ := json.Marshal(data)
 	fmt.Fprintf(reqCtx.Writer, "event: %s\ndata: %s\n\n", event, string(jsonData))
 	reqCtx.Writer.Flush()
 }
 
 // sendSSEData sends data without an event type
-func (api *CompletionAPI) sendSSEData(reqCtx *gin.Context, data interface{}) {
+func sendSSEData(reqCtx *gin.Context, data interface{}) {
 	jsonData, _ := json.Marshal(data)
 	fmt.Fprintf(reqCtx.Writer, "data: %s\n\n", string(jsonData))
 	reqCtx.Writer.Flush()
-}
-
-type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type PostChatCompletionRequest struct {
-	Model       string    `json:"model"`
-	Messages    []Message `json:"messages"`
-	Temperature float32   `json:"temperature"`
-	MaxTokens   int       `json:"max_tokens"`
-}
-
-type ResponseMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type Choice struct {
-	Index        int             `json:"index"`
-	Message      ResponseMessage `json:"message"`
-	FinishReason string          `json:"finish_reason"`
-}
-
-type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
-}
-
-type PostChatCompletionResponse struct {
-	ID      string   `json:"id"`
-	Object  string   `json:"object"`
-	Created int64    `json:"created"`
-	Model   string   `json:"model"`
-	Choices []Choice `json:"choices"`
-	Usage   Usage    `json:"usage"`
 }
