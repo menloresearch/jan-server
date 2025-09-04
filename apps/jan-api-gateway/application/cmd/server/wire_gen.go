@@ -79,7 +79,7 @@ func CreateApplication() (*Application, error) {
 	googleAuthAPI := google.NewGoogleAuthAPI(userService)
 	authRoute := auth.NewAuthRoute(googleAuthAPI)
 	apiKeyAPI := apikeys.NewApiKeyAPI(apiKeyService, userService)
-	chatCompletionAPI := chat2.NewCompletionAPI(userService, apiKeyService)
+	chatCompletionAPI := chat2.NewCompletionAPI(userService, apiKeyService, conversationService)
 	chatChatRoute := chat2.NewChatRoute(chatCompletionAPI)
 	conversationsConversationAPI := conversations2.NewConversationAPI(conversationHandler)
 	v1V1Route := v1_2.NewV1Route(authRoute, apiKeyAPI, chatChatRoute, conversationsConversationAPI)
