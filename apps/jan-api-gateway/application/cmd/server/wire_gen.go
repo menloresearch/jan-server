@@ -33,6 +33,7 @@ import (
 	apikeys2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/api_keys"
 	projects2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects/api_keys"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/responses"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
@@ -88,7 +89,8 @@ func CreateApplication() (*Application, error) {
 	projectsProjectsRoute := projects2.NewProjectsRoute(userService, projectService, organizationService, projectApiKeyRoute)
 	organizationApiKeyRoute := apikeys2.NewOrganizationApiKeyRouteRoute(organizationService, apiKeyService, userService)
 	organizationOrganizationRoute := organization3.NewOrganizationRoute(organizationService, userService, projectsProjectsRoute, organizationApiKeyRoute)
-	v1V1Route := v1_2.NewV1Route(authRoute, chatChatRoute, conversationsConversationAPI, organizationOrganizationRoute)
+	responseRoute := responses.NewResponseRoute(userService, apiKeyService)
+	v1V1Route := v1_2.NewV1Route(authRoute, chatChatRoute, conversationsConversationAPI, organizationOrganizationRoute, responseRoute)
 	janRoute := jan.NewJanRoute(v1V1Route, chatChatRoute)
 	httpServer := http.NewHttpServer(v1Route, janRoute)
 	application := &Application{

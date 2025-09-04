@@ -2377,6 +2377,328 @@
                 }
             }
         },
+        "/v1/responses": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a model response for the given input.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jan",
+                    "Jan-Responses"
+                ],
+                "summary": "Create a response",
+                "parameters": [
+                    {
+                        "description": "Create response request payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.CreateResponseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request payload",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/responses/{response_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves a model response by its ID.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jan",
+                    "Jan-Responses"
+                ],
+                "summary": "Get a response",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Response ID",
+                        "name": "response_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Response not found",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes a model response by its ID.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jan",
+                    "Jan-Responses"
+                ],
+                "summary": "Delete a response",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Response ID",
+                        "name": "response_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Response not found",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/responses/{response_id}/cancel": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Cancels a response created with the background parameter set to true.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jan",
+                    "Jan-Responses"
+                ],
+                "summary": "Cancel a response",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Response ID",
+                        "name": "response_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Response not found",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/responses/{response_id}/input_items": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves a list of input items for a given response ID.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jan",
+                    "Jan-Responses"
+                ],
+                "summary": "List input items",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Response ID",
+                        "name": "response_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of items to return",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Cursor for pagination",
+                        "name": "after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Cursor for pagination",
+                        "name": "before",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ListInputItemsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Response not found",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/version": {
             "get": {
                 "description": "Returns the current build version of the API server.",
@@ -3114,6 +3436,1152 @@
                     "additionalProperties": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.Annotation": {
+            "type": "object",
+            "properties": {
+                "end_index": {
+                    "description": "The end index of the annotation.",
+                    "type": "integer"
+                },
+                "metadata": {
+                    "description": "The metadata for the annotation.",
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "start_index": {
+                    "description": "The start index of the annotation.",
+                    "type": "integer"
+                },
+                "text": {
+                    "description": "The text of the annotation.",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "The type of annotation.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.CreateResponseInput": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "file": {
+                    "description": "The file input (required for file type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileInput"
+                        }
+                    ]
+                },
+                "file_search": {
+                    "description": "The file search input (required for file_search type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileSearchInput"
+                        }
+                    ]
+                },
+                "function_calls": {
+                    "description": "The function calls input (required for function_calls type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionCallsInput"
+                        }
+                    ]
+                },
+                "image": {
+                    "description": "The image input (required for image type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ImageInput"
+                        }
+                    ]
+                },
+                "reasoning": {
+                    "description": "The reasoning input (required for reasoning type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ReasoningInput"
+                        }
+                    ]
+                },
+                "streaming": {
+                    "description": "The streaming input (required for streaming type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.StreamingInput"
+                        }
+                    ]
+                },
+                "text": {
+                    "description": "The text input (required for text type).",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "The type of input.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.InputType"
+                        }
+                    ]
+                },
+                "web_search": {
+                    "description": "The web search input (required for web_search type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.WebSearchInput"
+                        }
+                    ]
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.CreateResponseRequest": {
+            "type": "object",
+            "required": [
+                "input",
+                "model"
+            ],
+            "properties": {
+                "background": {
+                    "description": "Whether to run the response in the background.",
+                    "type": "boolean"
+                },
+                "frequency_penalty": {
+                    "description": "The frequency penalty to use for this response.",
+                    "type": "number"
+                },
+                "input": {
+                    "description": "The input to the model.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.CreateResponseInput"
+                        }
+                    ]
+                },
+                "logit_bias": {
+                    "description": "The logit bias to use for this response.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number",
+                        "format": "float64"
+                    }
+                },
+                "max_tokens": {
+                    "description": "The maximum number of tokens to generate.",
+                    "type": "integer"
+                },
+                "metadata": {
+                    "description": "The metadata to use for this response.",
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "model": {
+                    "description": "The ID of the model to use for this response.",
+                    "type": "string"
+                },
+                "presence_penalty": {
+                    "description": "The presence penalty to use for this response.",
+                    "type": "number"
+                },
+                "repetition_penalty": {
+                    "description": "The repetition penalty to use for this response.",
+                    "type": "number"
+                },
+                "response_format": {
+                    "description": "The response format to use for this response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ResponseFormat"
+                        }
+                    ]
+                },
+                "seed": {
+                    "description": "The seed to use for this response.",
+                    "type": "integer"
+                },
+                "stop": {
+                    "description": "The stop sequences to use for this response.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "stream": {
+                    "description": "Whether to stream the response.",
+                    "type": "boolean"
+                },
+                "system_prompt": {
+                    "description": "The system prompt to use for this response.",
+                    "type": "string"
+                },
+                "temperature": {
+                    "description": "The temperature to use for this response.",
+                    "type": "number"
+                },
+                "timeout": {
+                    "description": "The timeout in seconds for this response.",
+                    "type": "integer"
+                },
+                "tool_choice": {
+                    "description": "The tool choice to use for this response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ToolChoice"
+                        }
+                    ]
+                },
+                "tools": {
+                    "description": "The tools to use for this response.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.Tool"
+                    }
+                },
+                "top_k": {
+                    "description": "The top_k to use for this response.",
+                    "type": "integer"
+                },
+                "top_p": {
+                    "description": "The top_p to use for this response.",
+                    "type": "number"
+                },
+                "user": {
+                    "description": "The user to use for this response.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileInput": {
+            "type": "object",
+            "required": [
+                "file_id"
+            ],
+            "properties": {
+                "file_id": {
+                    "description": "The ID of the file.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileOutput": {
+            "type": "object",
+            "properties": {
+                "file_id": {
+                    "description": "The ID of the generated file.",
+                    "type": "string"
+                },
+                "mime_type": {
+                    "description": "The MIME type of the file.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "The name of the file.",
+                    "type": "string"
+                },
+                "size": {
+                    "description": "The size of the file in bytes.",
+                    "type": "integer"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileSearchInput": {
+            "type": "object",
+            "required": [
+                "file_ids",
+                "query"
+            ],
+            "properties": {
+                "file_ids": {
+                    "description": "The IDs of the files to search in.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "max_results": {
+                    "description": "The number of results to return.",
+                    "type": "integer"
+                },
+                "query": {
+                    "description": "The query to search for.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileSearchOutput": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "description": "The search query that was used.",
+                    "type": "string"
+                },
+                "results": {
+                    "description": "The search results.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileSearchResult"
+                    }
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileSearchResult": {
+            "type": "object",
+            "properties": {
+                "file_id": {
+                    "description": "The ID of the file.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "The name of the file.",
+                    "type": "string"
+                },
+                "score": {
+                    "description": "The score of the result.",
+                    "type": "number"
+                },
+                "snippet": {
+                    "description": "The snippet of the result.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionCall": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "arguments": {
+                    "description": "The arguments to pass to the function.",
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "name": {
+                    "description": "The name of the function to call.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionCallResult": {
+            "type": "object",
+            "properties": {
+                "arguments": {
+                    "description": "The arguments that were passed to the function.",
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "error": {
+                    "description": "The error that occurred during the function call, if any.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "The name of the function that was called.",
+                    "type": "string"
+                },
+                "result": {
+                    "description": "The result of the function call."
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionCallsInput": {
+            "type": "object",
+            "required": [
+                "calls"
+            ],
+            "properties": {
+                "calls": {
+                    "description": "The function calls to make.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionCall"
+                    }
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionCallsOutput": {
+            "type": "object",
+            "properties": {
+                "calls": {
+                    "description": "The function calls that were made.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionCallResult"
+                    }
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionChoice": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "description": "The name of the function.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionDefinition": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "description": "The description of the function.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "The name of the function.",
+                    "type": "string"
+                },
+                "parameters": {
+                    "description": "The parameters of the function.",
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ImageInput": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "description": "The base64 encoded image data.",
+                    "type": "string"
+                },
+                "detail": {
+                    "description": "The detail level for the image.",
+                    "type": "string"
+                },
+                "url": {
+                    "description": "The URL of the image.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ImageOutput": {
+            "type": "object",
+            "properties": {
+                "format": {
+                    "description": "The format of the image.",
+                    "type": "string"
+                },
+                "size": {
+                    "description": "The size of the image.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ImageSize"
+                        }
+                    ]
+                },
+                "url": {
+                    "description": "The URL of the generated image.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ImageSize": {
+            "type": "object",
+            "properties": {
+                "height": {
+                    "description": "The height of the image in pixels.",
+                    "type": "integer"
+                },
+                "width": {
+                    "description": "The width of the image in pixels.",
+                    "type": "integer"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.InputItem": {
+            "type": "object",
+            "properties": {
+                "created": {
+                    "description": "The Unix timestamp (in seconds) when the input item was created.",
+                    "type": "integer"
+                },
+                "file": {
+                    "description": "The file content (for file type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileInput"
+                        }
+                    ]
+                },
+                "file_search": {
+                    "description": "The file search content (for file_search type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileSearchInput"
+                        }
+                    ]
+                },
+                "function_calls": {
+                    "description": "The function calls content (for function_calls type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionCallsInput"
+                        }
+                    ]
+                },
+                "id": {
+                    "description": "The unique identifier for the input item.",
+                    "type": "string"
+                },
+                "image": {
+                    "description": "The image content (for image type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ImageInput"
+                        }
+                    ]
+                },
+                "object": {
+                    "description": "The object type, which is always \"input_item\".",
+                    "type": "string"
+                },
+                "reasoning": {
+                    "description": "The reasoning content (for reasoning type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ReasoningInput"
+                        }
+                    ]
+                },
+                "streaming": {
+                    "description": "The streaming content (for streaming type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.StreamingInput"
+                        }
+                    ]
+                },
+                "text": {
+                    "description": "The text content (for text type).",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "The type of input item.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.InputType"
+                        }
+                    ]
+                },
+                "web_search": {
+                    "description": "The web search content (for web_search type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.WebSearchInput"
+                        }
+                    ]
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.InputType": {
+            "type": "string",
+            "enum": [
+                "text",
+                "image",
+                "file",
+                "web_search",
+                "file_search",
+                "streaming",
+                "function_calls",
+                "reasoning"
+            ],
+            "x-enum-varnames": [
+                "InputTypeText",
+                "InputTypeImage",
+                "InputTypeFile",
+                "InputTypeWebSearch",
+                "InputTypeFileSearch",
+                "InputTypeStreaming",
+                "InputTypeFunctionCalls",
+                "InputTypeReasoning"
+            ]
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ListInputItemsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "description": "The list of input items.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.InputItem"
+                    }
+                },
+                "first_id": {
+                    "description": "The first ID in the list.",
+                    "type": "string"
+                },
+                "has_more": {
+                    "description": "Whether there are more items available.",
+                    "type": "boolean"
+                },
+                "last_id": {
+                    "description": "The last ID in the list.",
+                    "type": "string"
+                },
+                "object": {
+                    "description": "The object type, which is always \"list\".",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.OutputType": {
+            "type": "string",
+            "enum": [
+                "text",
+                "image",
+                "file",
+                "web_search",
+                "file_search",
+                "streaming",
+                "function_calls",
+                "reasoning"
+            ],
+            "x-enum-varnames": [
+                "OutputTypeText",
+                "OutputTypeImage",
+                "OutputTypeFile",
+                "OutputTypeWebSearch",
+                "OutputTypeFileSearch",
+                "OutputTypeStreaming",
+                "OutputTypeFunctionCalls",
+                "OutputTypeReasoning"
+            ]
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ReasoningInput": {
+            "type": "object",
+            "required": [
+                "task"
+            ],
+            "properties": {
+                "context": {
+                    "description": "The context for the reasoning task.",
+                    "type": "string"
+                },
+                "task": {
+                    "description": "The reasoning task to perform.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ReasoningOutput": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "description": "The result of the reasoning task.",
+                    "type": "string"
+                },
+                "steps": {
+                    "description": "The steps taken during reasoning.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ReasoningStep"
+                    }
+                },
+                "task": {
+                    "description": "The reasoning task that was performed.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ReasoningStep": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "description": "The description of the step.",
+                    "type": "string"
+                },
+                "result": {
+                    "description": "The result of the step.",
+                    "type": "string"
+                },
+                "step": {
+                    "description": "The step number.",
+                    "type": "integer"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.Response": {
+            "type": "object",
+            "properties": {
+                "background": {
+                    "description": "Whether the response was run in the background.",
+                    "type": "boolean"
+                },
+                "cancelled_at": {
+                    "description": "The Unix timestamp (in seconds) when the response was cancelled.",
+                    "type": "integer"
+                },
+                "completed_at": {
+                    "description": "The Unix timestamp (in seconds) when the response was completed.",
+                    "type": "integer"
+                },
+                "created": {
+                    "description": "The Unix timestamp (in seconds) when the response was created.",
+                    "type": "integer"
+                },
+                "error": {
+                    "description": "The error that occurred during processing, if any.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ResponseError"
+                        }
+                    ]
+                },
+                "failed_at": {
+                    "description": "The Unix timestamp (in seconds) when the response was failed.",
+                    "type": "integer"
+                },
+                "frequency_penalty": {
+                    "description": "The frequency penalty that was used for this response.",
+                    "type": "number"
+                },
+                "id": {
+                    "description": "The unique identifier for the response.",
+                    "type": "string"
+                },
+                "input": {
+                    "description": "The input that was provided to the model.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.CreateResponseInput"
+                        }
+                    ]
+                },
+                "logit_bias": {
+                    "description": "The logit bias that was used for this response.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number",
+                        "format": "float64"
+                    }
+                },
+                "max_tokens": {
+                    "description": "The maximum number of tokens that were generated.",
+                    "type": "integer"
+                },
+                "metadata": {
+                    "description": "The metadata that was provided for this response.",
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "model": {
+                    "description": "The ID of the model used for this response.",
+                    "type": "string"
+                },
+                "object": {
+                    "description": "The object type, which is always \"response\".",
+                    "type": "string"
+                },
+                "output": {
+                    "description": "The output generated by the model.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ResponseOutput"
+                        }
+                    ]
+                },
+                "presence_penalty": {
+                    "description": "The presence penalty that was used for this response.",
+                    "type": "number"
+                },
+                "repetition_penalty": {
+                    "description": "The repetition penalty that was used for this response.",
+                    "type": "number"
+                },
+                "response_format": {
+                    "description": "The response format that was used for this response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ResponseFormat"
+                        }
+                    ]
+                },
+                "seed": {
+                    "description": "The seed that was used for this response.",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "The status of the response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ResponseStatus"
+                        }
+                    ]
+                },
+                "stop": {
+                    "description": "The stop sequences that were used for this response.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "stream": {
+                    "description": "Whether the response was streamed.",
+                    "type": "boolean"
+                },
+                "system_prompt": {
+                    "description": "The system prompt that was used for this response.",
+                    "type": "string"
+                },
+                "temperature": {
+                    "description": "The temperature that was used for this response.",
+                    "type": "number"
+                },
+                "timeout": {
+                    "description": "The timeout in seconds that was used for this response.",
+                    "type": "integer"
+                },
+                "tool_choice": {
+                    "description": "The tool choice that was used for this response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ToolChoice"
+                        }
+                    ]
+                },
+                "tools": {
+                    "description": "The tools that were used for this response.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.Tool"
+                    }
+                },
+                "top_k": {
+                    "description": "The top_k that was used for this response.",
+                    "type": "integer"
+                },
+                "top_p": {
+                    "description": "The top_p that was used for this response.",
+                    "type": "number"
+                },
+                "usage": {
+                    "description": "The usage statistics for this response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.Usage"
+                        }
+                    ]
+                },
+                "user": {
+                    "description": "The user that was provided for this response.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ResponseError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "The error code.",
+                    "type": "string"
+                },
+                "details": {
+                    "description": "The error details.",
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "message": {
+                    "description": "The error message.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ResponseFormat": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "type": {
+                    "description": "The type of response format.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ResponseOutput": {
+            "type": "object",
+            "properties": {
+                "file": {
+                    "description": "The file output (for file type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileOutput"
+                        }
+                    ]
+                },
+                "file_search": {
+                    "description": "The file search output (for file_search type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileSearchOutput"
+                        }
+                    ]
+                },
+                "function_calls": {
+                    "description": "The function calls output (for function_calls type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionCallsOutput"
+                        }
+                    ]
+                },
+                "image": {
+                    "description": "The image output (for image type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ImageOutput"
+                        }
+                    ]
+                },
+                "reasoning": {
+                    "description": "The reasoning output (for reasoning type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ReasoningOutput"
+                        }
+                    ]
+                },
+                "streaming": {
+                    "description": "The streaming output (for streaming type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.StreamingOutput"
+                        }
+                    ]
+                },
+                "text": {
+                    "description": "The text output (for text type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.TextOutput"
+                        }
+                    ]
+                },
+                "type": {
+                    "description": "The type of output.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.OutputType"
+                        }
+                    ]
+                },
+                "web_search": {
+                    "description": "The web search output (for web_search type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.WebSearchOutput"
+                        }
+                    ]
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ResponseStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "running",
+                "completed",
+                "cancelled",
+                "failed"
+            ],
+            "x-enum-varnames": [
+                "ResponseStatusPending",
+                "ResponseStatusRunning",
+                "ResponseStatusCompleted",
+                "ResponseStatusCancelled",
+                "ResponseStatusFailed"
+            ]
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.StreamingInput": {
+            "type": "object",
+            "required": [
+                "url"
+            ],
+            "properties": {
+                "body": {
+                    "description": "The body to send with the request.",
+                    "type": "string"
+                },
+                "headers": {
+                    "description": "The headers to send with the request.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "method": {
+                    "description": "The method to use for the request.",
+                    "type": "string"
+                },
+                "url": {
+                    "description": "The URL to stream from.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.StreamingOutput": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "description": "The data that was received.",
+                    "type": "string"
+                },
+                "headers": {
+                    "description": "The headers of the response.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "status_code": {
+                    "description": "The status code of the response.",
+                    "type": "integer"
+                },
+                "url": {
+                    "description": "The URL that was streamed from.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.TextOutput": {
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "description": "The annotations for the text.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.Annotation"
+                    }
+                },
+                "value": {
+                    "description": "The generated text.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.Tool": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "function": {
+                    "description": "The function definition for function tools.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionDefinition"
+                        }
+                    ]
+                },
+                "type": {
+                    "description": "The type of tool.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ToolChoice": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "function": {
+                    "description": "The function to use for function tool choice.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionChoice"
+                        }
+                    ]
+                },
+                "type": {
+                    "description": "The type of tool choice.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.Usage": {
+            "type": "object",
+            "properties": {
+                "completion_tokens": {
+                    "description": "The number of tokens in the completion.",
+                    "type": "integer"
+                },
+                "prompt_tokens": {
+                    "description": "The number of tokens in the prompt.",
+                    "type": "integer"
+                },
+                "total_tokens": {
+                    "description": "The total number of tokens used.",
+                    "type": "integer"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.WebSearchInput": {
+            "type": "object",
+            "required": [
+                "query"
+            ],
+            "properties": {
+                "max_results": {
+                    "description": "The number of results to return.",
+                    "type": "integer"
+                },
+                "query": {
+                    "description": "The query to search for.",
+                    "type": "string"
+                },
+                "search_engine": {
+                    "description": "The search engine to use.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.WebSearchOutput": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "description": "The search query that was used.",
+                    "type": "string"
+                },
+                "results": {
+                    "description": "The search results.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.WebSearchResult"
+                    }
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.WebSearchResult": {
+            "type": "object",
+            "properties": {
+                "snippet": {
+                    "description": "The snippet of the result.",
+                    "type": "string"
+                },
+                "source": {
+                    "description": "The source of the result.",
+                    "type": "string"
+                },
+                "title": {
+                    "description": "The title of the result.",
+                    "type": "string"
+                },
+                "url": {
+                    "description": "The URL of the result.",
+                    "type": "string"
                 }
             }
         },
