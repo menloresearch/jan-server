@@ -23,7 +23,7 @@ func (modelAPI *ModelAPI) RegisterRouter(router *gin.RouterGroup) {
 // ListModels
 // @Summary List available models
 // @Description Retrieves a list of available models that can be used for chat completions or other tasks.
-// @Tags Models
+// @Tags Platform, Platform-Models
 // @Security BearerAuth
 // @Accept json
 // @Produce json

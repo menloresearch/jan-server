@@ -100,8 +100,8 @@ func (repo *ApiKeyGormRepository) FindByFilter(ctx context.Context, filter domai
 }
 
 func (repo *ApiKeyGormRepository) applyFilter(query *gormgen.Query, sql gormgen.IApiKeyDo, filter domain.ApiKeyFilter) gormgen.IApiKeyDo {
-	if filter.OwnerType != nil {
-		sql = sql.Where(query.ApiKey.OwnerType.Eq(*filter.OwnerType))
+	if filter.ApikeyType != nil {
+		sql = sql.Where(query.ApiKey.ApikeyType.Eq(*filter.ApikeyType))
 	}
 	if filter.OwnerID != nil {
 		sql = sql.Where(query.ApiKey.OwnerID.Eq(*filter.OwnerID))
@@ -111,6 +111,9 @@ func (repo *ApiKeyGormRepository) applyFilter(query *gormgen.Query, sql gormgen.
 	}
 	if filter.PublicID != nil {
 		sql = sql.Where(query.ApiKey.PublicID.Eq(*filter.PublicID))
+	}
+	if filter.ProjectID != nil {
+		sql = sql.Where(query.ApiKey.ProjectID.Eq(*filter.ProjectID))
 	}
 	return sql
 }

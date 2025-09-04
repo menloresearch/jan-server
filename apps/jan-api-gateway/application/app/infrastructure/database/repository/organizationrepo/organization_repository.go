@@ -15,6 +15,8 @@ type OrganizationGormRepository struct {
 	db *transaction.Database
 }
 
+var _ domain.OrganizationRepository = (*OrganizationGormRepository)(nil)
+
 // applyFilter is a helper function to conditionally apply filter clauses to the GORM query.
 func (repo *OrganizationGormRepository) applyFilter(query *gormgen.Query, sql gormgen.IOrganizationDo, filter domain.OrganizationFilter) gormgen.IOrganizationDo {
 	if filter.PublicID != nil {

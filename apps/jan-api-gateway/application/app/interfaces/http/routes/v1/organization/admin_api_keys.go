@@ -42,7 +42,7 @@ func (adminApiKeyAPI *AdminApiKeyAPI) RegisterRouter(router *gin.RouterGroup) {
 // GetAdminApiKey godoc
 // @Summary Get Admin API Key
 // @Description Retrieves a specific admin API key by its ID.
-// @Tags Admin API Keys
+// @Tags Platform, Platform-Organizations
 // @Security BearerAuth
 // @Param Authorization header string true "Bearer token" default("Bearer <admin_api_key>")
 // @Param id path string true "ID of the admin API key"
@@ -86,7 +86,7 @@ func (api *AdminApiKeyAPI) GetAdminApiKey(reqCtx *gin.Context) {
 // GetAdminApiKeys godoc
 // @Summary List Admin API Keys
 // @Description Retrieves a paginated list of all admin API keys for the authenticated organization.
-// @Tags Admin API Keys
+// @Tags Platform, Platform-Organizations
 // @Security BearerAuth
 // @Param Authorization header string true "Bearer token" default("Bearer <admin_api_key>")
 // @Param limit query int false "The maximum number of items to return" default(20)
@@ -189,7 +189,7 @@ func (api *AdminApiKeyAPI) GetAdminApiKeys(reqCtx *gin.Context) {
 // DeleteAdminApiKey godoc
 // @Summary Delete Admin API Key
 // @Description Deletes an admin API key by its ID.
-// @Tags Admin API Keys
+// @Tags Platform, Platform-Organizations
 // @Security BearerAuth
 // @Param Authorization header string true "Bearer token" default("Bearer <admin_api_key>")
 // @Param id path string true "ID of the admin API key to delete"
@@ -222,7 +222,7 @@ func (api *AdminApiKeyAPI) DeleteAdminApiKey(reqCtx *gin.Context) {
 		})
 		return
 	}
-	if entity.OwnerType != string(apikey.OwnerTypeAdmin) {
+	if entity.ApikeyType != string(apikey.ApikeyTypeAdmin) {
 		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 			Code:  "f5a31a69-10b0-416c-8fa2-8183dca24eb9",
 			Error: "invalid or missing API key",
@@ -257,7 +257,7 @@ func (api *AdminApiKeyAPI) DeleteAdminApiKey(reqCtx *gin.Context) {
 // CreateAdminApiKey creates a new admin API key for an organization.
 // @Summary Create Admin API Key
 // @Description Creates a new admin API key for an organization. Requires a valid admin API key in the Authorization header.
-// @Tags Admin API Keys
+// @Tags Platform, Platform-Organizations
 // @Accept json
 // @Produce json
 // @Security BearerAuth
@@ -295,7 +295,7 @@ func (api *AdminApiKeyAPI) CreateAdminApiKey(reqCtx *gin.Context) {
 		return
 	}
 
-	key, hash, err := apikeyService.GenerateKeyAndHash(ctx, apikey.OwnerTypeAdmin)
+	key, hash, err := apikeyService.GenerateKeyAndHash(ctx, apikey.ApikeyTypeAdmin)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 			Code:  "e00e6ab3-1b43-490e-90df-aae030697f74",
@@ -308,7 +308,7 @@ func (api *AdminApiKeyAPI) CreateAdminApiKey(reqCtx *gin.Context) {
 		PlaintextHint:  fmt.Sprintf("sk-..%s", key[len(key)-3:]),
 		Description:    requestPayload.Name,
 		Enabled:        true,
-		OwnerType:      string(apikey.OwnerTypeAdmin),
+		ApikeyType:     string(apikey.ApikeyTypeAdmin),
 		OwnerID:        adminKeyEntity.OwnerID,
 		OrganizationID: adminKeyEntity.OrganizationID,
 		Permissions:    "{}",
@@ -350,7 +350,7 @@ func (api *AdminApiKeyAPI) validateAdminKey(reqCtx *gin.Context) (*apikey.ApiKey
 		return nil, err
 	}
 
-	if adminKeyEntity.OwnerType != string(apikey.OwnerTypeAdmin) {
+	if adminKeyEntity.ApikeyType != string(apikey.ApikeyTypeAdmin) {
 		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 			Code:  "27828731-bcb8-450b-81c0-3f9e2ff5ef12",
 			Error: "invalid or missing API key",
@@ -377,7 +377,7 @@ func domainToOrganizationAdminAPIKeyResponse(entity *apikey.ApiKey) Organization
 
 func domainToOwnerResponse(user *user.User) Owner {
 	return Owner{
-		Type:      string(openai.OwnerTypeUser),
+		Type:      string(openai.ApikeyTypeUser),
 		Object:    string(openai.OwnerObjectOrganizationUser),
 		ID:        user.PublicID,
 		Name:      user.Name,

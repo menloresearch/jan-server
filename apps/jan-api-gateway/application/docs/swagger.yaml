@@ -1,38 +1,5 @@
 basePath: /
 definitions:
-  app_interfaces_http_routes_jan_v1_apikeys.ApiKeyResponse:
-    properties:
-      created_at:
-        type: string
-      description:
-        type: string
-      enabled:
-        type: boolean
-      expires_at:
-        type: string
-      id:
-        type: integer
-      key:
-        type: string
-      plaintext_hint:
-        type: string
-    type: object
-  app_interfaces_http_routes_jan_v1_apikeys.CreateApiKeyRequest:
-    properties:
-      description:
-        type: string
-      expires_at:
-        type: string
-    type: object
-  app_interfaces_http_routes_jan_v1_apikeys.UpdateApiKeyRequest:
-    properties:
-      description:
-        type: string
-      enabled:
-        type: boolean
-      expires_at:
-        type: string
-    type: object
   app_interfaces_http_routes_jan_v1_auth.GetMeResponse:
     properties:
       email:
@@ -79,6 +46,90 @@ definitions:
         type: string
       usage:
         $ref: '#/definitions/openai.Usage'
+    type: object
+  app_interfaces_http_routes_jan_v1_organization.OrganizationResponse:
+    properties:
+      createdAt:
+        type: string
+      enabled:
+        type: boolean
+      name:
+        type: string
+      publicID:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  app_interfaces_http_routes_jan_v1_organization_api_keys.ApiKeyResponse:
+    properties:
+      apikeyType:
+        type: string
+      description:
+        type: string
+      enabled:
+        type: boolean
+      expiresAt:
+        type: string
+      id:
+        type: string
+      key:
+        type: string
+      last_usedAt:
+        type: string
+      permissions:
+        type: string
+      plaintextHint:
+        type: string
+    type: object
+  app_interfaces_http_routes_jan_v1_organization_api_keys.CreateAdminKeyRequest:
+    properties:
+      description:
+        type: string
+    type: object
+  app_interfaces_http_routes_jan_v1_organization_projects.ProjectResponse:
+    properties:
+      archivedAt:
+        type: string
+      createdAt:
+        type: string
+      name:
+        type: string
+      organizationID:
+        type: integer
+      publicID:
+        type: string
+      status:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  app_interfaces_http_routes_jan_v1_organization_projects_api_keys.ApiKeyResponse:
+    properties:
+      apikeyType:
+        type: string
+      description:
+        type: string
+      enabled:
+        type: boolean
+      expiresAt:
+        type: string
+      id:
+        type: string
+      key:
+        type: string
+      last_usedAt:
+        type: string
+      permissions:
+        type: string
+      plaintextHint:
+        type: string
+    type: object
+  app_interfaces_http_routes_jan_v1_organization_projects_api_keys.CreateApiKeyRequest:
+    properties:
+      description:
+        type: string
+      expiresAt:
+        type: string
     type: object
   app_interfaces_http_routes_v1.Model:
     properties:
@@ -247,18 +298,185 @@ definitions:
         example: Updated AI Project
         type: string
     type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.AnnotationResponse:
+    properties:
+      end_index:
+        type: integer
+      file_id:
+        type: string
+      index:
+        type: integer
+      start_index:
+        type: integer
+      text:
+        type: string
+      type:
+        type: string
+      url:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ContentResponse:
+    properties:
+      file:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.FileContentResponse'
+      image:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ImageContentResponse'
+      input_text:
+        type: string
+      output_text:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.OutputTextResponse'
+      text:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.TextResponse'
+      type:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationContentRequest:
+    properties:
+      text:
+        type: string
+      type:
+        type: string
+    required:
+    - type
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationItemListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationItemResponse'
+        type: array
+      first_id:
+        type: string
+      has_more:
+        type: boolean
+      last_id:
+        type: string
+      object:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationItemRequest:
+    properties:
+      content:
+        items:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationContentRequest'
+        type: array
+      role:
+        type: string
+      type:
+        type: string
+    required:
+    - content
+    - type
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationItemResponse:
+    properties:
+      content:
+        items:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ContentResponse'
+        type: array
+      created_at:
+        type: integer
+      id:
+        type: string
+      object:
+        type: string
+      role:
+        type: string
+      status:
+        type: string
+      type:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationResponse:
+    properties:
+      created_at:
+        type: integer
+      id:
+        type: string
+      metadata:
+        additionalProperties:
+          type: string
+        type: object
+      object:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.CreateConversationRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationItemRequest'
+        type: array
+      metadata:
+        additionalProperties:
+          type: string
+        type: object
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.CreateItemsRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationItemRequest'
+        type: array
+    required:
+    - items
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.DeletedConversationResponse:
+    properties:
+      deleted:
+        type: boolean
+      id:
+        type: string
+      object:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.FileContentResponse:
+    properties:
+      file_id:
+        type: string
+      mime_type:
+        type: string
+      name:
+        type: string
+      size:
+        type: integer
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ImageContentResponse:
+    properties:
+      detail:
+        type: string
+      file_id:
+        type: string
+      url:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.OutputTextResponse:
+    properties:
+      annotations:
+        items:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.AnnotationResponse'
+        type: array
+      text:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.TextResponse:
+    properties:
+      value:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.UpdateConversationRequest:
+    properties:
+      metadata:
+        additionalProperties:
+          type: string
+        type: object
+    required:
+    - metadata
+    type: object
   menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse:
     properties:
       code:
         type: string
       error:
-        type: string
-    type: object
-  menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_apikeys_ApiKeyResponse:
-    properties:
-      result:
-        $ref: '#/definitions/app_interfaces_http_routes_jan_v1_apikeys.ApiKeyResponse'
-      status:
         type: string
     type: object
   menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_auth_GetMeResponse:
@@ -282,196 +500,52 @@ definitions:
       status:
         type: string
     type: object
-  ? menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListlResponse-array_app_interfaces_http_routes_jan_v1_apikeys_ApiKeyResponse
+  ? menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_organization_api_keys_ApiKeyResponse
   : properties:
-      page:
-        type: integer
-      page_size:
-        type: integer
+      result:
+        $ref: '#/definitions/app_interfaces_http_routes_jan_v1_organization_api_keys.ApiKeyResponse'
+      status:
+        type: string
+    type: object
+  ? menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_organization_projects_api_keys_ApiKeyResponse
+  : properties:
+      result:
+        $ref: '#/definitions/app_interfaces_http_routes_jan_v1_organization_projects_api_keys.ApiKeyResponse'
+      status:
+        type: string
+    type: object
+  ? menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListResponse-app_interfaces_http_routes_jan_v1_organization_OrganizationResponse
+  : properties:
       results:
         items:
-          items:
-            $ref: '#/definitions/app_interfaces_http_routes_jan_v1_apikeys.ApiKeyResponse'
-          type: array
+          $ref: '#/definitions/app_interfaces_http_routes_jan_v1_organization.OrganizationResponse'
         type: array
       status:
         type: string
       total:
         type: integer
     type: object
-  menlo_ai_jan-api-gateway_app_usecases_conversation.AnnotationResponse:
-    properties:
-      end_index:
-        type: integer
-      file_id:
-        type: string
-      index:
-        type: integer
-      start_index:
-        type: integer
-      text:
-        type: string
-      type:
-        type: string
-      url:
-        type: string
-    type: object
-  menlo_ai_jan-api-gateway_app_usecases_conversation.ContentResponse:
-    properties:
-      file:
-        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.FileContentResponse'
-      image:
-        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ImageContentResponse'
-      input_text:
-        type: string
-      output_text:
-        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.OutputTextResponse'
-      text:
-        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.TextResponse'
-      type:
-        type: string
-    type: object
-  menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationContentRequest:
-    properties:
-      text:
-        type: string
-      type:
-        type: string
-    required:
-    - type
-    type: object
-  menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationItemListResponse:
-    properties:
-      data:
+  ? menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListResponse-app_interfaces_http_routes_jan_v1_organization_api_keys_ApiKeyResponse
+  : properties:
+      results:
         items:
-          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationItemResponse'
+          $ref: '#/definitions/app_interfaces_http_routes_jan_v1_organization_api_keys.ApiKeyResponse'
         type: array
-      first_id:
-        type: string
-      has_more:
-        type: boolean
-      last_id:
-        type: string
-      object:
-        type: string
-    type: object
-  menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationItemRequest:
-    properties:
-      content:
-        items:
-          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationContentRequest'
-        type: array
-      role:
-        type: string
-      type:
-        type: string
-    required:
-    - content
-    - type
-    type: object
-  menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationItemResponse:
-    properties:
-      content:
-        items:
-          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ContentResponse'
-        type: array
-      created_at:
-        type: integer
-      id:
-        type: string
-      object:
-        type: string
-      role:
-        type: string
       status:
         type: string
-      type:
-        type: string
-    type: object
-  menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationResponse:
-    properties:
-      created_at:
-        type: integer
-      id:
-        type: string
-      metadata:
-        additionalProperties:
-          type: string
-        type: object
-      object:
-        type: string
-    type: object
-  menlo_ai_jan-api-gateway_app_usecases_conversation.CreateConversationRequest:
-    properties:
-      items:
-        items:
-          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationItemRequest'
-        type: array
-      metadata:
-        additionalProperties:
-          type: string
-        type: object
-    type: object
-  menlo_ai_jan-api-gateway_app_usecases_conversation.CreateItemsRequest:
-    properties:
-      items:
-        items:
-          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationItemRequest'
-        type: array
-    required:
-    - items
-    type: object
-  menlo_ai_jan-api-gateway_app_usecases_conversation.DeletedConversationResponse:
-    properties:
-      deleted:
-        type: boolean
-      id:
-        type: string
-      object:
-        type: string
-    type: object
-  menlo_ai_jan-api-gateway_app_usecases_conversation.FileContentResponse:
-    properties:
-      file_id:
-        type: string
-      mime_type:
-        type: string
-      name:
-        type: string
-      size:
+      total:
         type: integer
     type: object
-  menlo_ai_jan-api-gateway_app_usecases_conversation.ImageContentResponse:
-    properties:
-      detail:
-        type: string
-      file_id:
-        type: string
-      url:
-        type: string
-    type: object
-  menlo_ai_jan-api-gateway_app_usecases_conversation.OutputTextResponse:
-    properties:
-      annotations:
+  ? menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListResponse-app_interfaces_http_routes_jan_v1_organization_projects_ProjectResponse
+  : properties:
+      results:
         items:
-          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.AnnotationResponse'
+          $ref: '#/definitions/app_interfaces_http_routes_jan_v1_organization_projects.ProjectResponse'
         type: array
-      text:
+      status:
         type: string
-    type: object
-  menlo_ai_jan-api-gateway_app_usecases_conversation.TextResponse:
-    properties:
-      value:
-        type: string
-    type: object
-  menlo_ai_jan-api-gateway_app_usecases_conversation.UpdateConversationRequest:
-    properties:
-      metadata:
-        additionalProperties:
-          type: string
-        type: object
-    required:
-    - metadata
+      total:
+        type: integer
     type: object
   openai.ChatCompletionChoice:
     properties:
@@ -953,143 +1027,6 @@ info:
   title: Jan Server
   version: "1.0"
 paths:
-  /jan/v1/apikeys/:
-    get:
-      description: Get a list of API keys for the authenticated user with pagination.
-      parameters:
-      - description: Page number for pagination
-        in: query
-        name: page
-        type: integer
-      - description: Number of items per page
-        in: query
-        name: pageSize
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Successfully retrieved the list of API keys
-          schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListlResponse-array_app_interfaces_http_routes_jan_v1_apikeys_ApiKeyResponse'
-        "400":
-          description: Bad request (e.g., invalid query parameters)
-          schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
-        "401":
-          description: Unauthorized (e.g., missing or invalid JWT)
-          schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: List API keys
-      tags:
-      - API Keys
-    post:
-      consumes:
-      - application/json
-      description: Create a new API key for the authenticated user.
-      parameters:
-      - description: Request body for creating an API key
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/app_interfaces_http_routes_jan_v1_apikeys.CreateApiKeyRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Successfully created the API key
-          schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_apikeys_ApiKeyResponse'
-        "400":
-          description: Bad request (e.g., invalid JSON, missing required fields)
-          schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
-        "401":
-          description: Unauthorized (e.g., missing or invalid JWT)
-          schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Create an API key
-      tags:
-      - API Keys
-  /jan/v1/apikeys/{id}:
-    delete:
-      description: Deletes a specific API key by its ID.
-      parameters:
-      - description: API Key ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad request (e.g., invalid ID format)
-          schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
-        "401":
-          description: Unauthorized (e.g., missing or invalid JWT)
-          schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
-        "404":
-          description: API key not found
-          schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Delete an API key
-      tags:
-      - API Keys
-    put:
-      consumes:
-      - application/json
-      description: Update the description, expiry date, or enabled status of an existing
-        API key.
-      parameters:
-      - description: API Key ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: Request body for updating an API key
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/app_interfaces_http_routes_jan_v1_apikeys.UpdateApiKeyRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Successfully updated the API key
-          schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_apikeys_ApiKeyResponse'
-        "400":
-          description: Bad request (e.g., invalid ID format, invalid JSON)
-          schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
-        "401":
-          description: Unauthorized (e.g., missing or invalid JWT)
-          schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
-        "404":
-          description: API key not found
-          schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Update an API key
-      tags:
-      - API Keys
   /jan/v1/auth/google/callback:
     post:
       consumes:
@@ -1127,7 +1064,8 @@ paths:
             $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       summary: Google OAuth2 Callback
       tags:
-      - Authentication
+      - Jan
+      - Jan-Authentication
   /jan/v1/auth/google/login:
     get:
       description: Redirects the user to the Google OAuth2 authorization page to initiate
@@ -1141,7 +1079,30 @@ paths:
             $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       summary: Google OAuth2 Login
       tags:
-      - Authentication
+      - Jan
+      - Jan-Authentication
+  /jan/v1/auth/guest-login:
+    post:
+      description: JWT-base Guest Login.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully refreshed the access token
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_auth_RefreshTokenResponse'
+        "400":
+          description: Bad Request (e.g., invalid refresh token)
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized (e.g., expired or missing refresh token)
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      summary: Guest Login
+      tags:
+      - Jan
+      - Jan-Authentication
   /jan/v1/auth/me:
     get:
       description: Retrieves the profile of the authenticated user based on the provided
@@ -1161,7 +1122,8 @@ paths:
       - BearerAuth: []
       summary: Get user profile
       tags:
-      - Authentication
+      - Jan
+      - Jan-Authentication
   /jan/v1/auth/refresh-token:
     get:
       consumes:
@@ -1185,7 +1147,8 @@ paths:
             $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       summary: Refresh an access token
       tags:
-      - Authentication
+      - Jan
+      - Jan-Authentication
   /jan/v1/chat/completions:
     post:
       consumes:
@@ -1221,7 +1184,8 @@ paths:
       - BearerAuth: []
       summary: Create a chat completion
       tags:
-      - Chat
+      - Jan
+      - Jan-Chat
   /jan/v1/conversations:
     post:
       consumes:
@@ -1233,14 +1197,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.CreateConversationRequest'
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.CreateConversationRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Created conversation
           schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationResponse'
         "400":
           description: Invalid request
           schema:
@@ -1257,7 +1221,8 @@ paths:
       - BearerAuth: []
       summary: Create a conversation
       tags:
-      - Conversations
+      - Jan
+      - Jan-Conversations
   /jan/v1/conversations/{conversation_id}:
     delete:
       description: Deletes a conversation and all its items
@@ -1273,7 +1238,7 @@ paths:
         "200":
           description: Deleted conversation
           schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.DeletedConversationResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.DeletedConversationResponse'
         "401":
           description: Unauthorized
           schema:
@@ -1294,7 +1259,8 @@ paths:
       - BearerAuth: []
       summary: Delete a conversation
       tags:
-      - Conversations
+      - Jan
+      - Jan-Conversations
     get:
       description: Retrieves a conversation by its ID
       parameters:
@@ -1309,7 +1275,7 @@ paths:
         "200":
           description: Conversation details
           schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationResponse'
         "401":
           description: Unauthorized
           schema:
@@ -1330,7 +1296,8 @@ paths:
       - BearerAuth: []
       summary: Get a conversation
       tags:
-      - Conversations
+      - Jan
+      - Jan-Conversations
     patch:
       consumes:
       - application/json
@@ -1346,14 +1313,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.UpdateConversationRequest'
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.UpdateConversationRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Updated conversation
           schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationResponse'
         "400":
           description: Invalid request
           schema:
@@ -1378,7 +1345,8 @@ paths:
       - BearerAuth: []
       summary: Update a conversation
       tags:
-      - Conversations
+      - Jan
+      - Jan-Conversations
   /jan/v1/conversations/{conversation_id}/items:
     get:
       description: Lists all items in a conversation
@@ -1406,7 +1374,7 @@ paths:
         "200":
           description: List of items
           schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationItemListResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationItemListResponse'
         "401":
           description: Unauthorized
           schema:
@@ -1427,7 +1395,8 @@ paths:
       - BearerAuth: []
       summary: List items in a conversation
       tags:
-      - Conversations
+      - Jan
+      - Jan-Conversations
     post:
       consumes:
       - application/json
@@ -1443,14 +1412,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.CreateItemsRequest'
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.CreateItemsRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Created items
           schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationItemListResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationItemListResponse'
         "400":
           description: Invalid request
           schema:
@@ -1475,7 +1444,8 @@ paths:
       - BearerAuth: []
       summary: Create items in a conversation
       tags:
-      - Conversations
+      - Jan
+      - Jan-Conversations
   /jan/v1/conversations/{conversation_id}/items/{item_id}:
     delete:
       description: Deletes a specific item from a conversation
@@ -1496,7 +1466,7 @@ paths:
         "200":
           description: Updated conversation
           schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationResponse'
         "401":
           description: Unauthorized
           schema:
@@ -1517,7 +1487,8 @@ paths:
       - BearerAuth: []
       summary: Delete an item from a conversation
       tags:
-      - Conversations
+      - Jan
+      - Jan-Conversations
     get:
       description: Retrieves a specific item from a conversation
       parameters:
@@ -1537,7 +1508,7 @@ paths:
         "200":
           description: Item details
           schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationItemResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationItemResponse'
         "401":
           description: Unauthorized
           schema:
@@ -1558,7 +1529,291 @@ paths:
       - BearerAuth: []
       summary: Get an item from a conversation
       tags:
-      - Conversations
+      - Jan
+      - Jan-Conversations
+  /jan/v1/organizations:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a list of organizations owned by the authenticated user.
+      parameters:
+      - default: 10
+        description: Number of organizations to return
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved organizations.
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListResponse-app_interfaces_http_routes_jan_v1_organization_OrganizationResponse'
+        "400":
+          description: Bad request, e.g., invalid pagination parameters.
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized, e.g., invalid or missing token.
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List organizations
+      tags:
+      - Jan
+      - Jan-Organizations
+  /jan/v1/organizations/{org_public_id}/api_keys:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a list of all API keys associated with an organization.
+      parameters:
+      - description: Organization Public ID
+        in: path
+        name: org_public_id
+        required: true
+        type: string
+      - default: 0
+        description: offset for pagination
+        in: query
+        name: offset
+        type: integer
+      - default: 10
+        description: Number of items per page
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of API keys retrieved successfully
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListResponse-app_interfaces_http_routes_jan_v1_organization_api_keys_ApiKeyResponse'
+        "400":
+          description: Bad request, e.g., invalid pagination parameters
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized, e.g., invalid or missing token
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Not Found, e.g., organization not found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List API keys for a specific organization
+      tags:
+      - Jan
+      - Jan-Organizations
+    post:
+      consumes:
+      - application/json
+      description: Creates a new API key with administrative permissions for a specific
+        organization.
+      parameters:
+      - description: Organization Public ID
+        in: path
+        name: org_public_id
+        required: true
+        type: string
+      - description: Request body for creating an admin key
+        in: body
+        name: requestBody
+        required: true
+        schema:
+          $ref: '#/definitions/app_interfaces_http_routes_jan_v1_organization_api_keys.CreateAdminKeyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Admin API key created successfully
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_organization_api_keys_ApiKeyResponse'
+        "400":
+          description: Bad request, e.g., invalid payload or missing IDs
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized, e.g., invalid or missing token
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Not Found, e.g., organization not found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new organization-level admin key
+      tags:
+      - Jan
+      - Jan-Organizations
+  /jan/v1/organizations/{org_public_id}/projects:
+    get:
+      consumes:
+      - application/json
+      description: List all projects within a given organization.
+      parameters:
+      - description: Organization Public ID
+        in: path
+        name: org_public_id
+        required: true
+        type: string
+      - default: 10
+        description: Number of projects to return
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved projects
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListResponse-app_interfaces_http_routes_jan_v1_organization_projects_ProjectResponse'
+        "400":
+          description: Bad request, e.g., invalid pagination parameters or organization
+            ID
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized, e.g., invalid or missing token
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Not Found, e.g., organization not found or no projects found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List projects
+      tags:
+      - Jan
+      - Jan-Organizations
+  /jan/v1/organizations/{org_public_id}/projects/{project_public_id}/api_keys:
+    get:
+      consumes:
+      - application/json
+      description: List API keys for a specific project.
+      parameters:
+      - description: Organization Public ID
+        in: path
+        name: org_public_id
+        required: true
+        type: string
+      - description: Project Public ID
+        in: path
+        name: project_public_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: API key created successfully
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_organization_projects_api_keys_ApiKeyResponse'
+        "400":
+          description: Bad request, e.g., invalid payload or missing IDs
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized, e.g., invalid or missing token
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Not Found, e.g., project or organization not found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List new project API key
+      tags:
+      - Jan
+      - Jan-Organizations
+    post:
+      consumes:
+      - application/json
+      description: Creates a new API key for a specific project.
+      parameters:
+      - description: Organization Public ID
+        in: path
+        name: org_public_id
+        required: true
+        type: string
+      - description: Project Public ID
+        in: path
+        name: project_public_id
+        required: true
+        type: string
+      - description: Request body for creating an API key
+        in: body
+        name: requestBody
+        required: true
+        schema:
+          $ref: '#/definitions/app_interfaces_http_routes_jan_v1_organization_projects_api_keys.CreateApiKeyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: API key created successfully
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_jan_v1_organization_projects_api_keys_ApiKeyResponse'
+        "400":
+          description: Bad request, e.g., invalid payload or missing IDs
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized, e.g., invalid or missing token
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Not Found, e.g., project or organization not found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new project API key
+      tags:
+      - Jan
+      - Jan-Organizations
   /v1/chat/completions:
     post:
       consumes:
@@ -1594,7 +1849,8 @@ paths:
       - BearerAuth: []
       summary: Create a chat completion
       tags:
-      - Chat
+      - Platform
+      - Platform-Chat
   /v1/conversations:
     post:
       consumes:
@@ -1606,14 +1862,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.CreateConversationRequest'
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.CreateConversationRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Created conversation
           schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationResponse'
         "400":
           description: Invalid request
           schema:
@@ -1630,7 +1886,8 @@ paths:
       - BearerAuth: []
       summary: Create a conversation
       tags:
-      - Conversations
+      - Platform
+      - Platform-Conversations
   /v1/conversations/{conversation_id}:
     delete:
       description: Deletes a conversation and all its items
@@ -1646,7 +1903,7 @@ paths:
         "200":
           description: Deleted conversation
           schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.DeletedConversationResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.DeletedConversationResponse'
         "401":
           description: Unauthorized
           schema:
@@ -1667,7 +1924,8 @@ paths:
       - BearerAuth: []
       summary: Delete a conversation
       tags:
-      - Conversations
+      - Platform
+      - Platform-Conversations
     get:
       description: Retrieves a conversation by its ID
       parameters:
@@ -1682,7 +1940,7 @@ paths:
         "200":
           description: Conversation details
           schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationResponse'
         "401":
           description: Unauthorized
           schema:
@@ -1703,7 +1961,8 @@ paths:
       - BearerAuth: []
       summary: Get a conversation
       tags:
-      - Conversations
+      - Platform
+      - Platform-Conversations
     patch:
       consumes:
       - application/json
@@ -1719,14 +1978,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.UpdateConversationRequest'
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.UpdateConversationRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Updated conversation
           schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationResponse'
         "400":
           description: Invalid request
           schema:
@@ -1751,7 +2010,8 @@ paths:
       - BearerAuth: []
       summary: Update a conversation
       tags:
-      - Conversations
+      - Platform
+      - Platform-Conversations
   /v1/conversations/{conversation_id}/items:
     get:
       description: Lists all items in a conversation
@@ -1779,7 +2039,7 @@ paths:
         "200":
           description: List of items
           schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationItemListResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationItemListResponse'
         "401":
           description: Unauthorized
           schema:
@@ -1800,7 +2060,8 @@ paths:
       - BearerAuth: []
       summary: List items in a conversation
       tags:
-      - Conversations
+      - Platform
+      - Platform-Conversations
     post:
       consumes:
       - application/json
@@ -1816,14 +2077,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.CreateItemsRequest'
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.CreateItemsRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Created items
           schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationItemListResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationItemListResponse'
         "400":
           description: Invalid request
           schema:
@@ -1848,7 +2109,8 @@ paths:
       - BearerAuth: []
       summary: Create items in a conversation
       tags:
-      - Conversations
+      - Platform
+      - Platform-Conversations
   /v1/conversations/{conversation_id}/items/{item_id}:
     delete:
       description: Deletes a specific item from a conversation
@@ -1869,7 +2131,7 @@ paths:
         "200":
           description: Updated conversation
           schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationResponse'
         "401":
           description: Unauthorized
           schema:
@@ -1890,7 +2152,8 @@ paths:
       - BearerAuth: []
       summary: Delete an item from a conversation
       tags:
-      - Conversations
+      - Platform
+      - Platform-Conversations
     get:
       description: Retrieves a specific item from a conversation
       parameters:
@@ -1910,7 +2173,7 @@ paths:
         "200":
           description: Item details
           schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_usecases_conversation.ConversationItemResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationItemResponse'
         "401":
           description: Unauthorized
           schema:
@@ -1931,7 +2194,8 @@ paths:
       - BearerAuth: []
       summary: Get an item from a conversation
       tags:
-      - Conversations
+      - Platform
+      - Platform-Conversations
   /v1/mcp:
     post:
       consumes:
@@ -1973,7 +2237,8 @@ paths:
       - BearerAuth: []
       summary: List available models
       tags:
-      - Models
+      - Platform
+      - Platform-Models
   /v1/organization/admin_api_keys:
     get:
       description: Retrieves a paginated list of all admin API keys for the authenticated
@@ -2012,7 +2277,8 @@ paths:
       - BearerAuth: []
       summary: List Admin API Keys
       tags:
-      - Admin API Keys
+      - Platform
+      - Platform-Organizations
     post:
       consumes:
       - application/json
@@ -2050,7 +2316,8 @@ paths:
       - BearerAuth: []
       summary: Create Admin API Key
       tags:
-      - Admin API Keys
+      - Platform
+      - Platform-Organizations
   /v1/organization/admin_api_keys/{id}:
     delete:
       description: Deletes an admin API key by its ID.
@@ -2084,7 +2351,8 @@ paths:
       - BearerAuth: []
       summary: Delete Admin API Key
       tags:
-      - Admin API Keys
+      - Platform
+      - Platform-Organizations
     get:
       description: Retrieves a specific admin API key by its ID.
       parameters:
@@ -2117,7 +2385,8 @@ paths:
       - BearerAuth: []
       summary: Get Admin API Key
       tags:
-      - Admin API Keys
+      - Platform
+      - Platform-Organizations
   /v1/organization/projects:
     get:
       description: Retrieves a paginated list of all projects for the authenticated
@@ -2160,7 +2429,8 @@ paths:
       - BearerAuth: []
       summary: List Projects
       tags:
-      - Projects
+      - Platform
+      - Platform-Organizations
     post:
       consumes:
       - application/json
@@ -2201,7 +2471,8 @@ paths:
       - BearerAuth: []
       summary: Create Project
       tags:
-      - Projects
+      - Platform
+      - Platform-Organizations
   /v1/organization/projects/{project_id}:
     get:
       description: Retrieves a specific project by its ID.
@@ -2235,7 +2506,8 @@ paths:
       - BearerAuth: []
       summary: Get Project
       tags:
-      - Projects
+      - Platform
+      - Platform-Organizations
     post:
       consumes:
       - application/json
@@ -2281,7 +2553,8 @@ paths:
       - BearerAuth: []
       summary: Update Project
       tags:
-      - Projects
+      - Platform
+      - Platform-Organizations
   /v1/organization/projects/{project_id}/archive:
     post:
       description: Archives a specific project by its ID, making it inactive.
@@ -2314,7 +2587,8 @@ paths:
       - BearerAuth: []
       summary: Archive Project
       tags:
-      - Projects
+      - Platform
+      - Platform-Organizations
   /v1/version:
     get:
       description: Returns the current build version of the API server.
@@ -2329,7 +2603,7 @@ paths:
             type: object
       summary: Get API build version
       tags:
-      - System
+      - Jan Server
 securityDefinitions:
   BearerAuth:
     description: Type "Bearer" followed by a space and JWT token.

@@ -1,12 +1,16 @@
 package auth
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
+	"menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/middleware"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth/google"
@@ -14,12 +18,14 @@ import (
 )
 
 type AuthRoute struct {
-	google *google.GoogleAuthAPI
+	google      *google.GoogleAuthAPI
+	userService *user.UserService
 }
 
-func NewAuthRoute(google *google.GoogleAuthAPI) *AuthRoute {
+func NewAuthRoute(google *google.GoogleAuthAPI, userService *user.UserService) *AuthRoute {
 	return &AuthRoute{
 		google,
+		userService,
 	}
 }
 
@@ -27,6 +33,7 @@ func (authRoute *AuthRoute) RegisterRouter(router gin.IRouter) {
 	authRouter := router.Group("/auth")
 	authRouter.GET("/refresh-token", authRoute.RefreshToken)
 	authRouter.GET("/me", middleware.AuthMiddleware(), authRoute.GetMe)
+	authRouter.POST("/guest-login", authRoute.GuestLogin)
 	authRoute.google.RegisterRouter(authRouter)
 
 }
@@ -43,7 +50,7 @@ type GetMeResponse struct {
 
 // @Summary Get user profile
 // @Description Retrieves the profile of the authenticated user based on the provided JWT.
-// @Tags Authentication
+// @Tags Jan, Jan-Authentication
 // @Security BearerAuth
 // @Produce json
 // @Success 200 {object} responses.GeneralResponse[GetMeResponse] "Successfully retrieved user profile"
@@ -75,7 +82,7 @@ func (authRoute *AuthRoute) GetMe(reqCtx *gin.Context) {
 
 // @Summary Refresh an access token
 // @Description Use a valid refresh token to obtain a new access token. The refresh token is typically sent in a cookie.
-// @Tags Authentication
+// @Tags Jan, Jan-Authentication
 // @Accept json
 // @Produce json
 // @Success 200 {object} responses.GeneralResponse[RefreshTokenResponse] "Successfully refreshed the access token"
@@ -142,6 +149,93 @@ func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(refreshTokenExp),
 			Subject:   userClaim.Email,
+		},
+	})
+	if err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code:  "0e596742-64bb-4904-8429-4c09ce8434b9",
+			Error: err.Error(),
+		})
+		return
+	}
+
+	http.SetCookie(reqCtx.Writer, &http.Cookie{
+		Name:     auth.RefreshTokenKey,
+		Value:    refreshTokenString,
+		Expires:  refreshTokenExp,
+		HttpOnly: true,
+		Secure:   true,
+		Path:     "/",
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	reqCtx.JSON(http.StatusOK, &responses.GeneralResponse[RefreshTokenResponse]{
+		Status: responses.ResponseCodeOk,
+		Result: RefreshTokenResponse{
+			accessTokenString,
+			int(time.Until(accessTokenExp).Seconds()),
+		},
+	})
+}
+
+// @Summary Guest Login
+// @Description JWT-base Guest Login.
+// @Tags Jan, Jan-Authentication
+// @Produce json
+// @Success 200 {object} responses.GeneralResponse[RefreshTokenResponse] "Successfully refreshed the access token"
+// @Failure 400 {object} responses.ErrorResponse "Bad Request (e.g., invalid refresh token)"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized (e.g., expired or missing refresh token)"
+// @Router /jan/v1/auth/guest-login [post]
+func (authRoute *AuthRoute) GuestLogin(reqCtx *gin.Context) {
+	ctx := reqCtx.Request.Context()
+	userClaim, ok := auth.GetUserClaimFromRefreshToken(reqCtx)
+	email := ""
+	name := ""
+	if !ok {
+		userService := authRoute.userService
+		randomStr := strings.ToUpper(uuid.New().String())
+		user, err := userService.RegisterUser(ctx, &user.User{
+			Name:    fmt.Sprintf("Jan-%s", randomStr),
+			Email:   fmt.Sprintf("Jan-%s@jan.ai", randomStr),
+			Enabled: true,
+		})
+		if err != nil {
+			reqCtx.AbortWithStatusJSON(http.StatusOK, responses.ErrorResponse{
+				Code: "9576b6ba-fcc6-4bd2-b13a-33d59d6a71f1",
+			})
+			return
+		}
+		email = user.Email
+		name = user.Name
+	} else {
+		email = userClaim.Email
+		name = userClaim.Name
+	}
+
+	accessTokenExp := time.Now().Add(15 * time.Minute)
+	accessTokenString, err := auth.CreateJwtSignedString(auth.UserClaim{
+		Email: email,
+		Name:  name,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(accessTokenExp),
+			Subject:   email,
+		},
+	})
+	if err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code:  "79373f8e-d80e-489c-95ba-9e6099ef7539",
+			Error: err.Error(),
+		})
+		return
+	}
+
+	refreshTokenExp := time.Now().Add(7 * 24 * time.Hour)
+	refreshTokenString, err := auth.CreateJwtSignedString(auth.UserClaim{
+		Email: email,
+		Name:  name,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(refreshTokenExp),
+			Subject:   email,
 		},
 	})
 	if err != nil {

@@ -229,7 +229,7 @@ func (api *CompletionAPI) getOrCreateConversation(reqCtx *gin.Context, userID ui
 // CreateChatCompletion
 // @Summary Create a chat completion
 // @Description Generates a model response for the given chat conversation.
-// @Tags Chat
+// @Tags Jan, Jan-Chat
 // @Security BearerAuth
 // @Accept json
 // @Produce json
@@ -271,7 +271,12 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		}
 		currentUser = user
 		fmt.Printf("DEBUG: Current user found: %+v\n", currentUser)
-		key, err = api.getOrCreateUserKey(reqCtx, user)
+
+		// Get or create API key for the user
+		apikeyEntities, err := api.apikeyService.Find(reqCtx, apikey.ApiKeyFilter{
+			OwnerID:    &user.ID,
+			ApikeyType: ptr.ToString(string(apikey.ApikeyTypeAdmin)),
+		}, nil)
 		if err != nil {
 			reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
 				Code:  "7e29d138-8b8e-4895-8edc-c0876ebb1a52",
@@ -279,6 +284,41 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 			})
 			return
 		}
+
+		// TODO: Should we provide a default key to user?
+		if len(apikeyEntities) == 0 {
+			key, hash, err := api.apikeyService.GenerateKeyAndHash(reqCtx, apikey.ApikeyTypeEphemeral)
+			if err != nil {
+				reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+					Code:  "207373ae-f94a-4b21-bf95-7bbd8d727f84",
+					Error: err.Error(),
+				})
+				return
+			}
+
+			// TODO: ApikeyTypeEphemeral
+			entity, err := api.apikeyService.CreateApiKey(reqCtx, &apikey.ApiKey{
+				KeyHash:        hash,
+				PlaintextHint:  fmt.Sprintf("sk-..%s", key[len(key)-3:]),
+				Description:    "Default Key For User",
+				Enabled:        true,
+				ApikeyType:     string(apikey.ApikeyTypeEphemeral),
+				OwnerID:        &user.ID,
+				OrganizationID: nil,
+				Permissions:    "{}",
+			})
+			if err != nil {
+				reqCtx.JSON(http.StatusBadRequest, responses.ErrorResponse{
+					Code:  "cfda552d-ec73-4e12-abfb-963b3c3829e9",
+					Error: err.Error(),
+				})
+				return
+			}
+			apikeyEntities = []*apikey.ApiKey{
+				entity,
+			}
+		}
+		key = apikeyEntities[0].KeyHash
 	} else {
 		fmt.Printf("DEBUG: No user claim found\n")
 	}
@@ -647,44 +687,6 @@ func (api *CompletionAPI) extractContentFromOpenAIStream(chunk string) (string, 
 	}
 
 	return "", nil
-}
-
-// getOrCreateUserKey gets or creates an API key for the user
-func (api *CompletionAPI) getOrCreateUserKey(reqCtx *gin.Context, user *user.User) (string, error) {
-	apikeyEntities, err := api.apikeyService.Find(reqCtx, apikey.ApiKeyFilter{
-		OwnerID:   &user.ID,
-		OwnerType: ptr.ToString(string(apikey.OwnerTypeAdmin)),
-	}, nil)
-	if err != nil {
-		return "", err
-	}
-
-	// TODO: Should we provide a default key to user?
-	if len(apikeyEntities) == 0 {
-		key, hash, err := api.apikeyService.GenerateKeyAndHash(reqCtx, apikey.OwnerTypeEphemeral)
-		if err != nil {
-			return "", err
-		}
-
-		// TODO: OwnerTypeEphemeral
-		entity, err := api.apikeyService.CreateApiKey(reqCtx, &apikey.ApiKey{
-			KeyHash:        hash,
-			PlaintextHint:  fmt.Sprintf("sk-..%s", key[len(key)-3:]),
-			Description:    "Default Key For User",
-			Enabled:        true,
-			OwnerType:      string(apikey.OwnerTypeEphemeral),
-			OwnerID:        &user.ID,
-			OrganizationID: nil,
-			Permissions:    "{}",
-		})
-		if err != nil {
-			return "", err
-		}
-		apikeyEntities = []*apikey.ApiKey{
-			entity,
-		}
-	}
-	return apikeyEntities[0].KeyHash, nil
 }
 
 // sendSSEEvent sends a Server-Sent Event

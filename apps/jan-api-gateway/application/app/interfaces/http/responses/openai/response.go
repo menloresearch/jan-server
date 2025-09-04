@@ -7,10 +7,10 @@ const (
 	ObjectKeyProject     ObjectKey = "organization.project"
 )
 
-type OwnerType string
+type ApikeyType string
 
 const (
-	OwnerTypeUser OwnerType = "user"
+	ApikeyTypeUser ApikeyType = "user"
 )
 
 type OwnerObject string

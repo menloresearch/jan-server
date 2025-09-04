@@ -22,7 +22,7 @@ func NewService(repo ApiKeyRepository) *ApiKeyService {
 	}
 }
 
-func (s *ApiKeyService) GenerateKeyAndHash(ctx context.Context, ownerType OwnerType) (string, string, error) {
+func (s *ApiKeyService) GenerateKeyAndHash(ctx context.Context, ownerType ApikeyType) (string, string, error) {
 	baseKey, err := idgen.GenerateSecureID("sk", 24)
 	if err != nil {
 		return "", "", err

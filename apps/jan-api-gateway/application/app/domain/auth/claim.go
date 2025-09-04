@@ -35,3 +35,40 @@ func GetUserClaimFromRequestContext(reqCtx *gin.Context) (*UserClaim, error) {
 	}
 	return u, nil
 }
+
+func GetUserFromRequestContext(reqCtx *gin.Context) (*UserClaim, error) {
+	userClaim, ok := reqCtx.Get(ContextUserClaim)
+	if !ok {
+		return nil, fmt.Errorf("userclaim not found in context")
+	}
+	u, ok := userClaim.(*UserClaim)
+	if !ok {
+		return nil, fmt.Errorf("invalid user claim in context: expected *auth.UserClaim, got %T", userClaim)
+	}
+	return u, nil
+}
+
+func GetUserClaimFromRefreshToken(reqCtx *gin.Context) (*UserClaim, bool) {
+	refreshTokenString, err := reqCtx.Cookie(RefreshTokenKey)
+	if err != nil {
+		return nil, false
+	}
+
+	token, err := jwt.ParseWithClaims(refreshTokenString, &UserClaim{}, func(token *jwt.Token) (interface{}, error) {
+		return environment_variables.EnvironmentVariables.JWT_SECRET, nil
+	})
+	if err != nil {
+		return nil, false
+	}
+
+	if !token.Valid {
+		return nil, false
+	}
+
+	claims, ok := token.Claims.(*UserClaim)
+	if !ok {
+		return nil, false
+	}
+
+	return claims, true
+}
