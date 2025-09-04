@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -342,20 +343,23 @@ func (api *CompletionAPI) handleStreamingCompletion(reqCtx *gin.Context, key str
 		},
 	}
 
-	// Add function call metadata if present
-	if functionCall != nil {
-		// Store function call as text content with metadata
-		functionCallText := fmt.Sprintf("Function Call: %s\nArguments: %s", functionCall.Name, functionCall.Arguments)
-		assistantContent = append(assistantContent, conversation.Content{
-			Type: "text",
-			Text: &conversation.Text{
-				Value: functionCallText,
-			},
-		})
-	}
-
 	assistantRole := conversation.ItemRoleAssistant
 	api.conversationService.AddItem(reqCtx, conv, userID, conversation.ItemTypeMessage, &assistantRole, assistantContent)
+
+	// Add function call as a separate item if present
+	if functionCall != nil {
+		functionCallContent := []conversation.Content{
+			{
+				Type: "text",
+				Text: &conversation.Text{
+					Value: fmt.Sprintf("Function: %s\nArguments: %s", functionCall.Name, functionCall.Arguments),
+				},
+			},
+		}
+
+		// Create a separate function call item
+		api.conversationService.AddItem(reqCtx, conv, userID, conversation.ItemTypeFunction, &assistantRole, functionCallContent)
+	}
 
 	// Update conversation title if generated
 	titleMutex.Lock()
@@ -403,6 +407,10 @@ func (api *CompletionAPI) streamCompletion(reqCtx *gin.Context, key string, requ
 		return err
 	}
 
+	// Track accumulated function call data
+	var accumulatedFunctionCall *openai.FunctionCall
+	var functionCallComplete bool
+
 	// Process chunks
 	for chunk := range chunkChan {
 		// Skip empty chunks and [DONE]
@@ -410,19 +418,45 @@ func (api *CompletionAPI) streamCompletion(reqCtx *gin.Context, key string, requ
 			continue
 		}
 
-		// Debug: Log the raw chunk (remove in production)
-		fmt.Printf("DEBUG: Raw chunk: %s\n", chunk)
-
 		// Extract content and function call from OpenAI streaming format
 		content, functionCall := api.extractContentFromOpenAIStream(chunk)
+
+		// Handle content
 		if content != "" {
-			fmt.Printf("DEBUG: Extracted content: %s\n", content)
 			onChunk(content)
 		}
+
 		// Handle function call if present
-		if functionCall != nil && onFunctionCall != nil {
-			fmt.Printf("DEBUG: Function call: %+v\n", functionCall)
-			onFunctionCall(functionCall)
+		if functionCall != nil && !functionCallComplete {
+			// Initialize or update accumulated function call
+			if accumulatedFunctionCall == nil {
+				accumulatedFunctionCall = &openai.FunctionCall{
+					Name:      functionCall.Name,
+					Arguments: functionCall.Arguments,
+				}
+			} else {
+				// Accumulate arguments if name is empty (streaming arguments)
+				if functionCall.Name == "" && functionCall.Arguments != "" {
+					accumulatedFunctionCall.Arguments += functionCall.Arguments
+				} else if functionCall.Name != "" {
+					// Update name if provided
+					accumulatedFunctionCall.Name = functionCall.Name
+					if functionCall.Arguments != "" {
+						accumulatedFunctionCall.Arguments = functionCall.Arguments
+					}
+				}
+			}
+
+			// Check if function call is complete (has both name and complete arguments)
+			if accumulatedFunctionCall.Name != "" && accumulatedFunctionCall.Arguments != "" {
+				// Check if arguments are complete JSON
+				if strings.HasSuffix(accumulatedFunctionCall.Arguments, "}") {
+					functionCallComplete = true
+					if onFunctionCall != nil {
+						onFunctionCall(accumulatedFunctionCall)
+					}
+				}
+			}
 		}
 	}
 	return nil
@@ -436,18 +470,47 @@ func (api *CompletionAPI) extractContentFromOpenAIStream(chunk string) (string, 
 	if len(chunk) >= 6 && chunk[:6] == "data: " {
 		jsonStr := chunk[6:]
 
-		// Parse the JSON
+		// Parse the JSON with both function_call and tool_calls support
 		var data struct {
 			Choices []struct {
 				Delta struct {
-					Content      string               `json:"content"`
-					FunctionCall *openai.FunctionCall `json:"function_call,omitempty"`
+					Content          string               `json:"content"`
+					ReasoningContent string               `json:"reasoning_content"`
+					FunctionCall     *openai.FunctionCall `json:"function_call,omitempty"`
+					ToolCalls        []struct {
+						ID       string `json:"id"`
+						Type     string `json:"type"`
+						Index    int    `json:"index"`
+						Function struct {
+							Name      string `json:"name"`
+							Arguments string `json:"arguments"`
+						} `json:"function"`
+					} `json:"tool_calls,omitempty"`
 				} `json:"delta"`
 			} `json:"choices"`
 		}
 
 		if err := json.Unmarshal([]byte(jsonStr), &data); err == nil && len(data.Choices) > 0 {
-			return data.Choices[0].Delta.Content, data.Choices[0].Delta.FunctionCall
+			// Use reasoning_content if content is empty (jan-v1-4b model format)
+			content := data.Choices[0].Delta.Content
+			if content == "" {
+				content = data.Choices[0].Delta.ReasoningContent
+			}
+
+			functionCall := data.Choices[0].Delta.FunctionCall
+
+			// Handle tool_calls format
+			if functionCall == nil && len(data.Choices[0].Delta.ToolCalls) > 0 {
+				toolCall := data.Choices[0].Delta.ToolCalls[0]
+
+				// Create function call even if name or arguments are empty (they will be accumulated)
+				functionCall = &openai.FunctionCall{
+					Name:      toolCall.Function.Name,
+					Arguments: toolCall.Function.Arguments,
+				}
+			}
+
+			return content, functionCall
 		}
 	}
 
@@ -456,14 +519,43 @@ func (api *CompletionAPI) extractContentFromOpenAIStream(chunk string) (string, 
 	var data struct {
 		Choices []struct {
 			Delta struct {
-				Content      string               `json:"content"`
-				FunctionCall *openai.FunctionCall `json:"function_call,omitempty"`
+				Content          string               `json:"content"`
+				ReasoningContent string               `json:"reasoning_content"`
+				FunctionCall     *openai.FunctionCall `json:"function_call,omitempty"`
+				ToolCalls        []struct {
+					ID       string `json:"id"`
+					Type     string `json:"type"`
+					Index    int    `json:"index"`
+					Function struct {
+						Name      string `json:"name"`
+						Arguments string `json:"arguments"`
+					} `json:"function"`
+				} `json:"tool_calls,omitempty"`
 			} `json:"delta"`
 		} `json:"choices"`
 	}
 
 	if err := json.Unmarshal([]byte(chunk), &data); err == nil && len(data.Choices) > 0 {
-		return data.Choices[0].Delta.Content, data.Choices[0].Delta.FunctionCall
+		// Use reasoning_content if content is empty (jan-v1-4b model format)
+		content := data.Choices[0].Delta.Content
+		if content == "" {
+			content = data.Choices[0].Delta.ReasoningContent
+		}
+
+		functionCall := data.Choices[0].Delta.FunctionCall
+
+		// Handle tool_calls format
+		if functionCall == nil && len(data.Choices[0].Delta.ToolCalls) > 0 {
+			toolCall := data.Choices[0].Delta.ToolCalls[0]
+
+			// Create function call even if name or arguments are empty (they will be accumulated)
+			functionCall = &openai.FunctionCall{
+				Name:      toolCall.Function.Name,
+				Arguments: toolCall.Function.Arguments,
+			}
+		}
+
+		return content, functionCall
 	}
 
 	// Format 3: Simple content string (fallback)
