@@ -1,6 +1,7 @@
 package invites
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -37,6 +38,7 @@ type InviteResponse struct {
 	InvitedAt  time.Time  `json:"invited_at"`
 	ExpiresAt  time.Time  `json:"expires_at"`
 	AcceptedAt *time.Time `json:"accepted_at,omitempty"`
+	Projects   []InviteProject
 }
 
 type InviteListResponse struct {
@@ -125,18 +127,19 @@ func (api *InvitesRoute) ListInvites(reqCtx *gin.Context) {
 	})
 }
 
-type CreateInviteUserRequestProject struct {
+type InviteProject struct {
 	ID   string `json:"id"`
 	Role string `json:"role"`
 }
 
 type CreateInviteUserRequest struct {
-	Email    string                           `json:"email"`
-	Role     string                           `json:"role"`
-	Projects []CreateInviteUserRequestProject `json:"projects,omitempty"`
+	Email    string          `json:"email"`
+	Role     string          `json:"role"`
+	Projects []InviteProject `json:"projects,omitempty"`
 }
 
 func (api *InvitesRoute) CreateInvite(reqCtx *gin.Context) {
+	ctx := reqCtx.Request.Context()
 	adminKey, ok := api.apiKeyHandler.GetApiKeyFromContext(reqCtx)
 	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
@@ -153,12 +156,84 @@ func (api *InvitesRoute) CreateInvite(reqCtx *gin.Context) {
 		return
 	}
 
-	organizationId := adminKey.OrganizationID
+	ok, err := api.inviteHandler.VerifyUserInvited(ctx, requestPayload.Email, *adminKey.OrganizationID)
+	if err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  "398c1de0-1a9f-47e2-8f56-c06e4510f884",
+			Error: err.Error(),
+		})
+		return
+	}
+	if !ok {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code: "ac130c69-e9fd-4dfc-b246-4c6abfa44bbe",
+		})
+		return
+	}
+	projectIDs := functional.Map(requestPayload.Projects, func(proj InviteProject) string {
+		return proj.ID
+	})
 
+	ok, err = api.inviteHandler.VerifyProjects(ctx, functional.Distinct[string](projectIDs))
+	if err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  "ea649ae7-d82c-48b2-9ef1-626c139f180d",
+			Error: err.Error(),
+		})
+		return
+	}
+	if !ok {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code: "a08c5ee3-651e-4465-a7c9-5009fec9d5c2",
+		})
+		return
+	}
+
+	// TODO: send a email here
+	projectsStr, err := json.Marshal(requestPayload.Projects)
+	if err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code: "f7957c66-77d6-494f-9ee9-8fa54408a604",
+		})
+		return
+	}
+
+	inviteEntity, err := api.inviteHandler.CreateInvite(ctx, &invite.Invite{
+		Email:          requestPayload.Email,
+		Role:           requestPayload.Role,
+		Status:         string(invite.InviteStatusPending),
+		OrganizationID: *adminKey.OrganizationID,
+		Projects:       string(projectsStr),
+	})
+
+	reqCtx.JSON(http.StatusOK, InviteResponse{})
 }
 func (api *InvitesRoute) RetrieveInvite(reqCtx *gin.Context) {
 
 }
 func (api *InvitesRoute) DeleteInvite(reqCtx *gin.Context) {
 
+}
+
+func convertInviteEntityToResponse(entity *invite.Invite) InviteResponse {
+	projectEntities, err := entity.GetProjects()
+	if err != nil {
+		projectEntities = make([]invite.InviteProject, 0)
+	}
+	return InviteResponse{
+		Object:     "organization.invite",
+		ID:         entity.PublicID,
+		Email:      entity.Email,
+		Role:       entity.Role,
+		Status:     entity.Status,
+		InvitedAt:  entity.InvitedAt,
+		AcceptedAt: entity.AcceptedAt,
+		ExpiresAt:  entity.ExpiresAt,
+		Projects: functional.Map(projectEntities, func(item invite.InviteProject) InviteProject {
+			return InviteProject{
+				Role: item.Role,
+				ID:   item.ID,
+			}
+		}),
+	}
 }

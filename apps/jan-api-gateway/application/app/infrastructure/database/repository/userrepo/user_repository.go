@@ -96,9 +96,9 @@ func (repo *UserGormRepository) applyFilter(query *gormgen.Query, sql gormgen.IU
 		sql = sql.Where(query.User.Enabled.Is(*filter.Enabled))
 	}
 	if filter.OrganizationId != nil {
-		sql.Join()
-		// Then, we use the `IN` clause to filter the users based on the subquery results.
-
+		sql = sql.
+			Join(query.OrganizationMember, query.OrganizationMember.UserID.EqCol(query.User.ID)).
+			Where(query.OrganizationMember.OrganizationID.Eq(*filter.OrganizationId))
 	}
 	return sql
 }

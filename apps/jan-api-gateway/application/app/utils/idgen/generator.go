@@ -1,10 +1,15 @@
 package idgen
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"strings"
+
+	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
 // GenerateSecureID generates a cryptographically secure ID with the given prefix and length
@@ -57,4 +62,11 @@ func ValidateIDFormat(id, expectedPrefix string) bool {
 	}
 
 	return true
+}
+
+func HashKey(key string) string {
+	h := hmac.New(sha256.New, []byte(environment_variables.EnvironmentVariables.APIKEY_SECRET))
+	h.Write([]byte(key))
+
+	return hex.EncodeToString(h.Sum(nil))
 }

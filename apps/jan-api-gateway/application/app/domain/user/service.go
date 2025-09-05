@@ -45,6 +45,10 @@ func (s *UserService) FindByEmail(ctx context.Context, email string) (*User, err
 	return users[0], nil
 }
 
+func (s *UserService) FindByFilter(ctx context.Context, filter UserFilter) ([]*User, error) {
+	return s.userrepo.FindByFilter(ctx, filter, nil)
+}
+
 func (s *UserService) FindByID(ctx context.Context, id uint) (*User, error) {
 	return s.userrepo.FindByID(ctx, id)
 }

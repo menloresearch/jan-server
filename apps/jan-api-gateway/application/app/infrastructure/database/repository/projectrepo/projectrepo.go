@@ -59,6 +59,9 @@ func (repo *ProjectGormRepository) applyFilter(query *gormgen.Query, sql gormgen
 	if filter.Archived == ptr.ToBool(true) {
 		sql = sql.Where(query.Project.ArchivedAt.IsNotNull())
 	}
+	if filter.PublicIDs != nil {
+		sql = sql.Where(query.Project.PublicID.In(*filter.PublicIDs...))
+	}
 	return sql
 }
 

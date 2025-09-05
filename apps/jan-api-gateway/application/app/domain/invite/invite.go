@@ -2,6 +2,7 @@ package invite
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"menlo.ai/jan-api-gateway/app/domain/query"
@@ -21,6 +22,24 @@ type Invite struct {
 	Projects       string
 }
 
+func (i *Invite) GetProjects() ([]InviteProject, error) {
+	var projects []InviteProject
+	byteData := []byte(i.Projects)
+	err := json.Unmarshal(byteData, &projects)
+	if err != nil {
+		return nil, err
+	}
+	return projects, nil
+}
+
+type InviteStatus string
+
+const (
+	InviteStatusAccepted InviteStatus = "accepted"
+	InviteStatusExpired  InviteStatus = "expired"
+	InviteStatusPending  InviteStatus = "pending"
+)
+
 type InviteProjectRole string
 
 const (
@@ -29,8 +48,8 @@ const (
 )
 
 type InviteProject struct {
-	ID   string
-	Role string
+	ID   string `json:"id"`
+	Role string `json:"role"`
 }
 
 type InvitesFilter struct {
