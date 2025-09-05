@@ -70,20 +70,26 @@ func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 
 	// TODO: Create response logic here
 
-	reqCtx.JSON(http.StatusOK, Response{
-		ID:      "resp_1234567890",
-		Object:  "response",
-		Created: 1234567890,
-		Model:   "gpt-4",
-		Status:  ResponseStatusCompleted,
-		Input: CreateResponseInput{
-			Type: InputTypeText,
-			Text: ptr.ToString("Hello, world!"),
-		},
-		Output: &ResponseOutput{
-			Type: OutputTypeText,
-			Text: &TextOutput{
-				Value: "Hello! How can I help you today?",
+	status := responses.ResponseCodeOk
+	objectType := responses.ObjectTypeResponse
+	reqCtx.JSON(http.StatusOK, responses.OpenAIGeneralResponse[Response]{
+		JanStatus: &status,
+		Object:    &objectType,
+		T: Response{
+			ID:      "resp_1234567890",
+			Object:  "response",
+			Created: 1234567890,
+			Model:   "gpt-4",
+			Status:  ResponseStatusCompleted,
+			Input: CreateResponseInput{
+				Type: InputTypeText,
+				Text: ptr.ToString("Hello, world!"),
+			},
+			Output: &ResponseOutput{
+				Type: OutputTypeText,
+				Text: &TextOutput{
+					Value: "Hello! How can I help you today?",
+				},
 			},
 		},
 	})
@@ -122,20 +128,26 @@ func (h *ResponseHandler) GetResponse(reqCtx *gin.Context) {
 	_ = userEntity // TODO: Use user info if needed
 	// TODO: Get response logic here
 
-	reqCtx.JSON(http.StatusOK, Response{
-		ID:      responseID,
-		Object:  "response",
-		Created: 1234567890,
-		Model:   "gpt-4",
-		Status:  ResponseStatusCompleted,
-		Input: CreateResponseInput{
-			Type: InputTypeText,
-			Text: ptr.ToString("Hello, world!"),
-		},
-		Output: &ResponseOutput{
-			Type: OutputTypeText,
-			Text: &TextOutput{
-				Value: "Hello! How can I help you today?",
+	status := responses.ResponseCodeOk
+	objectType := responses.ObjectTypeResponse
+	reqCtx.JSON(http.StatusOK, responses.OpenAIGeneralResponse[Response]{
+		JanStatus: &status,
+		Object:    &objectType,
+		T: Response{
+			ID:      responseID,
+			Object:  "response",
+			Created: 1234567890,
+			Model:   "gpt-4",
+			Status:  ResponseStatusCompleted,
+			Input: CreateResponseInput{
+				Type: InputTypeText,
+				Text: ptr.ToString("Hello, world!"),
+			},
+			Output: &ResponseOutput{
+				Type: OutputTypeText,
+				Text: &TextOutput{
+					Value: "Hello! How can I help you today?",
+				},
 			},
 		},
 	})
@@ -174,17 +186,23 @@ func (h *ResponseHandler) DeleteResponse(reqCtx *gin.Context) {
 	_ = userEntity // TODO: Use user info if needed
 	// TODO: Delete response logic here
 
-	reqCtx.JSON(http.StatusOK, Response{
-		ID:      responseID,
-		Object:  "response",
-		Created: 1234567890,
-		Model:   "gpt-4",
-		Status:  ResponseStatusCancelled,
-		Input: CreateResponseInput{
-			Type: InputTypeText,
-			Text: ptr.ToString("Hello, world!"),
+	status := responses.ResponseCodeOk
+	objectType := responses.ObjectTypeResponse
+	reqCtx.JSON(http.StatusOK, responses.OpenAIGeneralResponse[Response]{
+		JanStatus: &status,
+		Object:    &objectType,
+		T: Response{
+			ID:      responseID,
+			Object:  "response",
+			Created: 1234567890,
+			Model:   "gpt-4",
+			Status:  ResponseStatusCancelled,
+			Input: CreateResponseInput{
+				Type: InputTypeText,
+				Text: ptr.ToString("Hello, world!"),
+			},
+			CancelledAt: ptr.ToInt64(1234567890),
 		},
-		CancelledAt: ptr.ToInt64(1234567890),
 	})
 }
 
@@ -222,17 +240,23 @@ func (h *ResponseHandler) CancelResponse(reqCtx *gin.Context) {
 	_ = userEntity // TODO: Use user info if needed
 	// TODO: Cancel response logic here
 
-	reqCtx.JSON(http.StatusOK, Response{
-		ID:      responseID,
-		Object:  "response",
-		Created: 1234567890,
-		Model:   "gpt-4",
-		Status:  ResponseStatusCancelled,
-		Input: CreateResponseInput{
-			Type: InputTypeText,
-			Text: ptr.ToString("Hello, world!"),
+	status := responses.ResponseCodeOk
+	objectType := responses.ObjectTypeResponse
+	reqCtx.JSON(http.StatusOK, responses.OpenAIGeneralResponse[Response]{
+		JanStatus: &status,
+		Object:    &objectType,
+		T: Response{
+			ID:      responseID,
+			Object:  "response",
+			Created: 1234567890,
+			Model:   "gpt-4",
+			Status:  ResponseStatusCancelled,
+			Input: CreateResponseInput{
+				Type: InputTypeText,
+				Text: ptr.ToString("Hello, world!"),
+			},
+			CancelledAt: ptr.ToInt64(1234567890),
 		},
-		CancelledAt: ptr.ToInt64(1234567890),
 	})
 }
 
@@ -270,9 +294,14 @@ func (h *ResponseHandler) ListInputItems(reqCtx *gin.Context) {
 	_ = userEntity // TODO: Use user info if needed
 	// TODO: List input items logic here
 
-	reqCtx.JSON(http.StatusOK, ListInputItemsResponse{
-		Object: "list",
-		Data: []InputItem{
+	status := responses.ResponseCodeOk
+	objectType := responses.ObjectTypeList
+	hasMore := false
+	reqCtx.JSON(http.StatusOK, responses.OpenAIListResponse[InputItem]{
+		JanStatus: &status,
+		Object:    &objectType,
+		HasMore:   &hasMore,
+		T: []InputItem{
 			{
 				ID:      "input_1234567890",
 				Object:  "input_item",
@@ -281,6 +310,5 @@ func (h *ResponseHandler) ListInputItems(reqCtx *gin.Context) {
 				Text:    ptr.ToString("Hello, world!"),
 			},
 		},
-		HasMore: false,
 	})
 }
