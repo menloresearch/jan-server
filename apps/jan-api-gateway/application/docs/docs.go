@@ -779,6 +779,35 @@ const docTemplate = `{
                 }
             }
         },
+        "/jan/v1/models": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves a list of available models that can be used for chat completions or other tasks.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jan",
+                    "Jan-Models"
+                ],
+                "summary": "List available models",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_jan_v1.ModelsResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/jan/v1/organizations": {
             "get": {
                 "security": [
@@ -2409,6 +2438,37 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "app_interfaces_http_routes_jan_v1.Model": {
+            "type": "object",
+            "properties": {
+                "created": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "object": {
+                    "type": "string"
+                },
+                "owned_by": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_jan_v1.ModelsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app_interfaces_http_routes_jan_v1.Model"
+                    }
+                },
+                "object": {
+                    "type": "string"
+                }
+            }
+        },
         "app_interfaces_http_routes_jan_v1_auth.GetMeResponse": {
             "type": "object",
             "properties": {
