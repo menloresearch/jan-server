@@ -1,5 +1,25 @@
 basePath: /
 definitions:
+  app_interfaces_http_routes_jan_v1.Model:
+    properties:
+      created:
+        type: integer
+      id:
+        type: string
+      object:
+        type: string
+      owned_by:
+        type: string
+    type: object
+  app_interfaces_http_routes_jan_v1.ModelsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/app_interfaces_http_routes_jan_v1.Model'
+        type: array
+      object:
+        type: string
+    type: object
   app_interfaces_http_routes_jan_v1_auth.GetMeResponse:
     properties:
       email:
@@ -1531,6 +1551,25 @@ paths:
       tags:
       - Jan
       - Jan-Conversations
+  /jan/v1/models:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a list of available models that can be used for chat
+        completions or other tasks.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_jan_v1.ModelsResponse'
+      security:
+      - BearerAuth: []
+      summary: List available models
+      tags:
+      - Jan
+      - Jan-Models
   /jan/v1/organizations:
     get:
       consumes:
