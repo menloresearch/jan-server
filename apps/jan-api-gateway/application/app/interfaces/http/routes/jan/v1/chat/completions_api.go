@@ -549,6 +549,10 @@ func (api *CompletionAPI) streamCompletion(reqCtx *gin.Context, key string, requ
 	// Use FunctionCallAccumulator for better function call handling
 	accumulator := &FunctionCallAccumulator{}
 
+	// Buffer for accumulating content chunks
+	var contentBuffer strings.Builder
+	const minWordsPerChunk = 5
+
 	// Process chunks
 	for chunk := range chunkChan {
 		// Skip empty chunks and [DONE]
@@ -561,7 +565,18 @@ func (api *CompletionAPI) streamCompletion(reqCtx *gin.Context, key string, requ
 
 		// Handle content
 		if content != "" {
-			onChunk(content)
+			contentBuffer.WriteString(content)
+
+			// Check if we have enough words to send
+			bufferedContent := contentBuffer.String()
+			words := strings.Fields(bufferedContent)
+
+			if len(words) >= minWordsPerChunk {
+				// Send the buffered content
+				onChunk(bufferedContent)
+				// Clear the buffer
+				contentBuffer.Reset()
+			}
 		}
 
 		// Handle function call if present
@@ -578,6 +593,12 @@ func (api *CompletionAPI) streamCompletion(reqCtx *gin.Context, key string, requ
 			}
 		}
 	}
+
+	// Send any remaining buffered content
+	if contentBuffer.Len() > 0 {
+		onChunk(contentBuffer.String())
+	}
+
 	return nil
 }
 
