@@ -20,6 +20,10 @@ var (
 	ApiKey             *apiKey
 	Conversation       *conversation
 	DatabaseMigration  *databaseMigration
+<<<<<<< HEAD
+=======
+	Invite             *invite
+>>>>>>> b1d8785 (list invites)
 	Item               *item
 	Organization       *organization
 	OrganizationMember *organizationMember
@@ -33,6 +37,10 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	ApiKey = &Q.ApiKey
 	Conversation = &Q.Conversation
 	DatabaseMigration = &Q.DatabaseMigration
+<<<<<<< HEAD
+=======
+	Invite = &Q.Invite
+>>>>>>> b1d8785 (list invites)
 	Item = &Q.Item
 	Organization = &Q.Organization
 	OrganizationMember = &Q.OrganizationMember
@@ -47,6 +55,7 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		ApiKey:             newApiKey(db, opts...),
 		Conversation:       newConversation(db, opts...),
 		DatabaseMigration:  newDatabaseMigration(db, opts...),
+		Invite:             newInvite(db, opts...),
 		Item:               newItem(db, opts...),
 		Organization:       newOrganization(db, opts...),
 		OrganizationMember: newOrganizationMember(db, opts...),
@@ -62,6 +71,10 @@ type Query struct {
 	ApiKey             apiKey
 	Conversation       conversation
 	DatabaseMigration  databaseMigration
+<<<<<<< HEAD
+=======
+	Invite             invite
+>>>>>>> b1d8785 (list invites)
 	Item               item
 	Organization       organization
 	OrganizationMember organizationMember
@@ -78,6 +91,10 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		ApiKey:             q.ApiKey.clone(db),
 		Conversation:       q.Conversation.clone(db),
 		DatabaseMigration:  q.DatabaseMigration.clone(db),
+<<<<<<< HEAD
+=======
+		Invite:             q.Invite.clone(db),
+>>>>>>> b1d8785 (list invites)
 		Item:               q.Item.clone(db),
 		Organization:       q.Organization.clone(db),
 		OrganizationMember: q.OrganizationMember.clone(db),
@@ -101,6 +118,10 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		ApiKey:             q.ApiKey.replaceDB(db),
 		Conversation:       q.Conversation.replaceDB(db),
 		DatabaseMigration:  q.DatabaseMigration.replaceDB(db),
+<<<<<<< HEAD
+=======
+		Invite:             q.Invite.replaceDB(db),
+>>>>>>> b1d8785 (list invites)
 		Item:               q.Item.replaceDB(db),
 		Organization:       q.Organization.replaceDB(db),
 		OrganizationMember: q.OrganizationMember.replaceDB(db),
@@ -114,6 +135,10 @@ type queryCtx struct {
 	ApiKey             IApiKeyDo
 	Conversation       IConversationDo
 	DatabaseMigration  IDatabaseMigrationDo
+<<<<<<< HEAD
+=======
+	Invite             IInviteDo
+>>>>>>> b1d8785 (list invites)
 	Item               IItemDo
 	Organization       IOrganizationDo
 	OrganizationMember IOrganizationMemberDo
@@ -127,6 +152,10 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		ApiKey:             q.ApiKey.WithContext(ctx),
 		Conversation:       q.Conversation.WithContext(ctx),
 		DatabaseMigration:  q.DatabaseMigration.WithContext(ctx),
+<<<<<<< HEAD
+=======
+		Invite:             q.Invite.WithContext(ctx),
+>>>>>>> b1d8785 (list invites)
 		Item:               q.Item.WithContext(ctx),
 		Organization:       q.Organization.WithContext(ctx),
 		OrganizationMember: q.OrganizationMember.WithContext(ctx),

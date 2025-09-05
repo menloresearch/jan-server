@@ -16,6 +16,8 @@ type ProjectGormRepository struct {
 	db *transaction.Database
 }
 
+var _ domain.ProjectRepository = (*ProjectGormRepository)(nil)
+
 // AddMember implements project.ProjectRepository.
 func (repo *ProjectGormRepository) AddMember(ctx context.Context, m *domain.ProjectMember) error {
 	model := dbschema.NewSchemaProjectMember(m)

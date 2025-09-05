@@ -51,6 +51,7 @@ type ChatCompletionResponseSwagger struct {
 // @Router /v1/chat/completions [post]
 func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	var request openai.ChatCompletionRequest
+	
 	if err := reqCtx.ShouldBindJSON(&request); err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  "cf237451-8932-48d1-9cf6-42c4db2d4805",
