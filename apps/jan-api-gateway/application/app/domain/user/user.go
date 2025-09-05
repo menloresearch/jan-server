@@ -19,9 +19,10 @@ type User struct {
 }
 
 type UserFilter struct {
-	Email    *string
-	Enabled  *bool
-	PublicID *string
+	Email          *string
+	Enabled        *bool
+	PublicID       *string
+	OrganizationId *uint
 }
 
 type UserRepository interface {

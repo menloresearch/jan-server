@@ -124,7 +124,36 @@ func (api *InvitesRoute) ListInvites(reqCtx *gin.Context) {
 		}),
 	})
 }
+
+type CreateInviteUserRequestProject struct {
+	ID   string `json:"id"`
+	Role string `json:"role"`
+}
+
+type CreateInviteUserRequest struct {
+	Email    string                           `json:"email"`
+	Role     string                           `json:"role"`
+	Projects []CreateInviteUserRequestProject `json:"projects,omitempty"`
+}
+
 func (api *InvitesRoute) CreateInvite(reqCtx *gin.Context) {
+	adminKey, ok := api.apiKeyHandler.GetApiKeyFromContext(reqCtx)
+	if !ok {
+		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+			Code: "d16722a1-97ca-46b4-812a-678d25e47ef8",
+		})
+		return
+	}
+	var requestPayload CreateInviteUserRequest
+	if err := reqCtx.ShouldBindJSON(&requestPayload); err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  "470ad74e-f9bc-4e8d-b42b-9d506ff11a0a",
+			Error: err.Error(),
+		})
+		return
+	}
+
+	organizationId := adminKey.OrganizationID
 
 }
 func (api *InvitesRoute) RetrieveInvite(reqCtx *gin.Context) {
