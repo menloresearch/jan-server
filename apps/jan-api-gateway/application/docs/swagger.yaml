@@ -472,6 +472,304 @@ definitions:
     required:
     - metadata
     type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.CreateResponseInput:
+    properties:
+      file:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileInput'
+        description: The file input (required for file type).
+      file_search:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileSearchInput'
+        description: The file search input (required for file_search type).
+      function_calls:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionCallsInput'
+        description: The function calls input (required for function_calls type).
+      image:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ImageInput'
+        description: The image input (required for image type).
+      reasoning:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ReasoningInput'
+        description: The reasoning input (required for reasoning type).
+      streaming:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.StreamingInput'
+        description: The streaming input (required for streaming type).
+      text:
+        description: The text input (required for text type).
+        type: string
+      type:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.InputType'
+        description: The type of input.
+      web_search:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.WebSearchInput'
+        description: The web search input (required for web_search type).
+    required:
+    - type
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.CreateResponseRequest:
+    properties:
+      background:
+        description: Whether to run the response in the background.
+        type: boolean
+      frequency_penalty:
+        description: The frequency penalty to use for this response.
+        type: number
+      input:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.CreateResponseInput'
+        description: The input to the model.
+      logit_bias:
+        additionalProperties:
+          format: float64
+          type: number
+        description: The logit bias to use for this response.
+        type: object
+      max_tokens:
+        description: The maximum number of tokens to generate.
+        type: integer
+      metadata:
+        additionalProperties: true
+        description: The metadata to use for this response.
+        type: object
+      model:
+        description: The ID of the model to use for this response.
+        type: string
+      presence_penalty:
+        description: The presence penalty to use for this response.
+        type: number
+      repetition_penalty:
+        description: The repetition penalty to use for this response.
+        type: number
+      response_format:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ResponseFormat'
+        description: The response format to use for this response.
+      seed:
+        description: The seed to use for this response.
+        type: integer
+      stop:
+        description: The stop sequences to use for this response.
+        items:
+          type: string
+        type: array
+      stream:
+        description: Whether to stream the response.
+        type: boolean
+      system_prompt:
+        description: The system prompt to use for this response.
+        type: string
+      temperature:
+        description: The temperature to use for this response.
+        type: number
+      timeout:
+        description: The timeout in seconds for this response.
+        type: integer
+      tool_choice:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ToolChoice'
+        description: The tool choice to use for this response.
+      tools:
+        description: The tools to use for this response.
+        items:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.Tool'
+        type: array
+      top_k:
+        description: The top_k to use for this response.
+        type: integer
+      top_p:
+        description: The top_p to use for this response.
+        type: number
+      user:
+        description: The user to use for this response.
+        type: string
+    required:
+    - input
+    - model
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileInput:
+    properties:
+      file_id:
+        description: The ID of the file.
+        type: string
+    required:
+    - file_id
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileSearchInput:
+    properties:
+      file_ids:
+        description: The IDs of the files to search in.
+        items:
+          type: string
+        type: array
+      max_results:
+        description: The number of results to return.
+        type: integer
+      query:
+        description: The query to search for.
+        type: string
+    required:
+    - file_ids
+    - query
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionCall:
+    properties:
+      arguments:
+        additionalProperties: true
+        description: The arguments to pass to the function.
+        type: object
+      name:
+        description: The name of the function to call.
+        type: string
+    required:
+    - name
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionCallsInput:
+    properties:
+      calls:
+        description: The function calls to make.
+        items:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionCall'
+        type: array
+    required:
+    - calls
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionChoice:
+    properties:
+      name:
+        description: The name of the function.
+        type: string
+    required:
+    - name
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionDefinition:
+    properties:
+      description:
+        description: The description of the function.
+        type: string
+      name:
+        description: The name of the function.
+        type: string
+      parameters:
+        additionalProperties: true
+        description: The parameters of the function.
+        type: object
+    required:
+    - name
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ImageInput:
+    properties:
+      data:
+        description: The base64 encoded image data.
+        type: string
+      detail:
+        description: The detail level for the image.
+        type: string
+      url:
+        description: The URL of the image.
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.InputType:
+    enum:
+    - text
+    - image
+    - file
+    - web_search
+    - file_search
+    - streaming
+    - function_calls
+    - reasoning
+    type: string
+    x-enum-varnames:
+    - InputTypeText
+    - InputTypeImage
+    - InputTypeFile
+    - InputTypeWebSearch
+    - InputTypeFileSearch
+    - InputTypeStreaming
+    - InputTypeFunctionCalls
+    - InputTypeReasoning
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ReasoningInput:
+    properties:
+      context:
+        description: The context for the reasoning task.
+        type: string
+      task:
+        description: The reasoning task to perform.
+        type: string
+    required:
+    - task
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ResponseFormat:
+    properties:
+      type:
+        description: The type of response format.
+        type: string
+    required:
+    - type
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.StreamingInput:
+    properties:
+      body:
+        description: The body to send with the request.
+        type: string
+      headers:
+        additionalProperties:
+          type: string
+        description: The headers to send with the request.
+        type: object
+      method:
+        description: The method to use for the request.
+        type: string
+      url:
+        description: The URL to stream from.
+        type: string
+    required:
+    - url
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.Tool:
+    properties:
+      function:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionDefinition'
+        description: The function definition for function tools.
+      type:
+        description: The type of tool.
+        type: string
+    required:
+    - type
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ToolChoice:
+    properties:
+      function:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionChoice'
+        description: The function to use for function tool choice.
+      type:
+        description: The type of tool choice.
+        type: string
+    required:
+    - type
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.WebSearchInput:
+    properties:
+      max_results:
+        description: The number of results to return.
+        type: integer
+      query:
+        description: The query to search for.
+        type: string
+      search_engine:
+        description: The search engine to use.
+        type: string
+    required:
+    - query
+    type: object
   menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse:
     properties:
       code:
@@ -1814,6 +2112,304 @@ paths:
       tags:
       - Jan
       - Jan-Organizations
+  /jan/v1/responses:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Creates a new LLM response for the given input. Supports multiple input types including text, images, files, web search, and more.
+
+        **Supported Input Types:**
+        - `text`: Plain text input
+        - `image`: Image input (URL or base64)
+        - `file`: File input by file ID
+        - `web_search`: Web search input
+        - `file_search`: File search input
+        - `streaming`: Streaming input
+        - `function_calls`: Function calls input
+        - `reasoning`: Reasoning input
+
+        **Example Request:**
+        ```json
+        {
+        "model": "gpt-4",
+        "input": {
+        "type": "text",
+        "text": "Hello, how are you?"
+        },
+        "max_tokens": 100,
+        "temperature": 0.7,
+        "stream": false,
+        "background": false
+        }
+        ```
+
+        **Response Format:**
+        The response uses embedded structure where all fields are at the top level:
+        - `jan_status`: Jan API status code (optional)
+        - `id`: Response identifier
+        - `object`: Object type ("response")
+        - `created`: Unix timestamp
+        - `model`: Model used
+        - `status`: Response status
+        - `input`: Input data
+        - `output`: Generated output
+
+        **Example Response:**
+        ```json
+        {
+        "jan_status": "000000",
+        "id": "resp_1234567890",
+        "object": "response",
+        "created": 1234567890,
+        "model": "gpt-4",
+        "status": "completed",
+        "input": {
+        "type": "text",
+        "text": "Hello, how are you?"
+        },
+        "output": {
+        "type": "text",
+        "text": {
+        "value": "I'm doing well, thank you!"
+        }
+        }
+        }
+        ```
+
+        **Response Status:**
+        - `completed`: Response generation finished successfully
+        - `processing`: Response is being generated
+        - `failed`: Response generation failed
+        - `cancelled`: Response was cancelled
+      parameters:
+      - description: Request payload containing model, input, and generation parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.CreateResponseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response with embedded fields
+        "202":
+          description: Response accepted for background processing with embedded fields
+        "400":
+          description: Invalid request payload
+        "401":
+          description: Unauthorized
+        "422":
+          description: Validation error
+        "429":
+          description: Rate limit exceeded
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Create a response
+      tags:
+      - Jan
+      - Jan-Responses
+  /jan/v1/responses/{response_id}:
+    delete:
+      consumes:
+      - application/json
+      description: |-
+        Deletes an LLM response by its ID. Returns the deleted response object with embedded structure where all fields are at the top level.
+
+        **Response Format:**
+        The response uses embedded structure where all fields are at the top level:
+        - `jan_status`: Jan API status code (optional)
+        - `id`: Response identifier
+        - `object`: Object type ("response")
+        - `created`: Unix timestamp
+        - `model`: Model used
+        - `status`: Response status (will be "cancelled")
+        - `input`: Input data
+        - `cancelled_at`: Cancellation timestamp
+      parameters:
+      - description: Unique identifier of the response
+        in: path
+        name: response_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response with embedded fields
+        "400":
+          description: Invalid request
+        "401":
+          description: Unauthorized
+        "404":
+          description: Response not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Delete a response
+      tags:
+      - Jan
+      - Jan-Responses
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Retrieves an LLM response by its ID. Returns the complete response object with embedded structure where all fields are at the top level.
+
+        **Response Format:**
+        The response uses embedded structure where all fields are at the top level:
+        - `jan_status`: Jan API status code (optional)
+        - `id`: Response identifier
+        - `object`: Object type ("response")
+        - `created`: Unix timestamp
+        - `model`: Model used
+        - `status`: Response status
+        - `input`: Input data
+        - `output`: Generated output
+      parameters:
+      - description: Unique identifier of the response
+        in: path
+        name: response_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response with embedded fields
+        "400":
+          description: Invalid request
+        "401":
+          description: Unauthorized
+        "404":
+          description: Response not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Get a response
+      tags:
+      - Jan
+      - Jan-Responses
+  /jan/v1/responses/{response_id}/cancel:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Cancels a running LLM response that was created with background=true. Only responses that are currently processing can be cancelled.
+
+        **Response Format:**
+        The response uses embedded structure where all fields are at the top level:
+        - `jan_status`: Jan API status code (optional)
+        - `id`: Response identifier
+        - `object`: Object type ("response")
+        - `created`: Unix timestamp
+        - `model`: Model used
+        - `status`: Response status (will be "cancelled")
+        - `input`: Input data
+        - `cancelled_at`: Cancellation timestamp
+      parameters:
+      - description: Unique identifier of the response to cancel
+        in: path
+        name: response_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Response cancelled successfully with embedded fields
+        "400":
+          description: Invalid request or response cannot be cancelled
+        "401":
+          description: Unauthorized
+        "404":
+          description: Response not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: Cancel a response
+      tags:
+      - Jan
+      - Jan-Responses
+  /jan/v1/responses/{response_id}/input_items:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Retrieves a paginated list of input items for a response. Supports cursor-based pagination for efficient retrieval of large datasets.
+
+        **Response Format:**
+        The response uses embedded structure where all fields are at the top level:
+        - `jan_status`: Jan API status code (optional)
+        - `first_id`: First item ID for pagination (optional)
+        - `last_id`: Last item ID for pagination (optional)
+        - `has_more`: Whether more items are available (optional)
+        - `id`: Input item identifier
+        - `object`: Object type ("input_item")
+        - `created`: Unix timestamp
+        - `type`: Input type
+        - `text`: Text content (for text type)
+        - `image`: Image content (for image type)
+        - `file`: File content (for file type)
+
+        **Example Response:**
+        ```json
+        {
+        "jan_status": "000000",
+        "first_id": "input_123",
+        "last_id": "input_456",
+        "has_more": false,
+        "id": "input_1234567890",
+        "object": "input_item",
+        "created": 1234567890,
+        "type": "text",
+        "text": "Hello, world!"
+        }
+        ```
+      parameters:
+      - description: Unique identifier of the response
+        in: path
+        name: response_id
+        required: true
+        type: string
+      - description: 'Maximum number of items to return (default: 20, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      - description: Cursor for pagination - return items after this ID
+        in: query
+        name: after
+        type: string
+      - description: Cursor for pagination - return items before this ID
+        in: query
+        name: before
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response with paginated input items and embedded
+            fields
+        "400":
+          description: Invalid request or pagination parameters
+        "401":
+          description: Unauthorized
+        "404":
+          description: Response not found
+        "500":
+          description: Internal server error
+      security:
+      - BearerAuth: []
+      summary: List input items
+      tags:
+      - Jan
+      - Jan-Responses
   /v1/chat/completions:
     post:
       consumes:

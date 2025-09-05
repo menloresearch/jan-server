@@ -1201,6 +1201,265 @@
                 }
             }
         },
+        "/jan/v1/responses": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a new LLM response for the given input. Supports multiple input types including text, images, files, web search, and more.\n\n**Supported Input Types:**\n- `text`: Plain text input\n- `image`: Image input (URL or base64)\n- `file`: File input by file ID\n- `web_search`: Web search input\n- `file_search`: File search input\n- `streaming`: Streaming input\n- `function_calls`: Function calls input\n- `reasoning`: Reasoning input\n\n**Example Request:**\n```json\n{\n\"model\": \"gpt-4\",\n\"input\": {\n\"type\": \"text\",\n\"text\": \"Hello, how are you?\"\n},\n\"max_tokens\": 100,\n\"temperature\": 0.7,\n\"stream\": false,\n\"background\": false\n}\n```\n\n**Response Format:**\nThe response uses embedded structure where all fields are at the top level:\n- `jan_status`: Jan API status code (optional)\n- `id`: Response identifier\n- `object`: Object type (\"response\")\n- `created`: Unix timestamp\n- `model`: Model used\n- `status`: Response status\n- `input`: Input data\n- `output`: Generated output\n\n**Example Response:**\n```json\n{\n\"jan_status\": \"000000\",\n\"id\": \"resp_1234567890\",\n\"object\": \"response\",\n\"created\": 1234567890,\n\"model\": \"gpt-4\",\n\"status\": \"completed\",\n\"input\": {\n\"type\": \"text\",\n\"text\": \"Hello, how are you?\"\n},\n\"output\": {\n\"type\": \"text\",\n\"text\": {\n\"value\": \"I'm doing well, thank you!\"\n}\n}\n}\n```\n\n**Response Status:**\n- `completed`: Response generation finished successfully\n- `processing`: Response is being generated\n- `failed`: Response generation failed\n- `cancelled`: Response was cancelled",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jan",
+                    "Jan-Responses"
+                ],
+                "summary": "Create a response",
+                "parameters": [
+                    {
+                        "description": "Request payload containing model, input, and generation parameters",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.CreateResponseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response with embedded fields"
+                    },
+                    "202": {
+                        "description": "Response accepted for background processing with embedded fields"
+                    },
+                    "400": {
+                        "description": "Invalid request payload"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                }
+            }
+        },
+        "/jan/v1/responses/{response_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves an LLM response by its ID. Returns the complete response object with embedded structure where all fields are at the top level.\n\n**Response Format:**\nThe response uses embedded structure where all fields are at the top level:\n- `jan_status`: Jan API status code (optional)\n- `id`: Response identifier\n- `object`: Object type (\"response\")\n- `created`: Unix timestamp\n- `model`: Model used\n- `status`: Response status\n- `input`: Input data\n- `output`: Generated output",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jan",
+                    "Jan-Responses"
+                ],
+                "summary": "Get a response",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique identifier of the response",
+                        "name": "response_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response with embedded fields"
+                    },
+                    "400": {
+                        "description": "Invalid request"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "description": "Response not found"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes an LLM response by its ID. Returns the deleted response object with embedded structure where all fields are at the top level.\n\n**Response Format:**\nThe response uses embedded structure where all fields are at the top level:\n- `jan_status`: Jan API status code (optional)\n- `id`: Response identifier\n- `object`: Object type (\"response\")\n- `created`: Unix timestamp\n- `model`: Model used\n- `status`: Response status (will be \"cancelled\")\n- `input`: Input data\n- `cancelled_at`: Cancellation timestamp",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jan",
+                    "Jan-Responses"
+                ],
+                "summary": "Delete a response",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique identifier of the response",
+                        "name": "response_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response with embedded fields"
+                    },
+                    "400": {
+                        "description": "Invalid request"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "description": "Response not found"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                }
+            }
+        },
+        "/jan/v1/responses/{response_id}/cancel": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Cancels a running LLM response that was created with background=true. Only responses that are currently processing can be cancelled.\n\n**Response Format:**\nThe response uses embedded structure where all fields are at the top level:\n- `jan_status`: Jan API status code (optional)\n- `id`: Response identifier\n- `object`: Object type (\"response\")\n- `created`: Unix timestamp\n- `model`: Model used\n- `status`: Response status (will be \"cancelled\")\n- `input`: Input data\n- `cancelled_at`: Cancellation timestamp",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jan",
+                    "Jan-Responses"
+                ],
+                "summary": "Cancel a response",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique identifier of the response to cancel",
+                        "name": "response_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Response cancelled successfully with embedded fields"
+                    },
+                    "400": {
+                        "description": "Invalid request or response cannot be cancelled"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "description": "Response not found"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                }
+            }
+        },
+        "/jan/v1/responses/{response_id}/input_items": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves a paginated list of input items for a response. Supports cursor-based pagination for efficient retrieval of large datasets.\n\n**Response Format:**\nThe response uses embedded structure where all fields are at the top level:\n- `jan_status`: Jan API status code (optional)\n- `first_id`: First item ID for pagination (optional)\n- `last_id`: Last item ID for pagination (optional)\n- `has_more`: Whether more items are available (optional)\n- `id`: Input item identifier\n- `object`: Object type (\"input_item\")\n- `created`: Unix timestamp\n- `type`: Input type\n- `text`: Text content (for text type)\n- `image`: Image content (for image type)\n- `file`: File content (for file type)\n\n**Example Response:**\n```json\n{\n\"jan_status\": \"000000\",\n\"first_id\": \"input_123\",\n\"last_id\": \"input_456\",\n\"has_more\": false,\n\"id\": \"input_1234567890\",\n\"object\": \"input_item\",\n\"created\": 1234567890,\n\"type\": \"text\",\n\"text\": \"Hello, world!\"\n}\n```",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jan",
+                    "Jan-Responses"
+                ],
+                "summary": "List input items",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique identifier of the response",
+                        "name": "response_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of items to return (default: 20, max: 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Cursor for pagination - return items after this ID",
+                        "name": "after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Cursor for pagination - return items before this ID",
+                        "name": "before",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response with paginated input items and embedded fields"
+                    },
+                    "400": {
+                        "description": "Invalid request or pagination parameters"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "404": {
+                        "description": "Response not found"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                }
+            }
+        },
         "/v1/chat/completions": {
             "post": {
                 "security": [
@@ -3114,6 +3373,454 @@
                     "additionalProperties": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.CreateResponseInput": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "file": {
+                    "description": "The file input (required for file type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileInput"
+                        }
+                    ]
+                },
+                "file_search": {
+                    "description": "The file search input (required for file_search type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileSearchInput"
+                        }
+                    ]
+                },
+                "function_calls": {
+                    "description": "The function calls input (required for function_calls type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionCallsInput"
+                        }
+                    ]
+                },
+                "image": {
+                    "description": "The image input (required for image type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ImageInput"
+                        }
+                    ]
+                },
+                "reasoning": {
+                    "description": "The reasoning input (required for reasoning type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ReasoningInput"
+                        }
+                    ]
+                },
+                "streaming": {
+                    "description": "The streaming input (required for streaming type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.StreamingInput"
+                        }
+                    ]
+                },
+                "text": {
+                    "description": "The text input (required for text type).",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "The type of input.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.InputType"
+                        }
+                    ]
+                },
+                "web_search": {
+                    "description": "The web search input (required for web_search type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.WebSearchInput"
+                        }
+                    ]
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.CreateResponseRequest": {
+            "type": "object",
+            "required": [
+                "input",
+                "model"
+            ],
+            "properties": {
+                "background": {
+                    "description": "Whether to run the response in the background.",
+                    "type": "boolean"
+                },
+                "frequency_penalty": {
+                    "description": "The frequency penalty to use for this response.",
+                    "type": "number"
+                },
+                "input": {
+                    "description": "The input to the model.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.CreateResponseInput"
+                        }
+                    ]
+                },
+                "logit_bias": {
+                    "description": "The logit bias to use for this response.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number",
+                        "format": "float64"
+                    }
+                },
+                "max_tokens": {
+                    "description": "The maximum number of tokens to generate.",
+                    "type": "integer"
+                },
+                "metadata": {
+                    "description": "The metadata to use for this response.",
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "model": {
+                    "description": "The ID of the model to use for this response.",
+                    "type": "string"
+                },
+                "presence_penalty": {
+                    "description": "The presence penalty to use for this response.",
+                    "type": "number"
+                },
+                "repetition_penalty": {
+                    "description": "The repetition penalty to use for this response.",
+                    "type": "number"
+                },
+                "response_format": {
+                    "description": "The response format to use for this response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ResponseFormat"
+                        }
+                    ]
+                },
+                "seed": {
+                    "description": "The seed to use for this response.",
+                    "type": "integer"
+                },
+                "stop": {
+                    "description": "The stop sequences to use for this response.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "stream": {
+                    "description": "Whether to stream the response.",
+                    "type": "boolean"
+                },
+                "system_prompt": {
+                    "description": "The system prompt to use for this response.",
+                    "type": "string"
+                },
+                "temperature": {
+                    "description": "The temperature to use for this response.",
+                    "type": "number"
+                },
+                "timeout": {
+                    "description": "The timeout in seconds for this response.",
+                    "type": "integer"
+                },
+                "tool_choice": {
+                    "description": "The tool choice to use for this response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ToolChoice"
+                        }
+                    ]
+                },
+                "tools": {
+                    "description": "The tools to use for this response.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.Tool"
+                    }
+                },
+                "top_k": {
+                    "description": "The top_k to use for this response.",
+                    "type": "integer"
+                },
+                "top_p": {
+                    "description": "The top_p to use for this response.",
+                    "type": "number"
+                },
+                "user": {
+                    "description": "The user to use for this response.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileInput": {
+            "type": "object",
+            "required": [
+                "file_id"
+            ],
+            "properties": {
+                "file_id": {
+                    "description": "The ID of the file.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FileSearchInput": {
+            "type": "object",
+            "required": [
+                "file_ids",
+                "query"
+            ],
+            "properties": {
+                "file_ids": {
+                    "description": "The IDs of the files to search in.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "max_results": {
+                    "description": "The number of results to return.",
+                    "type": "integer"
+                },
+                "query": {
+                    "description": "The query to search for.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionCall": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "arguments": {
+                    "description": "The arguments to pass to the function.",
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "name": {
+                    "description": "The name of the function to call.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionCallsInput": {
+            "type": "object",
+            "required": [
+                "calls"
+            ],
+            "properties": {
+                "calls": {
+                    "description": "The function calls to make.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionCall"
+                    }
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionChoice": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "description": "The name of the function.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionDefinition": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "description": "The description of the function.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "The name of the function.",
+                    "type": "string"
+                },
+                "parameters": {
+                    "description": "The parameters of the function.",
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ImageInput": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "description": "The base64 encoded image data.",
+                    "type": "string"
+                },
+                "detail": {
+                    "description": "The detail level for the image.",
+                    "type": "string"
+                },
+                "url": {
+                    "description": "The URL of the image.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.InputType": {
+            "type": "string",
+            "enum": [
+                "text",
+                "image",
+                "file",
+                "web_search",
+                "file_search",
+                "streaming",
+                "function_calls",
+                "reasoning"
+            ],
+            "x-enum-varnames": [
+                "InputTypeText",
+                "InputTypeImage",
+                "InputTypeFile",
+                "InputTypeWebSearch",
+                "InputTypeFileSearch",
+                "InputTypeStreaming",
+                "InputTypeFunctionCalls",
+                "InputTypeReasoning"
+            ]
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ReasoningInput": {
+            "type": "object",
+            "required": [
+                "task"
+            ],
+            "properties": {
+                "context": {
+                    "description": "The context for the reasoning task.",
+                    "type": "string"
+                },
+                "task": {
+                    "description": "The reasoning task to perform.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ResponseFormat": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "type": {
+                    "description": "The type of response format.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.StreamingInput": {
+            "type": "object",
+            "required": [
+                "url"
+            ],
+            "properties": {
+                "body": {
+                    "description": "The body to send with the request.",
+                    "type": "string"
+                },
+                "headers": {
+                    "description": "The headers to send with the request.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "method": {
+                    "description": "The method to use for the request.",
+                    "type": "string"
+                },
+                "url": {
+                    "description": "The URL to stream from.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.Tool": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "function": {
+                    "description": "The function definition for function tools.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionDefinition"
+                        }
+                    ]
+                },
+                "type": {
+                    "description": "The type of tool.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.ToolChoice": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "function": {
+                    "description": "The function to use for function tool choice.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.FunctionChoice"
+                        }
+                    ]
+                },
+                "type": {
+                    "description": "The type of tool choice.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_responses.WebSearchInput": {
+            "type": "object",
+            "required": [
+                "query"
+            ],
+            "properties": {
+                "max_results": {
+                    "description": "The number of results to return.",
+                    "type": "integer"
+                },
+                "query": {
+                    "description": "The query to search for.",
+                    "type": "string"
+                },
+                "search_engine": {
+                    "description": "The search engine to use.",
+                    "type": "string"
                 }
             }
         },

@@ -2,7 +2,6 @@ package routes
 
 import (
 	"github.com/google/wire"
-	conversationHandler "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
 	jan "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan"
 	janV1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1"
 	janV1Auth "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth"
@@ -13,6 +12,7 @@ import (
 	janV1OrganizationApikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/api_keys"
 	janV1OrganizationProject "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects"
 	janV1OrganizationProjectApikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects/api_keys"
+	janV1Responses "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/responses"
 	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
@@ -23,6 +23,8 @@ import (
 )
 
 var RouteProvider = wire.NewSet(
+
+	// Route providers
 	janV1OrganizationApikeys.NewOrganizationApiKeyRouteRoute,
 	janV1OrganizationProjectApikeys.NewProjectApiKeyRoute,
 	janV1.NewV1Route,
@@ -32,6 +34,7 @@ var RouteProvider = wire.NewSet(
 	janV1Chat.NewChatRoute,
 	janV1AuthGoogle.NewGoogleAuthAPI,
 	janV1Auth.NewAuthRoute,
+	janV1Responses.NewResponseRoute,
 	jan.NewJanRoute,
 	projects.NewProjectsRoute,
 	organization.NewAdminApiKeyAPI,
@@ -44,7 +47,6 @@ var RouteProvider = wire.NewSet(
 	v1.NewV1Route,
 
 	// Conversation-related dependencies
-	conversationHandler.NewConversationHandler,
 	conversations.NewConversationAPI,
 	janV1Conversations.NewConversationAPI,
 )
