@@ -173,7 +173,7 @@ curl -X POST http://localhost:8080/jan/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -d '{
-    "model": "gpt-4",
+    "model": "jan-v1-4b",
     "messages": [
       {"role": "user", "content": "Hello, how are you?"}
     ],
