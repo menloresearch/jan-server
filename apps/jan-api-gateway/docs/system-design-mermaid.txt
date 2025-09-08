@@ -1,0 +1,125 @@
+graph TB
+    subgraph "Client Layer"
+        WEB[Web Client]
+        API_CLIENT[API Client]
+        MOBILE[Mobile App]
+        PROFILER[Profiling Tools<br/>pprof/Pyroscope]
+    end
+    
+    subgraph "Jan API Gateway"
+        subgraph "HTTP Layer"
+            GIN[Gin Router<br/>Port 8080]
+            MIDDLEWARE[Middleware<br/>- CORS<br/>- JWT Auth<br/>- Logging<br/>- Transaction<br/>- Request ID]
+        end
+        
+        subgraph "Route Handlers"
+            AUTH_ROUTE[Auth Routes<br/>- Google OAuth2<br/>- JWT Management]
+            CHAT_ROUTE[Chat Routes<br/>- OpenAI Compatible<br/>- Streaming Support]
+            CONV_ROUTE[Conversation Routes<br/>- CRUD Operations<br/>- Item Management]
+            ORG_ROUTE[Organization Routes<br/>- Multi-tenant<br/>- Project Management]
+            API_KEY_ROUTE[API Key Routes<br/>- Key Management<br/>- Access Control]
+            MCP_ROUTE[MCP Routes<br/>- JSON-RPC 2.0<br/>- Serper Integration]
+            MODEL_ROUTE[Model Routes<br/>- Model Registry<br/>- Health Checks]
+        end
+        
+        subgraph "Business Logic Layer"
+            USER_SVC[User Service<br/>- Authentication<br/>- Profile Management]
+            CONV_SVC[Conversation Service<br/>- Message Storage<br/>- Thread Management]
+            ORG_SVC[Organization Service<br/>- Multi-tenancy<br/>- Access Control]
+            API_KEY_SVC[API Key Service<br/>- Key Generation<br/>- Validation]
+            MCP_SVC[MCP Service<br/>- Tool Integration<br/>- External APIs]
+            HEALTH_SVC[Health Service<br/>- Model Monitoring<br/>- Cron Jobs]
+        end
+        
+        subgraph "Data Layer"
+            USER_REPO[User Repository]
+            CONV_REPO[Conversation Repository]
+            ITEM_REPO[Item Repository]
+            ORG_REPO[Organization Repository]
+            PROJECT_REPO[Project Repository]
+            API_KEY_REPO[API Key Repository]
+            TX_MGR[Transaction Manager<br/>- Auto Rollback<br/>- Context Handling]
+        end
+        
+        subgraph "Infrastructure"
+            DB_WRITE[(PostgreSQL<br/>Write Replica)]
+            DB_READ[(PostgreSQL<br/>Read Replicas)]
+            PPROF[pprof Server<br/>Port 6060]
+            CRON[Cron Scheduler<br/>Health Checks]
+        end
+        
+        subgraph "External Services"
+            JAN_INFERENCE[Jan Inference<br/>Service]
+            SERPER_API[Serper API<br/>Web Search]
+            GOOGLE_OAUTH[Google OAuth2<br/>Authentication]
+            PYROSCOPE[Grafana Pyroscope<br/>Continuous Profiling]
+        end
+    end
+    
+    %% Client connections
+    WEB --> GIN
+    API_CLIENT --> GIN
+    MOBILE --> GIN
+    PROFILER --> PPROF
+    
+    %% HTTP layer connections
+    GIN --> MIDDLEWARE
+    MIDDLEWARE --> AUTH_ROUTE
+    MIDDLEWARE --> CHAT_ROUTE
+    MIDDLEWARE --> CONV_ROUTE
+    MIDDLEWARE --> ORG_ROUTE
+    MIDDLEWARE --> API_KEY_ROUTE
+    MIDDLEWARE --> MCP_ROUTE
+    MIDDLEWARE --> MODEL_ROUTE
+    
+    %% Route to service connections
+    AUTH_ROUTE --> USER_SVC
+    CHAT_ROUTE --> CONV_SVC
+    CONV_ROUTE --> CONV_SVC
+    ORG_ROUTE --> ORG_SVC
+    API_KEY_ROUTE --> API_KEY_SVC
+    MCP_ROUTE --> MCP_SVC
+    MODEL_ROUTE --> HEALTH_SVC
+    
+    %% Service to repository connections
+    USER_SVC --> USER_REPO
+    CONV_SVC --> CONV_REPO
+    CONV_SVC --> ITEM_REPO
+    ORG_SVC --> ORG_REPO
+    ORG_SVC --> PROJECT_REPO
+    API_KEY_SVC --> API_KEY_REPO
+    
+    %% Repository to database connections
+    USER_REPO --> TX_MGR
+    CONV_REPO --> TX_MGR
+    ITEM_REPO --> TX_MGR
+    ORG_REPO --> TX_MGR
+    PROJECT_REPO --> TX_MGR
+    API_KEY_REPO --> TX_MGR
+    TX_MGR --> DB_WRITE
+    TX_MGR --> DB_READ
+    
+    %% Infrastructure connections
+    HEALTH_SVC --> CRON
+    HEALTH_SVC --> JAN_INFERENCE
+    
+    %% External service connections
+    CHAT_ROUTE --> JAN_INFERENCE
+    MCP_SVC --> SERPER_API
+    AUTH_ROUTE --> GOOGLE_OAUTH
+    PPROF --> PYROSCOPE
+    
+    %% Styling
+    classDef clientClass fill:#e1f5fe
+    classDef gatewayClass fill:#f3e5f5
+    classDef serviceClass fill:#e8f5e8
+    classDef dataClass fill:#fff3e0
+    classDef externalClass fill:#fce4ec
+    classDef infraClass fill:#f1f8e9
+    
+    class WEB,API_CLIENT,MOBILE,PROFILER clientClass
+    class GIN,MIDDLEWARE,AUTH_ROUTE,CHAT_ROUTE,CONV_ROUTE,ORG_ROUTE,API_KEY_ROUTE,MCP_ROUTE,MODEL_ROUTE gatewayClass
+    class USER_SVC,CONV_SVC,ORG_SVC,API_KEY_SVC,MCP_SVC,HEALTH_SVC serviceClass
+    class USER_REPO,CONV_REPO,ITEM_REPO,ORG_REPO,PROJECT_REPO,API_KEY_REPO,TX_MGR,DB_WRITE,DB_READ dataClass
+    class JAN_INFERENCE,SERPER_API,GOOGLE_OAUTH,PYROSCOPE externalClass
+    class PPROF,CRON infraClass
