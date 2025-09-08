@@ -24,6 +24,7 @@ func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 	conversationsRouter := router.Group("/conversations")
 
 	// Jan API endpoints (same as OpenAI for now, but can be extended)
+	conversationsRouter.GET("", api.handler.ListConversations) // Jan-specific: list all conversations
 	conversationsRouter.POST("", api.createConversation)
 	conversationsRouter.GET("/:conversation_id", api.getConversation)
 	conversationsRouter.PATCH("/:conversation_id", api.updateConversation)
@@ -33,9 +34,10 @@ func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 	conversationsRouter.GET("/:conversation_id/items/:item_id", api.getItem)
 	conversationsRouter.DELETE("/:conversation_id/items/:item_id", api.deleteItem)
 
-	// Future Jan-specific extensions can be added here:
-	// conversationsRouter.GET("", api.handler.ListConversations)  // Jan-specific: list all conversations
 	// conversationsRouter.GET("/:conversation_id/items/search", api.handler.SearchItems)  // Jan-specific: search items
+}
+
+func (api *ConversationAPI) ListConversations(ctx *gin.Context) {
 }
 
 // createConversation handles conversation creation
