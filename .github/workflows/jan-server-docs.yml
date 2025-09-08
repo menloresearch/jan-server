@@ -75,8 +75,18 @@ jobs:
         continue-on-error: true
         working-directory: docs
         run: |
-          cp _redirects dist/_redirects
-          cp _headers dist/_headers
+          if [ -f "_redirects" ]; then
+            cp _redirects dist/_redirects
+            echo "Copied _redirects file"
+          else
+            echo "_redirects file not found, skipping"
+          fi
+          if [ -f "_headers" ]; then
+            cp _headers dist/_headers
+            echo "Copied _headers file"
+          else
+            echo "_headers file not found, skipping"
+          fi
 
       - name: Publish to Cloudflare Pages PR Preview and Staging
         if: github.event_name == 'pull_request'
