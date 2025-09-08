@@ -1,28 +1,65 @@
-# Jan's Website
+# Jan Server Documentation
 
-This website is [built with Starlight](https://starlight.astro.build)
+This documentation site is built with [Starlight](https://starlight.astro.build) and mirrors the main [Jan documentation](https://docs.jan.ai) structure for consistency across the Jan ecosystem.
 
+## 🎯 For Jan Server Developers
 
-Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory. Each file is exposed
-as a route based on its file name.
+**Focus Area**: Work primarily in `./docs/src/content/docs/server/` - this is where all Jan Server-specific documentation lives.
 
-Images can be added to `src/assets/` and embedded in Markdown with a relative link.
+The navigation automatically routes to the main Jan docs:
+- **"Docs"** → `https://docs.jan.ai`
+- **"API Reference"** → `https://docs.jan.ai/api`
 
-Static assets, like favicons, can be placed in the `public/` directory.
+### Adding New Documentation
 
-If you want to add new pages, these can go in the `src/pages/` directory. Because of the topics plugin
-we are using ([starlight sidebar topics](https://starlight-sidebar-topics.netlify.app/docs/guides/excluded-pages/))
-you will need to exclude them from the sidebar by adding them to the exclude list in `astro.config.mjs`, e.g., `exclude: ['/example'],`.
+1. **Create files** in `./docs/src/content/docs/server/`
+2. **Update sidebar** in `astro.config.mjs` under the "Jan Server" section:
+
+```js
+{
+  label: "Jan Server",
+  items: [
+    { label: "Overview", slug: "server" },
+    { label: "Your New Page", slug: "server/your-new-page" }, // Add here
+    // ... existing items
+  ],
+}
+```
 
 ## 🧞 Commands
 
-All commands are run from the root of the project, from a terminal:
+All commands run from the `./docs/` directory:
 
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `bun install`             | Installs dependencies                            |
-| `bun dev`             | Starts local dev server at `localhost:4321`      |
-| `bun build`           | Build your production site to `./dist/`          |
-| `bun preview`         | Preview your build locally, before deploying     |
-| `bun astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `bun astro -- --help` | Get help using the Astro CLI                     |
+| Command               | Action                                    |
+| :-------------------- | :---------------------------------------- |
+| `bun install`         | Install dependencies                      |
+| `bun dev`             | Start dev server at `localhost:4321`     |
+| `bun build`           | Build production site to `./dist/`       |
+| `bun preview`         | Preview build locally                     |
+
+**⚠️ Important**: After running `bun dev`, manually navigate to `http://localhost:4321/server/` since the main index page doesn't exist in this repo (it's in the main Jan repository).
+
+## 📁 Structure
+
+```
+docs/
+├── src/content/docs/
+│   └── server/           ← Your work goes here
+├── astro.config.mjs      ← Update sidebar here
+└── public/
+    ├── scripts/
+    └── styles/
+```
+
+## 🔗 Navigation
+
+The site automatically includes navigation that links back to the main Jan documentation ecosystem. This ensures users can easily move between Jan Desktop docs, API Reference, and Jan Server docs.
+
+## 📝 Writing Guidelines
+
+- Use clear, concise language
+- Include code examples where helpful
+- Follow the existing documentation patterns from the main Jan docs
+- Test your changes with `bun dev` before committing
+
+For questions about the documentation structure or navigation, refer to the main [Jan documentation repository](https://github.com/menloresearch/jan).

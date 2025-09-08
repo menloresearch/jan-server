@@ -24,18 +24,16 @@ export default defineConfig({
     }),
     starlight({
       title: "👋 Jan",
-      favicon: "jan2.png",
+      favicon: "favicon.ico",
+      customCss: ["./src/styles/global.css"],
       head: [
         {
           tag: "script",
-          content: `
-            document.addEventListener('DOMContentLoaded', function() {
-              const logoLink = document.querySelector('a[href="/"]');
-              if (logoLink) {
-                logoLink.href = 'https://jan.ai';
-              }
-            });
-          `,
+          attrs: { src: "/scripts/inject-navigation.js", defer: true },
+        },
+        {
+          tag: "link",
+          attrs: { rel: "stylesheet", href: "/styles/navigation.css" },
         },
       ],
       plugins: [
