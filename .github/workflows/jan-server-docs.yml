@@ -26,12 +26,20 @@ jobs:
       deployments: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
 
       - uses: oven-sh/setup-bun@v2
+
+      - name: Verify docs directory
+        run: |
+          ls -la
+          ls -la docs/
+          ls -la docs/package.json
 
       - name: Install jq
         uses: dcarbone/install-jq-action@v2.0.1
@@ -55,7 +63,10 @@ jobs:
 
       - name: Install dependencies
         working-directory: docs
-        run: bun install
+        run: |
+          pwd
+          ls -la
+          bun install
       - name: Build docs
         working-directory: docs
         run: bun run build
@@ -64,8 +75,18 @@ jobs:
         continue-on-error: true
         working-directory: docs
         run: |
-          cp _redirects dist/_redirects
-          cp _headers dist/_headers
+          if [ -f "_redirects" ]; then
+            cp _redirects dist/_redirects
+            echo "Copied _redirects file"
+          else
+            echo "_redirects file not found, skipping"
+          fi
+          if [ -f "_headers" ]; then
+            cp _headers dist/_headers
+            echo "Copied _headers file"
+          else
+            echo "_headers file not found, skipping"
+          fi
 
       - name: Publish to Cloudflare Pages PR Preview and Staging
         if: github.event_name == 'pull_request'
