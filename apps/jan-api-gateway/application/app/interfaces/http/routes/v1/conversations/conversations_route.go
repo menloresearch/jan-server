@@ -2,20 +2,24 @@ package conversations
 
 import (
 	"github.com/gin-gonic/gin"
+	"menlo.ai/jan-api-gateway/app/domain/user"
 	_ "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation" // Import for Swagger types
 	conversationHandler "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/middleware"
 	_ "menlo.ai/jan-api-gateway/app/interfaces/http/responses" // Import for Swagger types
 )
 
 // ConversationAPI handles route registration for V1 conversations
 type ConversationAPI struct {
-	handler *conversationHandler.ConversationHandler
+	handler     *conversationHandler.ConversationHandler
+	userService *user.UserService
 }
 
 // NewConversationAPI creates a new conversation API instance
-func NewConversationAPI(handler *conversationHandler.ConversationHandler) *ConversationAPI {
+func NewConversationAPI(handler *conversationHandler.ConversationHandler, userService *user.UserService) *ConversationAPI {
 	return &ConversationAPI{
-		handler: handler,
+		handler:     handler,
+		userService: userService,
 	}
 }
 
@@ -23,15 +27,18 @@ func NewConversationAPI(handler *conversationHandler.ConversationHandler) *Conve
 func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 	conversationsRouter := router.Group("/conversations")
 
+	// Apply middleware to the entire group
+	conversationsGroup := conversationsRouter.Group("", middleware.AuthMiddleware(), api.userService.RegisteredApiKeyUserMiddleware())
+
 	// OpenAI-compatible endpoints with Swagger documentation
-	conversationsRouter.POST("", api.createConversation)
-	conversationsRouter.GET("/:conversation_id", api.getConversation)
-	conversationsRouter.PATCH("/:conversation_id", api.updateConversation)
-	conversationsRouter.DELETE("/:conversation_id", api.deleteConversation)
-	conversationsRouter.POST("/:conversation_id/items", api.createItems)
-	conversationsRouter.GET("/:conversation_id/items", api.listItems)
-	conversationsRouter.GET("/:conversation_id/items/:item_id", api.getItem)
-	conversationsRouter.DELETE("/:conversation_id/items/:item_id", api.deleteItem)
+	conversationsGroup.POST("", api.createConversation)
+	conversationsGroup.GET("/:conversation_id", api.getConversation)
+	conversationsGroup.PATCH("/:conversation_id", api.updateConversation)
+	conversationsGroup.DELETE("/:conversation_id", api.deleteConversation)
+	conversationsGroup.POST("/:conversation_id/items", api.createItems)
+	conversationsGroup.GET("/:conversation_id/items", api.listItems)
+	conversationsGroup.GET("/:conversation_id/items/:item_id", api.getItem)
+	conversationsGroup.DELETE("/:conversation_id/items/:item_id", api.deleteItem)
 }
 
 // createConversation handles conversation creation
