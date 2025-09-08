@@ -1,10 +1,5 @@
 package responses
 
-const (
-	// DefaultTimeout is the default timeout for non-streaming requests
-	DefaultTimeout = 60 * time.Second
-)
-
 import (
 	"context"
 	"fmt"
@@ -13,9 +8,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
+	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	requesttypes "menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	responsetypes "menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
+)
+
+const (
+	// DefaultTimeout is the default timeout for non-streaming requests
+	DefaultTimeout = 60 * time.Second
 )
 
 // NonStreamHandler handles non-streaming response requests
@@ -31,7 +32,7 @@ func NewNonStreamHandler(responseHandler *ResponseHandler) *NonStreamHandler {
 }
 
 // CreateNonStreamResponse handles the business logic for creating a non-streaming response
-func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string) {
+func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation) {
 	// Convert response request to chat completion request
 	chatCompletionRequest := h.convertToChatCompletionRequest(request)
 	if chatCompletionRequest == nil {
@@ -57,13 +58,25 @@ func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request 
 		return
 	}
 
+	// Append assistant's response to conversation
+	if len(response.Choices) > 0 && response.Choices[0].Message.Content != "" {
+		assistantMessage := openai.ChatCompletionMessage{
+			Role:    openai.ChatMessageRoleAssistant,
+			Content: response.Choices[0].Message.Content,
+		}
+		if err := h.appendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}); err != nil {
+			// Log error but don't fail the response
+			fmt.Printf("Failed to append assistant response to conversation: %v\n", err)
+		}
+	}
+
 	// Convert chat completion response to response format
-	responseData := h.convertFromChatCompletionResponse(response, request)
+	responseData := h.convertFromChatCompletionResponse(response, request, conv)
 	reqCtx.JSON(http.StatusOK, responseData.T)
 }
 
 // convertFromChatCompletionResponse converts a ChatCompletionResponse to a Response
-func (h *NonStreamHandler) convertFromChatCompletionResponse(chatResp *openai.ChatCompletionResponse, req *requesttypes.CreateResponseRequest) responsetypes.OpenAIGeneralResponse[responsetypes.Response] {
+func (h *NonStreamHandler) convertFromChatCompletionResponse(chatResp *openai.ChatCompletionResponse, req *requesttypes.CreateResponseRequest, conv *conversation.Conversation) responsetypes.OpenAIGeneralResponse[responsetypes.Response] {
 
 	// Extract the content from the first choice
 	var outputText string
@@ -112,15 +125,24 @@ func (h *NonStreamHandler) convertFromChatCompletionResponse(chatResp *openai.Ch
 		},
 	}
 
+	// Create conversation info
+	var conversationInfo *responsetypes.ConversationInfo
+	if conv != nil {
+		conversationInfo = &responsetypes.ConversationInfo{
+			ID: conv.PublicID,
+		}
+	}
+
 	response := responsetypes.Response{
-		ID:      chatResp.ID,
-		Object:  "response",
-		Created: chatResp.Created,
-		Model:   chatResp.Model,
-		Status:  responsetypes.ResponseStatusCompleted,
-		Input:   responseInput,
-		Output:  output,
-		Usage:   usage,
+		ID:           chatResp.ID,
+		Object:       "response",
+		Created:      chatResp.Created,
+		Model:        chatResp.Model,
+		Status:       responsetypes.ResponseStatusCompleted,
+		Input:        responseInput,
+		Output:       output,
+		Usage:        usage,
+		Conversation: conversationInfo,
 		// Add other OpenAI response fields
 		Error:              nil,
 		IncompleteDetails:  nil,

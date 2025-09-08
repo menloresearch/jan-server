@@ -23,7 +23,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
 	conversation2 "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
-	responses "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/responses"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/handlers/responses"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan"
 	v1_2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth"
@@ -33,20 +33,20 @@ import (
 	organization3 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization"
 	apikeys2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/api_keys"
 	projects2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects"
-	apikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects/api_keys"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects/api_keys"
 	responses2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/responses"
-	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
-	mcpimpl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	organization2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
+)
 
+import (
 	_ "github.com/grafana/pyroscope-go/godeltaprof/http/pprof"
-
 	_ "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
-
 	_ "net/http/pprof"
 )
 
@@ -90,7 +90,7 @@ func CreateApplication() (*Application, error) {
 	projectsProjectsRoute := projects2.NewProjectsRoute(userService, projectService, organizationService, projectApiKeyRoute)
 	organizationApiKeyRoute := apikeys2.NewOrganizationApiKeyRouteRoute(organizationService, apiKeyService, userService)
 	organizationOrganizationRoute := organization3.NewOrganizationRoute(organizationService, userService, projectsProjectsRoute, organizationApiKeyRoute)
-	responseHandler := responses.NewResponseHandler(userService, apiKeyService)
+	responseHandler := responses.NewResponseHandler(userService, apiKeyService, conversationService)
 	responseRoute := responses2.NewResponseRoute(responseHandler)
 	v1V1Route := v1_2.NewV1Route(authRoute, chatChatRoute, conversationsConversationAPI, organizationOrganizationRoute, responseRoute)
 	janRoute := jan.NewJanRoute(v1V1Route, chatChatRoute)

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	requesttypes "menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	responsetypes "menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
@@ -22,7 +23,7 @@ func NewStreamHandler(responseHandler *ResponseHandler) *StreamHandler {
 }
 
 // CreateStreamResponse handles the business logic for creating a streaming response
-func (h *StreamHandler) CreateStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string) {
+func (h *StreamHandler) CreateStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation) {
 	// Convert response request to chat completion request
 	chatCompletionRequest := h.convertToChatCompletionRequest(request)
 	if chatCompletionRequest == nil {
@@ -45,4 +46,9 @@ func (h *StreamHandler) CreateStreamResponse(reqCtx *gin.Context, request *reque
 			})
 		return
 	}
+
+	// TODO: For streaming responses, we need to collect the complete assistant response
+	// and append it to the conversation after the stream is complete.
+	// This requires modifying the streaming client to provide a callback or
+	// collecting the response chunks and appending them at the end.
 }

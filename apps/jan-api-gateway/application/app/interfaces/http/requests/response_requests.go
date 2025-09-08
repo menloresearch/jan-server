@@ -65,6 +65,9 @@ type CreateResponseRequest struct {
 
 	// The user to use for this response.
 	User *string `json:"user,omitempty"`
+
+	// The conversation ID to append items to. If not set or set to 'client-created-root', a new conversation will be created.
+	Conversation *string `json:"conversation,omitempty"`
 }
 
 // CreateResponseInput represents the input to the model

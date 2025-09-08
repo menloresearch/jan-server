@@ -85,6 +85,9 @@ type Response struct {
 	// The user that was provided for this response.
 	User *string `json:"user,omitempty"`
 
+	// The conversation that this response belongs to.
+	Conversation *ConversationInfo `json:"conversation,omitempty"`
+
 	// The usage statistics for this response.
 	Usage map[string]interface{} `json:"usage,omitempty"`
 
@@ -417,4 +420,10 @@ type ListInputItemsResponse struct {
 
 	// Whether there are more items available.
 	HasMore bool `json:"has_more"`
+}
+
+// ConversationInfo represents the conversation that a response belongs to
+type ConversationInfo struct {
+	// The unique ID of the conversation.
+	ID string `json:"id"`
 }

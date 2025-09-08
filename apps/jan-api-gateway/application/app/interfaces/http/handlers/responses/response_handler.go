@@ -8,6 +8,7 @@ import (
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
+	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
 	"menlo.ai/jan-api-gateway/app/domain/user"
 	requesttypes "menlo.ai/jan-api-gateway/app/interfaces/http/requests"
@@ -18,20 +19,23 @@ import (
 
 // ResponseHandler handles the business logic for response API endpoints
 type ResponseHandler struct {
-	UserService      *user.UserService
-	apikeyService    *apikey.ApiKeyService
-	streamHandler    *StreamHandler
-	nonStreamHandler *NonStreamHandler
+	UserService         *user.UserService
+	apikeyService       *apikey.ApiKeyService
+	conversationService *conversation.ConversationService
+	streamHandler       *StreamHandler
+	nonStreamHandler    *NonStreamHandler
 }
 
 // NewResponseHandler creates a new ResponseHandler instance
 func NewResponseHandler(
 	userService *user.UserService,
 	apikeyService *apikey.ApiKeyService,
+	conversationService *conversation.ConversationService,
 ) *ResponseHandler {
 	responseHandler := &ResponseHandler{
-		UserService:   userService,
-		apikeyService: apikeyService,
+		UserService:         userService,
+		apikeyService:       apikeyService,
+		conversationService: conversationService,
 	}
 
 	// Initialize specialized handlers
@@ -101,14 +105,106 @@ func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 		return
 	}
 
+	// Handle conversation logic
+	conversation, err := h.handleConversation(reqCtx, &request)
+	if err != nil {
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "a1b2c3d4-e5f6-7890-abcd-ef1234567890", err.Error())
+		return
+	}
+
+	// Append input messages to conversation
+	if err := h.appendMessagesToConversation(reqCtx, conversation, chatCompletionRequest.Messages); err != nil {
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "b2c3d4e5-f6g7-8901-bcde-f23456789012", err.Error())
+		return
+	}
+
 	// Delegate to specialized handlers based on streaming preference
 	if request.Stream != nil && *request.Stream {
 		// Handle streaming response
-		h.streamHandler.CreateStreamResponse(reqCtx, &request, key)
+		h.streamHandler.CreateStreamResponse(reqCtx, &request, key, conversation)
 	} else {
 		// Handle non-streaming response
-		h.nonStreamHandler.CreateNonStreamResponse(reqCtx, &request, key)
+		h.nonStreamHandler.CreateNonStreamResponse(reqCtx, &request, key, conversation)
 	}
+}
+
+// handleConversation handles conversation creation or loading based on the request
+func (h *ResponseHandler) handleConversation(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest) (*conversation.Conversation, error) {
+	// Get user from middleware context
+	userEntity, ok := h.UserService.GetUserFromContext(reqCtx)
+	if !ok {
+		return nil, fmt.Errorf("user not found in context")
+	}
+
+	// Check if conversation is specified and not 'client-created-root'
+	if request.Conversation != nil && *request.Conversation != "" && *request.Conversation != "client-created-root" {
+		// Load existing conversation
+		conv, err := h.conversationService.GetConversationByPublicIDAndUserID(reqCtx, *request.Conversation, userEntity.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load conversation: %w", err)
+		}
+		return conv, nil
+	}
+
+	// Create new conversation
+	conv, err := h.conversationService.CreateConversation(reqCtx, userEntity.ID, nil, true, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create conversation: %w", err)
+	}
+
+	return conv, nil
+}
+
+// appendMessagesToConversation converts chat completion messages to conversation items and appends them
+func (h *ResponseHandler) appendMessagesToConversation(reqCtx *gin.Context, conv *conversation.Conversation, messages []openai.ChatCompletionMessage) error {
+	if len(messages) == 0 {
+		return nil
+	}
+
+	// Convert messages to conversation items
+	itemsToCreate := make([]conversation.ItemCreationData, len(messages))
+	for i, msg := range messages {
+		// Convert OpenAI role to conversation role
+		var role *conversation.ItemRole
+		switch msg.Role {
+		case openai.ChatMessageRoleSystem:
+			roleStr := conversation.ItemRole("system")
+			role = &roleStr
+		case openai.ChatMessageRoleUser:
+			roleStr := conversation.ItemRole("user")
+			role = &roleStr
+		case openai.ChatMessageRoleAssistant:
+			roleStr := conversation.ItemRole("assistant")
+			role = &roleStr
+		default:
+			roleStr := conversation.ItemRole("user")
+			role = &roleStr
+		}
+
+		// Create content
+		content := []conversation.Content{
+			{
+				Type: "text",
+				Text: &conversation.Text{
+					Value: msg.Content,
+				},
+			},
+		}
+
+		itemsToCreate[i] = conversation.ItemCreationData{
+			Type:    conversation.ItemType("message"),
+			Role:    role,
+			Content: content,
+		}
+	}
+
+	// Add items to conversation
+	_, err := h.conversationService.AddMultipleItems(reqCtx, conv, conv.UserID, itemsToCreate)
+	if err != nil {
+		return fmt.Errorf("failed to add messages to conversation: %w", err)
+	}
+
+	return nil
 }
 
 // convertToChatCompletionRequest converts a CreateResponseRequest to a ChatCompletionRequest
@@ -253,6 +349,9 @@ func (h *ResponseHandler) GetResponse(reqCtx *gin.Context) {
 				Value: "Hello! How can I help you today?",
 			},
 		},
+		Conversation: &responsetypes.ConversationInfo{
+			ID: "mock-conversation-id",
+		},
 	}
 
 	h.sendSuccessResponse(reqCtx, mockResponse)
@@ -284,6 +383,9 @@ func (h *ResponseHandler) DeleteResponse(reqCtx *gin.Context) {
 			Text: ptr.ToString("Hello, world!"),
 		},
 		CancelledAt: ptr.ToInt64(1234567890),
+		Conversation: &responsetypes.ConversationInfo{
+			ID: "mock-conversation-id",
+		},
 	}
 
 	h.sendSuccessResponse(reqCtx, mockResponse)
@@ -315,6 +417,9 @@ func (h *ResponseHandler) CancelResponse(reqCtx *gin.Context) {
 			Text: ptr.ToString("Hello, world!"),
 		},
 		CancelledAt: ptr.ToInt64(1234567890),
+		Conversation: &responsetypes.ConversationInfo{
+			ID: "mock-conversation-id",
+		},
 	}
 
 	h.sendSuccessResponse(reqCtx, mockResponse)
@@ -364,7 +469,7 @@ func (h *ResponseHandler) validateUserAndResponseID(reqCtx *gin.Context, respons
 
 	// Validate response ID
 	if validationError := ValidateResponseID(responseID); validationError != nil {
-		return nil, fmt.Errorf(validationError.Message)
+		return nil, fmt.Errorf("validation error: %s", validationError.Message)
 	}
 
 	return userEntity, nil

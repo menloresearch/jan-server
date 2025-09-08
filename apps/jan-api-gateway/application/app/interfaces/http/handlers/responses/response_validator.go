@@ -143,7 +143,7 @@ func ValidateCreateResponseRequest(req *requesttypes.CreateResponseRequest) *Val
 	return nil
 }
 
-// validateInput validates the input field (can be string or array of strings)
+// validateInput validates the input field (can be string, array of strings, or structured CreateResponseInput)
 func validateInput(input interface{}) *[]ValidationError {
 	var errors []ValidationError
 
@@ -191,10 +191,23 @@ func validateInput(input interface{}) *[]ValidationError {
 				})
 			}
 		}
+	case map[string]interface{}:
+		// Check if this is a structured CreateResponseInput object
+		if structuredInput := convertToCreateResponseInput(v); structuredInput != nil {
+			// Delegate to structured input validation
+			if err := validateCreateResponseInput(structuredInput); err != nil {
+				errors = append(errors, *err...)
+			}
+		} else {
+			// Treat as a single message object
+			if err := validateMessageObject(v, 0); err != nil {
+				errors = append(errors, *err...)
+			}
+		}
 	default:
 		errors = append(errors, ValidationError{
 			Field:   "input",
-			Message: "input must be a string or array of strings/message objects",
+			Message: "input must be a string, array of strings/message objects, or structured input object",
 		})
 	}
 
@@ -203,6 +216,164 @@ func validateInput(input interface{}) *[]ValidationError {
 	}
 
 	return nil
+}
+
+// convertToCreateResponseInput attempts to convert a map to CreateResponseInput
+// Returns nil if the map doesn't represent a structured input
+func convertToCreateResponseInput(inputMap map[string]interface{}) *requesttypes.CreateResponseInput {
+	// Check if this looks like a structured input by looking for a 'type' field
+	typeField, hasType := inputMap["type"]
+	if !hasType {
+		return nil
+	}
+
+	typeStr, ok := typeField.(string)
+	if !ok {
+		return nil
+	}
+
+	// Check if it's a valid input type
+	switch requesttypes.InputType(typeStr) {
+	case requesttypes.InputTypeText,
+		requesttypes.InputTypeImage,
+		requesttypes.InputTypeFile,
+		requesttypes.InputTypeWebSearch,
+		requesttypes.InputTypeFileSearch,
+		requesttypes.InputTypeStreaming,
+		requesttypes.InputTypeFunctionCalls,
+		requesttypes.InputTypeReasoning:
+		// This looks like a structured input, create the object
+		structuredInput := &requesttypes.CreateResponseInput{
+			Type: requesttypes.InputType(typeStr),
+		}
+
+		// Extract type-specific fields based on the input type
+		switch requesttypes.InputType(typeStr) {
+		case requesttypes.InputTypeText:
+			if text, ok := inputMap["text"].(string); ok {
+				structuredInput.Text = &text
+			}
+		case requesttypes.InputTypeImage:
+			if imageData, ok := inputMap["image"].(map[string]interface{}); ok {
+				imageInput := &requesttypes.ImageInput{}
+				if url, ok := imageData["url"].(string); ok {
+					imageInput.URL = &url
+				}
+				if data, ok := imageData["data"].(string); ok {
+					imageInput.Data = &data
+				}
+				if detail, ok := imageData["detail"].(string); ok {
+					imageInput.Detail = &detail
+				}
+				structuredInput.Image = imageInput
+			}
+		case requesttypes.InputTypeFile:
+			if fileData, ok := inputMap["file"].(map[string]interface{}); ok {
+				if fileID, ok := fileData["file_id"].(string); ok {
+					structuredInput.File = &requesttypes.FileInput{
+						FileID: fileID,
+					}
+				}
+			}
+		case requesttypes.InputTypeWebSearch:
+			if webSearchData, ok := inputMap["web_search"].(map[string]interface{}); ok {
+				if query, ok := webSearchData["query"].(string); ok {
+					webSearchInput := &requesttypes.WebSearchInput{
+						Query: query,
+					}
+					if maxResults, ok := webSearchData["max_results"].(float64); ok {
+						maxResultsInt := int(maxResults)
+						webSearchInput.MaxResults = &maxResultsInt
+					}
+					if searchEngine, ok := webSearchData["search_engine"].(string); ok {
+						webSearchInput.SearchEngine = &searchEngine
+					}
+					structuredInput.WebSearch = webSearchInput
+				}
+			}
+		case requesttypes.InputTypeFileSearch:
+			if fileSearchData, ok := inputMap["file_search"].(map[string]interface{}); ok {
+				if query, ok := fileSearchData["query"].(string); ok {
+					fileSearchInput := &requesttypes.FileSearchInput{
+						Query: query,
+					}
+					if fileIDs, ok := fileSearchData["file_ids"].([]interface{}); ok {
+						fileSearchInput.FileIDs = make([]string, len(fileIDs))
+						for i, id := range fileIDs {
+							if idStr, ok := id.(string); ok {
+								fileSearchInput.FileIDs[i] = idStr
+							}
+						}
+					}
+					if maxResults, ok := fileSearchData["max_results"].(float64); ok {
+						maxResultsInt := int(maxResults)
+						fileSearchInput.MaxResults = &maxResultsInt
+					}
+					structuredInput.FileSearch = fileSearchInput
+				}
+			}
+		case requesttypes.InputTypeStreaming:
+			if streamingData, ok := inputMap["streaming"].(map[string]interface{}); ok {
+				if url, ok := streamingData["url"].(string); ok {
+					streamingInput := &requesttypes.StreamingInput{
+						URL: url,
+					}
+					if method, ok := streamingData["method"].(string); ok {
+						streamingInput.Method = &method
+					}
+					if body, ok := streamingData["body"].(string); ok {
+						streamingInput.Body = &body
+					}
+					if headers, ok := streamingData["headers"].(map[string]interface{}); ok {
+						streamingInput.Headers = make(map[string]string)
+						for k, v := range headers {
+							if vStr, ok := v.(string); ok {
+								streamingInput.Headers[k] = vStr
+							}
+						}
+					}
+					structuredInput.Streaming = streamingInput
+				}
+			}
+		case requesttypes.InputTypeFunctionCalls:
+			if functionCallsData, ok := inputMap["function_calls"].(map[string]interface{}); ok {
+				if calls, ok := functionCallsData["calls"].([]interface{}); ok {
+					functionCallsInput := &requesttypes.FunctionCallsInput{
+						Calls: make([]requesttypes.FunctionCall, len(calls)),
+					}
+					for i, call := range calls {
+						if callData, ok := call.(map[string]interface{}); ok {
+							if name, ok := callData["name"].(string); ok {
+								functionCallsInput.Calls[i] = requesttypes.FunctionCall{
+									Name: name,
+								}
+								if args, ok := callData["arguments"].(map[string]interface{}); ok {
+									functionCallsInput.Calls[i].Arguments = args
+								}
+							}
+						}
+					}
+					structuredInput.FunctionCalls = functionCallsInput
+				}
+			}
+		case requesttypes.InputTypeReasoning:
+			if reasoningData, ok := inputMap["reasoning"].(map[string]interface{}); ok {
+				if task, ok := reasoningData["task"].(string); ok {
+					reasoningInput := &requesttypes.ReasoningInput{
+						Task: task,
+					}
+					if context, ok := reasoningData["context"].(string); ok {
+						reasoningInput.Context = &context
+					}
+					structuredInput.Reasoning = reasoningInput
+				}
+			}
+		}
+
+		return structuredInput
+	default:
+		return nil
+	}
 }
 
 // validateMessageObject validates a message object in the input array
