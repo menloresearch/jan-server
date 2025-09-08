@@ -6,8 +6,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/net/context"
+	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
 )
@@ -15,12 +17,14 @@ import (
 type UserService struct {
 	userrepo            UserRepository
 	organizationService *organization.OrganizationService
+	apiKeyService       *apikey.ApiKeyService
 }
 
-func NewService(userrepo UserRepository, organizationService *organization.OrganizationService) *UserService {
+func NewService(userrepo UserRepository, organizationService *organization.OrganizationService, apiKeyService *apikey.ApiKeyService) *UserService {
 	return &UserService{
 		userrepo:            userrepo,
 		organizationService: organizationService,
+		apiKeyService:       apiKeyService,
 	}
 }
 
@@ -107,4 +111,63 @@ func (s *UserService) GetUserFromContext(reqCtx *gin.Context) (*User, bool) {
 		return nil, false
 	}
 	return user.(*User), true
+}
+
+// RegisteredApiKeyUserMiddleware validates API key and ensures the associated user is registered
+func (s *UserService) RegisteredApiKeyUserMiddleware() gin.HandlerFunc {
+	return func(reqCtx *gin.Context) {
+		ctx := reqCtx.Request.Context()
+
+		// Extract API key from Bearer token
+		apiKeyString, ok := requests.GetTokenFromBearer(reqCtx)
+		if !ok {
+			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+				Code:  "019928bd-2c6d-74bb-a03a-02a4fbcf292c",
+				Error: "API key not provided",
+			})
+			return
+		}
+
+		// Find API key by hash
+		apiKeyEntity, err := s.apiKeyService.FindByKey(ctx, apiKeyString)
+		if err != nil {
+			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+				Code:  "019928bd-57f8-7418-9c17-51c21cbf0f17",
+				Error: "Invalid API key",
+			})
+			return
+		}
+
+		// Validate API key
+		if !apiKeyEntity.IsValid() {
+			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+				Code:  "019928bd-67a8-743d-9843-785936bebc54",
+				Error: "API key is disabled or expired",
+			})
+			return
+		}
+
+		// Check if API key has an owner (user)
+		if apiKeyEntity.OwnerID == nil {
+			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+				Code:  "019928bd-78cb-734e-8b2c-d0ba0c43cb73",
+				Error: "API key has no associated user",
+			})
+			return
+		}
+
+		// Fetch the user by ID
+		userEntity, err := s.FindByID(ctx, *apiKeyEntity.OwnerID)
+		if err != nil {
+			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+				Code:  "019928bd-89dc-735f-8c3d-e1cb1d44dc84",
+				Error: "User not found",
+			})
+			return
+		}
+
+		// Store user in context for later use
+		reqCtx.Set(string(UserContextKeyEntity), userEntity)
+		reqCtx.Next()
+	}
 }
