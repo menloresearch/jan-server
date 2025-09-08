@@ -23,7 +23,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
 	conversation2 "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/handlers/responses"
+	responses "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/responses"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan"
 	v1_2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth"
@@ -33,20 +33,20 @@ import (
 	organization3 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization"
 	apikeys2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/api_keys"
 	projects2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects/api_keys"
+	apikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects/api_keys"
 	responses2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/responses"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
+	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
+	mcpimpl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	organization2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
-)
 
-import (
 	_ "github.com/grafana/pyroscope-go/godeltaprof/http/pprof"
+
 	_ "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
+
 	_ "net/http/pprof"
 )
 
