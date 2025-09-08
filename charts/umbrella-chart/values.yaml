@@ -25,6 +25,8 @@ jan-api-gateway:
       value: host=jan-server-postgresql user=jan-user password=jan-password dbname=jan port=5432 sslmode=disable
     - name: APIKEY_SECRET
       value: fhWMCXu29gKRcs6//I0HwaQgvTgv0uMdLRshU5cyC+4=
+    - name: ALLOWED_CORS_HOSTS
+      value: http://localhost:8080
 
 jan-inference-model:
   replicaCount: 1
