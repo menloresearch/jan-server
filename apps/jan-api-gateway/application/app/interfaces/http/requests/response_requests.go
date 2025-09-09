@@ -1,4 +1,4 @@
-package responses
+package requests
 
 // CreateResponseRequest represents the request body for creating a response
 // Reference: https://platform.openai.com/docs/api-reference/responses/create
@@ -6,8 +6,8 @@ type CreateResponseRequest struct {
 	// The ID of the model to use for this response.
 	Model string `json:"model" binding:"required"`
 
-	// The input to the model.
-	Input CreateResponseInput `json:"input" binding:"required"`
+	// The input to the model. Can be a string or array of strings.
+	Input interface{} `json:"input" binding:"required"`
 
 	// The system prompt to use for this response.
 	SystemPrompt *string `json:"system_prompt,omitempty"`
@@ -65,6 +65,9 @@ type CreateResponseRequest struct {
 
 	// The user to use for this response.
 	User *string `json:"user,omitempty"`
+
+	// The conversation ID to append items to. If not set or set to 'client-created-root', a new conversation will be created.
+	Conversation *string `json:"conversation,omitempty"`
 }
 
 // CreateResponseInput represents the input to the model

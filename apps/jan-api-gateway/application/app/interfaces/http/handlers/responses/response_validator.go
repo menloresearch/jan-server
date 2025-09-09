@@ -3,6 +3,8 @@ package responses
 import (
 	"fmt"
 	"strings"
+
+	requesttypes "menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 )
 
 // ValidationError represents a validation error
@@ -17,7 +19,7 @@ type ValidationErrors struct {
 }
 
 // ValidateCreateResponseRequest validates a CreateResponseRequest
-func ValidateCreateResponseRequest(req *CreateResponseRequest) *ValidationErrors {
+func ValidateCreateResponseRequest(req *requesttypes.CreateResponseRequest) *ValidationErrors {
 	var errors []ValidationError
 
 	// Validate model
@@ -29,7 +31,7 @@ func ValidateCreateResponseRequest(req *CreateResponseRequest) *ValidationErrors
 	}
 
 	// Validate input
-	if err := validateCreateResponseInput(&req.Input); err != nil {
+	if err := validateInput(req.Input); err != nil {
 		errors = append(errors, *err...)
 	}
 
@@ -141,8 +143,285 @@ func ValidateCreateResponseRequest(req *CreateResponseRequest) *ValidationErrors
 	return nil
 }
 
-// validateCreateResponseInput validates a CreateResponseInput
-func validateCreateResponseInput(input *CreateResponseInput) *[]ValidationError {
+// validateInput validates the input field (can be string, array of strings, or structured CreateResponseInput)
+func validateInput(input interface{}) *[]ValidationError {
+	var errors []ValidationError
+
+	if input == nil {
+		errors = append(errors, ValidationError{
+			Field:   "input",
+			Message: "input is required",
+		})
+		return &errors
+	}
+
+	switch v := input.(type) {
+	case string:
+		if v == "" {
+			errors = append(errors, ValidationError{
+				Field:   "input",
+				Message: "input string cannot be empty",
+			})
+		}
+	case []interface{}:
+		if len(v) == 0 {
+			errors = append(errors, ValidationError{
+				Field:   "input",
+				Message: "input array cannot be empty",
+			})
+		}
+		for i, item := range v {
+			switch itemVal := item.(type) {
+			case string:
+				if itemVal == "" {
+					errors = append(errors, ValidationError{
+						Field:   fmt.Sprintf("input[%d]", i),
+						Message: "input array string items cannot be empty",
+					})
+				}
+			case map[string]interface{}:
+				// Validate message object format
+				if err := validateMessageObject(itemVal, i); err != nil {
+					errors = append(errors, *err...)
+				}
+			default:
+				errors = append(errors, ValidationError{
+					Field:   fmt.Sprintf("input[%d]", i),
+					Message: "input array items must be strings or message objects with 'role' and 'content'",
+				})
+			}
+		}
+	case map[string]interface{}:
+		// Check if this is a structured CreateResponseInput object
+		if structuredInput := convertToCreateResponseInput(v); structuredInput != nil {
+			// Delegate to structured input validation
+			if err := validateCreateResponseInput(structuredInput); err != nil {
+				errors = append(errors, *err...)
+			}
+		} else {
+			// Treat as a single message object
+			if err := validateMessageObject(v, 0); err != nil {
+				errors = append(errors, *err...)
+			}
+		}
+	default:
+		errors = append(errors, ValidationError{
+			Field:   "input",
+			Message: "input must be a string, array of strings/message objects, or structured input object",
+		})
+	}
+
+	if len(errors) > 0 {
+		return &errors
+	}
+
+	return nil
+}
+
+// convertToCreateResponseInput attempts to convert a map to CreateResponseInput
+// Returns nil if the map doesn't represent a structured input
+func convertToCreateResponseInput(inputMap map[string]interface{}) *requesttypes.CreateResponseInput {
+	// Check if this looks like a structured input by looking for a 'type' field
+	typeField, hasType := inputMap["type"]
+	if !hasType {
+		return nil
+	}
+
+	typeStr, ok := typeField.(string)
+	if !ok {
+		return nil
+	}
+
+	// Check if it's a valid input type
+	switch requesttypes.InputType(typeStr) {
+	case requesttypes.InputTypeText,
+		requesttypes.InputTypeImage,
+		requesttypes.InputTypeFile,
+		requesttypes.InputTypeWebSearch,
+		requesttypes.InputTypeFileSearch,
+		requesttypes.InputTypeStreaming,
+		requesttypes.InputTypeFunctionCalls,
+		requesttypes.InputTypeReasoning:
+		// This looks like a structured input, create the object
+		structuredInput := &requesttypes.CreateResponseInput{
+			Type: requesttypes.InputType(typeStr),
+		}
+
+		// Extract type-specific fields based on the input type
+		switch requesttypes.InputType(typeStr) {
+		case requesttypes.InputTypeText:
+			if text, ok := inputMap["text"].(string); ok {
+				structuredInput.Text = &text
+			}
+		case requesttypes.InputTypeImage:
+			if imageData, ok := inputMap["image"].(map[string]interface{}); ok {
+				imageInput := &requesttypes.ImageInput{}
+				if url, ok := imageData["url"].(string); ok {
+					imageInput.URL = &url
+				}
+				if data, ok := imageData["data"].(string); ok {
+					imageInput.Data = &data
+				}
+				if detail, ok := imageData["detail"].(string); ok {
+					imageInput.Detail = &detail
+				}
+				structuredInput.Image = imageInput
+			}
+		case requesttypes.InputTypeFile:
+			if fileData, ok := inputMap["file"].(map[string]interface{}); ok {
+				if fileID, ok := fileData["file_id"].(string); ok {
+					structuredInput.File = &requesttypes.FileInput{
+						FileID: fileID,
+					}
+				}
+			}
+		case requesttypes.InputTypeWebSearch:
+			if webSearchData, ok := inputMap["web_search"].(map[string]interface{}); ok {
+				if query, ok := webSearchData["query"].(string); ok {
+					webSearchInput := &requesttypes.WebSearchInput{
+						Query: query,
+					}
+					if maxResults, ok := webSearchData["max_results"].(float64); ok {
+						maxResultsInt := int(maxResults)
+						webSearchInput.MaxResults = &maxResultsInt
+					}
+					if searchEngine, ok := webSearchData["search_engine"].(string); ok {
+						webSearchInput.SearchEngine = &searchEngine
+					}
+					structuredInput.WebSearch = webSearchInput
+				}
+			}
+		case requesttypes.InputTypeFileSearch:
+			if fileSearchData, ok := inputMap["file_search"].(map[string]interface{}); ok {
+				if query, ok := fileSearchData["query"].(string); ok {
+					fileSearchInput := &requesttypes.FileSearchInput{
+						Query: query,
+					}
+					if fileIDs, ok := fileSearchData["file_ids"].([]interface{}); ok {
+						fileSearchInput.FileIDs = make([]string, len(fileIDs))
+						for i, id := range fileIDs {
+							if idStr, ok := id.(string); ok {
+								fileSearchInput.FileIDs[i] = idStr
+							}
+						}
+					}
+					if maxResults, ok := fileSearchData["max_results"].(float64); ok {
+						maxResultsInt := int(maxResults)
+						fileSearchInput.MaxResults = &maxResultsInt
+					}
+					structuredInput.FileSearch = fileSearchInput
+				}
+			}
+		case requesttypes.InputTypeStreaming:
+			if streamingData, ok := inputMap["streaming"].(map[string]interface{}); ok {
+				if url, ok := streamingData["url"].(string); ok {
+					streamingInput := &requesttypes.StreamingInput{
+						URL: url,
+					}
+					if method, ok := streamingData["method"].(string); ok {
+						streamingInput.Method = &method
+					}
+					if body, ok := streamingData["body"].(string); ok {
+						streamingInput.Body = &body
+					}
+					if headers, ok := streamingData["headers"].(map[string]interface{}); ok {
+						streamingInput.Headers = make(map[string]string)
+						for k, v := range headers {
+							if vStr, ok := v.(string); ok {
+								streamingInput.Headers[k] = vStr
+							}
+						}
+					}
+					structuredInput.Streaming = streamingInput
+				}
+			}
+		case requesttypes.InputTypeFunctionCalls:
+			if functionCallsData, ok := inputMap["function_calls"].(map[string]interface{}); ok {
+				if calls, ok := functionCallsData["calls"].([]interface{}); ok {
+					functionCallsInput := &requesttypes.FunctionCallsInput{
+						Calls: make([]requesttypes.FunctionCall, len(calls)),
+					}
+					for i, call := range calls {
+						if callData, ok := call.(map[string]interface{}); ok {
+							if name, ok := callData["name"].(string); ok {
+								functionCallsInput.Calls[i] = requesttypes.FunctionCall{
+									Name: name,
+								}
+								if args, ok := callData["arguments"].(map[string]interface{}); ok {
+									functionCallsInput.Calls[i].Arguments = args
+								}
+							}
+						}
+					}
+					structuredInput.FunctionCalls = functionCallsInput
+				}
+			}
+		case requesttypes.InputTypeReasoning:
+			if reasoningData, ok := inputMap["reasoning"].(map[string]interface{}); ok {
+				if task, ok := reasoningData["task"].(string); ok {
+					reasoningInput := &requesttypes.ReasoningInput{
+						Task: task,
+					}
+					if context, ok := reasoningData["context"].(string); ok {
+						reasoningInput.Context = &context
+					}
+					structuredInput.Reasoning = reasoningInput
+				}
+			}
+		}
+
+		return structuredInput
+	default:
+		return nil
+	}
+}
+
+// validateMessageObject validates a message object in the input array
+func validateMessageObject(msg map[string]interface{}, index int) *[]ValidationError {
+	var errors []ValidationError
+
+	// Check for required role field
+	role, hasRole := msg["role"]
+	if !hasRole {
+		errors = append(errors, ValidationError{
+			Field:   fmt.Sprintf("input[%d].role", index),
+			Message: "role is required for message objects",
+		})
+	} else if roleStr, ok := role.(string); !ok || roleStr == "" {
+		errors = append(errors, ValidationError{
+			Field:   fmt.Sprintf("input[%d].role", index),
+			Message: "role must be a non-empty string",
+		})
+	} else if roleStr != "system" && roleStr != "user" && roleStr != "assistant" {
+		errors = append(errors, ValidationError{
+			Field:   fmt.Sprintf("input[%d].role", index),
+			Message: "role must be one of: system, user, assistant",
+		})
+	}
+
+	// Check for required content field
+	content, hasContent := msg["content"]
+	if !hasContent {
+		errors = append(errors, ValidationError{
+			Field:   fmt.Sprintf("input[%d].content", index),
+			Message: "content is required for message objects",
+		})
+	} else if contentStr, ok := content.(string); !ok || contentStr == "" {
+		errors = append(errors, ValidationError{
+			Field:   fmt.Sprintf("input[%d].content", index),
+			Message: "content must be a non-empty string",
+		})
+	}
+
+	if len(errors) > 0 {
+		return &errors
+	}
+
+	return nil
+}
+
+// validateCreateResponseInput validates a CreateResponseInput (legacy function for backward compatibility)
+func validateCreateResponseInput(input *requesttypes.CreateResponseInput) *[]ValidationError {
 	var errors []ValidationError
 
 	// Validate type
@@ -156,14 +435,14 @@ func validateCreateResponseInput(input *CreateResponseInput) *[]ValidationError 
 
 	// Validate type-specific fields
 	switch input.Type {
-	case InputTypeText:
+	case requesttypes.InputTypeText:
 		if input.Text == nil || *input.Text == "" {
 			errors = append(errors, ValidationError{
 				Field:   "input.text",
 				Message: "input.text is required for text type",
 			})
 		}
-	case InputTypeImage:
+	case requesttypes.InputTypeImage:
 		if input.Image == nil {
 			errors = append(errors, ValidationError{
 				Field:   "input.image",
@@ -174,7 +453,7 @@ func validateCreateResponseInput(input *CreateResponseInput) *[]ValidationError 
 				errors = append(errors, *err...)
 			}
 		}
-	case InputTypeFile:
+	case requesttypes.InputTypeFile:
 		if input.File == nil {
 			errors = append(errors, ValidationError{
 				Field:   "input.file",
@@ -185,7 +464,7 @@ func validateCreateResponseInput(input *CreateResponseInput) *[]ValidationError 
 				errors = append(errors, *err...)
 			}
 		}
-	case InputTypeWebSearch:
+	case requesttypes.InputTypeWebSearch:
 		if input.WebSearch == nil {
 			errors = append(errors, ValidationError{
 				Field:   "input.web_search",
@@ -196,7 +475,7 @@ func validateCreateResponseInput(input *CreateResponseInput) *[]ValidationError 
 				errors = append(errors, *err...)
 			}
 		}
-	case InputTypeFileSearch:
+	case requesttypes.InputTypeFileSearch:
 		if input.FileSearch == nil {
 			errors = append(errors, ValidationError{
 				Field:   "input.file_search",
@@ -207,7 +486,7 @@ func validateCreateResponseInput(input *CreateResponseInput) *[]ValidationError 
 				errors = append(errors, *err...)
 			}
 		}
-	case InputTypeStreaming:
+	case requesttypes.InputTypeStreaming:
 		if input.Streaming == nil {
 			errors = append(errors, ValidationError{
 				Field:   "input.streaming",
@@ -218,7 +497,7 @@ func validateCreateResponseInput(input *CreateResponseInput) *[]ValidationError 
 				errors = append(errors, *err...)
 			}
 		}
-	case InputTypeFunctionCalls:
+	case requesttypes.InputTypeFunctionCalls:
 		if input.FunctionCalls == nil {
 			errors = append(errors, ValidationError{
 				Field:   "input.function_calls",
@@ -229,7 +508,7 @@ func validateCreateResponseInput(input *CreateResponseInput) *[]ValidationError 
 				errors = append(errors, *err...)
 			}
 		}
-	case InputTypeReasoning:
+	case requesttypes.InputTypeReasoning:
 		if input.Reasoning == nil {
 			errors = append(errors, ValidationError{
 				Field:   "input.reasoning",
@@ -255,7 +534,7 @@ func validateCreateResponseInput(input *CreateResponseInput) *[]ValidationError 
 }
 
 // validateImageInput validates an ImageInput
-func validateImageInput(image *ImageInput) *[]ValidationError {
+func validateImageInput(image *requesttypes.ImageInput) *[]ValidationError {
 	var errors []ValidationError
 
 	// Either URL or data must be provided
@@ -312,7 +591,7 @@ func validateImageInput(image *ImageInput) *[]ValidationError {
 }
 
 // validateFileInput validates a FileInput
-func validateFileInput(file *FileInput) *[]ValidationError {
+func validateFileInput(file *requesttypes.FileInput) *[]ValidationError {
 	var errors []ValidationError
 
 	if file.FileID == "" {
@@ -330,7 +609,7 @@ func validateFileInput(file *FileInput) *[]ValidationError {
 }
 
 // validateWebSearchInput validates a WebSearchInput
-func validateWebSearchInput(webSearch *WebSearchInput) *[]ValidationError {
+func validateWebSearchInput(webSearch *requesttypes.WebSearchInput) *[]ValidationError {
 	var errors []ValidationError
 
 	if webSearch.Query == "" {
@@ -357,7 +636,7 @@ func validateWebSearchInput(webSearch *WebSearchInput) *[]ValidationError {
 }
 
 // validateFileSearchInput validates a FileSearchInput
-func validateFileSearchInput(fileSearch *FileSearchInput) *[]ValidationError {
+func validateFileSearchInput(fileSearch *requesttypes.FileSearchInput) *[]ValidationError {
 	var errors []ValidationError
 
 	if fileSearch.Query == "" {
@@ -391,7 +670,7 @@ func validateFileSearchInput(fileSearch *FileSearchInput) *[]ValidationError {
 }
 
 // validateStreamingInput validates a StreamingInput
-func validateStreamingInput(streaming *StreamingInput) *[]ValidationError {
+func validateStreamingInput(streaming *requesttypes.StreamingInput) *[]ValidationError {
 	var errors []ValidationError
 
 	if streaming.URL == "" {
@@ -424,7 +703,7 @@ func validateStreamingInput(streaming *StreamingInput) *[]ValidationError {
 }
 
 // validateFunctionCallsInput validates a FunctionCallsInput
-func validateFunctionCallsInput(functionCalls *FunctionCallsInput) *[]ValidationError {
+func validateFunctionCallsInput(functionCalls *requesttypes.FunctionCallsInput) *[]ValidationError {
 	var errors []ValidationError
 
 	if len(functionCalls.Calls) == 0 {
@@ -451,7 +730,7 @@ func validateFunctionCallsInput(functionCalls *FunctionCallsInput) *[]Validation
 }
 
 // validateReasoningInput validates a ReasoningInput
-func validateReasoningInput(reasoning *ReasoningInput) *[]ValidationError {
+func validateReasoningInput(reasoning *requesttypes.ReasoningInput) *[]ValidationError {
 	var errors []ValidationError
 
 	if reasoning.Task == "" {
@@ -469,7 +748,7 @@ func validateReasoningInput(reasoning *ReasoningInput) *[]ValidationError {
 }
 
 // validateResponseFormat validates a ResponseFormat
-func validateResponseFormat(format *ResponseFormat) *[]ValidationError {
+func validateResponseFormat(format *requesttypes.ResponseFormat) *[]ValidationError {
 	var errors []ValidationError
 
 	if format.Type == "" {
@@ -492,7 +771,7 @@ func validateResponseFormat(format *ResponseFormat) *[]ValidationError {
 }
 
 // validateTools validates a slice of Tools
-func validateTools(tools []Tool) *[]ValidationError {
+func validateTools(tools []requesttypes.Tool) *[]ValidationError {
 	var errors []ValidationError
 
 	for i, tool := range tools {
@@ -533,7 +812,7 @@ func validateTools(tools []Tool) *[]ValidationError {
 }
 
 // validateToolChoice validates a ToolChoice
-func validateToolChoice(choice *ToolChoice) *[]ValidationError {
+func validateToolChoice(choice *requesttypes.ToolChoice) *[]ValidationError {
 	var errors []ValidationError
 
 	if choice.Type == "" {

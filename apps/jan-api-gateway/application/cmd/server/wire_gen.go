@@ -90,7 +90,7 @@ func CreateApplication() (*Application, error) {
 	projectsProjectsRoute := projects2.NewProjectsRoute(userService, projectService, organizationService, projectApiKeyRoute)
 	organizationApiKeyRoute := apikeys2.NewOrganizationApiKeyRouteRoute(organizationService, apiKeyService, userService)
 	organizationOrganizationRoute := organization3.NewOrganizationRoute(organizationService, userService, projectsProjectsRoute, organizationApiKeyRoute)
-	responseHandler := responses.NewResponseHandler(userService, apiKeyService)
+	responseHandler := responses.NewResponseHandler(userService, apiKeyService, conversationService)
 	responseRoute := responses2.NewResponseRoute(responseHandler)
 	v1V1Route := v1_2.NewV1Route(authRoute, chatChatRoute, conversationsConversationAPI, organizationOrganizationRoute, responseRoute)
 	janRoute := jan.NewJanRoute(v1V1Route, chatChatRoute)
