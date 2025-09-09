@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
+	"menlo.ai/jan-api-gateway/app/domain/query"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
 	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
@@ -41,6 +42,14 @@ func NewServiceWithValidator(conversationRepo ConversationRepository, itemRepo I
 		itemRepo:         itemRepo,
 		validator:        validator,
 	}
+}
+
+func (s *ConversationService) FindConversationsByFilter(ctx context.Context, filter ConversationFilter, pagination *query.Pagination) ([]*Conversation, error) {
+	return s.conversationRepo.FindByFilter(ctx, filter, pagination)
+}
+
+func (s *ConversationService) CountConversationsByFilter(ctx context.Context, filter ConversationFilter) (int64, error) {
+	return s.conversationRepo.Count(ctx, filter)
 }
 
 func (s *ConversationService) CreateConversation(ctx context.Context, userID uint, title *string, isPrivate bool, metadata map[string]string) (*Conversation, error) {
@@ -126,58 +135,17 @@ func (s *ConversationService) getConversationWithAccessCheck(ctx context.Context
 	return conversation, nil
 }
 
-// UpdateAndAuthorizeConversation retrieves a conversation by its public ID, checks access permissions,
-// updates the conversation fields, and persists the changes.
-func (s *ConversationService) UpdateAndAuthorizeConversation(ctx context.Context, publicID string, userID uint, title *string, metadata map[string]string) (*Conversation, error) {
-	conversation, err := s.conversationRepo.FindByPublicID(ctx, publicID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find conversation: %w", err)
-	}
-
-	if conversation == nil {
-		return nil, ErrConversationNotFound
-	}
-
-	// Check access permissions
-	if conversation.UserID != userID {
-		return nil, ErrAccessDenied
-	}
-
-	// Update fields
-	if title != nil {
-		conversation.Title = title
-	}
-	if metadata != nil {
-		conversation.Metadata = metadata
-	}
-	conversation.UpdatedAt = time.Now().Unix()
-
-	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
+func (s *ConversationService) UpdateConversation(ctx context.Context, entity *Conversation) (*Conversation, error) {
+	if err := s.conversationRepo.Update(ctx, entity); err != nil {
 		return nil, fmt.Errorf("failed to update conversation: %w", err)
 	}
-
-	return conversation, nil
+	return entity, nil
 }
 
-func (s *ConversationService) DeleteConversation(ctx context.Context, publicID string, userID uint) error {
-	conversation, err := s.conversationRepo.FindByPublicID(ctx, publicID)
-	if err != nil {
-		return fmt.Errorf("failed to find conversation: %w", err)
-	}
-
-	if conversation == nil {
-		return ErrConversationNotFound
-	}
-
-	// Check access permissions
-	if conversation.UserID != userID {
-		return ErrAccessDenied
-	}
-
-	if err := s.conversationRepo.Delete(ctx, conversation.ID); err != nil {
+func (s *ConversationService) DeleteConversation(ctx context.Context, conv *Conversation) error {
+	if err := s.conversationRepo.Delete(ctx, conv.ID); err != nil {
 		return fmt.Errorf("failed to delete conversation: %w", err)
 	}
-
 	return nil
 }
 
@@ -187,8 +155,8 @@ func (s *ConversationService) AddItem(ctx context.Context, conversation *Convers
 		return nil, ErrPrivateConversation
 	}
 
-	if err := s.validator.ValidateItemContent(content); err != nil {
-		return nil, fmt.Errorf("validation failed: %w", err)
+	if errodCode := s.validator.ValidateItemContent(content); errodCode != nil {
+		return nil, fmt.Errorf("validation failed: %s", errodCode)
 	}
 
 	itemPublicID, err := s.generateItemPublicID()
@@ -404,19 +372,24 @@ func (s *ConversationService) generateItemPublicID() (string, error) {
 	return idgen.GenerateSecureID("msg", 16)
 }
 
+func (s *ConversationService) ValidateItems(ctx context.Context, items []*Item) (bool, *string) {
+	if len(items) > 100 {
+		return false, ptr.ToString("0502c02c-ea2d-429e-933c-1243d4e2bcb2")
+	}
+	for _, itemData := range items {
+		if errCode := s.validator.ValidateItemContent(itemData.Content); errCode != nil {
+			return false, errCode
+		}
+	}
+	return true, nil
+}
+
 // AddMultipleItems adds multiple items to a conversation in a single transaction
-func (s *ConversationService) AddMultipleItems(ctx context.Context, conversation *Conversation, userID uint, items []ItemCreationData) ([]*Item, error) {
+func (s *ConversationService) AddMultipleItems(ctx context.Context, conversation *Conversation, userID uint, items []*Item) ([]*Item, error) {
 	// Check access permissions
+	// TODO: Validate before persisting
 	if conversation.IsPrivate && conversation.UserID != userID {
 		return nil, ErrPrivateConversation
-	}
-
-	if len(items) == 0 {
-		return nil, fmt.Errorf("no items provided")
-	}
-
-	if len(items) > 100 {
-		return nil, fmt.Errorf("cannot add more than 100 items at once")
 	}
 
 	now := time.Now().Unix()
@@ -424,10 +397,6 @@ func (s *ConversationService) AddMultipleItems(ctx context.Context, conversation
 
 	// Create all items
 	for i, itemData := range items {
-		if err := s.validator.ValidateItemContent(itemData.Content); err != nil {
-			return nil, fmt.Errorf("validation failed for item %d: %w", i, err)
-		}
-
 		itemPublicID, err := s.generateItemPublicID()
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate item public ID for item %d: %w", i, err)
@@ -450,7 +419,6 @@ func (s *ConversationService) AddMultipleItems(ctx context.Context, conversation
 		createdItems[i] = item
 	}
 
-	// Update conversation timestamp once
 	conversation.UpdatedAt = now
 	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
 		return nil, fmt.Errorf("failed to update conversation timestamp: %w", err)

@@ -3,6 +3,7 @@ package routes
 import (
 	"github.com/google/wire"
 	conversationHandler "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/handlers/userhandler"
 	jan "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan"
 	janV1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1"
 	janV1Auth "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth"
@@ -48,6 +49,7 @@ var RouteProvider = wire.NewSet(
 	v1.NewV1Route,
 
 	// Conversation-related dependencies
+	userhandler.NewUserHandler,
 	conversationHandler.NewConversationHandler,
 	conversations.NewConversationAPI,
 	janV1Conversations.NewConversationAPI,

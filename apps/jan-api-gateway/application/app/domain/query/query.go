@@ -14,10 +14,11 @@ type Pagination struct {
 	Order  string
 }
 
-func GetPaginationFromQuery(reqCtx *gin.Context) (*Pagination, error) {
+func GetCursorPaginationFromQuery(reqCtx *gin.Context, findByLastID func(string) (*uint, error)) (*Pagination, error) {
 	limitStr := reqCtx.DefaultQuery("limit", "20")
 	offsetStr := reqCtx.Query("offset")
 	order := reqCtx.DefaultQuery("order", "asc")
+	lastStr := reqCtx.DefaultQuery("last", "")
 
 	var limit *int
 	if limitStr != "" {
@@ -29,12 +30,19 @@ func GetPaginationFromQuery(reqCtx *gin.Context) (*Pagination, error) {
 	}
 
 	var offset *int
+	var after *uint
 	if offsetStr != "" {
 		offsetInt, err := strconv.Atoi(offsetStr)
 		if err != nil {
 			return nil, fmt.Errorf("invalid offset number")
 		}
 		offset = &offsetInt
+	} else if lastStr != "" {
+		lastID, err := findByLastID(lastStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid offset number")
+		}
+		after = lastID
 	}
 
 	if order != "asc" && order != "desc" {
@@ -45,5 +53,12 @@ func GetPaginationFromQuery(reqCtx *gin.Context) (*Pagination, error) {
 		Limit:  limit,
 		Offset: offset,
 		Order:  order,
+		After:  after,
 	}, nil
+}
+
+func GetPaginationFromQuery(reqCtx *gin.Context) (*Pagination, error) {
+	return GetCursorPaginationFromQuery(reqCtx, func(s string) (*uint, error) {
+		return nil, fmt.Errorf("invalid query parameter: last")
+	})
 }

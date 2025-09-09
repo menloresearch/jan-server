@@ -23,6 +23,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
 	conversation2 "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/handlers/userhandler"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan"
 	v1_2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth"
@@ -84,7 +85,8 @@ func CreateApplication() (*Application, error) {
 	authRoute := auth.NewAuthRoute(googleAuthAPI, userService)
 	chatCompletionAPI := chat2.NewCompletionAPI(userService, apiKeyService)
 	chatChatRoute := chat2.NewChatRoute(chatCompletionAPI)
-	conversationsConversationAPI := conversations2.NewConversationAPI(conversationHandler)
+	userHandler := userhandler.NewUserHandler(userService)
+	conversationsConversationAPI := conversations2.NewConversationAPI(conversationHandler, userHandler)
 	projectApiKeyRoute := apikeys.NewProjectApiKeyRoute(organizationService, projectService, apiKeyService, userService)
 	projectsProjectsRoute := projects2.NewProjectsRoute(userService, projectService, organizationService, projectApiKeyRoute)
 	organizationApiKeyRoute := apikeys2.NewOrganizationApiKeyRouteRoute(organizationService, apiKeyService, userService)

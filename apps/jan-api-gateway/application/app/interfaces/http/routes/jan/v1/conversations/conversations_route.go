@@ -1,43 +1,102 @@
 package conversations
 
 import (
+	"fmt"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
-	_ "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation" // Import for Swagger types
+	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	conversationHandler "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
-	_ "menlo.ai/jan-api-gateway/app/interfaces/http/responses" // Import for Swagger types
+	"menlo.ai/jan-api-gateway/app/interfaces/http/handlers/userhandler"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/middleware"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/responses/jan"
+	"menlo.ai/jan-api-gateway/app/utils/functional"
 )
 
 // ConversationAPI handles route registration for Jan V1 conversations
 type ConversationAPI struct {
-	handler *conversationHandler.ConversationHandler
+	handler     *conversationHandler.ConversationHandler
+	userHandler *userhandler.UserHandler
 }
 
 // NewConversationAPI creates a new conversation API instance
-func NewConversationAPI(handler *conversationHandler.ConversationHandler) *ConversationAPI {
+func NewConversationAPI(handler *conversationHandler.ConversationHandler, userHandler *userhandler.UserHandler) *ConversationAPI {
 	return &ConversationAPI{
-		handler: handler,
+		handler,
+		userHandler,
 	}
 }
 
 // RegisterRouter registers Jan-specific conversation routes (currently identical to OpenAI)
 func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
-	conversationsRouter := router.Group("/conversations")
 
-	// Jan API endpoints (same as OpenAI for now, but can be extended)
-	conversationsRouter.GET("", api.handler.ListConversations) // Jan-specific: list all conversations
+	conversationsRouter := router.Group("/conversations", middleware.AuthMiddleware(), api.userHandler.RegisteredUserMiddleware())
+
+	conversationsRouter.GET("", api.listConversations)
 	conversationsRouter.POST("", api.createConversation)
-	conversationsRouter.GET("/:conversation_id", api.getConversation)
-	conversationsRouter.PATCH("/:conversation_id", api.updateConversation)
-	conversationsRouter.DELETE("/:conversation_id", api.deleteConversation)
-	conversationsRouter.POST("/:conversation_id/items", api.createItems)
-	conversationsRouter.GET("/:conversation_id/items", api.listItems)
-	conversationsRouter.GET("/:conversation_id/items/:item_id", api.getItem)
-	conversationsRouter.DELETE("/:conversation_id/items/:item_id", api.deleteItem)
+	conversationMiddleWare := api.handler.GetConversationMiddleWare()
+	conversationsRouter.GET(fmt.Sprintf("/:%s", conversationHandler.ConversationContextKeyPublicID), conversationMiddleWare, api.getConversation)
+	conversationsRouter.PATCH(fmt.Sprintf("/:%s", conversationHandler.ConversationContextKeyPublicID), conversationMiddleWare, api.updateConversation)
+	conversationsRouter.DELETE(fmt.Sprintf("/:%s", conversationHandler.ConversationContextKeyPublicID), conversationMiddleWare, api.deleteConversation)
+	conversationsRouter.POST(fmt.Sprintf("/:%s/items", conversationHandler.ConversationContextKeyPublicID), conversationMiddleWare, api.createItems)
+	conversationsRouter.GET(fmt.Sprintf("/:%s/items", conversationHandler.ConversationContextKeyPublicID), conversationMiddleWare, api.listItems)
+	conversationsRouter.GET(fmt.Sprintf("/:%s/items/:item_id", conversationHandler.ConversationContextKeyPublicID), conversationMiddleWare, api.getItem)
+	conversationsRouter.DELETE(fmt.Sprintf("/:%s/items/:item_id", conversationHandler.ConversationContextKeyPublicID), conversationMiddleWare, api.deleteItem)
 
 	// conversationsRouter.GET("/:conversation_id/items/search", api.handler.SearchItems)  // Jan-specific: search items
 }
 
-func (api *ConversationAPI) ListConversations(ctx *gin.Context) {
+type ConversationResponse struct {
+	ID        string            `json:"id"`
+	Title     *string           `json:"title"`
+	Status    string            `json:"status"`
+	Metadata  map[string]string `json:"metadata"`
+	CreatedAt int64             `json:"created_at"`
+	UpdatedAt int64             `json:"updated_at"`
+}
+
+func convertConversationEntityToResponse(entity *conversation.Conversation) ConversationResponse {
+	return ConversationResponse{
+		ID:        entity.PublicID,
+		Title:     entity.Title,
+		Status:    string(entity.Status),
+		Metadata:  entity.Metadata,
+		CreatedAt: entity.CreatedAt,
+		UpdatedAt: entity.UpdatedAt,
+	}
+}
+
+// ListConversations
+// @Summary List Conversations
+// @Description Retrieves a paginated list of conversations for the authenticated user.
+// @Tags Jan, Jan-Conversations
+// @Security BearerAuth
+// @Param limit query int false "The maximum number of items to return" default(20)
+// @Param after query string false "A cursor for use in pagination. The ID of the last object from the previous page"
+// @Success 200 {object} jan.JanListResponse[ConversationResponse] "Successfully retrieved the list of conversations"
+// @Failure 400 {object} responses.ErrorResponse "Bad Request - Invalid pagination parameters"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized - invalid or missing API key"
+// @Failure 500 {object} responses.ErrorResponse "Internal Server Error"
+// @Router /jan/v1/conversations [get]
+func (api *ConversationAPI) listConversations(reqCtx *gin.Context) {
+	httpCode, response, err := api.handler.ListConversations(reqCtx)
+	if httpCode != http.StatusOK {
+		reqCtx.AbortWithStatusJSON(httpCode, responses.ErrorResponse{
+			Code:          response.Status,
+			ErrorInstance: err,
+		})
+		return
+	}
+
+	reqCtx.JSON(httpCode, jan.JanListResponse[ConversationResponse]{
+		Status:  responses.ResponseCodeOk,
+		FirstID: response.FirstID,
+		LastID:  response.LastID,
+		Total:   response.Total,
+		HasMore: response.HasMore,
+		Results: functional.Map(response.Results, convertConversationEntityToResponse),
+	})
 }
 
 // createConversation handles conversation creation
@@ -48,13 +107,33 @@ func (api *ConversationAPI) ListConversations(ctx *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param request body menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.CreateConversationRequest true "Create conversation request"
-// @Success 200 {object} menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationResponse "Created conversation"
-// @Failure 400 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Invalid request"
-// @Failure 401 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Unauthorized"
-// @Failure 500 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Internal server error"
+// @Success 200 {object} jan.JanGeneralResponse[ConversationResponse] "Created conversation"
+// @Failure 400 {object} responses.ErrorResponse "Invalid request"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized"
+// @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /jan/v1/conversations [post]
-func (api *ConversationAPI) createConversation(ctx *gin.Context) {
-	api.handler.CreateConversation(ctx)
+func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
+	user, ok := userhandler.GetUserFromContext(reqCtx)
+	if !ok {
+		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+			Code: "4a0aeda0-417c-43ac-9b14-9a2f0a98acb1",
+		})
+		return
+	}
+
+	httpCode, response, err := api.handler.CreateConversationByUserID(reqCtx, user.ID)
+	if httpCode != http.StatusOK {
+		reqCtx.AbortWithStatusJSON(httpCode, responses.ErrorResponse{
+			Code:          response.Status,
+			ErrorInstance: err,
+		})
+		return
+	}
+
+	reqCtx.JSON(httpCode, jan.JanGeneralResponse[ConversationResponse]{
+		Status: responses.ResponseCodeOk,
+		Result: convertConversationEntityToResponse(response.Result),
+	})
 }
 
 // getConversation handles conversation retrieval
@@ -64,14 +143,18 @@ func (api *ConversationAPI) createConversation(ctx *gin.Context) {
 // @Security BearerAuth
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
-// @Success 200 {object} menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationResponse "Conversation details"
-// @Failure 401 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Unauthorized"
-// @Failure 403 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Access denied"
-// @Failure 404 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Conversation not found"
-// @Failure 500 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Internal server error"
+// @Success 200 {object} jan.JanGeneralResponse[ConversationResponse] "Conversation details"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized"
+// @Failure 403 {object} responses.ErrorResponse "Access denied"
+// @Failure 404 {object} responses.ErrorResponse "Conversation not found"
+// @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /jan/v1/conversations/{conversation_id} [get]
-func (api *ConversationAPI) getConversation(ctx *gin.Context) {
-	api.handler.GetConversation(ctx)
+func (api *ConversationAPI) getConversation(reqCtx *gin.Context) {
+	conv, ok := conversationHandler.GetConversationFromContext(reqCtx)
+	if !ok {
+		return
+	}
+	reqCtx.JSON(http.StatusOK, convertConversationEntityToResponse(conv))
 }
 
 // updateConversation handles conversation updates
@@ -83,15 +166,25 @@ func (api *ConversationAPI) getConversation(ctx *gin.Context) {
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
 // @Param request body menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.UpdateConversationRequest true "Update conversation request"
-// @Success 200 {object} menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationResponse "Updated conversation"
-// @Failure 400 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Invalid request"
-// @Failure 401 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Unauthorized"
-// @Failure 403 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Access denied"
-// @Failure 404 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Conversation not found"
-// @Failure 500 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Internal server error"
+// @Success 200 {object} jan.JanGeneralResponse[ConversationResponse] "Updated conversation"
+// @Failure 400 {object} responses.ErrorResponse "Invalid request"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized"
+// @Failure 403 {object} responses.ErrorResponse "Access denied"
+// @Failure 404 {object} responses.ErrorResponse "Conversation not found"
+// @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /jan/v1/conversations/{conversation_id} [patch]
-func (api *ConversationAPI) updateConversation(ctx *gin.Context) {
-	api.handler.UpdateConversation(ctx)
+func (api *ConversationAPI) updateConversation(reqCtx *gin.Context) {
+	httpStatus, result, err := api.handler.UpdateConversation(reqCtx)
+	if httpStatus != http.StatusOK {
+		reqCtx.AbortWithStatusJSON(httpStatus, responses.ErrorResponse{
+			Code:          result.Status,
+			ErrorInstance: err,
+		})
+	}
+	reqCtx.JSON(httpStatus, jan.JanGeneralResponse[ConversationResponse]{
+		Result: convertConversationEntityToResponse(&result.Result),
+		Status: result.Status,
+	})
 }
 
 // deleteConversation handles conversation deletion
@@ -101,14 +194,25 @@ func (api *ConversationAPI) updateConversation(ctx *gin.Context) {
 // @Security BearerAuth
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
-// @Success 200 {object} menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.DeletedConversationResponse "Deleted conversation"
-// @Failure 401 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Unauthorized"
-// @Failure 403 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Access denied"
-// @Failure 404 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Conversation not found"
-// @Failure 500 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Internal server error"
+// @Success 200 {object} jan.JanGeneralResponse[ConversationResponse] "Deleted conversation"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized"
+// @Failure 403 {object} responses.ErrorResponse "Access denied"
+// @Failure 404 {object} responses.ErrorResponse "Conversation not found"
+// @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /jan/v1/conversations/{conversation_id} [delete]
-func (api *ConversationAPI) deleteConversation(ctx *gin.Context) {
-	api.handler.DeleteConversation(ctx)
+func (api *ConversationAPI) deleteConversation(reqCtx *gin.Context) {
+	status, result, err := api.handler.DeleteConversation(reqCtx)
+	if status != http.StatusOK {
+		reqCtx.AbortWithStatusJSON(status, responses.ErrorResponse{
+			Code:          result.Status,
+			ErrorInstance: err,
+		})
+		return
+	}
+	reqCtx.JSON(status, jan.JanGeneralResponse[ConversationResponse]{
+		Status: result.Status,
+		Result: convertConversationEntityToResponse(&result.Result),
+	})
 }
 
 // createItems handles item creation
@@ -121,11 +225,11 @@ func (api *ConversationAPI) deleteConversation(ctx *gin.Context) {
 // @Param conversation_id path string true "Conversation ID"
 // @Param request body menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.CreateItemsRequest true "Create items request"
 // @Success 200 {object} menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationItemListResponse "Created items"
-// @Failure 400 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Invalid request"
-// @Failure 401 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Unauthorized"
-// @Failure 403 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Access denied"
-// @Failure 404 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Conversation not found"
-// @Failure 500 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Internal server error"
+// @Failure 400 {object} responses.ErrorResponse "Invalid request"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized"
+// @Failure 403 {object} responses.ErrorResponse "Access denied"
+// @Failure 404 {object} responses.ErrorResponse "Conversation not found"
+// @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /jan/v1/conversations/{conversation_id}/items [post]
 func (api *ConversationAPI) createItems(ctx *gin.Context) {
 	api.handler.CreateItems(ctx)
@@ -142,10 +246,10 @@ func (api *ConversationAPI) createItems(ctx *gin.Context) {
 // @Param cursor query string false "Cursor for pagination"
 // @Param order query string false "Order of items (asc/desc)"
 // @Success 200 {object} menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationItemListResponse "List of items"
-// @Failure 401 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Unauthorized"
-// @Failure 403 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Access denied"
-// @Failure 404 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Conversation not found"
-// @Failure 500 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Internal server error"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized"
+// @Failure 403 {object} responses.ErrorResponse "Access denied"
+// @Failure 404 {object} responses.ErrorResponse "Conversation not found"
+// @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /jan/v1/conversations/{conversation_id}/items [get]
 func (api *ConversationAPI) listItems(ctx *gin.Context) {
 	api.handler.ListItems(ctx)
@@ -160,10 +264,10 @@ func (api *ConversationAPI) listItems(ctx *gin.Context) {
 // @Param conversation_id path string true "Conversation ID"
 // @Param item_id path string true "Item ID"
 // @Success 200 {object} menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationItemResponse "Item details"
-// @Failure 401 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Unauthorized"
-// @Failure 403 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Access denied"
-// @Failure 404 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Conversation not found"
-// @Failure 500 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Internal server error"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized"
+// @Failure 403 {object} responses.ErrorResponse "Access denied"
+// @Failure 404 {object} responses.ErrorResponse "Conversation not found"
+// @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /jan/v1/conversations/{conversation_id}/items/{item_id} [get]
 func (api *ConversationAPI) getItem(ctx *gin.Context) {
 	api.handler.GetItem(ctx)
@@ -178,10 +282,10 @@ func (api *ConversationAPI) getItem(ctx *gin.Context) {
 // @Param conversation_id path string true "Conversation ID"
 // @Param item_id path string true "Item ID"
 // @Success 200 {object} menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationResponse "Updated conversation"
-// @Failure 401 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Unauthorized"
-// @Failure 403 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Access denied"
-// @Failure 404 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Conversation not found"
-// @Failure 500 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Internal server error"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized"
+// @Failure 403 {object} responses.ErrorResponse "Access denied"
+// @Failure 404 {object} responses.ErrorResponse "Conversation not found"
+// @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /jan/v1/conversations/{conversation_id}/items/{item_id} [delete]
 func (api *ConversationAPI) deleteItem(ctx *gin.Context) {
 	api.handler.DeleteItem(ctx)

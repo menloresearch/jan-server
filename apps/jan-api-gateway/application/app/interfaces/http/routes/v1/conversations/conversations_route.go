@@ -48,7 +48,7 @@ func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 // @Failure 500 {object} menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations [post]
 func (api *ConversationAPI) createConversation(ctx *gin.Context) {
-	api.handler.CreateConversation(ctx)
+	// api.handler.CreateConversation(ctx, 0)
 }
 
 // getConversation handles conversation retrieval

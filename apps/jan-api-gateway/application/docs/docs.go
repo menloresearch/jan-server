@@ -249,6 +249,60 @@ const docTemplate = `{
             }
         },
         "/jan/v1/conversations": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves a paginated list of conversations for the authenticated user.",
+                "tags": [
+                    "Jan",
+                    "Jan-Conversations"
+                ],
+                "summary": "List Conversations",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "The maximum number of items to return",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "A cursor for use in pagination. The ID of the last object from the previous page",
+                        "name": "after",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully retrieved the list of conversations",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_jan.JanListResponse-app_interfaces_http_routes_jan_v1_conversations_ConversationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request - Invalid pagination parameters",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - invalid or missing API key",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -2580,6 +2634,32 @@ const docTemplate = `{
                 }
             }
         },
+        "app_interfaces_http_routes_jan_v1_conversations.ConversationResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "integer"
+                }
+            }
+        },
         "app_interfaces_http_routes_jan_v1_organization.OrganizationResponse": {
             "type": "object",
             "properties": {
@@ -2954,6 +3034,19 @@ const docTemplate = `{
                 }
             }
         },
+        "menlo_ai_jan-api-gateway_app_domain_conversation.ItemRole": {
+            "type": "string",
+            "enum": [
+                "system",
+                "user",
+                "assistant"
+            ],
+            "x-enum-varnames": [
+                "ItemRoleSystem",
+                "ItemRoleUser",
+                "ItemRoleAssistant"
+            ]
+        },
         "menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.AnnotationResponse": {
             "type": "object",
             "properties": {
@@ -3054,7 +3147,7 @@ const docTemplate = `{
                     }
                 },
                 "role": {
-                    "type": "string"
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.ItemRole"
                 },
                 "type": {
                     "type": "string"
@@ -3291,6 +3384,15 @@ const docTemplate = `{
         "menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListResponse-app_interfaces_http_routes_jan_v1_organization_OrganizationResponse": {
             "type": "object",
             "properties": {
+                "first_id": {
+                    "type": "string"
+                },
+                "has_more": {
+                    "type": "boolean"
+                },
+                "last_id": {
+                    "type": "string"
+                },
                 "results": {
                     "type": "array",
                     "items": {
@@ -3308,6 +3410,15 @@ const docTemplate = `{
         "menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListResponse-app_interfaces_http_routes_jan_v1_organization_api_keys_ApiKeyResponse": {
             "type": "object",
             "properties": {
+                "first_id": {
+                    "type": "string"
+                },
+                "has_more": {
+                    "type": "boolean"
+                },
+                "last_id": {
+                    "type": "string"
+                },
                 "results": {
                     "type": "array",
                     "items": {
@@ -3325,10 +3436,45 @@ const docTemplate = `{
         "menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListResponse-app_interfaces_http_routes_jan_v1_organization_projects_ProjectResponse": {
             "type": "object",
             "properties": {
+                "first_id": {
+                    "type": "string"
+                },
+                "has_more": {
+                    "type": "boolean"
+                },
+                "last_id": {
+                    "type": "string"
+                },
                 "results": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/app_interfaces_http_routes_jan_v1_organization_projects.ProjectResponse"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses_jan.JanListResponse-app_interfaces_http_routes_jan_v1_conversations_ConversationResponse": {
+            "type": "object",
+            "properties": {
+                "first_id": {
+                    "type": "string"
+                },
+                "has_more": {
+                    "type": "boolean"
+                },
+                "last_id": {
+                    "type": "string"
+                },
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app_interfaces_http_routes_jan_v1_conversations.ConversationResponse"
                     }
                 },
                 "status": {

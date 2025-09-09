@@ -8,3 +8,8 @@ type JanListResponse[T any] struct {
 	LastID  *string `json:"last_id"`
 	HasMore bool    `json:"has_more"`
 }
+
+type JanGeneralResponse[T any] struct {
+	Status string `json:"status"`
+	Result T      `json:"results"`
+}

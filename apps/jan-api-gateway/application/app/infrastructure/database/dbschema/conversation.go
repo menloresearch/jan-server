@@ -79,8 +79,8 @@ func (c *Conversation) EtoD() *conversation.Conversation {
 		Status:    conversation.ConversationStatus(c.Status),
 		Metadata:  metadata,
 		IsPrivate: c.IsPrivate,
-		CreatedAt: c.CreatedAt.Unix(), // Convert time.Time to Unix timestamp
-		UpdatedAt: c.UpdatedAt.Unix(), // Convert time.Time to Unix timestamp
+		CreatedAt: c.CreatedAt.Unix(),
+		UpdatedAt: c.UpdatedAt.Unix(),
 	}
 }
 

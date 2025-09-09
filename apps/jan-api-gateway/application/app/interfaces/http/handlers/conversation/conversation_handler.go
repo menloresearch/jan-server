@@ -8,9 +8,18 @@ import (
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
+	"menlo.ai/jan-api-gateway/app/domain/query"
 	"menlo.ai/jan-api-gateway/app/domain/user"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/requests"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/handlers/userhandler"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
+	"menlo.ai/jan-api-gateway/app/utils/ptr"
+)
+
+type ConversationContextKey string
+
+const (
+	ConversationContextKeyPublicID ConversationContextKey = "conv_public_id"
+	ConversationContextEntity      ConversationContextKey = "ConversationContextEntity"
 )
 
 // ConversationHandler handles HTTP requests for conversations
@@ -47,7 +56,7 @@ type CreateConversationRequest struct {
 // ConversationItemRequest represents an item in the conversation request
 type ConversationItemRequest struct {
 	Type    string                       `json:"type" binding:"required"`
-	Role    string                       `json:"role,omitempty"`
+	Role    conversation.ItemRole        `json:"role,omitempty"`
 	Content []ConversationContentRequest `json:"content" binding:"required"`
 }
 
@@ -139,9 +148,11 @@ type ConversationItemListResponse struct {
 	LastID  string                     `json:"last_id"`
 }
 
+// TODO: OpenAI doesn't provide title, we will need to go back and fix the model
 // UpdateConversationRequest represents the request body for updating a conversation
 type UpdateConversationRequest struct {
-	Metadata map[string]string `json:"metadata" binding:"required"`
+	Title    *string            `json:"title"`
+	Metadata *map[string]string `json:"metadata"`
 }
 
 // CreateItemsRequest represents the request body for creating items
@@ -149,281 +160,280 @@ type CreateItemsRequest struct {
 	Items []ConversationItemRequest `json:"items" binding:"required"`
 }
 
-// authenticateAPIKey validates API key and returns authenticated user
-func (h *ConversationHandler) authenticateAPIKey(ctx *gin.Context) (*AuthenticatedUser, error) {
-	apiKey, ok := requests.GetTokenFromBearer(ctx)
+func (h *ConversationHandler) ListConversations(reqCtx *gin.Context) (int, responses.ListResponse[*conversation.Conversation], error) {
+	ctx := reqCtx.Request.Context()
+	user, ok := userhandler.GetUserFromContext(reqCtx)
 	if !ok {
-		return nil, fmt.Errorf("invalid or missing API key")
+		return http.StatusBadRequest, responses.ListResponse[*conversation.Conversation]{
+			Status: "50a50c92-a0b9-481f-a7fe-4c0bee16d17f",
+		}, nil
 	}
-
-	apiKeyEntity, err := h.apiKeyService.FindByKey(ctx, apiKey)
+	userID := user.ID
+	pagination, err := query.GetCursorPaginationFromQuery(reqCtx, func(lastID string) (*uint, error) {
+		convs, err := h.conversationService.FindConversationsByFilter(ctx, conversation.ConversationFilter{
+			UserID:   &userID,
+			PublicID: &lastID,
+		}, nil)
+		if err != nil {
+			return nil, err
+		}
+		if len(convs) != 1 {
+			return nil, fmt.Errorf("invalid conversation")
+		}
+		return &convs[0].ID, nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("invalid API key")
+		return http.StatusBadRequest, responses.ListResponse[*conversation.Conversation]{
+			Status: "c404de95-8895-41b5-8bb1-e9c260155315",
+		}, err
 	}
-
-	if apiKeyEntity == nil {
-		return nil, fmt.Errorf("API key not found")
+	filter := conversation.ConversationFilter{
+		UserID: &userID,
 	}
-
-	user, err := h.userService.FindByID(ctx, *apiKeyEntity.OwnerID)
+	conversations, err := h.conversationService.FindConversationsByFilter(ctx, filter, pagination)
 	if err != nil {
-		return nil, fmt.Errorf("user not found")
+		return http.StatusInternalServerError, responses.ListResponse[*conversation.Conversation]{
+			Status: "adb7f0d3-127a-447d-abcf-0dfb50afd548",
+		}, err
+	}
+	count, err := h.conversationService.CountConversationsByFilter(ctx, filter)
+	if err != nil {
+		return http.StatusInternalServerError, responses.ListResponse[*conversation.Conversation]{
+			Status: "0eba79b1-5a32-4552-b66c-419feeabb790",
+		}, err
+	}
+	var firstId *string
+	var lastId *string
+	hasMore := false
+	if len(conversations) > 0 {
+		firstId = &conversations[0].PublicID
+		lastId = &conversations[len(conversations)-1].PublicID
+		moreRecords, err := h.conversationService.FindConversationsByFilter(ctx, filter, &query.Pagination{
+			Order: pagination.Order,
+			Limit: ptr.ToInt(1),
+			After: &conversations[len(conversations)-1].ID,
+		})
+		if err != nil {
+			return http.StatusInternalServerError, responses.ListResponse[*conversation.Conversation]{
+				Status: "89fa4638-c897-48c7-88f4-0e4fed0a9ce6",
+			}, err
+		}
+		if len(moreRecords) != 0 {
+			hasMore = true
+		}
 	}
 
-	return &AuthenticatedUser{ID: user.ID}, nil
+	return http.StatusOK, responses.ListResponse[*conversation.Conversation]{
+		Status:  responses.ResponseCodeOk,
+		Results: conversations,
+		Total:   count,
+		HasMore: hasMore,
+		FirstID: firstId,
+		LastID:  lastId,
+	}, nil
 }
 
 // CreateConversation handles conversation creation
-func (h *ConversationHandler) CreateConversation(ctx *gin.Context) {
-	// Authenticate user
-	user, err := h.authenticateAPIKey(ctx)
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-			Error: "Invalid or missing API key",
-		})
-		return
-	}
-
+func (h *ConversationHandler) CreateConversationByUserID(ctx *gin.Context, userId uint) (int, responses.GeneralResponse[*conversation.Conversation], error) {
 	// Parse request
 	var request CreateConversationRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "b2c3d4e5-f6g7-8901-bcde-f23456789012",
-			Error: "Invalid request format",
-		})
-		return
-	}
-
-	// Create conversation
-	conv, err := h.conversationService.CreateConversation(ctx, user.ID, nil, true, request.Metadata)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "c3d4e5f6-g7h8-9012-cdef-345678901234",
-			Error: fmt.Sprintf("failed to create conversation: %v", err),
-		})
-		return
+		return http.StatusBadRequest, responses.GeneralResponse[*conversation.Conversation]{
+			Status: "b2c3d4e5-f6g7-8901-bcde-f23456789012",
+		}, err
 	}
 
 	if len(request.Items) > 20 {
-		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "e5f6g7h8-i9j0-1234-efgh-567890123456",
-			Error: "Cannot create more than 20 items in a single conversation creation request",
-		})
-		return
+		return http.StatusBadRequest, responses.GeneralResponse[*conversation.Conversation]{
+			Status: "c8ac11af-5972-41b6-a5fb-fde39b9d0a0f",
+		}, nil
 	}
-	// Add items if provided using batch operation
-	if len(request.Items) > 0 {
-		// Convert all items at once for batch processing
-		itemsToCreate := make([]conversation.ItemCreationData, len(request.Items))
 
-		for i, itemReq := range request.Items {
-			// Convert request to domain types
-			itemType := conversation.ItemType(itemReq.Type)
-			var role *conversation.ItemRole
-			if itemReq.Role != "" {
-				r := conversation.ItemRole(itemReq.Role)
-				role = &r
+	itemsToCreate := make([]*conversation.Item, len(request.Items))
+
+	for i, itemReq := range request.Items {
+		// Convert request to domain types
+		ok := conversation.ValidateItemType(string(itemReq.Type))
+		if !ok {
+			return http.StatusBadRequest, responses.GeneralResponse[*conversation.Conversation]{
+				Status: "ac4d231e-c085-432f-94df-ef2440c1e01a",
+			}, nil
+		}
+		itemType := conversation.ItemType(itemReq.Type)
+		var role *conversation.ItemRole
+		if itemReq.Role != "" {
+			ok := conversation.ValidateItemRole(string(itemReq.Role))
+			if !ok {
+				return http.StatusBadRequest, responses.GeneralResponse[*conversation.Conversation]{
+					Status: "4a9fc6d5-6c34-4f9f-a2ea-becfab1ecbcb",
+				}, nil
 			}
+			r := conversation.ItemRole(itemReq.Role)
+			role = &r
+		}
 
-			// Convert content
-			content := make([]conversation.Content, len(itemReq.Content))
-			for j, c := range itemReq.Content {
-				content[j] = conversation.Content{
-					Type: c.Type,
-					Text: &conversation.Text{
-						Value: c.Text,
-					},
-				}
-			}
-
-			itemsToCreate[i] = conversation.ItemCreationData{
-				Type:    itemType,
-				Role:    role,
-				Content: content,
+		// Convert content
+		content := make([]conversation.Content, len(itemReq.Content))
+		for j, c := range itemReq.Content {
+			content[j] = conversation.Content{
+				Type: c.Type,
+				Text: &conversation.Text{
+					Value: c.Text,
+				},
 			}
 		}
 
-		// Single batch operation instead of N individual operations
-		_, err := h.conversationService.AddMultipleItems(ctx, conv, user.ID, itemsToCreate)
+		itemsToCreate[i] = &conversation.Item{
+			Type:    itemType,
+			Role:    role,
+			Content: content,
+		}
+	}
+
+	ok, errorCode := h.conversationService.ValidateItems(ctx, itemsToCreate)
+	if !ok {
+		return http.StatusBadRequest, responses.GeneralResponse[*conversation.Conversation]{
+			Status: *errorCode,
+		}, nil
+	}
+
+	// Create conversation
+	conv, err := h.conversationService.CreateConversation(ctx, userId, nil, true, request.Metadata)
+	if err != nil {
+		return http.StatusBadRequest, responses.GeneralResponse[*conversation.Conversation]{
+			Status: "0f58924c-3c32-4ab1-b39b-dd74d34b5b2c",
+		}, nil
+	}
+
+	// Add items if provided using batch operation
+	if len(request.Items) > 0 {
+
+		_, err := h.conversationService.AddMultipleItems(ctx, conv, userId, itemsToCreate)
 		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:  "d4e5f6g7-h8i9-0123-defg-456789012345",
-				Error: fmt.Sprintf("failed to add items: %v", err),
-			})
-			return
+			return http.StatusInternalServerError, responses.GeneralResponse[*conversation.Conversation]{
+				Status: "af56ad8e-e88a-4ca2-8a1d-46c3ade25df0",
+			}, nil
 		}
 
 		// Reload conversation with items
-		conv, err = h.conversationService.GetConversationByPublicIDAndUserID(ctx, conv.PublicID, user.ID)
+		conv, err = h.conversationService.GetConversationByPublicIDAndUserID(ctx, conv.PublicID, userId)
 		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:  "e5f6g7h8-i9j0-1234-efgh-567890123456",
-				Error: fmt.Sprintf("failed to reload conversation: %v", err),
-			})
-			return
+			return http.StatusBadRequest, responses.GeneralResponse[*conversation.Conversation]{
+				Status: "d4e5f6g7-h8i9-0123-defg-456789012345",
+			}, nil
 		}
 	}
 
-	response := h.domainToConversationResponse(conv)
-	ctx.JSON(http.StatusOK, response)
+	return http.StatusOK, responses.GeneralResponse[*conversation.Conversation]{
+		Status: responses.ResponseCodeOk,
+		Result: conv,
+	}, nil
 }
 
-// GetConversation handles conversation retrieval
-func (h *ConversationHandler) GetConversation(ctx *gin.Context) {
-	// Authenticate user
-	user, err := h.authenticateAPIKey(ctx)
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "f6g7h8i9-j0k1-2345-fghi-678901234567",
-			Error: "Invalid or missing API key",
-		})
-		return
-	}
-
-	conversationID := ctx.Param("conversation_id")
-
-	conv, err := h.conversationService.GetConversationByPublicIDAndUserID(ctx, conversationID, user.ID)
-	if err != nil {
-		if errors.Is(err, conversation.ErrConversationNotFound) {
-			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
-				Code:  "g7h8i9j0-k1l2-3456-ghij-789012345678",
-				Error: err.Error(),
+func (h *ConversationHandler) GetConversationMiddleWare() gin.HandlerFunc {
+	return func(reqCtx *gin.Context) {
+		ctx := reqCtx.Request.Context()
+		publicID := reqCtx.Param(string(ConversationContextKeyPublicID))
+		if publicID == "" {
+			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+				Code:  "f5742805-2c6e-45a8-b6a8-95091b9d46f0",
+				Error: "missing conversation public ID",
 			})
 			return
 		}
-		if errors.Is(err, conversation.ErrPrivateConversation) {
-			ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
-				Code:  "h8i9j0k1-l2m3-4567-hijk-890123456789",
-				Error: err.Error(),
+		user, ok := userhandler.GetUserFromContext(reqCtx)
+		if !ok {
+			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+				Code: "f5742805-2c6e-45a8-b6a8-95091b9d46f0",
 			})
 			return
 		}
-		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "i9j0k1l2-m3n4-5678-ijkl-901234567890",
-			Error: err.Error(),
-		})
-		return
-	}
+		entities, err := h.conversationService.FindConversationsByFilter(ctx, conversation.ConversationFilter{
+			PublicID: &publicID,
+			UserID:   &user.ID,
+		}, nil)
 
-	response := h.domainToConversationResponse(conv)
-	ctx.JSON(http.StatusOK, response)
+		if err != nil {
+			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+				Code:          "1fe94ab8-ba2c-4356-a446-f091c256e260",
+				ErrorInstance: err,
+			})
+			return
+		}
+
+		if len(entities) == 0 {
+			reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
+				Code: "e91636c2-fced-4a89-bf08-55309005365f",
+			})
+			return
+		}
+
+		SetConversationFromContext(reqCtx, entities[0])
+		reqCtx.Next()
+	}
+}
+
+func SetConversationFromContext(reqCtx *gin.Context, conv *conversation.Conversation) {
+	reqCtx.Set(string(ConversationContextEntity), conv)
+}
+
+func GetConversationFromContext(reqCtx *gin.Context) (*conversation.Conversation, bool) {
+	conv, ok := reqCtx.Get(string(ConversationContextEntity))
+	if !ok {
+		return nil, false
+	}
+	return conv.(*conversation.Conversation), true
 }
 
 // UpdateConversation handles conversation updates
-func (h *ConversationHandler) UpdateConversation(ctx *gin.Context) {
-	// Authenticate user
-	user, err := h.authenticateAPIKey(ctx)
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "j0k1l2m3-n4o5-6789-jklm-012345678901",
-			Error: "Invalid or missing API key",
-		})
+func (h *ConversationHandler) UpdateConversation(reqCtx *gin.Context) (httpStatus int, result responses.GeneralResponse[conversation.Conversation], err error) {
+	ctx := reqCtx.Request.Context()
+	conv, ok := GetConversationFromContext(reqCtx)
+	if !ok {
 		return
 	}
 
-	conversationID := ctx.Param("conversation_id")
-
-	// Parse request
 	var request UpdateConversationRequest
-	if err := ctx.ShouldBindJSON(&request); err != nil {
-		ctx.JSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "k1l2m3n4-o5p6-7890-klmn-123456789012",
-			Error: "Invalid request format",
-		})
-		return
+	if err := reqCtx.ShouldBindJSON(&request); err != nil {
+		result.Status = "6ebfd85f-a462-4176-8ea7-d9367330b699"
+		return http.StatusBadRequest, result, err
 	}
 
-	conv, err := h.conversationService.UpdateAndAuthorizeConversation(ctx, conversationID, user.ID, nil, request.Metadata)
+	if request.Title != nil {
+		conv.Title = request.Title
+	}
+	if request.Metadata != nil {
+		conv.Metadata = *request.Metadata
+	}
+
+	conv, err = h.conversationService.UpdateConversation(ctx, conv)
 	if err != nil {
-		if errors.Is(err, conversation.ErrConversationNotFound) {
-			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
-				Code:  "l2m3n4o5-p6q7-8901-lmno-234567890123",
-				Error: err.Error(),
-			})
-			return
-		}
-		if errors.Is(err, conversation.ErrAccessDenied) {
-			ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
-				Code:  "m3n4o5p6-q7r8-9012-mnop-345678901234",
-				Error: err.Error(),
-			})
-			return
-		}
-		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "n4o5p6q7-r8s9-0123-nopq-456789012345",
-			Error: err.Error(),
-		})
-		return
+		result.Status = "6ebfd85f-a462-4176-8ea7-d9367330b699"
+		return http.StatusInternalServerError, result, err
 	}
-
-	response := h.domainToConversationResponse(conv)
-	ctx.JSON(http.StatusOK, response)
+	result.Result = *conv
+	result.Status = responses.ResponseCodeOk
+	return http.StatusOK, result, nil
 }
 
 // DeleteConversation handles conversation deletion
-func (h *ConversationHandler) DeleteConversation(ctx *gin.Context) {
-	// Authenticate user
-	user, err := h.authenticateAPIKey(ctx)
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "o5p6q7r8-s9t0-1234-opqr-567890123456",
-			Error: "Invalid or missing API key",
-		})
-		return
+func (h *ConversationHandler) DeleteConversation(reqCtx *gin.Context) (httpStatusCode int, result responses.GeneralResponse[conversation.Conversation], err error) {
+	ctx := reqCtx.Request.Context()
+	conv, ok := GetConversationFromContext(reqCtx)
+	if !ok {
+		result.Status = "db18fa07-a469-4564-8110-c0275d460653"
+		return http.StatusNotFound, result, nil
 	}
 
-	conversationID := ctx.Param("conversation_id")
-
-	// Get conversation first to get the public ID for response
-	conv, err := h.conversationService.GetConversationByPublicIDAndUserID(ctx, conversationID, user.ID)
+	err = h.conversationService.DeleteConversation(ctx, conv)
 	if err != nil {
-		if errors.Is(err, conversation.ErrConversationNotFound) {
-			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
-				Code:  "p6q7r8s9-t0u1-2345-pqrs-678901234567",
-				Error: err.Error(),
-			})
-			return
-		}
-		if errors.Is(err, conversation.ErrPrivateConversation) {
-			ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
-				Code:  "q7r8s9t0-u1v2-3456-qrst-789012345678",
-				Error: err.Error(),
-			})
-			return
-		}
-		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "r8s9t0u1-v2w3-4567-rstu-890123456789",
-			Error: err.Error(),
-		})
-		return
+		result.Status = "691463d7-79a9-48e9-aa70-3c0787dbc840"
+		return http.StatusInternalServerError, result, err
 	}
 
-	err = h.conversationService.DeleteConversation(ctx, conversationID, user.ID)
-	if err != nil {
-		if errors.Is(err, conversation.ErrConversationNotFound) {
-			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
-				Code:  "s9t0u1v2-w3x4-5678-stuv-901234567890",
-				Error: err.Error(),
-			})
-			return
-		}
-		if errors.Is(err, conversation.ErrAccessDenied) {
-			ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
-				Code:  "t0u1v2w3-x4y5-6789-tuvw-012345678901",
-				Error: err.Error(),
-			})
-			return
-		}
-		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "u1v2w3x4-y5z6-7890-uvwx-123456789012",
-			Error: err.Error(),
-		})
-		return
-	}
-
-	response := h.domainToDeletedConversationResponse(conv)
-	ctx.JSON(http.StatusOK, response)
+	result.Result = *conv
+	result.Status = responses.ResponseCodeOk
+	return http.StatusOK, result, nil
 }
 
 // CreateItems handles item creation
@@ -475,7 +485,7 @@ func (h *ConversationHandler) CreateItems(ctx *gin.Context) {
 	}
 
 	// Convert all items at once for batch processing
-	itemsToCreate := make([]conversation.ItemCreationData, len(request.Items))
+	itemsToCreate := make([]*conversation.Item, len(request.Items))
 
 	for i, itemReq := range request.Items {
 		// Convert request to domain types
@@ -497,7 +507,7 @@ func (h *ConversationHandler) CreateItems(ctx *gin.Context) {
 			}
 		}
 
-		itemsToCreate[i] = conversation.ItemCreationData{
+		itemsToCreate[i] = &conversation.Item{
 			Type:    itemType,
 			Role:    role,
 			Content: content,

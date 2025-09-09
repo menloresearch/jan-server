@@ -2,6 +2,8 @@ package conversation
 
 import (
 	"context"
+
+	"menlo.ai/jan-api-gateway/app/domain/query"
 )
 
 type ConversationStatus string
@@ -12,6 +14,7 @@ const (
 	ConversationStatusDeleted  ConversationStatus = "deleted"
 )
 
+// @Enum(message, function_call, function_call_output)
 type ItemType string
 
 const (
@@ -20,6 +23,16 @@ const (
 	ItemTypeFunctionCall ItemType = "function_call_output"
 )
 
+func ValidateItemType(input string) bool {
+	switch ItemType(input) {
+	case ItemTypeMessage, ItemTypeFunction, ItemTypeFunctionCall:
+		return true
+	default:
+		return false
+	}
+}
+
+// @Enum(system, user, assistant)
 type ItemRole string
 
 const (
@@ -27,6 +40,15 @@ const (
 	ItemRoleUser      ItemRole = "user"
 	ItemRoleAssistant ItemRole = "assistant"
 )
+
+func ValidateItemRole(input string) bool {
+	switch ItemRole(input) {
+	case ItemRoleSystem, ItemRoleUser, ItemRoleAssistant:
+		return true
+	default:
+		return false
+	}
+}
 
 type Item struct {
 	ID                uint               `json:"-"`  // Internal DB ID (hidden from JSON)
@@ -39,14 +61,6 @@ type Item struct {
 	IncompleteDetails *IncompleteDetails `json:"incomplete_details,omitempty"`
 	CompletedAt       *int64             `json:"completed_at,omitempty"`
 	CreatedAt         int64              `json:"created_at"` // Unix timestamp for OpenAI compatibility
-}
-
-// ItemCreationData represents the data needed to create a new conversation item
-// This excludes system-generated fields like ID, PublicID, CreatedAt, etc.
-type ItemCreationData struct {
-	Type    ItemType  `json:"type"`
-	Role    *ItemRole `json:"role,omitempty"`
-	Content []Content `json:"content"`
 }
 
 type Content struct {
@@ -126,16 +140,21 @@ type Conversation struct {
 	UpdatedAt int64              `json:"updated_at"` // Unix timestamp for OpenAI compatibility
 }
 
+type ConversationFilter struct {
+	PublicID *string
+	UserID   *uint
+}
+
 type ConversationRepository interface {
 	Create(ctx context.Context, conversation *Conversation) error
+	FindByFilter(ctx context.Context, filter ConversationFilter, pagination *query.Pagination) ([]*Conversation, error)
+	Count(ctx context.Context, filter ConversationFilter) (int64, error)
 	FindByID(ctx context.Context, id uint) (*Conversation, error)
 	FindByPublicID(ctx context.Context, publicID string) (*Conversation, error)
-
 	Update(ctx context.Context, conversation *Conversation) error
 	Delete(ctx context.Context, id uint) error
 	AddItem(ctx context.Context, conversationID uint, item *Item) error
 	SearchItems(ctx context.Context, conversationID uint, query string) ([]*Item, error)
-
 	BulkAddItems(ctx context.Context, conversationID uint, items []*Item) error
 	CountItemsByConversation(ctx context.Context, conversationID uint) (int64, error)
 }
