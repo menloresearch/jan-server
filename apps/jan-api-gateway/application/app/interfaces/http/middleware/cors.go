@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
@@ -12,6 +13,14 @@ func CORS() gin.HandlerFunc {
 		host := c.Request.Header.Get("Origin")
 		isValidHost := false
 		for _, allowedHost := range environment_variables.EnvironmentVariables.ALLOWED_CORS_HOSTS {
+			// wildcard
+			if strings.HasPrefix(allowedHost, "*") {
+				suffix := strings.TrimPrefix(allowedHost, "*")
+				if strings.HasSuffix(host, suffix) {
+					isValidHost = true
+					break
+				}
+			}
 			if allowedHost == host {
 				isValidHost = true
 				break
