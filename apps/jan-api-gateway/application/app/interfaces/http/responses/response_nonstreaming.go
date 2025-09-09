@@ -89,7 +89,7 @@ type Response struct {
 	Conversation *ConversationInfo `json:"conversation,omitempty"`
 
 	// The usage statistics for this response.
-	Usage map[string]interface{} `json:"usage,omitempty"`
+	Usage *DetailedUsage `json:"usage,omitempty"`
 
 	// The error that occurred during processing, if any.
 	Error *ResponseError `json:"error,omitempty"`
@@ -104,15 +104,15 @@ type Response struct {
 	FailedAt *int64 `json:"failed_at,omitempty"`
 
 	// OpenAI API response fields
-	IncompleteDetails  interface{}            `json:"incomplete_details,omitempty"`
-	Instructions       interface{}            `json:"instructions,omitempty"`
-	MaxOutputTokens    *int                   `json:"max_output_tokens,omitempty"`
-	ParallelToolCalls  bool                   `json:"parallel_tool_calls,omitempty"`
-	PreviousResponseID *string                `json:"previous_response_id,omitempty"`
-	Reasoning          map[string]interface{} `json:"reasoning,omitempty"`
-	Store              bool                   `json:"store,omitempty"`
-	Text               map[string]interface{} `json:"text,omitempty"`
-	Truncation         string                 `json:"truncation,omitempty"`
+	IncompleteDetails  interface{} `json:"incomplete_details,omitempty"`
+	Instructions       interface{} `json:"instructions,omitempty"`
+	MaxOutputTokens    *int        `json:"max_output_tokens,omitempty"`
+	ParallelToolCalls  bool        `json:"parallel_tool_calls,omitempty"`
+	PreviousResponseID *string     `json:"previous_response_id,omitempty"`
+	Reasoning          *Reasoning  `json:"reasoning,omitempty"`
+	Store              bool        `json:"store,omitempty"`
+	Text               *TextFormat `json:"text,omitempty"`
+	Truncation         string      `json:"truncation,omitempty"`
 }
 
 // ResponseStatus represents the status of a response
@@ -426,4 +426,52 @@ type ListInputItemsResponse struct {
 type ConversationInfo struct {
 	// The unique ID of the conversation.
 	ID string `json:"id"`
+}
+
+// DetailedUsage represents detailed usage statistics with token details
+type DetailedUsage struct {
+	// The number of tokens in the prompt.
+	InputTokens int `json:"input_tokens"`
+
+	// The number of tokens in the completion.
+	OutputTokens int `json:"output_tokens"`
+
+	// The total number of tokens used.
+	TotalTokens int `json:"total_tokens"`
+
+	// Details about input tokens.
+	InputTokensDetails *TokenDetails `json:"input_tokens_details,omitempty"`
+
+	// Details about output tokens.
+	OutputTokensDetails *TokenDetails `json:"output_tokens_details,omitempty"`
+}
+
+// TokenDetails represents detailed token information
+type TokenDetails struct {
+	// The number of cached tokens.
+	CachedTokens int `json:"cached_tokens,omitempty"`
+
+	// The number of reasoning tokens.
+	ReasoningTokens int `json:"reasoning_tokens,omitempty"`
+}
+
+// Reasoning represents reasoning information
+type Reasoning struct {
+	// The effort level for reasoning.
+	Effort *string `json:"effort,omitempty"`
+
+	// The summary of reasoning.
+	Summary *string `json:"summary,omitempty"`
+}
+
+// TextFormat represents text format information
+type TextFormat struct {
+	// The format type.
+	Format *FormatType `json:"format,omitempty"`
+}
+
+// FormatType represents the type of format
+type FormatType struct {
+	// The type of format.
+	Type string `json:"type"`
 }

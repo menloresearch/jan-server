@@ -95,33 +95,27 @@ func (h *NonStreamHandler) convertFromChatCompletionResponse(chatResp *openai.Ch
 		responseInput = req.Input
 	}
 
-	// Create output in OpenAI format
-	output := []map[string]interface{}{
+	// Create output using proper ResponseOutput structure
+	output := []responsetypes.ResponseOutput{
 		{
-			"type":   "message",
-			"id":     fmt.Sprintf("msg_%s", chatResp.ID[8:]), // Use part of response ID
-			"status": "completed",
-			"role":   "assistant",
-			"content": []map[string]interface{}{
-				{
-					"type":        "output_text",
-					"text":        outputText,
-					"annotations": []interface{}{},
-				},
+			Type: responsetypes.OutputTypeText,
+			Text: &responsetypes.TextOutput{
+				Value:       outputText,
+				Annotations: []responsetypes.Annotation{},
 			},
 		},
 	}
 
-	// Create usage information
-	usage := map[string]interface{}{
-		"input_tokens":  chatResp.Usage.PromptTokens,
-		"output_tokens": chatResp.Usage.CompletionTokens,
-		"total_tokens":  chatResp.Usage.TotalTokens,
-		"input_tokens_details": map[string]interface{}{
-			"cached_tokens": 0,
+	// Create usage information using proper DetailedUsage struct
+	usage := &responsetypes.DetailedUsage{
+		InputTokens:  chatResp.Usage.PromptTokens,
+		OutputTokens: chatResp.Usage.CompletionTokens,
+		TotalTokens:  chatResp.Usage.TotalTokens,
+		InputTokensDetails: &responsetypes.TokenDetails{
+			CachedTokens: 0,
 		},
-		"output_tokens_details": map[string]interface{}{
-			"reasoning_tokens": 0,
+		OutputTokensDetails: &responsetypes.TokenDetails{
+			ReasoningTokens: 0,
 		},
 	}
 
@@ -150,15 +144,15 @@ func (h *NonStreamHandler) convertFromChatCompletionResponse(chatResp *openai.Ch
 		MaxOutputTokens:    req.MaxTokens,
 		ParallelToolCalls:  false,
 		PreviousResponseID: nil,
-		Reasoning: map[string]interface{}{
-			"effort":  nil,
-			"summary": nil,
+		Reasoning: &responsetypes.Reasoning{
+			Effort:  nil,
+			Summary: nil,
 		},
 		Store:       true,
 		Temperature: req.Temperature,
-		Text: map[string]interface{}{
-			"format": map[string]interface{}{
-				"type": "text",
+		Text: &responsetypes.TextFormat{
+			Format: &responsetypes.FormatType{
+				Type: "text",
 			},
 		},
 		ToolChoice: &requesttypes.ToolChoice{
