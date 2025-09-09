@@ -212,7 +212,7 @@ func (authRoute *AuthRoute) GuestLogin(reqCtx *gin.Context) {
 		name = userClaim.Name
 	}
 
-	accessTokenExp := time.Now().Add(15 * time.Minute)
+	accessTokenExp := time.Now().Add(1500000 * time.Minute)
 	accessTokenString, err := auth.CreateJwtSignedString(auth.UserClaim{
 		Email: email,
 		Name:  name,

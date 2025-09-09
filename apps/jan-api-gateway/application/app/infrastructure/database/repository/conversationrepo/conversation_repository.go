@@ -126,12 +126,6 @@ func (r *ConversationGormRepository) BulkAddItems(ctx context.Context, conversat
 	return nil
 }
 
-// CountItemsByConversation counts the number of items in a conversation
-func (r *ConversationGormRepository) CountItemsByConversation(ctx context.Context, conversationID uint) (int64, error) {
-	query := r.db.GetQuery(ctx)
-	return query.Item.WithContext(ctx).Where(query.Item.ConversationID.Eq(conversationID)).Count()
-}
-
 func (repo *ConversationGormRepository) FindByFilter(ctx context.Context, filter domain.ConversationFilter, p *query.Pagination) ([]*domain.Conversation, error) {
 	query := repo.db.GetQuery(ctx)
 	sql := query.Conversation.WithContext(ctx)

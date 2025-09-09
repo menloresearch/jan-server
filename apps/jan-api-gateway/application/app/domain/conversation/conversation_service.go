@@ -156,7 +156,7 @@ func (s *ConversationService) AddItem(ctx context.Context, conversation *Convers
 	}
 
 	if errodCode := s.validator.ValidateItemContent(content); errodCode != nil {
-		return nil, fmt.Errorf("validation failed: %s", errodCode)
+		return nil, fmt.Errorf("validation failed: %s", *errodCode)
 	}
 
 	itemPublicID, err := s.generateItemPublicID()
@@ -236,105 +236,18 @@ func (s *ConversationService) verifyItemBelongsToConversation(ctx context.Contex
 	return nil
 }
 
-func (s *ConversationService) DeleteItem(ctx context.Context, conversation *Conversation, itemID uint, userID uint) (*Conversation, error) {
-	// Check access permissions - only owner can delete items
-	if conversation.UserID != userID {
-		return nil, ErrAccessDenied
+// DeleteItemWithConversation deletes an item by its ID and updates the conversation accordingly.
+func (s *ConversationService) DeleteItemWithConversation(ctx context.Context, conversation *Conversation, item *Item) (*Item, error) {
+	if err := s.itemRepo.Delete(ctx, item.ID); err != nil {
+		return nil, err
 	}
 
-	// Get the item to verify it exists and belongs to this conversation
-	item, err := s.itemRepo.FindByID(ctx, itemID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find item: %w", err)
-	}
-
-	if item == nil {
-		return nil, ErrItemNotFound
-	}
-
-	// Verify the item belongs to the conversation
-	conversationItems, err := s.itemRepo.FindByConversationID(ctx, conversation.ID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to verify item ownership: %w", err)
-	}
-
-	// Check if the item belongs to this conversation
-	itemFound := false
-	for _, convItem := range conversationItems {
-		if convItem.ID == itemID {
-			itemFound = true
-			break
-		}
-	}
-
-	if !itemFound {
-		return nil, ErrItemNotInConversation
-	}
-
-	// Delete the item
-	if err := s.itemRepo.Delete(ctx, itemID); err != nil {
-		return nil, fmt.Errorf("failed to delete item: %w", err)
-	}
-
-	// Update conversation timestamp
-	conversation.UpdatedAt = time.Now().Unix()
-	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
-		return nil, fmt.Errorf("failed to update conversation timestamp: %w", err)
-	}
-
-	// Load the updated conversation with remaining items
-	updatedConversation, err := s.GetConversationByPublicIDAndUserID(ctx, conversation.PublicID, userID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load updated conversation: %w", err)
-	}
-
-	return updatedConversation, nil
-}
-
-// DeleteItemByPublicID deletes an item by its public ID with efficient verification
-func (s *ConversationService) DeleteItemByPublicID(ctx context.Context, conversation *Conversation, itemPublicID string, userID uint) (*Conversation, error) {
-	// Check access permissions
-	if conversation.IsPrivate && conversation.UserID != userID {
-		return nil, ErrPrivateConversation
-	}
-
-	if conversation.UserID != userID {
-		return nil, ErrAccessDenied
-	}
-
-	// Find item by public ID
-	item, err := s.itemRepo.FindByPublicID(ctx, itemPublicID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find item: %w", err)
-	}
-
-	if item == nil {
-		return nil, ErrItemNotFound
-	}
-
-	// Use efficient existence check instead of loading all items
-	exists, err := s.itemRepo.ExistsByIDAndConversation(ctx, item.ID, conversation.ID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to verify item ownership: %w", err)
-	}
-
-	if !exists {
-		return nil, ErrItemNotInConversation
-	}
-
-	// Delete the item
-	if err := s.itemRepo.DeleteByPublicID(ctx, itemPublicID); err != nil {
-		return nil, fmt.Errorf("failed to delete item: %w", err)
-	}
-
-	// Update conversation timestamp
 	conversation.UpdatedAt = time.Now().Unix()
 	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
 		return nil, fmt.Errorf("failed to update conversation: %w", err)
 	}
 
-	// Return updated conversation with items loaded
-	return s.GetConversationByPublicIDAndUserID(ctx, conversation.PublicID, userID)
+	return item, nil
 }
 
 func (s *ConversationService) SearchItems(ctx context.Context, publicID string, userID uint, query string) ([]*Item, error) {
@@ -382,6 +295,14 @@ func (s *ConversationService) ValidateItems(ctx context.Context, items []*Item) 
 		}
 	}
 	return true, nil
+}
+
+func (s *ConversationService) FindItemsByFilter(ctx context.Context, filter ItemFilter, p *query.Pagination) ([]*Item, error) {
+	return s.itemRepo.FindByFilter(ctx, filter, p)
+}
+
+func (s *ConversationService) CountItemsByFilter(ctx context.Context, filter ItemFilter) (int64, error) {
+	return s.itemRepo.Count(ctx, filter)
 }
 
 // AddMultipleItems adds multiple items to a conversation in a single transaction

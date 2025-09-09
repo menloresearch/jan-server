@@ -51,7 +51,8 @@ func ValidateItemRole(input string) bool {
 }
 
 type Item struct {
-	ID                uint               `json:"-"`  // Internal DB ID (hidden from JSON)
+	ID                uint               `json:"-"` // Internal DB ID (hidden from JSON)
+	ConversationID    uint               `json:"-"`
 	PublicID          string             `json:"id"` // OpenAI-compatible string ID like "msg_abc123"
 	Type              ItemType           `json:"type"`
 	Role              *ItemRole          `json:"role,omitempty"`
@@ -145,6 +146,11 @@ type ConversationFilter struct {
 	UserID   *uint
 }
 
+type ItemFilter struct {
+	PublicID       *string
+	ConversationID *uint
+}
+
 type ConversationRepository interface {
 	Create(ctx context.Context, conversation *Conversation) error
 	FindByFilter(ctx context.Context, filter ConversationFilter, pagination *query.Pagination) ([]*Conversation, error)
@@ -156,7 +162,6 @@ type ConversationRepository interface {
 	AddItem(ctx context.Context, conversationID uint, item *Item) error
 	SearchItems(ctx context.Context, conversationID uint, query string) ([]*Item, error)
 	BulkAddItems(ctx context.Context, conversationID uint, items []*Item) error
-	CountItemsByConversation(ctx context.Context, conversationID uint) (int64, error)
 }
 
 type ItemRepository interface {
@@ -166,9 +171,9 @@ type ItemRepository interface {
 	FindByConversationID(ctx context.Context, conversationID uint) ([]*Item, error)
 	Search(ctx context.Context, conversationID uint, query string) ([]*Item, error)
 	Delete(ctx context.Context, id uint) error
-	DeleteByPublicID(ctx context.Context, publicID string) error // Delete by OpenAI-compatible string ID
-
 	BulkCreate(ctx context.Context, items []*Item) error
 	CountByConversation(ctx context.Context, conversationID uint) (int64, error)
 	ExistsByIDAndConversation(ctx context.Context, itemID uint, conversationID uint) (bool, error)
+	FindByFilter(ctx context.Context, filter ItemFilter, pagination *query.Pagination) ([]*Item, error)
+	Count(ctx context.Context, filter ItemFilter) (int64, error)
 }

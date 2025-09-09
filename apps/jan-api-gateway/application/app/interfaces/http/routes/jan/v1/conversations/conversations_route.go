@@ -28,22 +28,23 @@ func NewConversationAPI(handler *conversationHandler.ConversationHandler, userHa
 	}
 }
 
-// RegisterRouter registers Jan-specific conversation routes (currently identical to OpenAI)
+// RegisterRouter registers Jan-specific conversation routes
 func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
-
 	conversationsRouter := router.Group("/conversations", middleware.AuthMiddleware(), api.userHandler.RegisteredUserMiddleware())
 
 	conversationsRouter.GET("", api.listConversations)
 	conversationsRouter.POST("", api.createConversation)
+
 	conversationMiddleWare := api.handler.GetConversationMiddleWare()
 	conversationsRouter.GET(fmt.Sprintf("/:%s", conversationHandler.ConversationContextKeyPublicID), conversationMiddleWare, api.getConversation)
 	conversationsRouter.PATCH(fmt.Sprintf("/:%s", conversationHandler.ConversationContextKeyPublicID), conversationMiddleWare, api.updateConversation)
 	conversationsRouter.DELETE(fmt.Sprintf("/:%s", conversationHandler.ConversationContextKeyPublicID), conversationMiddleWare, api.deleteConversation)
 	conversationsRouter.POST(fmt.Sprintf("/:%s/items", conversationHandler.ConversationContextKeyPublicID), conversationMiddleWare, api.createItems)
 	conversationsRouter.GET(fmt.Sprintf("/:%s/items", conversationHandler.ConversationContextKeyPublicID), conversationMiddleWare, api.listItems)
-	conversationsRouter.GET(fmt.Sprintf("/:%s/items/:item_id", conversationHandler.ConversationContextKeyPublicID), conversationMiddleWare, api.getItem)
-	conversationsRouter.DELETE(fmt.Sprintf("/:%s/items/:item_id", conversationHandler.ConversationContextKeyPublicID), conversationMiddleWare, api.deleteItem)
 
+	conversationItemMiddleWare := api.handler.GetConversationItemMiddleWare()
+	conversationsRouter.GET(fmt.Sprintf("/:%s/items/:%s", conversationHandler.ConversationContextKeyPublicID, conversationHandler.ConversationItemContextKeyPublicID), conversationMiddleWare, conversationItemMiddleWare, api.getItem)
+	conversationsRouter.DELETE(fmt.Sprintf("/:%s/items/:%s", conversationHandler.ConversationContextKeyPublicID, conversationHandler.ConversationItemContextKeyPublicID), conversationMiddleWare, conversationItemMiddleWare, api.deleteItem)
 	// conversationsRouter.GET("/:conversation_id/items/search", api.handler.SearchItems)  // Jan-specific: search items
 }
 
@@ -67,6 +68,32 @@ func convertConversationEntityToResponse(entity *conversation.Conversation) Conv
 	}
 }
 
+type ItemResponse struct {
+	ID                string                          `json:"id"`
+	Type              conversation.ItemType           `json:"type"`
+	Role              *conversation.ItemRole          `json:"role,omitempty"`
+	Content           []conversation.Content          `json:"content,omitempty"`
+	Status            *string                         `json:"status,omitempty"`
+	IncompleteAt      *int64                          `json:"incomplete_at,omitempty"`
+	IncompleteDetails *conversation.IncompleteDetails `json:"incomplete_details,omitempty"`
+	CompletedAt       *int64                          `json:"completed_at,omitempty"`
+	CreatedAt         int64                           `json:"created_at"`
+}
+
+func convertItemEntityToResponse(entity *conversation.Item) ItemResponse {
+	return ItemResponse{
+		ID:                entity.PublicID,
+		Type:              entity.Type,
+		Role:              entity.Role,
+		Content:           entity.Content,
+		Status:            entity.Status,
+		IncompleteAt:      entity.IncompleteAt,
+		IncompleteDetails: entity.IncompleteDetails,
+		CompletedAt:       entity.CompletedAt,
+		CreatedAt:         entity.CreatedAt,
+	}
+}
+
 // ListConversations
 // @Summary List Conversations
 // @Description Retrieves a paginated list of conversations for the authenticated user.
@@ -74,6 +101,7 @@ func convertConversationEntityToResponse(entity *conversation.Conversation) Conv
 // @Security BearerAuth
 // @Param limit query int false "The maximum number of items to return" default(20)
 // @Param after query string false "A cursor for use in pagination. The ID of the last object from the previous page"
+// @Param order query string false "Order of items (asc/desc)"
 // @Success 200 {object} jan.JanListResponse[ConversationResponse] "Successfully retrieved the list of conversations"
 // @Failure 400 {object} responses.ErrorResponse "Bad Request - Invalid pagination parameters"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - invalid or missing API key"
@@ -224,15 +252,30 @@ func (api *ConversationAPI) deleteConversation(reqCtx *gin.Context) {
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
 // @Param request body menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.CreateItemsRequest true "Create items request"
-// @Success 200 {object} menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationItemListResponse "Created items"
+// @Success 200 {object} jan.JanListResponse[ItemResponse] "Created items"
 // @Failure 400 {object} responses.ErrorResponse "Invalid request"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /jan/v1/conversations/{conversation_id}/items [post]
-func (api *ConversationAPI) createItems(ctx *gin.Context) {
-	api.handler.CreateItems(ctx)
+func (api *ConversationAPI) createItems(reqCtx *gin.Context) {
+	status, result, err := api.handler.CreateItems(reqCtx)
+	if status != http.StatusOK {
+		reqCtx.AbortWithStatusJSON(status, responses.ErrorResponse{
+			Code:          result.Status,
+			ErrorInstance: err,
+		})
+		return
+	}
+	reqCtx.JSON(status, jan.JanListResponse[ItemResponse]{
+		Status:  result.Status,
+		Results: functional.Map(result.Results, convertItemEntityToResponse),
+		FirstID: result.FirstID,
+		LastID:  result.LastID,
+		HasMore: result.HasMore,
+		Total:   result.Total,
+	})
 }
 
 // listItems handles item listing with optional pagination
@@ -242,17 +285,32 @@ func (api *ConversationAPI) createItems(ctx *gin.Context) {
 // @Security BearerAuth
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
-// @Param limit query int false "Number of items to return (1-100)"
-// @Param cursor query string false "Cursor for pagination"
+// @Param limit query int false "The maximum number of items to return" default(20)
+// @Param after query string false "A cursor for use in pagination. The ID of the last object from the previous page"
 // @Param order query string false "Order of items (asc/desc)"
-// @Success 200 {object} menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationItemListResponse "List of items"
+// @Success 200 {object} jan.JanListResponse[ItemResponse] "List of items"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /jan/v1/conversations/{conversation_id}/items [get]
-func (api *ConversationAPI) listItems(ctx *gin.Context) {
-	api.handler.ListItems(ctx)
+func (api *ConversationAPI) listItems(reqCtx *gin.Context) {
+	status, result, err := api.handler.ListItems(reqCtx)
+	if status != http.StatusOK {
+		reqCtx.AbortWithStatusJSON(status, responses.ErrorResponse{
+			Code:          result.Status,
+			ErrorInstance: err,
+		})
+		return
+	}
+	reqCtx.JSON(status, jan.JanListResponse[ItemResponse]{
+		Status:  result.Status,
+		Results: functional.Map(result.Results, convertItemEntityToResponse),
+		FirstID: result.FirstID,
+		LastID:  result.LastID,
+		HasMore: result.HasMore,
+		Total:   result.Total,
+	})
 }
 
 // getItem handles single item retrieval
@@ -263,14 +321,21 @@ func (api *ConversationAPI) listItems(ctx *gin.Context) {
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
 // @Param item_id path string true "Item ID"
-// @Success 200 {object} menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationItemResponse "Item details"
+// @Success 200 {object} jan.JanGeneralResponse[ItemResponse] "Item details"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /jan/v1/conversations/{conversation_id}/items/{item_id} [get]
-func (api *ConversationAPI) getItem(ctx *gin.Context) {
-	api.handler.GetItem(ctx)
+func (api *ConversationAPI) getItem(reqCtx *gin.Context) {
+	item, ok := conversationHandler.GetConversationItemFromContext(reqCtx)
+	if !ok {
+		return
+	}
+	reqCtx.JSON(http.StatusOK, jan.JanGeneralResponse[ItemResponse]{
+		Status: responses.ResponseCodeOk,
+		Result: convertItemEntityToResponse(item),
+	})
 }
 
 // deleteItem handles item deletion
@@ -281,12 +346,23 @@ func (api *ConversationAPI) getItem(ctx *gin.Context) {
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
 // @Param item_id path string true "Item ID"
-// @Success 200 {object} menlo_ai_jan-api-gateway_app_interfaces_http_handlers_conversation.ConversationResponse "Updated conversation"
+// @Success 200 {object} jan.JanGeneralResponse[ItemResponse] "Updated conversation"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /jan/v1/conversations/{conversation_id}/items/{item_id} [delete]
-func (api *ConversationAPI) deleteItem(ctx *gin.Context) {
-	api.handler.DeleteItem(ctx)
+func (api *ConversationAPI) deleteItem(reqCtx *gin.Context) {
+	status, result, err := api.handler.DeleteItem(reqCtx)
+	if status != http.StatusOK {
+		reqCtx.AbortWithStatusJSON(status, responses.ErrorResponse{
+			Code:          result.Status,
+			ErrorInstance: err,
+		})
+		return
+	}
+	reqCtx.JSON(http.StatusOK, jan.JanGeneralResponse[ItemResponse]{
+		Status: result.Status,
+		Result: convertItemEntityToResponse(result.Result),
+	})
 }

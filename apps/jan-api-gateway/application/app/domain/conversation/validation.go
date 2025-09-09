@@ -163,7 +163,7 @@ func (v *ConversationValidator) validateMetadata(metadata map[string]string) err
 			return fmt.Errorf("invalid metadata key '%s': %w", key, err)
 		}
 
-		if err := v.validateMetadataValue(key, value); err != nil {
+		if err := v.validateMetadataValue(value); err != nil {
 			return fmt.Errorf("invalid metadata value for key '%s': %w", key, err)
 		}
 	}
@@ -187,7 +187,7 @@ func (v *ConversationValidator) validateMetadataKey(key string) error {
 	return nil
 }
 
-func (v *ConversationValidator) validateMetadataValue(key, value string) error {
+func (v *ConversationValidator) validateMetadataValue(value string) error {
 	if utf8.RuneCountInString(value) > v.config.MaxMetadataValueLength {
 		return fmt.Errorf("metadata value cannot exceed %d characters", v.config.MaxMetadataValueLength)
 	}

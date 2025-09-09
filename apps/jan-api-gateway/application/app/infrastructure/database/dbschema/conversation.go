@@ -139,6 +139,7 @@ func (i *Item) EtoD() *conversation.Item {
 		IncompleteDetails: incompleteDetails,
 		CompletedAt:       i.CompletedAt,
 		CreatedAt:         i.CreatedAt.Unix(), // Convert time.Time to Unix timestamp
+		ConversationID:    i.ConversationID,
 	}
 }
 
