@@ -47,6 +47,8 @@ func NewHttpServer(v1Route *v1.V1Route, janRoute *jan.JanRoute) *HttpServer {
 		v1Route,
 		janRoute,
 	}
+	// TODO: we should enable cors later
+	server.engine.Use(middleware.CORS())
 	server.engine.Use(middleware.LoggerMiddleware(logger.Logger))
 	server.engine.GET("/healthcheck", func(c *gin.Context) {
 		c.JSON(200, "ok")
