@@ -779,6 +779,44 @@ const docTemplate = `{
                 }
             }
         },
+        "/jan/v1/mcp": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Handles Model Context Protocol (MCP) requests over an HTTP stream. The response is sent as a continuous stream of data.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "Jan",
+                    "Jan-MCP"
+                ],
+                "summary": "MCP streamable endpoint",
+                "parameters": [
+                    {
+                        "description": "MCP request payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {}
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Streamed response (SSE or chunked transfer)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/jan/v1/models": {
             "get": {
                 "security": [

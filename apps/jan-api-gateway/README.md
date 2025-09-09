@@ -163,6 +163,7 @@ A comprehensive API gateway for Jan Server that provides OpenAI-compatible endpo
 | `OAUTH2_GOOGLE_CLIENT_ID` | Google OAuth2 client ID | `your-google-client-id` |
 | `OAUTH2_GOOGLE_CLIENT_SECRET` | Google OAuth2 client secret | `your-google-client-secret` |
 | `OAUTH2_GOOGLE_REDIRECT_URL` | Google OAuth2 redirect URL | `http://localhost:8080/auth/google/callback` |
+| `ALLOWED_CORS_HOSTS` | allowed cors hosts | `http://localhost:8080` |
 
 ## 📚 API Usage Examples
 

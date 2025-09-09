@@ -30,23 +30,24 @@ import (
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth/google"
 	chat2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/chat"
 	conversations2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/conversations"
+	mcp2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/mcp"
 	organization3 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization"
 	apikeys2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/api_keys"
 	projects2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects/api_keys"
+	apikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects/api_keys"
 	responses2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/responses"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
+	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
+	mcpimpl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	organization2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
-)
 
-import (
 	_ "github.com/grafana/pyroscope-go/godeltaprof/http/pprof"
+
 	_ "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation"
+
 	_ "net/http/pprof"
 )
 
@@ -92,7 +93,8 @@ func CreateApplication() (*Application, error) {
 	organizationOrganizationRoute := organization3.NewOrganizationRoute(organizationService, userService, projectsProjectsRoute, organizationApiKeyRoute)
 	responseHandler := responses.NewResponseHandler(userService, apiKeyService, conversationService)
 	responseRoute := responses2.NewResponseRoute(responseHandler)
-	v1V1Route := v1_2.NewV1Route(authRoute, chatChatRoute, conversationsConversationAPI, organizationOrganizationRoute, responseRoute)
+	mcpMCPAPI := mcp2.NewMCPAPI(serperMCP)
+	v1V1Route := v1_2.NewV1Route(authRoute, chatChatRoute, conversationsConversationAPI, organizationOrganizationRoute, responseRoute, mcpMCPAPI)
 	janRoute := jan.NewJanRoute(v1V1Route, chatChatRoute)
 	httpServer := http.NewHttpServer(v1Route, janRoute)
 	application := &Application{

@@ -8,6 +8,8 @@ import (
 	janV1AuthGoogle "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth/google"
 	janV1Chat "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/chat"
 	janV1Conversations "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/conversations"
+	janMcp "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/mcp"
+	janMcpImpl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/mcp/mcp_impl"
 	janV1Organization "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization"
 	janV1OrganizationApikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/api_keys"
 	janV1OrganizationProject "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects"
@@ -24,7 +26,8 @@ import (
 
 var RouteProvider = wire.NewSet(
 
-	// Route providers
+	janMcp.NewMCPAPI,
+	janMcpImpl.NewSerperMCP,
 	janV1OrganizationApikeys.NewOrganizationApiKeyRouteRoute,
 	janV1OrganizationProjectApikeys.NewProjectApiKeyRoute,
 	janV1.NewV1Route,

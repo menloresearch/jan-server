@@ -1849,6 +1849,31 @@ paths:
       tags:
       - Jan
       - Jan-Conversations
+  /jan/v1/mcp:
+    post:
+      consumes:
+      - application/json
+      description: Handles Model Context Protocol (MCP) requests over an HTTP stream.
+        The response is sent as a continuous stream of data.
+      parameters:
+      - description: MCP request payload
+        in: body
+        name: request
+        required: true
+        schema: {}
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: Streamed response (SSE or chunked transfer)
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: MCP streamable endpoint
+      tags:
+      - Jan
+      - Jan-MCP
   /jan/v1/models:
     get:
       consumes:

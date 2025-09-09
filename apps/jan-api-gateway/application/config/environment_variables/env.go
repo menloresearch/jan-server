@@ -5,6 +5,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 type EnvironmentVariable struct {
@@ -17,6 +18,7 @@ type EnvironmentVariable struct {
 	DB_POSTGRESQL_WRITE_DSN     string
 	DB_POSTGRESQL_READ1_DSN     string
 	APIKEY_SECRET               string
+	ALLOWED_CORS_HOSTS          []string
 }
 
 func (ev *EnvironmentVariable) LoadFromEnv() {
@@ -43,6 +45,9 @@ func (ev *EnvironmentVariable) LoadFromEnv() {
 			case reflect.Slice:
 				if v.Field(i).Type().Elem().Kind() == reflect.Uint8 {
 					v.Field(i).SetBytes([]byte(envValue))
+				} else if v.Field(i).Type().Elem().Kind() == reflect.String {
+					hosts := strings.Split(envValue, ",")
+					v.Field(i).Set(reflect.ValueOf(hosts))
 				} else {
 					fmt.Printf("Unsupported slice type for %s\n", field.Name)
 				}
