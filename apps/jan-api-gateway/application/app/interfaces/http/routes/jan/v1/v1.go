@@ -9,6 +9,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/auth"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/conversations"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/mcp"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization"
 	"menlo.ai/jan-api-gateway/app/utils/functional"
 )
@@ -18,18 +19,21 @@ type V1Route struct {
 	chat          *chat.ChatRoute
 	conversations *conversations.ConversationAPI
 	organizations *organization.OrganizationRoute
+	mcpAPI        *mcp.MCPAPI
 }
 
 func NewV1Route(
 	auth *auth.AuthRoute,
 	chat *chat.ChatRoute,
 	conversations *conversations.ConversationAPI,
-	organizations *organization.OrganizationRoute) *V1Route {
+	organizations *organization.OrganizationRoute,
+	mcpAPI *mcp.MCPAPI) *V1Route {
 	return &V1Route{
 		auth,
 		chat,
 		conversations,
 		organizations,
+		mcpAPI,
 	}
 }
 
@@ -39,6 +43,7 @@ func (v1Route *V1Route) RegisterRouter(router gin.IRouter) {
 	v1Route.chat.RegisterRouter(v1Router)
 	v1Route.conversations.RegisterRouter(v1Router)
 	v1Route.organizations.RegisterRouter(v1Router)
+	v1Route.mcpAPI.RegisterRouter(v1Router)
 	v1Router.GET("/models", v1Route.GetModels)
 }
 
