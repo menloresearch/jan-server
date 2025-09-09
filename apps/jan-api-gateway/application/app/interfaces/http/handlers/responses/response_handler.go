@@ -477,7 +477,7 @@ func (h *ResponseHandler) validateUserAndResponseID(reqCtx *gin.Context, respons
 
 // sendErrorResponse sends a standardized error response
 func (h *ResponseHandler) sendErrorResponse(reqCtx *gin.Context, statusCode int, errorCode, errorMessage string) {
-	reqCtx.JSON(statusCode, responsetypes.ErrorResponse{
+	reqCtx.AbortWithStatusJSON(statusCode, responsetypes.ErrorResponse{
 		Code:  errorCode,
 		Error: errorMessage,
 	})
