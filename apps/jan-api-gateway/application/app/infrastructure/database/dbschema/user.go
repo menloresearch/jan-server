@@ -13,7 +13,7 @@ type User struct {
 	BaseModel
 	Name          string `gorm:"type:varchar(100);not null"`
 	Email         string `gorm:"type:varchar(255);uniqueIndex;not null"`
-	PublicID      string `gorm:"type:varchar(50);uniqueIndex"`
+	PublicID      string `gorm:"type:varchar(50);uniqueIndex;not null"`
 	Enabled       bool
 	Organizations []OrganizationMember `gorm:"foreignKey:UserID"`
 	Projects      []ProjectMember      `gorm:"foreignKey:UserID"`

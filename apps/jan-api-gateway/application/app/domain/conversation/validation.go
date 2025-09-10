@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
+	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
 // ValidationConfig holds conversation validation rules
@@ -73,18 +74,18 @@ func (v *ConversationValidator) ValidateConversationInput(title *string, metadat
 }
 
 // ValidateItemContent performs comprehensive content validation
-func (v *ConversationValidator) ValidateItemContent(content []Content) error {
+func (v *ConversationValidator) ValidateItemContent(content []Content) *string {
 	if len(content) == 0 {
-		return fmt.Errorf("item must have at least one content block")
+		return ptr.ToString("aa497939-edbb-416a-899c-a8acc387247e")
 	}
 
 	if len(content) > v.config.MaxContentBlocks {
-		return fmt.Errorf("item cannot have more than %d content blocks", v.config.MaxContentBlocks)
+		return ptr.ToString("6dbdb6a2-72f0-430a-909c-9f8ca5dd3397")
 	}
 
-	for i, c := range content {
-		if err := v.validateContentBlock(c, i); err != nil {
-			return fmt.Errorf("content block %d: %w", i, err)
+	for _, c := range content {
+		if err := v.validateContentBlock(c); err != nil {
+			return ptr.ToString("c67847d7-9011-41c0-9a05-520c9c670a28")
 		}
 	}
 
@@ -162,7 +163,7 @@ func (v *ConversationValidator) validateMetadata(metadata map[string]string) err
 			return fmt.Errorf("invalid metadata key '%s': %w", key, err)
 		}
 
-		if err := v.validateMetadataValue(key, value); err != nil {
+		if err := v.validateMetadataValue(value); err != nil {
 			return fmt.Errorf("invalid metadata value for key '%s': %w", key, err)
 		}
 	}
@@ -186,7 +187,7 @@ func (v *ConversationValidator) validateMetadataKey(key string) error {
 	return nil
 }
 
-func (v *ConversationValidator) validateMetadataValue(key, value string) error {
+func (v *ConversationValidator) validateMetadataValue(value string) error {
 	if utf8.RuneCountInString(value) > v.config.MaxMetadataValueLength {
 		return fmt.Errorf("metadata value cannot exceed %d characters", v.config.MaxMetadataValueLength)
 	}
@@ -194,7 +195,7 @@ func (v *ConversationValidator) validateMetadataValue(key, value string) error {
 	return nil
 }
 
-func (v *ConversationValidator) validateContentBlock(content Content, index int) error {
+func (v *ConversationValidator) validateContentBlock(content Content) error {
 	if content.Type == "" {
 		return fmt.Errorf("content type cannot be empty")
 	}
