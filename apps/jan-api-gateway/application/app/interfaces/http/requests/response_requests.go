@@ -68,6 +68,9 @@ type CreateResponseRequest struct {
 
 	// The conversation ID to append items to. If not set or set to 'client-created-root', a new conversation will be created.
 	Conversation *string `json:"conversation,omitempty"`
+
+	// The ID of the previous response to continue from. If set, the conversation will be loaded from the previous response.
+	PreviousResponseID *string `json:"previous_response_id,omitempty"`
 }
 
 // CreateResponseInput represents the input to the model

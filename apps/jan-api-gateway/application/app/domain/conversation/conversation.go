@@ -38,6 +38,8 @@ type Item struct {
 	IncompleteAt      *int64             `json:"incomplete_at,omitempty"`
 	IncompleteDetails *IncompleteDetails `json:"incomplete_details,omitempty"`
 	CompletedAt       *int64             `json:"completed_at,omitempty"`
+	ConversationID    uint               `json:"-"`          // Internal conversation ID (hidden from JSON)
+	ResponseID        *uint              `json:"-"`          // Internal response ID (hidden from JSON)
 	CreatedAt         int64              `json:"created_at"` // Unix timestamp for OpenAI compatibility
 }
 

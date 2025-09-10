@@ -12,6 +12,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/project"
+	"menlo.ai/jan-api-gateway/app/domain/response"
 	"menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/apikeyrepo"
@@ -19,6 +20,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/itemrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/organizationrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/projectrepo"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/responserepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
@@ -91,7 +93,9 @@ func CreateApplication() (*Application, error) {
 	projectsProjectsRoute := projects2.NewProjectsRoute(userService, projectService, organizationService, projectApiKeyRoute)
 	organizationApiKeyRoute := apikeys2.NewOrganizationApiKeyRouteRoute(organizationService, apiKeyService, userService)
 	organizationOrganizationRoute := organization3.NewOrganizationRoute(organizationService, userService, projectsProjectsRoute, organizationApiKeyRoute)
-	responseHandler := responses.NewResponseHandler(userService, apiKeyService, conversationService)
+	responseRepository := responserepo.NewResponseRepository(db)
+	responseService := response.NewResponseService(responseRepository, itemRepository)
+	responseHandler := responses.NewResponseHandler(userService, apiKeyService, conversationService, responseService)
 	responseRoute := responses2.NewResponseRoute(responseHandler)
 	mcpMCPAPI := mcp2.NewMCPAPI(serperMCP)
 	v1V1Route := v1_2.NewV1Route(authRoute, chatChatRoute, conversationsConversationAPI, organizationOrganizationRoute, responseRoute, mcpMCPAPI)

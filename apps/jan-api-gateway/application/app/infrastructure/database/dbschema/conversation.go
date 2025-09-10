@@ -29,6 +29,7 @@ type Item struct {
 	BaseModel
 	PublicID          string       `gorm:"type:varchar(50);uniqueIndex;not null"` // OpenAI-compatible string ID
 	ConversationID    uint         `gorm:"not null;index"`
+	ResponseID        *uint        `gorm:"index"` // Optional response ID for items that belong to a specific response
 	Type              string       `gorm:"type:varchar(50);not null"`
 	Role              string       `gorm:"type:varchar(20)"`
 	Content           string       `gorm:"type:text"`
@@ -37,6 +38,7 @@ type Item struct {
 	IncompleteDetails string       `gorm:"type:text"`
 	CompletedAt       *int64       `gorm:"type:bigint"`
 	Conversation      Conversation `gorm:"foreignKey:ConversationID"`
+	Response          *Response    `gorm:"foreignKey:ResponseID"`
 }
 
 func NewSchemaConversation(c *conversation.Conversation) *Conversation {
@@ -104,6 +106,8 @@ func NewSchemaItem(i *conversation.Item) *Item {
 			ID: i.ID,
 		},
 		PublicID:          i.PublicID, // Add PublicID field
+		ConversationID:    i.ConversationID,
+		ResponseID:        i.ResponseID,
 		Type:              string(i.Type),
 		Role:              stringPtrToString((*string)(i.Role)),
 		Content:           contentJSON,
@@ -138,6 +142,8 @@ func (i *Item) EtoD() *conversation.Item {
 		IncompleteAt:      i.IncompleteAt,
 		IncompleteDetails: incompleteDetails,
 		CompletedAt:       i.CompletedAt,
+		ConversationID:    i.ConversationID,
+		ResponseID:        i.ResponseID,
 		CreatedAt:         i.CreatedAt.Unix(), // Convert time.Time to Unix timestamp
 	}
 }

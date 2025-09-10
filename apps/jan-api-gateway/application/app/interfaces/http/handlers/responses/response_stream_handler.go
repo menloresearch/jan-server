@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
+	"menlo.ai/jan-api-gateway/app/domain/response"
 	requesttypes "menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	responsetypes "menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
@@ -138,7 +139,7 @@ func (h *StreamHandler) createFunctionCallEvent(itemID string, sequenceNumber in
 }
 
 // CreateStreamResponse handles the business logic for creating a streaming response
-func (h *StreamHandler) CreateStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation) {
+func (h *StreamHandler) CreateStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *response.Response) {
 	// Validate request
 	if err := h.validateRequest(request); err != nil {
 		reqCtx.JSON(http.StatusBadRequest, responsetypes.ErrorResponse{
@@ -172,8 +173,8 @@ func (h *StreamHandler) CreateStreamResponse(reqCtx *gin.Context, request *reque
 	reqCtx.Header("Access-Control-Allow-Origin", "*")
 	reqCtx.Header("Access-Control-Allow-Headers", "Cache-Control")
 
-	// Generate response ID
-	responseID := fmt.Sprintf("response_%d", time.Now().UnixNano())
+	// Use the public ID from the response entity
+	responseID := responseEntity.PublicID
 
 	// Create conversation info
 	var conversationInfo *responsetypes.ConversationInfo
@@ -219,23 +220,8 @@ func (h *StreamHandler) CreateStreamResponse(reqCtx *gin.Context, request *reque
 		Response: response,
 	})
 
-	// Add user message to conversation if conversation exists
-	if conv != nil {
-		// Extract user message from the last message in the chat completion request
-		if len(chatCompletionRequest.Messages) > 0 {
-			lastMessage := chatCompletionRequest.Messages[len(chatCompletionRequest.Messages)-1]
-			if lastMessage.Role == openai.ChatMessageRoleUser {
-				userMessage := openai.ChatCompletionMessage{
-					Role:    openai.ChatMessageRoleUser,
-					Content: lastMessage.Content,
-				}
-				if err := h.appendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{userMessage}); err != nil {
-					// Log error but don't fail the response
-					logger.GetLogger().Errorf("Failed to append user message to conversation: %v", err)
-				}
-			}
-		}
-	}
+	// Note: User messages are already added to conversation by the main response handler
+	// No need to add them again here to avoid duplication
 
 	// Process with Jan inference client for streaming
 	janInferenceClient := janinference.NewJanInferenceClient(reqCtx)

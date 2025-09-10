@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
+	"menlo.ai/jan-api-gateway/app/domain/response"
 	requesttypes "menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	responsetypes "menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
@@ -32,7 +33,7 @@ func NewNonStreamHandler(responseHandler *ResponseHandler) *NonStreamHandler {
 }
 
 // CreateNonStreamResponse handles the business logic for creating a non-streaming response
-func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation) {
+func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *response.Response) {
 	// Convert response request to chat completion request
 	chatCompletionRequest := h.convertToChatCompletionRequest(request)
 	if chatCompletionRequest == nil {

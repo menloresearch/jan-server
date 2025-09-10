@@ -1,6 +1,7 @@
 package responses
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -10,6 +11,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
+	"menlo.ai/jan-api-gateway/app/domain/response"
 	"menlo.ai/jan-api-gateway/app/domain/user"
 	requesttypes "menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	responsetypes "menlo.ai/jan-api-gateway/app/interfaces/http/responses"
@@ -22,6 +24,7 @@ type ResponseHandler struct {
 	UserService         *user.UserService
 	apikeyService       *apikey.ApiKeyService
 	conversationService *conversation.ConversationService
+	responseService     *response.ResponseService
 	streamHandler       *StreamHandler
 	nonStreamHandler    *NonStreamHandler
 }
@@ -31,11 +34,13 @@ func NewResponseHandler(
 	userService *user.UserService,
 	apikeyService *apikey.ApiKeyService,
 	conversationService *conversation.ConversationService,
+	responseService *response.ResponseService,
 ) *ResponseHandler {
 	responseHandler := &ResponseHandler{
 		UserService:         userService,
 		apikeyService:       apikeyService,
 		conversationService: conversationService,
+		responseService:     responseService,
 	}
 
 	// Initialize specialized handlers
@@ -48,7 +53,7 @@ func NewResponseHandler(
 // CreateResponse handles the business logic for creating a response
 func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 	// Get user from middleware context
-	_, ok := h.UserService.GetUserFromContext(reqCtx)
+	userEntity, ok := h.UserService.GetUserFromContext(reqCtx)
 	if !ok {
 		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "user not found in context")
 		return
@@ -118,13 +123,42 @@ func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 		return
 	}
 
+	// Create response parameters
+	responseParams := &response.ResponseParams{
+		MaxTokens:         request.MaxTokens,
+		Temperature:       request.Temperature,
+		TopP:              request.TopP,
+		TopK:              request.TopK,
+		RepetitionPenalty: request.RepetitionPenalty,
+		Seed:              request.Seed,
+		Stop:              request.Stop,
+		PresencePenalty:   request.PresencePenalty,
+		FrequencyPenalty:  request.FrequencyPenalty,
+		LogitBias:         request.LogitBias,
+		ResponseFormat:    request.ResponseFormat,
+		Tools:             request.Tools,
+		ToolChoice:        request.ToolChoice,
+		Metadata:          request.Metadata,
+		Stream:            request.Stream,
+		Background:        request.Background,
+		Timeout:           request.Timeout,
+		User:              request.User,
+	}
+
+	// Create response record in database
+	responseEntity, err := h.responseService.CreateResponse(reqCtx, userEntity.ID, &conversation.ID, request.Model, request.Input, request.SystemPrompt, responseParams)
+	if err != nil {
+		h.sendErrorResponse(reqCtx, http.StatusInternalServerError, "c7d8e9f0-a1b2-3456-cdef-012345678901", "failed to create response record: "+err.Error())
+		return
+	}
+
 	// Delegate to specialized handlers based on streaming preference
 	if request.Stream != nil && *request.Stream {
 		// Handle streaming response
-		h.streamHandler.CreateStreamResponse(reqCtx, &request, key, conversation)
+		h.streamHandler.CreateStreamResponse(reqCtx, &request, key, conversation, responseEntity)
 	} else {
 		// Handle non-streaming response
-		h.nonStreamHandler.CreateNonStreamResponse(reqCtx, &request, key, conversation)
+		h.nonStreamHandler.CreateNonStreamResponse(reqCtx, &request, key, conversation, responseEntity)
 	}
 }
 
@@ -134,6 +168,34 @@ func (h *ResponseHandler) handleConversation(reqCtx *gin.Context, request *reque
 	userEntity, ok := h.UserService.GetUserFromContext(reqCtx)
 	if !ok {
 		return nil, fmt.Errorf("user not found in context")
+	}
+
+	// If previous_response_id is provided, load the conversation from the previous response
+	if request.PreviousResponseID != nil && *request.PreviousResponseID != "" {
+		// Load the previous response
+		previousResponse, err := h.responseService.GetResponseByPublicID(reqCtx, *request.PreviousResponseID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load previous response: %w", err)
+		}
+		if previousResponse == nil {
+			return nil, fmt.Errorf("previous response not found: %s", *request.PreviousResponseID)
+		}
+
+		// Validate that the previous response belongs to the same user
+		if previousResponse.UserID != userEntity.ID {
+			return nil, fmt.Errorf("previous response does not belong to the current user")
+		}
+
+		// Load the conversation from the previous response
+		if previousResponse.ConversationID == nil {
+			return nil, fmt.Errorf("previous response does not belong to any conversation")
+		}
+
+		conv, err := h.conversationService.GetConversationByIDAndUserID(reqCtx, *previousResponse.ConversationID, userEntity.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load conversation from previous response: %w", err)
+		}
+		return conv, nil
 	}
 
 	// Check if conversation is specified and not 'client-created-root'
@@ -329,32 +391,27 @@ func (h *ResponseHandler) GetResponse(reqCtx *gin.Context) {
 		return
 	}
 
-	_ = userEntity // TODO: Use user info if needed
-	// TODO: Get response logic here
-
-	// Create mock response data
-	mockResponse := responsetypes.Response{
-		ID:      responseID,
-		Object:  "response",
-		Created: 1234567890,
-		Model:   "gpt-4",
-		Status:  responsetypes.ResponseStatusCompleted,
-		Input: requesttypes.CreateResponseInput{
-			Type: requesttypes.InputTypeText,
-			Text: ptr.ToString("Hello, world!"),
-		},
-		Output: &responsetypes.ResponseOutput{
-			Type: responsetypes.OutputTypeText,
-			Text: &responsetypes.TextOutput{
-				Value: "Hello! How can I help you today?",
-			},
-		},
-		Conversation: &responsetypes.ConversationInfo{
-			ID: "mock-conversation-id",
-		},
+	// Get response from database
+	responseEntity, err := h.responseService.GetResponseByPublicID(reqCtx, responseID)
+	if err != nil {
+		h.sendErrorResponse(reqCtx, http.StatusInternalServerError, "d8e9f0a1-b2c3-4567-def0-123456789012", "failed to get response: "+err.Error())
+		return
 	}
 
-	h.sendSuccessResponse(reqCtx, mockResponse)
+	if responseEntity == nil {
+		h.sendErrorResponse(reqCtx, http.StatusNotFound, "e9f0a1b2-c3d4-5678-ef01-234567890123", "response not found")
+		return
+	}
+
+	// Check if user owns this response
+	if responseEntity.UserID != userEntity.ID {
+		h.sendErrorResponse(reqCtx, http.StatusForbidden, "f0a1b2c3-d4e5-6789-f012-345678901234", "access denied")
+		return
+	}
+
+	// Convert domain response to API response
+	apiResponse := h.convertDomainResponseToAPIResponse(responseEntity)
+	h.sendSuccessResponse(reqCtx, apiResponse)
 }
 
 // DeleteResponse handles the business logic for deleting a response
@@ -539,4 +596,98 @@ func (h *ResponseHandler) getAPIKey(reqCtx *gin.Context) (string, error) {
 	}
 
 	return key, nil
+}
+
+// convertDomainResponseToAPIResponse converts a domain response to API response format
+func (h *ResponseHandler) convertDomainResponseToAPIResponse(responseEntity *response.Response) responsetypes.Response {
+	apiResponse := responsetypes.Response{
+		ID:      responseEntity.PublicID,
+		Object:  "response",
+		Created: responseEntity.CreatedAt.Unix(),
+		Model:   responseEntity.Model,
+		Status:  responsetypes.ResponseStatus(responseEntity.Status),
+		Input:   responseEntity.Input, // This is already JSON string
+	}
+
+	// Parse and set output if available
+	if responseEntity.Output != nil {
+		apiResponse.Output = responseEntity.Output
+	}
+
+	// Set optional fields
+	if responseEntity.SystemPrompt != nil {
+		apiResponse.SystemPrompt = responseEntity.SystemPrompt
+	}
+	if responseEntity.MaxTokens != nil {
+		apiResponse.MaxTokens = responseEntity.MaxTokens
+	}
+	if responseEntity.Temperature != nil {
+		apiResponse.Temperature = responseEntity.Temperature
+	}
+	if responseEntity.TopP != nil {
+		apiResponse.TopP = responseEntity.TopP
+	}
+	if responseEntity.TopK != nil {
+		apiResponse.TopK = responseEntity.TopK
+	}
+	if responseEntity.RepetitionPenalty != nil {
+		apiResponse.RepetitionPenalty = responseEntity.RepetitionPenalty
+	}
+	if responseEntity.Seed != nil {
+		apiResponse.Seed = responseEntity.Seed
+	}
+	if responseEntity.PresencePenalty != nil {
+		apiResponse.PresencePenalty = responseEntity.PresencePenalty
+	}
+	if responseEntity.FrequencyPenalty != nil {
+		apiResponse.FrequencyPenalty = responseEntity.FrequencyPenalty
+	}
+	if responseEntity.Stream != nil {
+		apiResponse.Stream = responseEntity.Stream
+	}
+	if responseEntity.Background != nil {
+		apiResponse.Background = responseEntity.Background
+	}
+	if responseEntity.Timeout != nil {
+		apiResponse.Timeout = responseEntity.Timeout
+	}
+	if responseEntity.User != nil {
+		apiResponse.User = responseEntity.User
+	}
+	// Parse usage and error from JSON strings if available
+	if responseEntity.Usage != nil {
+		var usage responsetypes.DetailedUsage
+		if err := json.Unmarshal([]byte(*responseEntity.Usage), &usage); err == nil {
+			apiResponse.Usage = &usage
+		}
+	}
+	if responseEntity.Error != nil {
+		var errorResp responsetypes.ResponseError
+		if err := json.Unmarshal([]byte(*responseEntity.Error), &errorResp); err == nil {
+			apiResponse.Error = &errorResp
+		}
+	}
+
+	// Set timestamps
+	if responseEntity.CompletedAt != nil {
+		completedAt := responseEntity.CompletedAt.Unix()
+		apiResponse.CompletedAt = &completedAt
+	}
+	if responseEntity.CancelledAt != nil {
+		cancelledAt := responseEntity.CancelledAt.Unix()
+		apiResponse.CancelledAt = &cancelledAt
+	}
+	if responseEntity.FailedAt != nil {
+		failedAt := responseEntity.FailedAt.Unix()
+		apiResponse.FailedAt = &failedAt
+	}
+
+	// Set conversation info if available
+	if responseEntity.ConversationID != nil {
+		apiResponse.Conversation = &responsetypes.ConversationInfo{
+			ID: fmt.Sprintf("%d", *responseEntity.ConversationID),
+		}
+	}
+
+	return apiResponse
 }

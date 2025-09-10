@@ -7,6 +7,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/project"
+	"menlo.ai/jan-api-gateway/app/domain/response"
 	"menlo.ai/jan-api-gateway/app/domain/user"
 )
 
@@ -16,5 +17,6 @@ var ServiceProvider = wire.NewSet(
 	apikey.NewService,
 	user.NewService,
 	conversation.NewService,
+	response.NewResponseService,
 	serpermcp.NewSerperService,
 )
