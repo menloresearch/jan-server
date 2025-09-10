@@ -11,6 +11,7 @@ import (
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
+// Todo: Deprecated
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenString, ok := requests.GetTokenFromBearer(c)

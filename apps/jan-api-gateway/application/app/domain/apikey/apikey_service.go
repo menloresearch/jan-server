@@ -22,14 +22,16 @@ func NewService(repo ApiKeyRepository) *ApiKeyService {
 	}
 }
 
+const ApikeyPrefix = "sk"
+
 func (s *ApiKeyService) GenerateKeyAndHash(ctx context.Context, ownerType ApikeyType) (string, string, error) {
-	baseKey, err := idgen.GenerateSecureID("sk", 24)
+	baseKey, err := idgen.GenerateSecureID(ApikeyPrefix, 24)
 	if err != nil {
 		return "", "", err
 	}
 
-	// Business rule: Format as sk_<random>-<ownerType> for identification
-	apikey := fmt.Sprintf("%s-%s", baseKey, ownerType)
+	// Business rule: Format as sk_<ownerType>-<random> for identification
+	apikey := fmt.Sprintf("%s-%s", ownerType, baseKey)
 	hash := s.HashKey(ctx, apikey)
 	return apikey, hash, nil
 }

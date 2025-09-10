@@ -1,23 +1,32 @@
 package conversation
 
 import (
-	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"golang.org/x/net/context"
+
 	"menlo.ai/jan-api-gateway/app/domain/query"
+	"menlo.ai/jan-api-gateway/app/domain/user"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
 	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
-// Custom errors
-var (
-	ErrConversationNotFound  = errors.New("conversation not found")
-	ErrAccessDenied          = errors.New("access denied: not the owner of this conversation")
-	ErrPrivateConversation   = errors.New("access denied: conversation is private")
-	ErrItemNotFound          = errors.New("item not found")
-	ErrItemNotInConversation = errors.New("item not found in conversation")
+type ConversationContextKey string
+
+const (
+	ConversationContextKeyPublicID ConversationContextKey = "conv_public_id"
+	ConversationContextEntity      ConversationContextKey = "ConversationContextEntity"
+)
+
+type ConversationItemContextKey string
+
+const (
+	ConversationItemContextKeyPublicID ConversationItemContextKey = "conv_item_public_id"
+	ConversationItemContextEntity      ConversationItemContextKey = "ConversationItemContextEntity"
 )
 
 type ConversationService struct {
@@ -83,56 +92,17 @@ func (s *ConversationService) CreateConversation(ctx context.Context, userID uin
 
 // GetConversation retrieves a conversation by its public ID with access control and items loaded
 func (s *ConversationService) GetConversationByPublicIDAndUserID(ctx context.Context, publicID string, userID uint) (*Conversation, error) {
-	return s.getConversationWithAccessCheck(ctx, publicID, userID, true)
-}
-
-// GetConversationWithAccessAndItems is an alias for backward compatibility
-func (s *ConversationService) GetConversationWithAccessAndItems(ctx context.Context, publicID string, userID uint) (*Conversation, error) {
-	return s.GetConversationByPublicIDAndUserID(ctx, publicID, userID)
-}
-
-// GetConversationWithoutItems retrieves a conversation without loading items for performance
-func (s *ConversationService) GetConversationWithoutItems(ctx context.Context, publicID string, userID uint) (*Conversation, error) {
-	return s.getConversationWithAccessCheck(ctx, publicID, userID, false)
-}
-
-// getConversationWithAccessCheck is the internal method that handles conversation retrieval with optional item loading
-func (s *ConversationService) getConversationWithAccessCheck(ctx context.Context, publicID string, userID uint, loadItems bool) (*Conversation, error) {
-	// Validate inputs
-	if publicID == "" {
-		return nil, fmt.Errorf("public ID cannot be empty")
-	}
-
-	conversation, err := s.conversationRepo.FindByPublicID(ctx, publicID)
+	convs, err := s.conversationRepo.FindByFilter(ctx, ConversationFilter{
+		UserID:   &userID,
+		PublicID: &publicID,
+	}, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find conversation: %w", err)
+		return nil, err
 	}
-
-	if conversation == nil {
-		return nil, ErrConversationNotFound
+	if len(convs) != 1 {
+		return nil, fmt.Errorf("conversation not found")
 	}
-
-	// Check access permissions
-	if conversation.IsPrivate && conversation.UserID != userID {
-		return nil, ErrPrivateConversation
-	}
-
-	// Load items if requested
-	if loadItems {
-		items, err := s.itemRepo.FindByConversationID(ctx, conversation.ID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load items: %w", err)
-		}
-
-		// Convert []*Item to []Item
-		itemSlice := make([]Item, len(items))
-		for i, item := range items {
-			itemSlice[i] = *item
-		}
-		conversation.Items = itemSlice
-	}
-
-	return conversation, nil
+	return convs[0], nil
 }
 
 func (s *ConversationService) UpdateConversation(ctx context.Context, entity *Conversation) (*Conversation, error) {
@@ -149,93 +119,6 @@ func (s *ConversationService) DeleteConversation(ctx context.Context, conv *Conv
 	return nil
 }
 
-func (s *ConversationService) AddItem(ctx context.Context, conversation *Conversation, userID uint, itemType ItemType, role *ItemRole, content []Content) (*Item, error) {
-	// Check access permissions
-	if conversation.IsPrivate && conversation.UserID != userID {
-		return nil, ErrPrivateConversation
-	}
-
-	if errodCode := s.validator.ValidateItemContent(content); errodCode != nil {
-		return nil, fmt.Errorf("validation failed: %s", *errodCode)
-	}
-
-	itemPublicID, err := s.generateItemPublicID()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate item public ID: %w", err)
-	}
-
-	now := time.Now().Unix()
-	item := &Item{
-		PublicID:    itemPublicID,
-		Type:        itemType,
-		Role:        role,
-		Content:     content,
-		Status:      ptr.ToString("completed"), // Default status
-		CreatedAt:   now,
-		CompletedAt: &now,
-	}
-
-	if err := s.conversationRepo.AddItem(ctx, conversation.ID, item); err != nil {
-		return nil, fmt.Errorf("failed to add item: %w", err)
-	}
-
-	// Update conversation timestamp
-	conversation.UpdatedAt = now
-	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
-		return nil, fmt.Errorf("failed to update conversation timestamp: %w", err)
-	}
-
-	return item, nil
-}
-
-func (s *ConversationService) GetItem(ctx context.Context, conversation *Conversation, itemID uint, userID uint) (*Item, error) {
-	// Check access permissions
-	if conversation.IsPrivate && conversation.UserID != userID {
-		return nil, ErrPrivateConversation
-	}
-
-	// More efficient: check if item exists in the already loaded conversation items
-	if len(conversation.Items) > 0 {
-		for _, item := range conversation.Items {
-			if item.ID == itemID {
-				return &item, nil
-			}
-		}
-		return nil, ErrItemNotFound
-	}
-
-	// Fallback: if items aren't loaded, get the item and verify ownership
-	item, err := s.itemRepo.FindByID(ctx, itemID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find item: %w", err)
-	}
-
-	if item == nil {
-		return nil, ErrItemNotFound
-	}
-
-	if err := s.verifyItemBelongsToConversation(ctx, itemID, conversation.ID); err != nil {
-		return nil, err
-	}
-
-	return item, nil
-}
-
-// verifyItemBelongsToConversation efficiently checks if an item belongs to a conversation
-func (s *ConversationService) verifyItemBelongsToConversation(ctx context.Context, itemID uint, conversationID uint) error {
-	// Use the efficient exists check instead of loading all items
-	exists, err := s.itemRepo.ExistsByIDAndConversation(ctx, itemID, conversationID)
-	if err != nil {
-		return fmt.Errorf("failed to verify item ownership: %w", err)
-	}
-
-	if !exists {
-		return ErrItemNotInConversation
-	}
-
-	return nil
-}
-
 // DeleteItemWithConversation deletes an item by its ID and updates the conversation accordingly.
 func (s *ConversationService) DeleteItemWithConversation(ctx context.Context, conversation *Conversation, item *Item) (*Item, error) {
 	if err := s.itemRepo.Delete(ctx, item.ID); err != nil {
@@ -248,29 +131,6 @@ func (s *ConversationService) DeleteItemWithConversation(ctx context.Context, co
 	}
 
 	return item, nil
-}
-
-func (s *ConversationService) SearchItems(ctx context.Context, publicID string, userID uint, query string) ([]*Item, error) {
-	conversation, err := s.conversationRepo.FindByPublicID(ctx, publicID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find conversation: %w", err)
-	}
-
-	if conversation == nil {
-		return nil, ErrConversationNotFound
-	}
-
-	// Check access permissions
-	if conversation.IsPrivate && conversation.UserID != userID {
-		return nil, ErrPrivateConversation
-	}
-
-	items, err := s.itemRepo.Search(ctx, conversation.ID, query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to search items: %w", err)
-	}
-
-	return items, nil
 }
 
 // generateConversationPublicID generates a conversation ID with business rules
@@ -308,11 +168,6 @@ func (s *ConversationService) CountItemsByFilter(ctx context.Context, filter Ite
 // AddMultipleItems adds multiple items to a conversation in a single transaction
 func (s *ConversationService) AddMultipleItems(ctx context.Context, conversation *Conversation, userID uint, items []*Item) ([]*Item, error) {
 	// Check access permissions
-	// TODO: Validate before persisting
-	if conversation.IsPrivate && conversation.UserID != userID {
-		return nil, ErrPrivateConversation
-	}
-
 	now := time.Now().Unix()
 	createdItems := make([]*Item, len(items))
 
@@ -346,4 +201,122 @@ func (s *ConversationService) AddMultipleItems(ctx context.Context, conversation
 	}
 
 	return createdItems, nil
+}
+
+func (s *ConversationService) GetConversationMiddleWare() gin.HandlerFunc {
+	return func(reqCtx *gin.Context) {
+		ctx := reqCtx.Request.Context()
+		publicID := reqCtx.Param(string(ConversationContextKeyPublicID))
+		if publicID == "" {
+			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+				Code:  "f5742805-2c6e-45a8-b6a8-95091b9d46f0",
+				Error: "missing conversation public ID",
+			})
+			return
+		}
+		user, ok := user.GetUserFromContext(reqCtx)
+		if !ok {
+			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+				Code: "f5742805-2c6e-45a8-b6a8-95091b9d46f0",
+			})
+			return
+		}
+		entities, err := s.FindConversationsByFilter(ctx, ConversationFilter{
+			PublicID: &publicID,
+			UserID:   &user.ID,
+		}, nil)
+
+		if err != nil {
+			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+				Code:          "1fe94ab8-ba2c-4356-a446-f091c256e260",
+				ErrorInstance: err,
+			})
+			return
+		}
+
+		if len(entities) == 0 {
+			reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
+				Code: "e91636c2-fced-4a89-bf08-55309005365f",
+			})
+			return
+		}
+
+		SetConversationFromContext(reqCtx, entities[0])
+		reqCtx.Next()
+	}
+}
+
+func SetConversationFromContext(reqCtx *gin.Context, conv *Conversation) {
+	reqCtx.Set(string(ConversationContextEntity), conv)
+}
+
+func GetConversationFromContext(reqCtx *gin.Context) (*Conversation, bool) {
+	conv, ok := reqCtx.Get(string(ConversationContextEntity))
+	if !ok {
+		return nil, false
+	}
+	v, ok := conv.(*Conversation)
+	if !ok {
+		return nil, false
+	}
+	return v, true
+}
+
+func (s *ConversationService) GetConversationItemMiddleWare() gin.HandlerFunc {
+	return func(reqCtx *gin.Context) {
+		ctx := reqCtx.Request.Context()
+		conv, ok := GetConversationFromContext(reqCtx)
+		if !ok {
+			reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
+				Code: "0f5c3304-bf46-45ce-8719-7c03a3485b37",
+			})
+			return
+		}
+		publicID := reqCtx.Param(string(ConversationItemContextKeyPublicID))
+		if publicID == "" {
+			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+				Code:  "f5b144fe-090e-4251-bed0-66e27c37c328",
+				Error: "missing conversation item public ID",
+			})
+			return
+		}
+		entities, err := s.FindItemsByFilter(ctx, ItemFilter{
+			PublicID:       &publicID,
+			ConversationID: &conv.ID,
+		}, nil)
+
+		if err != nil {
+			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+				Code:          "bff3c8bf-c259-46a1-8ff0-7c2b2dbfe1b2",
+				ErrorInstance: err,
+			})
+			return
+		}
+
+		if len(entities) == 0 {
+			reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
+				Code: "25647b40-4967-497e-9cbd-a85243ccef58",
+			})
+			return
+		}
+
+		SetConversationItemFromContext(reqCtx, entities[0])
+		reqCtx.Next()
+	}
+}
+
+func SetConversationItemFromContext(reqCtx *gin.Context, item *Item) {
+	reqCtx.Set(string(ConversationItemContextEntity), item)
+}
+
+func GetConversationItemFromContext(reqCtx *gin.Context) (*Item, bool) {
+	item, ok := reqCtx.Get(string(ConversationItemContextEntity))
+	if !ok {
+		return nil, false
+	}
+	v, ok := item.(*Item)
+	if !ok {
+		return nil, false
+	}
+	return v, true
 }

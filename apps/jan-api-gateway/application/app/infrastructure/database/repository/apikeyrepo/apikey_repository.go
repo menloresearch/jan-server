@@ -103,8 +103,8 @@ func (repo *ApiKeyGormRepository) applyFilter(query *gormgen.Query, sql gormgen.
 	if filter.ApikeyType != nil {
 		sql = sql.Where(query.ApiKey.ApikeyType.Eq(*filter.ApikeyType))
 	}
-	if filter.OwnerID != nil {
-		sql = sql.Where(query.ApiKey.OwnerID.Eq(*filter.OwnerID))
+	if filter.OwnerPublicID != nil {
+		sql = sql.Where(query.ApiKey.OwnerPublicID.Eq(*filter.OwnerPublicID))
 	}
 	if filter.OrganizationID != nil {
 		sql = sql.Where(query.ApiKey.OrganizationID.Eq(*filter.OrganizationID))

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
@@ -17,6 +18,7 @@ type V1Route struct {
 	conversationAPI   *conversations.ConversationAPI
 	modelAPI          *ModelAPI
 	mcpAPI            *mcp.MCPAPI
+	authRoute         *auth.AuthRoute
 }
 
 func NewV1Route(
@@ -25,6 +27,7 @@ func NewV1Route(
 	conversationAPI *conversations.ConversationAPI,
 	modelAPI *ModelAPI,
 	mcpAPI *mcp.MCPAPI,
+	authRoute *auth.AuthRoute,
 ) *V1Route {
 	return &V1Route{
 		organizationRoute,
@@ -32,6 +35,7 @@ func NewV1Route(
 		conversationAPI,
 		modelAPI,
 		mcpAPI,
+		authRoute,
 	}
 }
 
@@ -43,6 +47,7 @@ func (v1Route *V1Route) RegisterRouter(router gin.IRouter) {
 	v1Route.modelAPI.RegisterRouter(v1Router)
 	v1Route.mcpAPI.RegisterRouter(v1Router)
 	v1Route.organizationRoute.RegisterRouter(v1Router)
+	v1Route.authRoute.RegisterRouter(v1Router)
 }
 
 // GetVersion godoc

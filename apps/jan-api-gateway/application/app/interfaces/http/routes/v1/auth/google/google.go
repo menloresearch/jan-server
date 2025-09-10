@@ -57,9 +57,15 @@ type GoogleCallbackRequest struct {
 	State string `json:"state"`
 }
 
-type GoogleCallbackResponse struct {
-	AccessToken string `json:"access_token"`
-	ExpiresIn   int    `json:"expires_in"`
+// @Enum(access.token)
+type AccessTokenResponseObjectType string
+
+const AccessTokenResponseObjectTypeObject = "access.token"
+
+type AccessTokenResponse struct {
+	Object      AccessTokenResponseObjectType `json:"object"`
+	AccessToken string                        `json:"access_token"`
+	ExpiresIn   int                           `json:"expires_in"`
 }
 
 func generateState() (string, error) {
@@ -72,15 +78,15 @@ func generateState() (string, error) {
 
 // @Summary Google OAuth2 Callback
 // @Description Handles the callback from the Google OAuth2 provider to exchange the authorization code for a token, verify the user, and issue access and refresh tokens.
-// @Tags Jan, Jan-Authentication
+// @Tags Authentication
 // @Accept json
 // @Produce json
 // @Param request body GoogleCallbackRequest true "Request body containing the authorization code and state"
-// @Success 200 {object} responses.GeneralResponse[GoogleCallbackResponse] "Successfully authenticated and returned tokens"
+// @Success 200 {object} AccessTokenResponse "Successfully authenticated and returned tokens"
 // @Failure 400 {object} responses.ErrorResponse "Bad request (e.g., invalid state, missing code, or invalid claims)"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized (e.g., a user claim is not found or is invalid in the context)"
 // @Failure 500 {object} responses.ErrorResponse "Internal Server Error"
-// @Router /jan/v1/auth/google/callback [post]
+// @Router /v1/auth/google/callback [post]
 func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 	var req GoogleCallbackRequest
 	if err := reqCtx.ShouldBindJSON(&req); err != nil {
@@ -171,6 +177,7 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 	accessTokenString, err := auth.CreateJwtSignedString(auth.UserClaim{
 		Email: exists.Email,
 		Name:  exists.Name,
+		ID:    exists.PublicID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(accessTokenExp),
 			Subject:   exists.Email,
@@ -188,6 +195,7 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 	refreshTokenString, err := auth.CreateJwtSignedString(auth.UserClaim{
 		Email: exists.Email,
 		Name:  exists.Name,
+		ID:    exists.PublicID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(refreshTokenExp),
 			Subject:   exists.Email,
@@ -211,21 +219,19 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 		SameSite: http.SameSiteStrictMode,
 	})
 
-	reqCtx.JSON(http.StatusOK, &responses.GeneralResponse[GoogleCallbackResponse]{
-		Status: responses.ResponseCodeOk,
-		Result: GoogleCallbackResponse{
-			accessTokenString,
-			int(time.Until(accessTokenExp).Seconds()),
-		},
+	reqCtx.JSON(http.StatusOK, &AccessTokenResponse{
+		AccessTokenResponseObjectTypeObject,
+		accessTokenString,
+		int(time.Until(accessTokenExp).Seconds()),
 	})
 }
 
 // @Summary Google OAuth2 Login
 // @Description Redirects the user to the Google OAuth2 authorization page to initiate the login process.
-// @Tags Jan, Jan-Authentication
+// @Tags Authentication
 // @Success 307 "Redirects to Google's login page"
 // @Failure 500 {object} responses.ErrorResponse "Internal Server Error"
-// @Router /jan/v1/auth/google/login [get]
+// @Router /v1/auth/google/login [get]
 func (googleAuthAPI *GoogleAuthAPI) GetGoogleLoginUrl(reqCtx *gin.Context) {
 	state, err := generateState()
 	if err != nil {
