@@ -123,6 +123,17 @@ func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 		return
 	}
 
+	// If previous_response_id is provided, prepend conversation history to input messages
+	if request.PreviousResponseID != nil && *request.PreviousResponseID != "" {
+		conversationMessages, err := h.convertConversationItemsToMessages(reqCtx, conversation)
+		if err != nil {
+			h.sendErrorResponse(reqCtx, http.StatusBadRequest, "c3d4e5f6-g7h8-9012-cdef-345678901234", err.Error())
+			return
+		}
+		// Prepend conversation history to the input messages
+		chatCompletionRequest.Messages = append(conversationMessages, chatCompletionRequest.Messages...)
+	}
+
 	// Create response parameters
 	responseParams := &response.ResponseParams{
 		MaxTokens:         request.MaxTokens,
@@ -155,10 +166,10 @@ func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 	// Delegate to specialized handlers based on streaming preference
 	if request.Stream != nil && *request.Stream {
 		// Handle streaming response
-		h.streamHandler.CreateStreamResponse(reqCtx, &request, key, conversation, responseEntity)
+		h.streamHandler.CreateStreamResponse(reqCtx, &request, key, conversation, responseEntity, chatCompletionRequest)
 	} else {
 		// Handle non-streaming response
-		h.nonStreamHandler.CreateNonStreamResponse(reqCtx, &request, key, conversation, responseEntity)
+		h.nonStreamHandler.CreateNonStreamResponse(reqCtx, &request, key, conversation, responseEntity, chatCompletionRequest)
 	}
 }
 
@@ -690,4 +701,53 @@ func (h *ResponseHandler) convertDomainResponseToAPIResponse(responseEntity *res
 	}
 
 	return apiResponse
+}
+
+// convertConversationItemsToMessages converts conversation items to OpenAI chat completion messages
+func (h *ResponseHandler) convertConversationItemsToMessages(reqCtx *gin.Context, conv *conversation.Conversation) ([]openai.ChatCompletionMessage, error) {
+	// Load conversation with items
+	convWithItems, err := h.conversationService.GetConversationByPublicIDAndUserID(reqCtx, conv.PublicID, conv.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load conversation with items: %w", err)
+	}
+
+	// Convert items to messages
+	messages := make([]openai.ChatCompletionMessage, 0, len(convWithItems.Items))
+	for _, item := range convWithItems.Items {
+		// Skip items that don't have a role or content
+		if item.Role == nil || len(item.Content) == 0 {
+			continue
+		}
+
+		// Convert conversation role to OpenAI role
+		var openaiRole string
+		switch *item.Role {
+		case conversation.ItemRoleSystem:
+			openaiRole = openai.ChatMessageRoleSystem
+		case conversation.ItemRoleUser:
+			openaiRole = openai.ChatMessageRoleUser
+		case conversation.ItemRoleAssistant:
+			openaiRole = openai.ChatMessageRoleAssistant
+		default:
+			openaiRole = openai.ChatMessageRoleUser
+		}
+
+		// Extract text content from the item
+		var content string
+		for _, contentPart := range item.Content {
+			if contentPart.Type == "text" && contentPart.Text != nil {
+				content += contentPart.Text.Value
+			}
+		}
+
+		// Only add messages with content
+		if content != "" {
+			messages = append(messages, openai.ChatCompletionMessage{
+				Role:    openaiRole,
+				Content: content,
+			})
+		}
+	}
+
+	return messages, nil
 }

@@ -139,7 +139,7 @@ func (h *StreamHandler) createFunctionCallEvent(itemID string, sequenceNumber in
 }
 
 // CreateStreamResponse handles the business logic for creating a streaming response
-func (h *StreamHandler) CreateStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *response.Response) {
+func (h *StreamHandler) CreateStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *response.Response, chatCompletionRequest *openai.ChatCompletionRequest) {
 	// Validate request
 	if err := h.validateRequest(request); err != nil {
 		reqCtx.JSON(http.StatusBadRequest, responsetypes.ErrorResponse{
@@ -155,16 +155,6 @@ func (h *StreamHandler) CreateStreamResponse(reqCtx *gin.Context, request *reque
 
 	// Use ctx for long-running operations
 	reqCtx.Request = reqCtx.Request.WithContext(ctx)
-
-	// Convert response request to chat completion request
-	chatCompletionRequest := h.convertToChatCompletionRequest(request)
-	if chatCompletionRequest == nil {
-		reqCtx.JSON(http.StatusBadRequest, responsetypes.ErrorResponse{
-			Code:  "019929ec-6f89-76c5-8ed4-bd0eb1c6c8db",
-			Error: "unsupported input type for chat completion",
-		})
-		return
-	}
 
 	// Set up streaming headers (matching completion API format)
 	reqCtx.Header("Content-Type", "text/event-stream")

@@ -33,16 +33,7 @@ func NewNonStreamHandler(responseHandler *ResponseHandler) *NonStreamHandler {
 }
 
 // CreateNonStreamResponse handles the business logic for creating a non-streaming response
-func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *response.Response) {
-	// Convert response request to chat completion request
-	chatCompletionRequest := h.convertToChatCompletionRequest(request)
-	if chatCompletionRequest == nil {
-		reqCtx.JSON(http.StatusBadRequest, responsetypes.ErrorResponse{
-			Code:  "019929ec-6f89-76c5-8ed4-bd0eb1c6c8db",
-			Error: "unsupported input type for chat completion",
-		})
-		return
-	}
+func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *response.Response, chatCompletionRequest *openai.ChatCompletionRequest) {
 
 	// Process with Jan inference client for non-streaming with timeout
 	janInferenceClient := janinference.NewJanInferenceClient(reqCtx)
