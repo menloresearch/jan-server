@@ -56,21 +56,6 @@ The system automatically:
 - Makes them available in CLI and reports
 - Validates file existence before running
 
-### Step 3: Update CI workflow (optional)
-
-If you want the new test case to be available in GitHub Actions, update `.github/workflows/load-test.yml`:
-
-```yaml
-test_case:
-  description: 'Test case to run'
-  required: true
-  default: 'chat-completion'
-  type: choice
-  options:
-    - chat-completion
-    - health-check  # Add this line
-```
-
 ## Environment Variables
 
 All test cases share the same environment variables from `.env` file:

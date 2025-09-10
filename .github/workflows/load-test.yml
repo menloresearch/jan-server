@@ -38,13 +38,6 @@ on:
         default: '1'
         type: string
   
-  # Auto trigger on push to feat/loadtest branch
-  push:
-    branches:
-      - feat/loadtest
-    paths:
-      - 'tests/**'
-      - '.github/workflows/load-test.yml'
 
 env:
   # Test configuration - use inputs for workflow_dispatch, defaults for push
@@ -94,25 +87,16 @@ jobs:
           echo "Trigger: ${{ github.event_name }}"
           echo ""
           echo "Test Configuration:"
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            if [[ -n "${{ github.event.inputs.test_case }}" ]]; then
-              echo "  Test Case: ${{ github.event.inputs.test_case }} (specific test)"
-            else
-              echo "  Test Case: ALL TESTS (manual trigger)"
-            fi
-            echo "  Base URL: ${{ github.event.inputs.base_url }}"
-            echo "  Model: ${{ github.event.inputs.model }}"
-            echo "  Duration: ${{ github.event.inputs.duration_minutes }} minutes"
-            echo "  Non-stream RPS: ${{ github.event.inputs.nonstream_rps }}"
-            echo "  Stream RPS: ${{ github.event.inputs.stream_rps }}"
+          if [[ -n "${{ github.event.inputs.test_case }}" ]]; then
+            echo "  Test Case: ${{ github.event.inputs.test_case }} (specific test)"
           else
-            echo "  Test Case: ALL TESTS (auto trigger on push)"
-            echo "  Base URL: $BASE"
-            echo "  Model: $MODEL"
-            echo "  Duration: $DURATION_MIN minutes"
-            echo "  Non-stream RPS: $NONSTREAM_RPS"
-            echo "  Stream RPS: $STREAM_RPS"
+            echo "  Test Case: ALL TESTS (manual trigger)"
           fi
+          echo "  Base URL: ${{ github.event.inputs.base_url }}"
+          echo "  Model: ${{ github.event.inputs.model }}"
+          echo "  Duration: ${{ github.event.inputs.duration_minutes }} minutes"
+          echo "  Non-stream RPS: ${{ github.event.inputs.nonstream_rps }}"
+          echo "  Stream RPS: ${{ github.event.inputs.stream_rps }}"
           
           # Validate required secrets
           if [[ -z "$API_KEY" && -z "$LOADTEST_TOKEN" ]]; then

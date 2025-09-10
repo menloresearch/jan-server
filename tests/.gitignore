@@ -1,5 +1,6 @@
 # Environment configuration
 .env
+!.env.example
 
 # Test results
 results/

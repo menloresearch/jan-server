@@ -105,19 +105,69 @@ The script will attach `Authorization: Bearer <API_KEY>` and `X-LoadTest-Token: 
 
 ## Run via Docker
 
-Mount your working directory so the script is visible inside the container:
+You can run these tests without installing k6 locally.
+
+### Option A: Use the provided Dockerfile (recommended)
+
+Build the image once:
+
+```bash
+docker build -t janai/k6-tests:local ./tests
+```
+
+Run with your local tests mounted (so changes are picked up and results persist):
 
 ```bash
 docker run --rm -it \
-  -e BASE=https://api.jan.ai \
-  -e MODEL=jan-v1-4b \
-  -e NONSTREAM_RPS=3 \
-  -e STREAM_RPS=1 \
-  -e DURATION_MIN=1 \
-  -e API_KEY=your_api_key \
-  -e LOADTEST_TOKEN=your_secret_bypass_token \
-  -v "$PWD":/work -w /work \
-  grafana/k6 run /work/chat-completion.js
+   -e BASE=https://api.jan.ai \
+   -e MODEL=jan-v1-4b \
+   -e NONSTREAM_RPS=3 \
+   -e STREAM_RPS=1 \
+   -e DURATION_MIN=1 \
+   -e API_KEY=your_api_key \
+   -e LOADTEST_TOKEN=your_secret_bypass_token \
+   -e K6_PROMETHEUS_RW_SERVER_URL="$K6_PROMETHEUS_RW_SERVER_URL" \
+   -e K6_PROMETHEUS_RW_USERNAME="$K6_PROMETHEUS_RW_USERNAME" \
+   -e K6_PROMETHEUS_RW_PASSWORD="$K6_PROMETHEUS_RW_PASSWORD" \
+   -e K6_PROMETHEUS_RW_TREND_STATS="p(95),p(99),min,max" \
+   -e K6_PROMETHEUS_RW_PUSH_INTERVAL="5s" \
+   -v "$PWD/tests":/tests \
+   janai/k6-tests:local run-all
+```
+
+Run a specific test case (e.g., `chat-completion`):
+
+```bash
+docker run --rm -it \
+   -e BASE=https://api.jan.ai \
+   -e MODEL=jan-v1-4b \
+   -e NONSTREAM_RPS=3 \
+   -e STREAM_RPS=1 \
+   -e DURATION_MIN=1 \
+   -e API_KEY=your_api_key \
+   -e LOADTEST_TOKEN=your_secret_bypass_token \
+   -v "$PWD/tests":/tests \
+   janai/k6-tests:local run chat-completion
+```
+
+Notes:
+
+- If you don’t mount `/tests`, the container runs with a baked-in copy at `/app` (copied at build time).
+- If a `.env` file exists inside the mounted `/tests`, it’s automatically loaded.
+
+### Option B: Use upstream `grafana/k6` image
+
+```bash
+docker run --rm -it \
+   -e BASE=https://api.jan.ai \
+   -e MODEL=jan-v1-4b \
+   -e NONSTREAM_RPS=3 \
+   -e STREAM_RPS=1 \
+   -e DURATION_MIN=1 \
+   -e API_KEY=your_api_key \
+   -e LOADTEST_TOKEN=your_secret_bypass_token \
+   -v "$PWD/tests":/work -w /work \
+   grafana/k6 run src/chat-completion.js
 ```
 
 ## Environment variables (knobs)
@@ -143,6 +193,8 @@ docker run --rm -it \
 | `K6_PROMETHEUS_RW_PUSH_INTERVAL` | `5s` | How often to push metrics to Prometheus |
 
 **Note:** When Prometheus is configured, k6 will automatically export metrics using the `experimental-prometheus-rw` output.
+
+Docker tip: pass these environment variables with `-e` flags as shown above. Make sure the endpoint is reachable from the container network.
 
 ## Disable scenarios
 
