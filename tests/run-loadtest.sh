@@ -30,10 +30,12 @@ export STREAM_RPS="${STREAM_RPS:-$DEFAULT_STREAM_RPS}"
 export LOADTEST_TOKEN="${LOADTEST_TOKEN:-}"
 export API_KEY="${API_KEY:-}"
 
-# Prometheus metrics endpoint configuration
-export PROMETHEUS_ENDPOINT="${PROMETHEUS_ENDPOINT:-}"
-export PROMETHEUS_USERNAME="${PROMETHEUS_USERNAME:-}"
-export PROMETHEUS_PASSWORD="${PROMETHEUS_PASSWORD:-}"
+# Prometheus remote write configuration (following k6 docs)
+export K6_PROMETHEUS_RW_SERVER_URL="${K6_PROMETHEUS_RW_SERVER_URL:-}"
+export K6_PROMETHEUS_RW_USERNAME="${K6_PROMETHEUS_RW_USERNAME:-}"
+export K6_PROMETHEUS_RW_PASSWORD="${K6_PROMETHEUS_RW_PASSWORD:-}"
+export K6_PROMETHEUS_RW_TREND_STATS="${K6_PROMETHEUS_RW_TREND_STATS:-p(95),p(99),min,max}"
+export K6_PROMETHEUS_RW_PUSH_INTERVAL="${K6_PROMETHEUS_RW_PUSH_INTERVAL:-5s}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -81,9 +83,9 @@ validate_env() {
     fi
     
     # Validate Prometheus endpoint format if provided
-    if [[ -n "$PROMETHEUS_ENDPOINT" ]]; then
-        if [[ ! "$PROMETHEUS_ENDPOINT" =~ ^https?:// ]]; then
-            log_error "PROMETHEUS_ENDPOINT must start with http:// or https://"
+    if [[ -n "$K6_PROMETHEUS_RW_SERVER_URL" ]]; then
+        if [[ ! "$K6_PROMETHEUS_RW_SERVER_URL" =~ ^https?:// ]]; then
+            log_error "K6_PROMETHEUS_RW_SERVER_URL must start with http:// or https://"
             exit 1
         fi
         log_info "Prometheus remote write endpoint configured"
@@ -177,6 +179,7 @@ run_single_test_case() {
     
     log_info "Running test case: $test_case"
     log_info "Test file: $test_file"
+    log_info "Running command: k6 run $test_file"
     log_info "Configuration:"
     log_info "  Base URL: $BASE"
     log_info "  Model: $MODEL"
@@ -185,32 +188,55 @@ run_single_test_case() {
     log_info "  Stream RPS: $STREAM_RPS"
     log_info "  Output: $output_file"
     
-    # Build k6 command with outputs
-    local k6_cmd="k6 run --summary-export=\"$output_file\""
+    # Generate unique test ID for metrics segmentation
+    local test_id="${test_case}_$(date +%Y%m%d_%H%M%S)_$$"
+    log_info "Test ID: $test_id"
     
-    # Add JSON output for local analysis
-    k6_cmd+=" --out json=\"$output_file\""
-    
-    # Add Prometheus output if endpoint is configured
-    if [[ -n "$PROMETHEUS_ENDPOINT" ]]; then
-        log_info "Prometheus endpoint configured: $PROMETHEUS_ENDPOINT"
+    # Execute k6 with conditional Prometheus output
+    if [[ -n "$K6_PROMETHEUS_RW_SERVER_URL" ]]; then
+        log_info "Prometheus remote write endpoint configured: [CONFIGURED]"
         
-        # Build Prometheus output URL with basic auth if configured
-        local prometheus_url="$PROMETHEUS_ENDPOINT"
-        if [[ -n "$PROMETHEUS_USERNAME" && -n "$PROMETHEUS_PASSWORD" ]]; then
-            # Extract protocol and rest of URL
-            local protocol=$(echo "$PROMETHEUS_ENDPOINT" | cut -d':' -f1)
-            local rest=$(echo "$PROMETHEUS_ENDPOINT" | cut -d'/' -f3-)
-            prometheus_url="${protocol}://${PROMETHEUS_USERNAME}:${PROMETHEUS_PASSWORD}@${rest}"
+        # Validate that it's not localhost in CI environment
+        if [[ "$K6_PROMETHEUS_RW_SERVER_URL" == *"localhost"* ]] || [[ "$K6_PROMETHEUS_RW_SERVER_URL" == *"127.0.0.1"* ]]; then
+            log_warning "Prometheus endpoint appears to be localhost - this will not work in CI environment!"
         fi
         
-        k6_cmd+=" --out experimental-prometheus-rw=\"$prometheus_url\""
+        # Set optional k6 environment variables for Prometheus remote write
+        if [[ -n "$K6_PROMETHEUS_RW_USERNAME" ]]; then
+            log_info "Using Prometheus with basic auth (username: [CONFIGURED])"
+            export K6_PROMETHEUS_RW_USERNAME
+        fi
+        
+        if [[ -n "$K6_PROMETHEUS_RW_PASSWORD" ]]; then
+            export K6_PROMETHEUS_RW_PASSWORD
+        fi
+        
+        export K6_PROMETHEUS_RW_TREND_STATS
+        export K6_PROMETHEUS_RW_PUSH_INTERVAL
+        
+        # Run k6 with Prometheus remote write output
+        log_info "Running with Prometheus remote write metrics export"
+        log_info "Trend stats: $K6_PROMETHEUS_RW_TREND_STATS"
+        log_info "Push interval: $K6_PROMETHEUS_RW_PUSH_INTERVAL"
+        
+        k6 run \
+            --summary-export="$output_file" \
+            --out json="$output_file" \
+            --out experimental-prometheus-rw \
+            --tag testid="$test_id" \
+            --tag test_case="$test_case" \
+            --tag environment="${BASE##*/}" \
+            "$test_file"
+    else
+        log_info "No Prometheus endpoint configured, running without metrics export"
+        k6 run \
+            --summary-export="$output_file" \
+            --out json="$output_file" \
+            --tag testid="$test_id" \
+            --tag test_case="$test_case" \
+            --tag environment="${BASE##*/}" \
+            "$test_file"
     fi
-    
-    # Execute the k6 command
-    log_info "Running command: k6 run ... $test_file"
-    k6_cmd+=" \"$test_file\""
-    eval $k6_cmd
     
     # Check if test completed successfully
     if [[ $? -eq 0 ]]; then
@@ -227,7 +253,7 @@ run_single_test_case() {
                 echo "=========================================================="
             fi
             
-            if [[ -n "$PROMETHEUS_ENDPOINT" ]]; then
+            if [[ -n "$K6_PROMETHEUS_RW_SERVER_URL" ]]; then
                 log_success "Metrics sent to Prometheus directly via k6"
             fi
         fi

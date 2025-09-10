@@ -132,6 +132,18 @@ docker run --rm -it \
 | `API_KEY` | (empty) | Bearer token; adds `Authorization: Bearer ...` |
 | `LOADTEST_TOKEN` | (empty) | Adds `X-LoadTest-Token` header (e.g., to bypass WAF rules) |
 
+### Prometheus Remote Write Configuration (Optional)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `K6_PROMETHEUS_RW_SERVER_URL` | (empty) | Prometheus remote write endpoint (e.g., `https://prometheus.example.com/api/v1/write`) |
+| `K6_PROMETHEUS_RW_USERNAME` | (empty) | Basic auth username for Prometheus endpoint |
+| `K6_PROMETHEUS_RW_PASSWORD` | (empty) | Basic auth password for Prometheus endpoint |
+| `K6_PROMETHEUS_RW_TREND_STATS` | `p(95),p(99),min,max` | Trend metrics to export to Prometheus |
+| `K6_PROMETHEUS_RW_PUSH_INTERVAL` | `5s` | How often to push metrics to Prometheus |
+
+**Note:** When Prometheus is configured, k6 will automatically export metrics using the `experimental-prometheus-rw` output.
+
 ## Disable scenarios
 
 - **Disable stream scenarios**: Set `STREAM_RPS=0`
@@ -247,13 +259,18 @@ Before using the CI workflow, configure the following repository secrets:
 
 - `LOADTEST_API_KEY` or `LOADTEST_TOKEN` - Authentication for the API
 
-**Optional secrets (for Prometheus metrics):**
+**Optional secrets (for Prometheus metrics - following k6 official docs):**
 
-- `PROMETHEUS_ENDPOINT` - Prometheus remote write endpoint (e.g., `https://prometheus.example.com/api/v1/write`)
-- `PROMETHEUS_USERNAME` - Basic auth username (optional)
-- `PROMETHEUS_PASSWORD` - Basic auth password (optional)
+- `K6_PROMETHEUS_RW_SERVER_URL` - Prometheus remote write endpoint (e.g., `https://prometheus.example.com/api/v1/write`)
+- `K6_PROMETHEUS_RW_USERNAME` - Basic auth username (optional)
+- `K6_PROMETHEUS_RW_PASSWORD` - Basic auth password (optional)
 
-**Note:** Metrics are sent directly from k6 to Prometheus via the remote write protocol, not via file upload.
+**Optional variables (for advanced Prometheus config):**
+
+- `K6_PROMETHEUS_RW_TREND_STATS` - Trend metrics to export (default: `p(95),p(99),min,max`)
+- `K6_PROMETHEUS_RW_PUSH_INTERVAL` - Push interval (default: `5s`)
+
+**Note:** Metrics are sent directly from k6 to Prometheus via the remote write protocol using k6's built-in experimental-prometheus-rw output.
 
 ### Running Tests via GitHub Actions
 
@@ -276,8 +293,27 @@ Before using the CI workflow, configure the following repository secrets:
 - **Auto-detection**: Automatically discovers test cases from `src/` directory
 - **Test results**: Automatically uploaded as artifacts
 - **Direct metrics export**: k6 sends metrics directly to Prometheus remote write endpoint
-- **Failure detection**: Fails the job if errors are detected
-- **Results summary**: Parses and displays key metrics
+- **Test ID tagging**: Each test run gets unique `testid` tag for metrics segmentation
+- **Grafana dashboard**: Pre-built dashboard for monitoring LLM and HTTP metrics
+
+## 📊 Grafana Dashboard
+
+A comprehensive Grafana dashboard is provided for monitoring load test metrics:
+
+- **Location**: `grafana-dashboard.json`
+- **Setup Guide**: See `GRAFANA_SETUP.md` for detailed instructions
+- **Features**:
+  - LLM-specific metrics (TTFB, tokens/sec, queue time)
+  - HTTP performance monitoring
+  - Test segmentation by Test ID and Test Case
+  - Real-time monitoring with 5s refresh
+
+### Quick Dashboard Import
+
+1. Open Grafana → Dashboards → New → Import
+2. Upload `grafana-dashboard.json`
+3. Configure Prometheus data source
+4. Start monitoring your load tests!
 
 ### Adding New Test Cases
 

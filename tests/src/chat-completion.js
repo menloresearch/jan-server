@@ -24,7 +24,8 @@ const ttfb     = new Trend('llm_ttfb_ms', true);
 const recvTime = new Trend('llm_receiving_ms', true);
 const totalDur = new Trend('llm_total_ms', true);
 const queueDur = new Trend('llm_queue_ms', true);
-const tokRate  = new Trend('llm_tokens_per_sec', true);
+// tokens per second is NOT a time metric; don't mark as time
+const tokRate  = new Trend('llm_tokens_per_sec');
 const errors   = new Counter('llm_errors');
 
 // helper: record timings with tags (scenario + status + promptType)

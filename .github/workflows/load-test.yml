@@ -1,6 +1,7 @@
 name: Load Test
 
 on:
+  # Manual trigger
   workflow_dispatch:
     inputs:
       test_case:
@@ -14,7 +15,7 @@ on:
       base_url:
         description: 'Base URL for testing'
         required: true
-        default: 'https://api-dev.jan.ai'
+        default: 'https://api.jan.ai'
         type: string
       model:
         description: 'Model to test'
@@ -36,23 +37,33 @@ on:
         required: true
         default: '1'
         type: string
+  
+  # Auto trigger on push to feat/loadtest branch
+  push:
+    branches:
+      - feat/loadtest
+    paths:
+      - 'tests/**'
+      - '.github/workflows/load-test.yml'
 
 env:
-  # Test configuration
-  BASE: ${{ github.event.inputs.base_url }}
-  MODEL: ${{ github.event.inputs.model }}
-  DURATION_MIN: ${{ github.event.inputs.duration_minutes }}
-  NONSTREAM_RPS: ${{ github.event.inputs.nonstream_rps }}
-  STREAM_RPS: ${{ github.event.inputs.stream_rps }}
+  # Test configuration - use inputs for workflow_dispatch, defaults for push
+  BASE: ${{ github.event.inputs.base_url || 'https://api.jan.ai' }}
+  MODEL: ${{ github.event.inputs.model || 'jan-v1-4b' }}
+  DURATION_MIN: ${{ github.event.inputs.duration_minutes || '2' }}
+  NONSTREAM_RPS: ${{ github.event.inputs.nonstream_rps || '2' }}
+  STREAM_RPS: ${{ github.event.inputs.stream_rps || '1' }}
   
   # Authentication (set these as repository secrets)
   API_KEY: ${{ secrets.LOADTEST_API_KEY }}
   LOADTEST_TOKEN: ${{ secrets.LOADTEST_TOKEN }}
   
-  # Prometheus configuration (set these as repository secrets)
-  PROMETHEUS_ENDPOINT: ${{ secrets.PROMETHEUS_ENDPOINT }}
-  PROMETHEUS_USERNAME: ${{ secrets.PROMETHEUS_USERNAME }}
-  PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
+  # Prometheus remote write configuration (k6 standard env vars)
+  K6_PROMETHEUS_RW_SERVER_URL: ${{ secrets.K6_PROMETHEUS_RW_SERVER_URL }}
+  K6_PROMETHEUS_RW_USERNAME: ${{ secrets.K6_PROMETHEUS_RW_USERNAME }}
+  K6_PROMETHEUS_RW_PASSWORD: ${{ secrets.K6_PROMETHEUS_RW_PASSWORD }}
+  K6_PROMETHEUS_RW_TREND_STATS: ${{ vars.K6_PROMETHEUS_RW_TREND_STATS || 'p(95),p(99),min,max' }}
+  K6_PROMETHEUS_RW_PUSH_INTERVAL: ${{ vars.K6_PROMETHEUS_RW_PUSH_INTERVAL || '5s' }}
 
 jobs:
   load-test:
@@ -65,39 +76,74 @@ jobs:
       - name: Setup k6
         uses: grafana/setup-k6-action@v1
         
+      - name: Clear k6 defaults
+        run: |
+          # Clear any potential k6 config files that might have localhost defaults
+          rm -f ~/.k6rc || true
+          rm -f .k6rc || true
+          # Unset any k6 environment variables that might interfere
+          unset K6_OUT || true
+          unset K6_PROMETHEUS_URL || true
+        
       - name: Install jq for metrics parsing
         run: sudo apt-get update && sudo apt-get install -y jq
         
       - name: Validate inputs
         run: |
+          echo "🚀 Load Test Execution"
+          echo "Trigger: ${{ github.event_name }}"
+          echo ""
           echo "Test Configuration:"
-          if [[ -n "${{ github.event.inputs.test_case }}" ]]; then
-            echo "  Test Case: ${{ github.event.inputs.test_case }} (specific test)"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ -n "${{ github.event.inputs.test_case }}" ]]; then
+              echo "  Test Case: ${{ github.event.inputs.test_case }} (specific test)"
+            else
+              echo "  Test Case: ALL TESTS (manual trigger)"
+            fi
+            echo "  Base URL: ${{ github.event.inputs.base_url }}"
+            echo "  Model: ${{ github.event.inputs.model }}"
+            echo "  Duration: ${{ github.event.inputs.duration_minutes }} minutes"
+            echo "  Non-stream RPS: ${{ github.event.inputs.nonstream_rps }}"
+            echo "  Stream RPS: ${{ github.event.inputs.stream_rps }}"
           else
-            echo "  Test Case: ALL TESTS (default)"
+            echo "  Test Case: ALL TESTS (auto trigger on push)"
+            echo "  Base URL: $BASE"
+            echo "  Model: $MODEL"
+            echo "  Duration: $DURATION_MIN minutes"
+            echo "  Non-stream RPS: $NONSTREAM_RPS"
+            echo "  Stream RPS: $STREAM_RPS"
           fi
-          echo "  Base URL: ${{ github.event.inputs.base_url }}"
-          echo "  Model: ${{ github.event.inputs.model }}"
-          echo "  Duration: ${{ github.event.inputs.duration_minutes }} minutes"
-          echo "  Non-stream RPS: ${{ github.event.inputs.nonstream_rps }}"
-          echo "  Stream RPS: ${{ github.event.inputs.stream_rps }}"
           
           # Validate required secrets
           if [[ -z "$API_KEY" && -z "$LOADTEST_TOKEN" ]]; then
             echo "⚠️  Warning: Neither API_KEY nor LOADTEST_TOKEN is configured"
           fi
           
-          if [[ -n "$PROMETHEUS_ENDPOINT" ]]; then
-            echo "✅ Prometheus remote write endpoint configured"
+          echo ""
+          echo "Prometheus Configuration:"
+          if [[ -n "$K6_PROMETHEUS_RW_SERVER_URL" ]]; then
+            echo "✅ k6 Prometheus remote write endpoint configured: [CONFIGURED]"
+            if [[ -n "$K6_PROMETHEUS_RW_USERNAME" ]]; then
+              echo "✅ k6 Prometheus username configured: [CONFIGURED]"
+            else
+              echo "⚠️  k6 Prometheus username not configured"
+            fi
+            if [[ -n "$K6_PROMETHEUS_RW_PASSWORD" ]]; then
+              echo "✅ k6 Prometheus password configured: [HIDDEN]"
+            else
+              echo "⚠️  k6 Prometheus password not configured"
+            fi
+            echo "📊 Trend stats: $K6_PROMETHEUS_RW_TREND_STATS"
+            echo "⏱️  Push interval: $K6_PROMETHEUS_RW_PUSH_INTERVAL"
           else
-            echo "⚠️  Warning: PROMETHEUS_ENDPOINT is not configured"
+            echo "⚠️  Warning: K6_PROMETHEUS_RW_SERVER_URL is not configured"
           fi
         
       - name: Run load test
         id: loadtest
         run: |
           cd tests
-          if [[ -n "${{ github.event.inputs.test_case }}" ]]; then
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.test_case }}" ]]; then
             echo "Running specific test case: ${{ github.event.inputs.test_case }}"
             ./run-loadtest.sh ${{ github.event.inputs.test_case }}
           else
@@ -120,9 +166,15 @@ jobs:
             # Extract key metrics using jq
             if command -v jq &> /dev/null; then
               echo "=== Load Test Results ===" >> results_summary.txt
-              echo "Test Case: ${{ github.event.inputs.test_case }}" >> results_summary.txt
+              if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+                echo "Test Case: ${{ github.event.inputs.test_case || 'All Tests' }}" >> results_summary.txt
+                echo "Duration: ${{ github.event.inputs.duration_minutes || '2' }} minutes" >> results_summary.txt
+              else
+                echo "Test Case: All Tests (auto-triggered)" >> results_summary.txt
+                echo "Duration: $DURATION_MIN minutes" >> results_summary.txt
+              fi
+              echo "Trigger: ${{ github.event_name }}" >> results_summary.txt
               echo "Date: $(date)" >> results_summary.txt
-              echo "Duration: ${{ github.event.inputs.duration_minutes }} minutes" >> results_summary.txt
               echo "" >> results_summary.txt
               
               # Parse metrics
@@ -151,36 +203,10 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: loadtest-results-${{ github.event.inputs.test_case || 'all-tests' }}-${{ github.run_number }}
+          name: loadtest-results-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test_case || 'all-tests' }}-${{ github.run_number }}
           path: |
             tests/results/
-            
-      - name: Comment on commit (if triggered by PR)
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const path = './tests/results/results_summary.txt';
-            
-            let comment = `## 🚀 Load Test Results\n\n`;
-            comment += `**Test Case:** ${{ github.event.inputs.test_case || 'All Tests' }}\n`;
-            comment += `**Status:** ${{ job.status }}\n\n`;
-            
-            if (fs.existsSync(path)) {
-              const summary = fs.readFileSync(path, 'utf8');
-              comment += `\`\`\`\n${summary}\n\`\`\`\n`;
-            } else {
-              comment += `❌ No test results available\n`;
-            }
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
-            
+
       - name: Fail job if errors detected
         if: steps.parse_results.outputs.error_count != '0'
         run: |
@@ -191,7 +217,8 @@ jobs:
         if: success()
         run: |
           echo "✅ Load test completed successfully!"
-          if [[ -n "${{ github.event.inputs.test_case }}" ]]; then
+          echo "Trigger: ${{ github.event_name }}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.test_case }}" ]]; then
             echo "Test case: ${{ github.event.inputs.test_case }}"
           else
             echo "Test case: All tests"

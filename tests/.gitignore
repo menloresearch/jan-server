@@ -4,6 +4,7 @@
 # Test results
 results/
 *.json
+!grafana-dashboard.json
 *.log
 
 # Temporary files
