@@ -2,7 +2,6 @@ package responses
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	requesttypes "menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	responsetypes "menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
+	"menlo.ai/jan-api-gateway/app/utils/logger"
 )
 
 const (
@@ -66,7 +66,7 @@ func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request 
 		}
 		if err := h.appendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}); err != nil {
 			// Log error but don't fail the response
-			fmt.Printf("Failed to append assistant response to conversation: %v\n", err)
+			logger.GetLogger().Errorf("Failed to append assistant response to conversation: %v", err)
 		}
 	}
 

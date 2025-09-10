@@ -398,21 +398,6 @@ func validateMessageObject(msg map[string]interface{}, index int) *[]ValidationE
 			Message: "role must be one of: system, user, assistant",
 		})
 	}
-
-	// Check for required content field
-	content, hasContent := msg["content"]
-	if !hasContent {
-		errors = append(errors, ValidationError{
-			Field:   fmt.Sprintf("input[%d].content", index),
-			Message: "content is required for message objects",
-		})
-	} else if contentStr, ok := content.(string); !ok || contentStr == "" {
-		errors = append(errors, ValidationError{
-			Field:   fmt.Sprintf("input[%d].content", index),
-			Message: "content must be a non-empty string",
-		})
-	}
-
 	if len(errors) > 0 {
 		return &errors
 	}
