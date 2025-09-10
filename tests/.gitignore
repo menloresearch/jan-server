@@ -1,0 +1,15 @@
+# Environment configuration
+.env
+
+# Test results
+results/
+*.json
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# OS files
+.DS_Store
+Thumbs.db

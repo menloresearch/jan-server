@@ -1,0 +1,199 @@
+name: Load Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_case:
+        description: 'Test case to run (leave empty to run all tests)'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - chat-completion
+      base_url:
+        description: 'Base URL for testing'
+        required: true
+        default: 'https://api-dev.jan.ai'
+        type: string
+      model:
+        description: 'Model to test'
+        required: true
+        default: 'jan-v1-4b'
+        type: string
+      duration_minutes:
+        description: 'Test duration in minutes'
+        required: true
+        default: '5'
+        type: string
+      nonstream_rps:
+        description: 'Non-streaming requests per second'
+        required: true
+        default: '2'
+        type: string
+      stream_rps:
+        description: 'Streaming requests per second'
+        required: true
+        default: '1'
+        type: string
+
+env:
+  # Test configuration
+  BASE: ${{ github.event.inputs.base_url }}
+  MODEL: ${{ github.event.inputs.model }}
+  DURATION_MIN: ${{ github.event.inputs.duration_minutes }}
+  NONSTREAM_RPS: ${{ github.event.inputs.nonstream_rps }}
+  STREAM_RPS: ${{ github.event.inputs.stream_rps }}
+  
+  # Authentication (set these as repository secrets)
+  API_KEY: ${{ secrets.LOADTEST_API_KEY }}
+  LOADTEST_TOKEN: ${{ secrets.LOADTEST_TOKEN }}
+  
+  # Prometheus configuration (set these as repository secrets)
+  PROMETHEUS_ENDPOINT: ${{ secrets.PROMETHEUS_ENDPOINT }}
+  PROMETHEUS_USERNAME: ${{ secrets.PROMETHEUS_USERNAME }}
+  PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+        
+      - name: Install jq for metrics parsing
+        run: sudo apt-get update && sudo apt-get install -y jq
+        
+      - name: Validate inputs
+        run: |
+          echo "Test Configuration:"
+          if [[ -n "${{ github.event.inputs.test_case }}" ]]; then
+            echo "  Test Case: ${{ github.event.inputs.test_case }} (specific test)"
+          else
+            echo "  Test Case: ALL TESTS (default)"
+          fi
+          echo "  Base URL: ${{ github.event.inputs.base_url }}"
+          echo "  Model: ${{ github.event.inputs.model }}"
+          echo "  Duration: ${{ github.event.inputs.duration_minutes }} minutes"
+          echo "  Non-stream RPS: ${{ github.event.inputs.nonstream_rps }}"
+          echo "  Stream RPS: ${{ github.event.inputs.stream_rps }}"
+          
+          # Validate required secrets
+          if [[ -z "$API_KEY" && -z "$LOADTEST_TOKEN" ]]; then
+            echo "⚠️  Warning: Neither API_KEY nor LOADTEST_TOKEN is configured"
+          fi
+          
+          if [[ -n "$PROMETHEUS_ENDPOINT" ]]; then
+            echo "✅ Prometheus remote write endpoint configured"
+          else
+            echo "⚠️  Warning: PROMETHEUS_ENDPOINT is not configured"
+          fi
+        
+      - name: Run load test
+        id: loadtest
+        run: |
+          cd tests
+          if [[ -n "${{ github.event.inputs.test_case }}" ]]; then
+            echo "Running specific test case: ${{ github.event.inputs.test_case }}"
+            ./run-loadtest.sh ${{ github.event.inputs.test_case }}
+          else
+            echo "Running all test cases"
+            ./run-loadtest.sh
+          fi
+        
+      - name: Parse test results
+        id: parse_results
+        if: always()
+        run: |
+          cd tests/results
+          
+          # Find the latest results file
+          LATEST_FILE=$(ls -t *_*.json 2>/dev/null | head -1 || echo "")
+          
+          if [[ -n "$LATEST_FILE" && -f "$LATEST_FILE" ]]; then
+            echo "results_file=$LATEST_FILE" >> $GITHUB_OUTPUT
+            
+            # Extract key metrics using jq
+            if command -v jq &> /dev/null; then
+              echo "=== Load Test Results ===" >> results_summary.txt
+              echo "Test Case: ${{ github.event.inputs.test_case }}" >> results_summary.txt
+              echo "Date: $(date)" >> results_summary.txt
+              echo "Duration: ${{ github.event.inputs.duration_minutes }} minutes" >> results_summary.txt
+              echo "" >> results_summary.txt
+              
+              # Parse metrics
+              jq -r '.metrics | to_entries[] | select(.key | contains("llm_")) | "\(.key): avg=\(.value.avg // "N/A"), min=\(.value.min // "N/A"), max=\(.value.max // "N/A"), p95=\(.value.p95 // "N/A")"' "$LATEST_FILE" >> results_summary.txt 2>/dev/null || echo "Failed to parse detailed metrics" >> results_summary.txt
+              
+              # Check for errors
+              ERROR_COUNT=$(jq -r '.metrics.llm_errors.count // 0' "$LATEST_FILE" 2>/dev/null || echo "0")
+              echo "" >> results_summary.txt
+              echo "Error Count: $ERROR_COUNT" >> results_summary.txt
+              
+              # Set output for next steps
+              echo "error_count=$ERROR_COUNT" >> $GITHUB_OUTPUT
+              
+              # Display summary
+              echo "=== Test Results Summary ==="
+              cat results_summary.txt
+            else
+              echo "jq not available, skipping detailed metrics parsing"
+            fi
+          else
+            echo "No results file found"
+            echo "error_count=999" >> $GITHUB_OUTPUT
+          fi
+        
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: loadtest-results-${{ github.event.inputs.test_case || 'all-tests' }}-${{ github.run_number }}
+          path: |
+            tests/results/
+            
+      - name: Comment on commit (if triggered by PR)
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = './tests/results/results_summary.txt';
+            
+            let comment = `## 🚀 Load Test Results\n\n`;
+            comment += `**Test Case:** ${{ github.event.inputs.test_case || 'All Tests' }}\n`;
+            comment += `**Status:** ${{ job.status }}\n\n`;
+            
+            if (fs.existsSync(path)) {
+              const summary = fs.readFileSync(path, 'utf8');
+              comment += `\`\`\`\n${summary}\n\`\`\`\n`;
+            } else {
+              comment += `❌ No test results available\n`;
+            }
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+            
+      - name: Fail job if errors detected
+        if: steps.parse_results.outputs.error_count != '0'
+        run: |
+          echo "❌ Load test detected ${{ steps.parse_results.outputs.error_count }} errors"
+          exit 1
+          
+      - name: Success notification
+        if: success()
+        run: |
+          echo "✅ Load test completed successfully!"
+          if [[ -n "${{ github.event.inputs.test_case }}" ]]; then
+            echo "Test case: ${{ github.event.inputs.test_case }}"
+          else
+            echo "Test case: All tests"
+          fi
+          echo "Error count: ${{ steps.parse_results.outputs.error_count }}"

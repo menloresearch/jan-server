@@ -48,6 +48,35 @@ Download from [k6.io/docs/get-started/installation](https://k6.io/docs/get-start
 
 ## Quick start (local)
 
+### Method 1: Using the bash script (Recommended)
+
+1. **Configure environment (optional)**:
+
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+
+2. **Run all test cases**:
+
+   ```bash
+   ./run-loadtest.sh
+   ```
+
+3. **Run a specific test case**:
+
+   ```bash
+   ./run-loadtest.sh chat-completion
+   ```
+
+4. **View available test cases**:
+
+   ```bash
+   ./run-loadtest.sh --list
+   ```
+
+### Method 2: Direct k6 execution
+
 From the `tests/loadtests` directory:
 
 ```bash
@@ -204,6 +233,79 @@ API_KEY="sk-xxx" LOADTEST_TOKEN="lt-xxx" \
 BASE=https://api.jan.ai \
 MODEL=jan-v1-4b \
 k6 run chat-completion.js
+```
+
+## CI/CD Integration
+
+The repository includes a GitHub Actions workflow for automated load testing that can be triggered manually.
+
+### Setup GitHub Secrets
+
+Before using the CI workflow, configure the following repository secrets:
+
+**Required secrets:**
+
+- `LOADTEST_API_KEY` or `LOADTEST_TOKEN` - Authentication for the API
+
+**Optional secrets (for Prometheus metrics):**
+
+- `PROMETHEUS_ENDPOINT` - Prometheus remote write endpoint (e.g., `https://prometheus.example.com/api/v1/write`)
+- `PROMETHEUS_USERNAME` - Basic auth username (optional)
+- `PROMETHEUS_PASSWORD` - Basic auth password (optional)
+
+**Note:** Metrics are sent directly from k6 to Prometheus via the remote write protocol, not via file upload.
+
+### Running Tests via GitHub Actions
+
+1. Go to your repository's **Actions** tab
+2. Select the **Load Test** workflow
+3. Click **Run workflow**
+4. Configure the test parameters:
+   - Test case: Leave empty to run **all tests**, or select specific test
+   - Base URL
+   - Model name
+   - Duration in minutes
+   - RPS settings
+
+**Default behavior:** If no test case is selected, all tests will be executed automatically.
+
+### Workflow Features
+
+- **Manual trigger**: Workflow dispatch with configurable parameters
+- **All tests by default**: Runs all available tests unless specific test is selected
+- **Auto-detection**: Automatically discovers test cases from `src/` directory
+- **Test results**: Automatically uploaded as artifacts
+- **Direct metrics export**: k6 sends metrics directly to Prometheus remote write endpoint
+- **Failure detection**: Fails the job if errors are detected
+- **Results summary**: Parses and displays key metrics
+
+### Adding New Test Cases
+
+The system automatically detects test cases by scanning the `src/` directory for `.js` files.
+
+To add new test cases:
+
+1. **Create a new k6 script file** in the `src/` directory (e.g., `src/new-test.js`)
+2. **Test immediately** - no registration needed:
+
+   ```bash
+   ./run-loadtest.sh new-test      # Test specific case
+   ./run-loadtest.sh               # Test all cases including new one
+   ```
+
+3. **Update the workflow file** to include the new option in the dropdown
+
+**Environment variables** are shared across all test cases, so new tests can use the same `.env` configuration.
+
+**File structure:**
+
+```text
+tests/
+├── src/                    # Test scripts directory
+│   ├── chat-completion.js  # Auto-detected test
+│   └── your-test.js        # Your new test (auto-detected)
+├── run-loadtest.sh         # Test runner
+└── .env                    # Shared environment
 ```
 
 ### Test against local development server
