@@ -5,20 +5,38 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"golang.org/x/net/context"
+	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/query"
+	"menlo.ai/jan-api-gateway/app/domain/user"
+
+	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
+type ApikeyContextKey string
+
+const (
+	ApikeyContextKeyEntity   ApikeyContextKey = "ApikeyContextKeyEntity"
+	ApikeyContextKeyPublicID ApikeyContextKey = "apikey_public_id"
+)
+
 type ApiKeyService struct {
-	repo ApiKeyRepository
+	repo                ApiKeyRepository
+	organizationService *organization.OrganizationService
 }
 
-func NewService(repo ApiKeyRepository) *ApiKeyService {
+func NewService(
+	repo ApiKeyRepository,
+	organizationService *organization.OrganizationService,
+) *ApiKeyService {
 	return &ApiKeyService{
-		repo: repo,
+		repo,
+		organizationService,
 	}
 }
 
@@ -101,4 +119,63 @@ func (s *ApiKeyService) Count(ctx context.Context, filter ApiKeyFilter) (int64, 
 
 func (s *ApiKeyService) Save(ctx context.Context, entity *ApiKey) error {
 	return s.repo.Update(ctx, entity)
+}
+
+func (s *ApiKeyService) GetAdminApiKeyFromQuery() gin.HandlerFunc {
+	return func(reqCtx *gin.Context) {
+		ctx := reqCtx.Request.Context()
+		user, ok := user.GetUserFromContext(reqCtx)
+		if !ok {
+			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+				Code: "72ca928d-bd8b-44f8-af70-1a9e33b58295",
+			})
+			return
+		}
+
+		publicID := reqCtx.Param(string(ApikeyContextKeyPublicID))
+		if publicID == "" {
+			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+				Code:  "9c6ed28c-1dab-4fab-945a-f0efa2dec1eb",
+				Error: "missing apikey public ID",
+			})
+			return
+		}
+
+		adminKeyEntity, err := s.repo.FindOneByFilter(ctx, ApiKeyFilter{
+			PublicID: &publicID,
+		})
+		if adminKeyEntity == nil || err != nil {
+			reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
+				Code: "f4f47443-0c80-4c7a-bedc-ac30ec49f494",
+			})
+			return
+		}
+		memberEntity, err := s.organizationService.FindOneMemberByFilter(ctx, organization.OrganizationMemberFilter{
+			UserID:         &user.ID,
+			OrganizationID: adminKeyEntity.OrganizationID,
+		})
+		if memberEntity == nil || err != nil {
+			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+				Code: "56a9fa87-ddd7-40b7-b2d6-94ae41a600f8",
+			})
+			return
+		}
+		SetAdminKeyFromContext(reqCtx, adminKeyEntity)
+	}
+}
+
+func GetAdminKeyFromContext(reqCtx *gin.Context) (*ApiKey, bool) {
+	apiKey, ok := reqCtx.Get(string(ApikeyContextKeyEntity))
+	if !ok {
+		return nil, false
+	}
+	v, ok := apiKey.(*ApiKey)
+	if !ok {
+		return nil, false
+	}
+	return v, true
+}
+
+func SetAdminKeyFromContext(reqCtx *gin.Context, apiKey *ApiKey) {
+	reqCtx.Set(string(ApikeyContextKeyEntity), apiKey)
 }

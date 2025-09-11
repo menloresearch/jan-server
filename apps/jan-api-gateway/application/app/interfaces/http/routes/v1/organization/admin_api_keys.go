@@ -34,9 +34,12 @@ func NewAdminApiKeyAPI(organizationService *organization.OrganizationService, ap
 func (adminApiKeyAPI *AdminApiKeyAPI) RegisterRouter(router *gin.RouterGroup) {
 	adminApiKeyRouter := router.Group("/admin_api_keys")
 	adminApiKeyRouter.GET("", adminApiKeyAPI.GetAdminApiKeys)
-	adminApiKeyRouter.GET("/:id", adminApiKeyAPI.GetAdminApiKey)
 	adminApiKeyRouter.POST("", adminApiKeyAPI.CreateAdminApiKey)
-	adminApiKeyRouter.DELETE("/:id", adminApiKeyAPI.DeleteAdminApiKey)
+
+	adminKeyPath := fmt.Sprintf("/:%s", apikey.ApikeyContextKeyPublicID)
+	adminApiKeyIdRoute := adminApiKeyRouter.Group(adminKeyPath, adminApiKeyAPI.apiKeyService.GetAdminApiKeyFromQuery())
+	adminApiKeyIdRoute.GET("", adminApiKeyAPI.GetAdminApiKey)
+	adminApiKeyIdRoute.DELETE("", adminApiKeyAPI.DeleteAdminApiKey)
 }
 
 // GetAdminApiKey godoc
@@ -50,33 +53,8 @@ func (adminApiKeyAPI *AdminApiKeyAPI) RegisterRouter(router *gin.RouterGroup) {
 // @Failure 404 {object} responses.ErrorResponse "Not Found - API key with the given ID does not exist or does not belong to the organization"
 // @Router /v1/organization/admin_api_keys/{id} [get]
 func (api *AdminApiKeyAPI) GetAdminApiKey(reqCtx *gin.Context) {
-	apikeyService := api.apiKeyService
-	ctx := reqCtx.Request.Context()
-	adminKeyEntity, err := api.validateAdminKey(reqCtx)
-	if err != nil {
-		return
-	}
-	publicID := reqCtx.Param("id")
-	if publicID == "" {
-		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  "2ab393c5-708d-42bc-a785-dcbdcf429ad1",
-			Error: "invalid or missing API key",
-		})
-		return
-	}
-	entity, err := apikeyService.FindByPublicID(ctx, publicID)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  "26b68f41-0eb0-4fca-8365-613742ef9204",
-			Error: "invalid or missing API key",
-		})
-		return
-	}
-	if entity.OrganizationID != adminKeyEntity.OrganizationID {
-		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  "4b656858-4212-451a-9ab6-23bc09dcc357",
-			Error: "invalid or missing API key",
-		})
+	entity, ok := apikey.GetAdminKeyFromContext(reqCtx)
+	if !ok {
 		return
 	}
 	reqCtx.JSON(http.StatusOK, domainToOrganizationAdminAPIKeyResponse(entity))
@@ -195,49 +173,15 @@ func (api *AdminApiKeyAPI) GetAdminApiKeys(reqCtx *gin.Context) {
 // @Failure 404 {object} responses.ErrorResponse "Not Found - API key with the given ID does not exist or does not belong to the organization"
 // @Router /v1/organization/admin_api_keys/{id} [delete]
 func (api *AdminApiKeyAPI) DeleteAdminApiKey(reqCtx *gin.Context) {
-	apikeyService := api.apiKeyService
+	entity, ok := apikey.GetAdminKeyFromContext(reqCtx)
+	if !ok {
+		return
+	}
 	ctx := reqCtx.Request.Context()
-
-	adminKeyEntity, err := api.validateAdminKey(reqCtx)
+	// TODO: RBAC
+	err := api.apiKeyService.Delete(ctx, entity)
 	if err != nil {
-		return
-	}
-
-	publicID := reqCtx.Param("id")
-	if publicID == "" {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "2ab393c5-708d-42bc-a785-dcbdcf429ad1",
-			Error: "invalid or missing API key",
-		})
-		return
-	}
-	entity, err := apikeyService.FindByPublicID(ctx, publicID)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "26b68f41-0eb0-4fca-8365-613742ef9204",
-			Error: "invalid or missing API key",
-		})
-		return
-	}
-	if entity.ApikeyType != string(apikey.ApikeyTypeAdmin) {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "f5a31a69-10b0-416c-8fa2-8183dca24eb9",
-			Error: "invalid or missing API key",
-		})
-		return
-	}
-
-	if entity.OrganizationID != adminKeyEntity.OrganizationID {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "13e172b1-7eec-4b1a-af81-3107ca5a6b0e",
-			Error: "invalid or missing API key",
-		})
-		return
-	}
-
-	err = apikeyService.Delete(ctx, entity)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Code:  "c9a103b2-985c-44b7-9ccd-38e914a2c82b",
 			Error: "invalid or missing API key",
 		})

@@ -124,6 +124,55 @@ func (repo *OrganizationGormRepository) AddMember(ctx context.Context, m *domain
 	return query.OrganizationMember.WithContext(ctx).Create(model)
 }
 
+// FindMemberByFilter implements organization.OrganizationRepository.
+func (repo *OrganizationGormRepository) FindMemberByFilter(ctx context.Context, filter domain.OrganizationMemberFilter, p *query.Pagination) ([]*domain.OrganizationMember, error) {
+	query := repo.db.GetQuery(ctx)
+	sql := query.WithContext(ctx).OrganizationMember
+	sql = repo.applyMemberFilter(query, sql, filter)
+	if p != nil {
+		if p.Limit != nil && *p.Limit > 0 {
+			sql = sql.Limit(*p.Limit)
+		}
+		if p.After != nil {
+			if p.Order == "desc" {
+				sql = sql.Where(query.OrganizationMember.ID.Lt(*p.After))
+			} else {
+				sql = sql.Where(query.OrganizationMember.ID.Gt(*p.After))
+			}
+		}
+		if p.Order == "desc" {
+			sql = sql.Order(query.OrganizationMember.ID.Desc())
+		} else {
+			// Default to ascending order
+			sql = sql.Order(query.OrganizationMember.ID.Asc())
+		}
+	}
+
+	rows, err := sql.Find()
+	if err != nil {
+		return nil, err
+	}
+	result := functional.Map(rows, func(org *dbschema.OrganizationMember) *domain.OrganizationMember {
+		return org.EtoD()
+	})
+	return result, nil
+}
+
+// applyFilter is a helper function to conditionally apply filter clauses to the GORM query.
+func (repo *OrganizationGormRepository) applyMemberFilter(query *gormgen.Query, sql gormgen.IOrganizationMemberDo, filter domain.OrganizationMemberFilter) gormgen.IOrganizationMemberDo {
+	if filter.UserID != nil {
+		sql = sql.Where(query.OrganizationMember.UserID.Eq(*filter.UserID))
+	}
+	// If the Enabled filter is not nil, add a WHERE clause.
+	if filter.OrganizationID != nil {
+		sql = sql.Where(query.OrganizationMember.OrganizationID.Eq(*filter.OrganizationID))
+	}
+	if filter.Role != nil {
+		sql = sql.Where(query.OrganizationMember.Role.Eq(*filter.Role))
+	}
+	return sql
+}
+
 // NewOrganizationGormRepository creates a new repository instance.
 func NewOrganizationGormRepository(db *transaction.Database) domain.OrganizationRepository {
 	return &OrganizationGormRepository{

@@ -32,6 +32,12 @@ type OrganizationFilter struct {
 	OwnerID  *uint
 }
 
+type OrganizationMemberFilter struct {
+	UserID         *uint
+	OrganizationID *uint
+	Role           *string
+}
+
 type OrganizationRepository interface {
 	Create(ctx context.Context, o *Organization) error
 	Update(ctx context.Context, o *Organization) error
@@ -41,4 +47,5 @@ type OrganizationRepository interface {
 	FindByFilter(ctx context.Context, filter OrganizationFilter, pagination *query.Pagination) ([]*Organization, error)
 	Count(ctx context.Context, filter OrganizationFilter) (int64, error)
 	AddMember(ctx context.Context, m *OrganizationMember) error
+	FindMemberByFilter(ctx context.Context, filter OrganizationMemberFilter, pagination *query.Pagination) ([]*OrganizationMember, error)
 }

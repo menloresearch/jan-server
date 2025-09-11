@@ -63,3 +63,14 @@ func (o *Organization) EtoD() *organization.Organization {
 		OwnerID:   o.OwnerID,
 	}
 }
+
+func (o *OrganizationMember) EtoD() *organization.OrganizationMember {
+	return &organization.OrganizationMember{
+		ID:             o.ID,
+		UserID:         o.UserID,
+		OrganizationID: o.OrganizationID,
+		Role:           o.Role,
+		IsPrimary:      o.IsPrimary,
+		CreatedAt:      o.CreatedAt,
+	}
+}

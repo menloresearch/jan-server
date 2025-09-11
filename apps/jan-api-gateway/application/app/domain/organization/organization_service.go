@@ -106,6 +106,21 @@ func (s *OrganizationService) AddMember(ctx context.Context, m *OrganizationMemb
 	return s.repo.AddMember(ctx, m)
 }
 
+func (s *OrganizationService) FindMembersByFilter(ctx context.Context, f OrganizationMemberFilter, p *query.Pagination) ([]*OrganizationMember, error) {
+	return s.repo.FindMemberByFilter(ctx, f, p)
+}
+
+func (s *OrganizationService) FindOneMemberByFilter(ctx context.Context, f OrganizationMemberFilter) (*OrganizationMember, error) {
+	entities, err := s.repo.FindMemberByFilter(ctx, f, nil)
+	if err != nil {
+		return nil, err
+	}
+	if len(entities) != 1 {
+		return nil, fmt.Errorf("no records")
+	}
+	return entities[0], err
+}
+
 type OrganizationContextKey string
 
 const (
