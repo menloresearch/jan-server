@@ -19,21 +19,27 @@ import (
 type AuthRoute struct {
 	google      *google.GoogleAuthAPI
 	userService *user.UserService
+	authService *auth.AuthService
 }
 
-func NewAuthRoute(google *google.GoogleAuthAPI, userService *user.UserService) *AuthRoute {
+func NewAuthRoute(
+	google *google.GoogleAuthAPI,
+	userService *user.UserService,
+	authService *auth.AuthService) *AuthRoute {
 	return &AuthRoute{
 		google,
 		userService,
+		authService,
 	}
 }
 
 func (authRoute *AuthRoute) RegisterRouter(router gin.IRouter) {
 	authRouter := router.Group("/auth")
+	authRouter.GET("/logout", authRoute.Logout)
 	authRouter.GET("/refresh-token", authRoute.RefreshToken)
 	authRouter.GET("/me",
-		authRoute.userService.AppUserAuthMiddleware(),
-		authRoute.userService.RegisteredUserMiddleware(),
+		authRoute.authService.AppUserAuthMiddleware(),
+		authRoute.authService.RegisteredUserMiddleware(),
 		authRoute.GetMe,
 	)
 	authRouter.POST("/guest-login", authRoute.GuestLogin)
@@ -68,13 +74,36 @@ type GetMeResponse struct {
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized (e.g., missing or invalid JWT)"
 // @Router /v1/auth/me [get]
 func (authRoute *AuthRoute) GetMe(reqCtx *gin.Context) {
-	user, _ := user.GetUserFromContext(reqCtx)
+	user, _ := auth.GetUserFromContext(reqCtx)
 	reqCtx.JSON(http.StatusOK, GetMeResponse{
 		Object: "me",
 		ID:     user.PublicID,
 		Email:  user.Email,
 		Name:   user.Name,
 	})
+}
+
+// @Summary Refresh an access token
+// @Description Use a valid refresh token to obtain a new access token. The refresh token is typically sent in a cookie.
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Success 200 {object} nil "Successfully logout"
+// @Failure 400 {object} responses.ErrorResponse "Bad Request (e.g., invalid refresh token)"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized (e.g., expired or missing refresh token)"
+// @Router /v1/auth/logout [get]
+func (authRoute *AuthRoute) Logout(reqCtx *gin.Context) {
+	http.SetCookie(reqCtx.Writer, &http.Cookie{
+		Name:     auth.RefreshTokenKey,
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+	})
+	reqCtx.Status(http.StatusOK)
 }
 
 // @Summary Refresh an access token

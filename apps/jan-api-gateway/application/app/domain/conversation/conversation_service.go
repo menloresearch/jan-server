@@ -8,8 +8,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/net/context"
 
+	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/query"
-	"menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
 	"menlo.ai/jan-api-gateway/app/utils/ptr"
@@ -214,7 +214,7 @@ func (s *ConversationService) GetConversationMiddleWare() gin.HandlerFunc {
 			})
 			return
 		}
-		user, ok := user.GetUserFromContext(reqCtx)
+		user, ok := auth.GetUserFromContext(reqCtx)
 		if !ok {
 			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 				Code: "f5742805-2c6e-45a8-b6a8-95091b9d46f0",
