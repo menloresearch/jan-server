@@ -42,7 +42,7 @@ const (
 
 func (s *AuthService) JWTAuthMiddleware() gin.HandlerFunc {
 	return func(reqCtx *gin.Context) {
-		userId, ok := s.getUserIDFromJWT(reqCtx)
+		userId, ok := s.getUserPublicIDFromJWT(reqCtx)
 		if !ok {
 			return
 		}
@@ -55,7 +55,7 @@ func (s *AuthService) JWTAuthMiddleware() gin.HandlerFunc {
 // Retrieve the user's public ID from the header.
 func (s *AuthService) AppUserAuthMiddleware() gin.HandlerFunc {
 	return func(reqCtx *gin.Context) {
-		userId, ok := s.getUserIDFromJWT(reqCtx)
+		userId, ok := s.getUserPublicIDFromJWT(reqCtx)
 		if ok {
 			SetUserIDToContext(reqCtx, userId)
 			reqCtx.Next()
@@ -76,7 +76,7 @@ func (s *AuthService) AppUserAuthMiddleware() gin.HandlerFunc {
 
 func (s *AuthService) AdminUserAuthMiddleware() gin.HandlerFunc {
 	return func(reqCtx *gin.Context) {
-		userId, ok := s.getUserIDFromJWT(reqCtx)
+		userId, ok := s.getUserPublicIDFromJWT(reqCtx)
 		if ok {
 			SetUserIDToContext(reqCtx, userId)
 			reqCtx.Next()
@@ -130,7 +130,7 @@ func (s *AuthService) RegisteredUserMiddleware() gin.HandlerFunc {
 	}
 }
 
-func (s *AuthService) getUserIDFromJWT(reqCtx *gin.Context) (string, bool) {
+func (s *AuthService) getUserPublicIDFromJWT(reqCtx *gin.Context) (string, bool) {
 	tokenString, ok := requests.GetTokenFromBearer(reqCtx)
 	if !ok {
 		return "", false
