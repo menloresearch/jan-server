@@ -63,7 +63,7 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID
 	}
 
 	// Generate public ID
-	publicID, err := idgen.GenerateSecureID("resp", 16)
+	publicID, err := idgen.GenerateSecureID("resp", 42)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate response ID: %w", err)
 	}
@@ -339,7 +339,7 @@ func (s *ResponseService) CreateItemsForResponse(ctx context.Context, responseID
 			Content:        itemData.Content,
 			ConversationID: conversationID,
 			ResponseID:     &responseID,
-			CreatedAt:      time.Now().Unix(),
+			CreatedAt:      time.Now(),
 		}
 
 		if err := s.itemRepo.Create(ctx, item); err != nil {

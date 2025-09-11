@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"context"
+	"time"
 )
 
 type ConversationStatus string
@@ -35,12 +36,12 @@ type Item struct {
 	Role              *ItemRole          `json:"role,omitempty"`
 	Content           []Content          `json:"content,omitempty"`
 	Status            *string            `json:"status,omitempty"`
-	IncompleteAt      *int64             `json:"incomplete_at,omitempty"`
+	IncompleteAt      *time.Time         `json:"incomplete_at,omitempty"`
 	IncompleteDetails *IncompleteDetails `json:"incomplete_details,omitempty"`
-	CompletedAt       *int64             `json:"completed_at,omitempty"`
+	CompletedAt       *time.Time         `json:"completed_at,omitempty"`
 	ConversationID    uint               `json:"-"`          // Internal conversation ID (hidden from JSON)
 	ResponseID        *uint              `json:"-"`          // Internal response ID (hidden from JSON)
-	CreatedAt         int64              `json:"created_at"` // Unix timestamp for OpenAI compatibility
+	CreatedAt         time.Time          `json:"created_at"` // Unix timestamp for OpenAI compatibility
 }
 
 // ItemCreationData represents the data needed to create a new conversation item
@@ -124,8 +125,8 @@ type Conversation struct {
 	Items     []Item             `json:"items,omitempty"`
 	Metadata  map[string]string  `json:"metadata,omitempty"`
 	IsPrivate bool               `json:"is_private"`
-	CreatedAt int64              `json:"created_at"` // Unix timestamp for OpenAI compatibility
-	UpdatedAt int64              `json:"updated_at"` // Unix timestamp for OpenAI compatibility
+	CreatedAt time.Time          `json:"created_at"` // Unix timestamp for OpenAI compatibility
+	UpdatedAt time.Time          `json:"updated_at"` // Unix timestamp for OpenAI compatibility
 }
 
 type ConversationRepository interface {

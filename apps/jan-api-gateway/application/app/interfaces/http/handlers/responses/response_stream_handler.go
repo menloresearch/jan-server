@@ -143,8 +143,7 @@ func (h *StreamHandler) CreateStreamResponse(reqCtx *gin.Context, request *reque
 	// Validate request
 	if err := h.validateRequest(request); err != nil {
 		reqCtx.JSON(http.StatusBadRequest, responsetypes.ErrorResponse{
-			Code:  "019929ec-6f89-76c5-8ed4-bd0eb1c6c8db",
-			Error: err.Error(),
+			Code: "019929ec-6f89-76c5-8ed4-bd0eb1c6c8db",
 		})
 		return
 	}
@@ -218,24 +217,22 @@ func (h *StreamHandler) CreateStreamResponse(reqCtx *gin.Context, request *reque
 	err := h.processStreamingResponse(reqCtx, janInferenceClient, key, *chatCompletionRequest, responseID, conv)
 	if err != nil {
 		// Check if context was cancelled (timeout)
-		if ctx.Err() == context.DeadlineExceeded {
+		if reqCtx.Request.Context().Err() == context.DeadlineExceeded {
 			h.emitStreamEvent(reqCtx, "response.error", responsetypes.ResponseErrorEvent{
 				Event:      "response.error",
 				Created:    time.Now().Unix(),
 				ResponseID: responseID,
 				Data: responsetypes.ResponseError{
-					Code:    "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-					Message: "Request timeout exceeded",
+					Code: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 				},
 			})
-		} else if ctx.Err() == context.Canceled {
+		} else if reqCtx.Request.Context().Err() == context.Canceled {
 			h.emitStreamEvent(reqCtx, "response.error", responsetypes.ResponseErrorEvent{
 				Event:      "response.error",
 				Created:    time.Now().Unix(),
 				ResponseID: responseID,
 				Data: responsetypes.ResponseError{
-					Code:    "b2c3d4e5-f6g7-8901-bcde-f23456789012",
-					Message: "Request was cancelled",
+					Code: "b2c3d4e5-f6g7-8901-bcde-f23456789012",
 				},
 			})
 		} else {
@@ -244,8 +241,7 @@ func (h *StreamHandler) CreateStreamResponse(reqCtx *gin.Context, request *reque
 				Created:    time.Now().Unix(),
 				ResponseID: responseID,
 				Data: responsetypes.ResponseError{
-					Code:    "c3af973c-eada-4e8b-96d9-e92546588cd3",
-					Message: err.Error(),
+					Code: "c3af973c-eada-4e8b-96d9-e92546588cd3",
 				},
 			})
 		}
@@ -308,8 +304,7 @@ func (h *StreamHandler) processStreamingResponse(reqCtx *gin.Context, _ *janinfe
 				reqCtx.AbortWithStatusJSON(
 					http.StatusBadRequest,
 					responsetypes.ErrorResponse{
-						Code:  "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",
-						Error: err.Error(),
+						Code: "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",
 					})
 				return err
 			}
@@ -319,8 +314,7 @@ func (h *StreamHandler) processStreamingResponse(reqCtx *gin.Context, _ *janinfe
 				reqCtx.AbortWithStatusJSON(
 					http.StatusBadRequest,
 					responsetypes.ErrorResponse{
-						Code:  "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",
-						Error: err.Error(),
+						Code: "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",
 					})
 				return err
 			}
@@ -351,7 +345,12 @@ type OpenAIStreamData struct {
 // parseOpenAIStreamData parses OpenAI streaming data and extracts content and function call
 func (h *StreamHandler) parseOpenAIStreamData(jsonStr string) (string, *openai.FunctionCall) {
 	var data OpenAIStreamData
-	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil || len(data.Choices) == 0 {
+	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+		return "", nil
+	}
+
+	// Check if choices array is empty to prevent panic
+	if len(data.Choices) == 0 {
 		return "", nil
 	}
 
@@ -485,7 +484,7 @@ func (h *StreamHandler) streamResponseToChannel(reqCtx *gin.Context, request ope
 	scanner := bufio.NewScanner(resp.RawResponse.Body)
 	for scanner.Scan() {
 		// Check if context was cancelled
-		if h.checkContextCancellation(reqCtx.Request.Context(), errChan) {
+		if h.checkContextCancellation(reqCtx, errChan) {
 			return
 		}
 

@@ -19,6 +19,11 @@ import (
 	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
+const (
+	// ClientCreatedRootConversationID is the special conversation ID that indicates a new conversation should be created
+	ClientCreatedRootConversationID = "client-created-root"
+)
+
 // ResponseHandler handles the business logic for response API endpoints
 type ResponseHandler struct {
 	UserService         *user.UserService
@@ -75,7 +80,7 @@ func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 	// Get API key for the user
 	key, err := h.getAPIKey(reqCtx)
 	if err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "019929d1-1e85-72c1-a1cf-e151403692dc", err.Error())
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "019929d1-1e85-72c1-a1cf-e151403692dc", "invalid apikey")
 		return
 	}
 
@@ -202,7 +207,7 @@ func (h *ResponseHandler) handleConversation(reqCtx *gin.Context, request *reque
 			return nil, fmt.Errorf("previous response does not belong to any conversation")
 		}
 
-		conv, err := h.conversationService.GetConversationByIDAndUserID(reqCtx, *previousResponse.ConversationID, userEntity.ID)
+		conv, err := h.conversationService.GetConversationByID(reqCtx, *previousResponse.ConversationID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load conversation from previous response: %w", err)
 		}
@@ -210,7 +215,7 @@ func (h *ResponseHandler) handleConversation(reqCtx *gin.Context, request *reque
 	}
 
 	// Check if conversation is specified and not 'client-created-root'
-	if request.Conversation != nil && *request.Conversation != "" && *request.Conversation != "client-created-root" {
+	if request.Conversation != nil && *request.Conversation != "" && *request.Conversation != ClientCreatedRootConversationID {
 		// Load existing conversation
 		conv, err := h.conversationService.GetConversationByPublicIDAndUserID(reqCtx, *request.Conversation, userEntity.ID)
 		if err != nil {
@@ -421,7 +426,7 @@ func (h *ResponseHandler) GetResponse(reqCtx *gin.Context) {
 	}
 
 	// Convert domain response to API response
-	apiResponse := h.convertDomainResponseToAPIResponse(responseEntity)
+	apiResponse := h.convertDomainResponseToAPIResponse(reqCtx, responseEntity)
 	h.sendSuccessResponse(reqCtx, apiResponse)
 }
 
@@ -610,7 +615,7 @@ func (h *ResponseHandler) getAPIKey(reqCtx *gin.Context) (string, error) {
 }
 
 // convertDomainResponseToAPIResponse converts a domain response to API response format
-func (h *ResponseHandler) convertDomainResponseToAPIResponse(responseEntity *response.Response) responsetypes.Response {
+func (h *ResponseHandler) convertDomainResponseToAPIResponse(reqCtx *gin.Context, responseEntity *response.Response) responsetypes.Response {
 	apiResponse := responsetypes.Response{
 		ID:      responseEntity.PublicID,
 		Object:  "response",
@@ -695,8 +700,12 @@ func (h *ResponseHandler) convertDomainResponseToAPIResponse(responseEntity *res
 
 	// Set conversation info if available
 	if responseEntity.ConversationID != nil {
-		apiResponse.Conversation = &responsetypes.ConversationInfo{
-			ID: fmt.Sprintf("%d", *responseEntity.ConversationID),
+		// Get conversation to retrieve its public ID
+		conv, err := h.conversationService.GetConversationByID(reqCtx, *responseEntity.ConversationID)
+		if err == nil && conv != nil {
+			apiResponse.Conversation = &responsetypes.ConversationInfo{
+				ID: conv.PublicID,
+			}
 		}
 	}
 

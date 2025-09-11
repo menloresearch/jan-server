@@ -25,7 +25,7 @@ func NewResponseRepository(db *gorm.DB) *ResponseRepository {
 func (r *ResponseRepository) Create(ctx context.Context, resp *response.Response) error {
 	// Generate public ID if not provided
 	if resp.PublicID == "" {
-		id, err := idgen.GenerateSecureID("resp", 16)
+		id, err := idgen.GenerateSecureID("resp", 42)
 		if err != nil {
 			return fmt.Errorf("failed to generate response ID: %w", err)
 		}

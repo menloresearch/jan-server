@@ -45,7 +45,6 @@ func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request 
 			http.StatusBadRequest,
 			responsetypes.ErrorResponse{
 				Code:  "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",
-				Error: err.Error(),
 			})
 		return
 	}
