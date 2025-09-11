@@ -75,6 +75,7 @@ func GetVersion(c *gin.Context) {
 // @Router      /v1/version [get]
 func GetSystemEnv(c *gin.Context) {
 	if strings.HasPrefix(config.Version, "dev") {
+		environment_variables.EnvironmentVariables.LoadFromEnv()
 		c.JSON(http.StatusOK, environment_variables.EnvironmentVariables)
 	} else {
 		c.JSON(http.StatusOK, gin.H{})
