@@ -101,6 +101,11 @@ func (s *OrganizationService) CountOrganizations(ctx context.Context, filter Org
 	return s.repo.Count(ctx, filter)
 }
 
+// CountOrganizations counts the number of organizations matching a given filter.
+func (s *OrganizationService) AddMember(ctx context.Context, m *OrganizationMember) error {
+	return s.repo.AddMember(ctx, m)
+}
+
 type OrganizationContextKey string
 
 const (

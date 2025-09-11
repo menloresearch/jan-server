@@ -117,6 +117,13 @@ func (repo *OrganizationGormRepository) Count(ctx context.Context, filter domain
 	return sql.Count()
 }
 
+// AddMember implements organization.OrganizationRepository.
+func (repo *OrganizationGormRepository) AddMember(ctx context.Context, m *domain.OrganizationMember) error {
+	model := dbschema.NewSchemaOrganizationMember(m)
+	query := repo.db.GetQuery(ctx)
+	return query.OrganizationMember.WithContext(ctx).Create(model)
+}
+
 // NewOrganizationGormRepository creates a new repository instance.
 func NewOrganizationGormRepository(db *transaction.Database) domain.OrganizationRepository {
 	return &OrganizationGormRepository{

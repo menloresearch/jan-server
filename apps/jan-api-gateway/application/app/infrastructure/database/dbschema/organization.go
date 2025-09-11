@@ -25,6 +25,7 @@ type OrganizationMember struct {
 	UserID         uint   `gorm:"primaryKey"`
 	OrganizationID uint   `gorm:"primaryKey"`
 	Role           string `gorm:"type:varchar(20);not null"`
+	IsPrimary      bool   `gorm:"default:false"`
 }
 
 func NewSchemaOrganization(o *organization.Organization) *Organization {
@@ -36,6 +37,18 @@ func NewSchemaOrganization(o *organization.Organization) *Organization {
 		PublicID: o.PublicID,
 		OwnerID:  o.OwnerID,
 		Enabled:  o.Enabled,
+	}
+}
+
+func NewSchemaOrganizationMember(o *organization.OrganizationMember) *OrganizationMember {
+	return &OrganizationMember{
+		BaseModel: BaseModel{
+			ID: o.ID,
+		},
+		UserID:         o.UserID,
+		OrganizationID: o.OrganizationID,
+		Role:           o.Role,
+		IsPrimary:      o.IsPrimary,
 	}
 }
 
