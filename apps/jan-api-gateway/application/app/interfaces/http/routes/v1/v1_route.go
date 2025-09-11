@@ -2,6 +2,7 @@ package v1
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth"
@@ -10,6 +11,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
 	"menlo.ai/jan-api-gateway/config"
+	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
 type V1Route struct {
@@ -42,6 +44,7 @@ func NewV1Route(
 func (v1Route *V1Route) RegisterRouter(router gin.IRouter) {
 	v1Router := router.Group("/v1")
 	v1Router.GET("/version", GetVersion)
+	v1Router.GET("/envs", GetSystemEnv)
 	v1Route.chatRoute.RegisterRouter(v1Router)
 	v1Route.conversationAPI.RegisterRouter(v1Router)
 	v1Route.modelAPI.RegisterRouter(v1Router)
@@ -61,4 +64,19 @@ func GetVersion(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"version": config.Version,
 	})
+}
+
+// GetVersion godoc
+// @Summary     Get API build version
+// @Description Returns the current build version of the API server.
+// @Tags        Jan Server
+// @Produce     json
+// @Success     200 {object} map[string]string "version info"
+// @Router      /v1/version [get]
+func GetSystemEnv(c *gin.Context) {
+	if strings.HasPrefix(config.Version, "dev") {
+		c.JSON(http.StatusOK, environment_variables.EnvironmentVariables)
+	} else {
+		c.JSON(http.StatusOK, gin.H{})
+	}
 }
