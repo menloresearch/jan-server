@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
+	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/query"
@@ -57,7 +58,7 @@ func (api *ProjectApiKeyRoute) RegisterRouter(router gin.IRouter) {
 // @Router /v1/organization/projects/{project_public_id}/api_keys [get]
 func (api *ProjectApiKeyRoute) ListProjectApiKey(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
-	user, ok := user.GetUserFromContext(reqCtx)
+	user, ok := auth.GetUserFromContext(reqCtx)
 	if !ok {
 		return
 	}
@@ -151,7 +152,7 @@ func (api *ProjectApiKeyRoute) CreateProjectApiKey(reqCtx *gin.Context) {
 		return
 	}
 
-	user, ok := user.GetUserFromContext(reqCtx)
+	user, ok := auth.GetUserFromContext(reqCtx)
 	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code: "a3be84ac-132e-4af1-a4ca-9f70aa49fd70",

@@ -8,6 +8,7 @@ package main
 
 import (
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
+	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
@@ -23,7 +24,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth"
+	auth2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth/google"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
@@ -54,23 +55,24 @@ func CreateApplication() (*Application, error) {
 	apiKeyRepository := apikeyrepo.NewApiKeyGormRepository(transactionDatabase)
 	apiKeyService := apikey.NewService(apiKeyRepository)
 	userRepository := userrepo.NewUserGormRepository(transactionDatabase)
-	userService := user.NewService(userRepository, organizationService, apiKeyService)
+	userService := user.NewService(userRepository)
 	adminApiKeyAPI := organization2.NewAdminApiKeyAPI(organizationService, apiKeyService, userService)
 	projectApiKeyRoute := apikeys.NewProjectApiKeyRoute(organizationService, projectService, apiKeyService, userService)
 	projectsRoute := projects.NewProjectsRoute(projectService, apiKeyService, projectApiKeyRoute)
-	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI, projectsRoute, userService)
+	authService := auth.NewAuthService(userService, apiKeyService, organizationService)
+	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI, projectsRoute, authService)
 	completionAPI := chat.NewCompletionAPI(apiKeyService)
 	chatRoute := chat.NewChatRoute(completionAPI)
 	conversationRepository := conversationrepo.NewConversationGormRepository(transactionDatabase)
 	itemRepository := itemrepo.NewItemGormRepository(transactionDatabase)
 	conversationService := conversation.NewService(conversationRepository, itemRepository)
-	conversationAPI := conversations.NewConversationAPI(conversationService, userService)
+	conversationAPI := conversations.NewConversationAPI(conversationService, authService)
 	modelAPI := v1.NewModelAPI()
 	serperService := serpermcp.NewSerperService()
 	serperMCP := mcpimpl.NewSerperMCP(serperService)
 	mcpapi := mcp.NewMCPAPI(serperMCP)
 	googleAuthAPI := google.NewGoogleAuthAPI(userService)
-	authRoute := auth.NewAuthRoute(googleAuthAPI, userService)
+	authRoute := auth2.NewAuthRoute(googleAuthAPI, userService, authService)
 	v1Route := v1.NewV1Route(organizationRoute, chatRoute, conversationAPI, modelAPI, mcpapi, authRoute)
 	httpServer := http.NewHttpServer(v1Route)
 	application := &Application{
