@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
+	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/query"
 
@@ -19,13 +20,19 @@ import (
 
 type AdminApiKeyAPI struct {
 	organizationService *organization.OrganizationService
+	authService         *auth.AuthService
 	apiKeyService       *apikey.ApiKeyService
 	userService         *user.UserService
 }
 
-func NewAdminApiKeyAPI(organizationService *organization.OrganizationService, apiKeyService *apikey.ApiKeyService, userService *user.UserService) *AdminApiKeyAPI {
+func NewAdminApiKeyAPI(
+	organizationService *organization.OrganizationService,
+	authService *auth.AuthService,
+	apiKeyService *apikey.ApiKeyService,
+	userService *user.UserService) *AdminApiKeyAPI {
 	return &AdminApiKeyAPI{
 		organizationService,
+		authService,
 		apiKeyService,
 		userService,
 	}
@@ -36,8 +43,8 @@ func (adminApiKeyAPI *AdminApiKeyAPI) RegisterRouter(router *gin.RouterGroup) {
 	adminApiKeyRouter.GET("", adminApiKeyAPI.GetAdminApiKeys)
 	adminApiKeyRouter.POST("", adminApiKeyAPI.CreateAdminApiKey)
 
-	adminKeyPath := fmt.Sprintf("/:%s", apikey.ApikeyContextKeyPublicID)
-	adminApiKeyIdRoute := adminApiKeyRouter.Group(adminKeyPath, adminApiKeyAPI.apiKeyService.GetAdminApiKeyFromQuery())
+	adminKeyPath := fmt.Sprintf("/:%s", auth.ApikeyContextKeyPublicID)
+	adminApiKeyIdRoute := adminApiKeyRouter.Group(adminKeyPath, adminApiKeyAPI.authService.GetAdminApiKeyFromQuery())
 	adminApiKeyIdRoute.GET("", adminApiKeyAPI.GetAdminApiKey)
 	adminApiKeyIdRoute.DELETE("", adminApiKeyAPI.DeleteAdminApiKey)
 }
@@ -53,7 +60,7 @@ func (adminApiKeyAPI *AdminApiKeyAPI) RegisterRouter(router *gin.RouterGroup) {
 // @Failure 404 {object} responses.ErrorResponse "Not Found - API key with the given ID does not exist or does not belong to the organization"
 // @Router /v1/organization/admin_api_keys/{id} [get]
 func (api *AdminApiKeyAPI) GetAdminApiKey(reqCtx *gin.Context) {
-	entity, ok := apikey.GetAdminKeyFromContext(reqCtx)
+	entity, ok := auth.GetAdminKeyFromContext(reqCtx)
 	if !ok {
 		return
 	}
@@ -173,7 +180,7 @@ func (api *AdminApiKeyAPI) GetAdminApiKeys(reqCtx *gin.Context) {
 // @Failure 404 {object} responses.ErrorResponse "Not Found - API key with the given ID does not exist or does not belong to the organization"
 // @Router /v1/organization/admin_api_keys/{id} [delete]
 func (api *AdminApiKeyAPI) DeleteAdminApiKey(reqCtx *gin.Context) {
-	entity, ok := apikey.GetAdminKeyFromContext(reqCtx)
+	entity, ok := auth.GetAdminKeyFromContext(reqCtx)
 	if !ok {
 		return
 	}

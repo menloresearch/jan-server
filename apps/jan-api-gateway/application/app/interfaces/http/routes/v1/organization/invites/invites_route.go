@@ -206,7 +206,7 @@ func (api *InvitesRoute) CreateInvite(reqCtx *gin.Context) {
 		Projects:       string(projectsStr),
 	})
 
-	reqCtx.JSON(http.StatusOK, InviteResponse{})
+	reqCtx.JSON(http.StatusOK, inviteEntity)
 }
 func (api *InvitesRoute) RetrieveInvite(reqCtx *gin.Context) {
 
