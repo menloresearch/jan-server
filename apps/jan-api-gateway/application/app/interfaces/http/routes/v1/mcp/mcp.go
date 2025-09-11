@@ -3,9 +3,7 @@ package mcp
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	mcpserver "github.com/mark3labs/mcp-go/server"
@@ -14,16 +12,12 @@ import (
 
 func MCPMethodGuard(allowedMethods map[string]bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if c.Request.Header.Get("Mcp-Session-Id") == "" {
+			// TODO: server hack
+			c.Request.Header.Add("Mcp-Session-Id", "mcp-session-60cbe9c6-2b87-4a82-bbaa-5a8fad2bb462")
+		}
 		bodyBytes, err := io.ReadAll(c.Request.Body)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"jsonrpc": "2.0",
-				"error": map[string]interface{}{
-					"code":    -32600,
-					"message": "Invalid request body",
-				},
-				"id": nil,
-			})
 			c.Abort()
 			return
 		}
@@ -33,27 +27,11 @@ func MCPMethodGuard(allowedMethods map[string]bool) gin.HandlerFunc {
 		}
 
 		if err := json.Unmarshal(bodyBytes, &req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"jsonrpc": "2.0",
-				"error": map[string]interface{}{
-					"code":    -32600,
-					"message": "Invalid JSON-RPC request",
-				},
-				"id": nil,
-			})
 			c.Abort()
 			return
 		}
 
 		if !allowedMethods[req.Method] {
-			c.JSON(http.StatusOK, gin.H{
-				"jsonrpc": "2.0",
-				"error": map[string]interface{}{
-					"code":    -32601, // Method not found
-					"message": fmt.Sprintf("Method '%s' not found", req.Method),
-				},
-				"id": nil,
-			})
 			c.Abort()
 			return
 		}
@@ -69,6 +47,7 @@ type MCPAPI struct {
 func NewMCPAPI(serperMCP *mcpimpl.SerperMCP) *MCPAPI {
 	mcpSrv := mcpserver.NewMCPServer("demo", "0.1.0",
 		mcpserver.WithToolCapabilities(true),
+		mcpserver.WithRecovery(),
 	)
 	return &MCPAPI{
 		SerperMCP: serperMCP,
