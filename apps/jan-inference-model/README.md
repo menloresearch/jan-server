@@ -6,6 +6,8 @@ A high-performance inference service for Jan models using vLLM, providing OpenAI
 
 The fastest way to get started is using Docker, which provides a pre-configured environment with all dependencies.
 
+### Building Docker Images
+
 #### Prerequisites for Building
 
 - Docker installed and running
@@ -23,6 +25,8 @@ docker build -t jan-inference-model:latest .
 # Build with specific tag/version
 docker build -t jan-inference-model:v1.0.0 .
 
+```
+
 **Note**: The production build will download the Jan v1-4B model (~8GB) during the build process, which may take some time depending on your internet connection.
 
 #### Mock Image (Development/Testing)
@@ -32,9 +36,12 @@ Build the lightweight mock server for development:
 ```bash
 # Build the mock image
 docker build -f Dockerfile.mock -t jan-inference-model:mock .
+
 ```
 
-### Production Setup
+### Running Docker Containers
+
+#### Production Setup
 
 Run the Jan v1-4B model with vLLM:
 
@@ -46,7 +53,7 @@ docker run -d \
   jan-inference-model:latest
 ```
 
-### Development/Testing Setup
+#### Development/Testing Setup
 
 For development or testing without GPU requirements, use the mock server:
 
@@ -215,6 +222,7 @@ pip install -r requirements.txt
 uvicorn mockserver:app --host 0.0.0.0 --port 8101
 ```
 
+### Advanced Docker Build Options
 
 #### Build Optimization
 
