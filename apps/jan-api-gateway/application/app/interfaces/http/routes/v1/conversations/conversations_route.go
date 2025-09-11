@@ -5,9 +5,9 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/query"
-	"menlo.ai/jan-api-gateway/app/domain/user"
 
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses/openai"
@@ -18,24 +18,24 @@ import (
 // ConversationAPI handles route registration for V1 conversations
 type ConversationAPI struct {
 	conversationService *conversation.ConversationService
-	userService         *user.UserService
+	authService         *auth.AuthService
 }
 
 // NewConversationAPI creates a new conversation API instance
 func NewConversationAPI(
 	conversationService *conversation.ConversationService,
-	userService *user.UserService) *ConversationAPI {
+	authService *auth.AuthService) *ConversationAPI {
 	return &ConversationAPI{
 		conversationService,
-		userService,
+		authService,
 	}
 }
 
 // RegisterRouter registers OpenAI-compatible conversation routes
 func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 	conversationsRouter := router.Group("/conversations",
-		api.userService.AppUserAuthMiddleware(),
-		api.userService.RegisteredUserMiddleware(),
+		api.authService.AppUserAuthMiddleware(),
+		api.authService.RegisteredUserMiddleware(),
 	)
 
 	// OpenAI-compatible endpoints with Swagger documentation
@@ -87,7 +87,7 @@ func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 // @Router /v1/conversations [get]
 func (api *ConversationAPI) listConversations(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
-	user, _ := user.GetUserFromContext(reqCtx)
+	user, _ := auth.GetUserFromContext(reqCtx)
 	userID := user.ID
 	pagination, err := query.GetCursorPaginationFromQuery(reqCtx, func(lastID string) (*uint, error) {
 		convs, err := api.conversationService.FindConversationsByFilter(ctx, conversation.ConversationFilter{
@@ -185,7 +185,7 @@ type ConversationResponse struct {
 // @Router /v1/conversations [post]
 func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
-	user, _ := user.GetUserFromContext(reqCtx)
+	user, _ := auth.GetUserFromContext(reqCtx)
 	userId := user.ID
 
 	var request CreateConversationRequest

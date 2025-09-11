@@ -119,6 +119,38 @@ const docTemplate = `{
                 }
             }
         },
+        "/v1/auth/logout": {
+            "get": {
+                "description": "Use a valid refresh token to obtain a new access token. The refresh token is typically sent in a cookie.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Refresh an access token",
+                "responses": {
+                    "200": {
+                        "description": "Successfully logout"
+                    },
+                    "400": {
+                        "description": "Bad Request (e.g., invalid refresh token)",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized (e.g., expired or missing refresh token)",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/auth/me": {
             "get": {
                 "security": [
