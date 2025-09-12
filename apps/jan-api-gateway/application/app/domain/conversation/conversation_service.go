@@ -105,29 +105,6 @@ func (s *ConversationService) GetConversationByID(ctx context.Context, conversat
 	return conversation, nil
 }
 
-// GetConversationByIDAndUserID retrieves a conversation by its internal ID with user access control
-func (s *ConversationService) GetConversationByIDAndUserID(ctx context.Context, conversationID uint, userID uint) (*Conversation, error) {
-	// Validate inputs
-	if conversationID == 0 {
-		return nil, fmt.Errorf("conversation ID cannot be zero")
-	}
-
-	conversation, err := s.conversationRepo.FindByID(ctx, conversationID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find conversation: %w", err)
-	}
-	if conversation == nil {
-		return nil, fmt.Errorf("conversation not found")
-	}
-
-	// Check user access
-	if conversation.UserID != userID {
-		return nil, fmt.Errorf("conversation access denied")
-	}
-
-	return conversation, nil
-}
-
 // getConversationWithAccessCheck is the internal method that handles conversation retrieval with optional item loading
 func (s *ConversationService) getConversationWithAccessCheck(ctx context.Context, publicID string, userID uint, loadItems bool) (*Conversation, error) {
 	// Validate inputs

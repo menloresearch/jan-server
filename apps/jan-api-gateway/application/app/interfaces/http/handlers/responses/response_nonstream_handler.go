@@ -52,8 +52,8 @@ func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request 
 	// Process reasoning content
 	var processedResponse *openai.ChatCompletionResponse = response
 
-	// Append assistant's response to conversation
-	if len(processedResponse.Choices) > 0 && processedResponse.Choices[0].Message.Content != "" {
+	// Append assistant's response to conversation (only if conversation exists)
+	if conv != nil && len(processedResponse.Choices) > 0 && processedResponse.Choices[0].Message.Content != "" {
 		assistantMessage := openai.ChatCompletionMessage{
 			Role:    openai.ChatMessageRoleAssistant,
 			Content: processedResponse.Choices[0].Message.Content,

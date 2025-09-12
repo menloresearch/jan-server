@@ -122,10 +122,12 @@ func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 		return
 	}
 
-	// Append input messages to conversation
-	if err := h.appendMessagesToConversation(reqCtx, conversation, chatCompletionRequest.Messages); err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "b2c3d4e5-f6g7-8901-bcde-f23456789012", err.Error())
-		return
+	// Append input messages to conversation (only if conversation exists)
+	if conversation != nil {
+		if err := h.appendMessagesToConversation(reqCtx, conversation, chatCompletionRequest.Messages); err != nil {
+			h.sendErrorResponse(reqCtx, http.StatusBadRequest, "b2c3d4e5-f6g7-8901-bcde-f23456789012", err.Error())
+			return
+		}
 	}
 
 	// If previous_response_id is provided, prepend conversation history to input messages
@@ -160,7 +162,11 @@ func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 	}
 
 	// Create response record in database
-	responseEntity, err := h.responseService.CreateResponse(reqCtx, userEntity.ID, &conversation.ID, request.Model, request.Input, request.SystemPrompt, responseParams)
+	var conversationID *uint
+	if conversation != nil {
+		conversationID = &conversation.ID
+	}
+	responseEntity, err := h.responseService.CreateResponse(reqCtx, userEntity.ID, conversationID, request.Model, request.Input, request.SystemPrompt, responseParams)
 	if err != nil {
 		h.sendErrorResponse(reqCtx, http.StatusInternalServerError, "c7d8e9f0-a1b2-3456-cdef-012345678901", "failed to create response record: "+err.Error())
 		return
@@ -178,6 +184,11 @@ func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 
 // handleConversation handles conversation creation or loading based on the request
 func (h *ResponseHandler) handleConversation(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest) (*conversation.Conversation, error) {
+	// If store is explicitly set to false, don't create or use any conversation
+	if request.Store != nil && !*request.Store {
+		return nil, nil
+	}
+
 	// Get user from middleware context
 	userEntity, ok := h.UserService.GetUserFromContext(reqCtx)
 	if !ok {

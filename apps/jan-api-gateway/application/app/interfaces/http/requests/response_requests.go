@@ -71,6 +71,9 @@ type CreateResponseRequest struct {
 
 	// The ID of the previous response to continue from. If set, the conversation will be loaded from the previous response.
 	PreviousResponseID *string `json:"previous_response_id,omitempty"`
+
+	// Whether to store the conversation. If false, no conversation will be created or used.
+	Store *bool `json:"store,omitempty"`
 }
 
 // CreateResponseInput represents the input to the model
