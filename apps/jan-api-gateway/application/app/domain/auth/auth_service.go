@@ -136,7 +136,31 @@ func (s *AuthService) RegisteredUserMiddleware() gin.HandlerFunc {
 			})
 			return
 		}
-		reqCtx.Set(string(UserContextKeyEntity), user)
+		SetUserToContext(reqCtx, user)
+		reqCtx.Next()
+	}
+}
+
+func (s *AuthService) RegisteredOrganizationMiddleware() gin.HandlerFunc {
+	return func(reqCtx *gin.Context) {
+		ctx := reqCtx.Request.Context()
+		user, ok := GetUserFromContext(reqCtx)
+		if !ok {
+			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+				Code: "33349e8b-bcb5-4589-9032-b3d0b6c08ae1",
+			})
+			return
+		}
+		org, err := s.organizationService.FindOneByFilter(ctx, organization.OrganizationFilter{
+			OwnerID: &user.ID,
+		})
+		if err != nil {
+			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+				Code: "cf6ad4c4-efa1-4d9c-97af-8c111cd771fd",
+			})
+			return
+		}
+		SetAdminOrganizationFromContext(reqCtx, org)
 		reqCtx.Next()
 	}
 }
@@ -301,6 +325,25 @@ func SetAdminKeyFromContext(reqCtx *gin.Context, apiKey *apikey.ApiKey) {
 	reqCtx.Set(string(ApikeyContextKeyEntity), apiKey)
 }
 
-func AdminOrganizationMiddleware() gin.HandlerFunc {
-	
+type OrganizationContextKey string
+
+const (
+	OrganizationContextKeyEntity   ApikeyContextKey = "OrganizationContextKeyEntity"
+	OrganizationContextKeyPublicID ApikeyContextKey = "org_public_id"
+)
+
+func GetAdminOrganizationFromContext(reqCtx *gin.Context) (*organization.Organization, bool) {
+	org, ok := reqCtx.Get(string(OrganizationContextKeyEntity))
+	if !ok {
+		return nil, false
+	}
+	v, ok := org.(*organization.Organization)
+	if !ok {
+		return nil, false
+	}
+	return v, true
+}
+
+func SetAdminOrganizationFromContext(reqCtx *gin.Context, org *organization.Organization) {
+	reqCtx.Set(string(OrganizationContextKeyEntity), org)
 }

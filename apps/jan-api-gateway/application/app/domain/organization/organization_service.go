@@ -96,6 +96,17 @@ func (s *OrganizationService) FindOrganizations(ctx context.Context, filter Orga
 	return s.repo.FindByFilter(ctx, filter, pagination)
 }
 
+func (s *OrganizationService) FindOneByFilter(ctx context.Context, filter OrganizationFilter) (*Organization, error) {
+	orgEntities, err := s.repo.FindByFilter(ctx, filter, nil)
+	if err != nil {
+		return nil, err
+	}
+	if len(orgEntities) != 1 {
+		return nil, fmt.Errorf("no records found")
+	}
+	return orgEntities[0], nil
+}
+
 // CountOrganizations counts the number of organizations matching a given filter.
 func (s *OrganizationService) CountOrganizations(ctx context.Context, filter OrganizationFilter) (int64, error) {
 	return s.repo.Count(ctx, filter)

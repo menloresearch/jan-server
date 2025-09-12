@@ -40,7 +40,7 @@ func NewAdminApiKeyAPI(
 
 func (adminApiKeyAPI *AdminApiKeyAPI) RegisterRouter(router *gin.RouterGroup) {
 	adminApiKeyRouter := router.Group("/admin_api_keys")
-	adminApiKeyRouter.GET("", adminApiKeyAPI.GetAdminApiKeys)
+	adminApiKeyRouter.GET("", adminApiKeyAPI.GetAdminApiKeys, adminApiKeyAPI.authService.RegisteredOrganizationMiddleware())
 	adminApiKeyRouter.POST("", adminApiKeyAPI.CreateAdminApiKey)
 
 	adminKeyPath := fmt.Sprintf("/:%s", auth.ApikeyContextKeyPublicID)
