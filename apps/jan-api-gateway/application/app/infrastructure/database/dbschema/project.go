@@ -15,7 +15,7 @@ func init() {
 type Project struct {
 	BaseModel
 	Name           string          `gorm:"size:128;not null;uniqueIndex"`
-	PublicID       string          `gorm:"size:64;not null;uniqueIndex"`
+	PublicID       string          `gorm:"type:varchar(50);uniqueIndex;not null"`
 	Status         string          `gorm:"type:varchar(20);not null;default:'active';index"`
 	OrganizationID uint            `gorm:"not null;index"`
 	ArchivedAt     *time.Time      `gorm:"column:archived_at;index"`

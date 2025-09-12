@@ -10,7 +10,6 @@ import (
 	"github.com/mileusna/crontab"
 	"menlo.ai/jan-api-gateway/app/domain/healthcheck"
 	apphttp "menlo.ai/jan-api-gateway/app/interfaces/http"
-	_ "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/conversation" // Import handler for Swagger types
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
 	"menlo.ai/jan-api-gateway/app/utils/httpclients/serper"
 	"menlo.ai/jan-api-gateway/app/utils/logger"

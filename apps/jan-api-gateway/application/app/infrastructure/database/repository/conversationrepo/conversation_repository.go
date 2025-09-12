@@ -5,8 +5,11 @@ import (
 	"strings"
 
 	domain "menlo.ai/jan-api-gateway/app/domain/conversation"
+	"menlo.ai/jan-api-gateway/app/domain/query"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/dbschema"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/gormgen"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
+	"menlo.ai/jan-api-gateway/app/utils/functional"
 )
 
 type ConversationGormRepository struct {
@@ -123,8 +126,54 @@ func (r *ConversationGormRepository) BulkAddItems(ctx context.Context, conversat
 	return nil
 }
 
-// CountItemsByConversation counts the number of items in a conversation
-func (r *ConversationGormRepository) CountItemsByConversation(ctx context.Context, conversationID uint) (int64, error) {
-	query := r.db.GetQuery(ctx)
-	return query.Item.WithContext(ctx).Where(query.Item.ConversationID.Eq(conversationID)).Count()
+func (repo *ConversationGormRepository) FindByFilter(ctx context.Context, filter domain.ConversationFilter, p *query.Pagination) ([]*domain.Conversation, error) {
+	query := repo.db.GetQuery(ctx)
+	sql := query.Conversation.WithContext(ctx)
+	sql = repo.applyFilter(query, sql, filter)
+	if p != nil {
+		if p.Limit != nil && *p.Limit > 0 {
+			sql = sql.Limit(*p.Limit)
+		}
+		if p.After != nil {
+			if p.Order == "desc" {
+				sql = sql.Where(query.Conversation.ID.Lt(*p.After))
+			} else {
+				sql = sql.Where(query.Conversation.ID.Gt(*p.After))
+			}
+		}
+		if p.Order == "desc" {
+			sql = sql.Order(query.Conversation.ID.Desc())
+		} else {
+			sql = sql.Order(query.Conversation.ID.Asc())
+		}
+	}
+	rows, err := sql.Find()
+	if err != nil {
+		return nil, err
+	}
+	result := functional.Map(rows, func(item *dbschema.Conversation) *domain.Conversation {
+		return item.EtoD()
+	})
+	return result, nil
+}
+
+func (repo *ConversationGormRepository) applyFilter(
+	query *gormgen.Query,
+	sql gormgen.IConversationDo,
+	filter domain.ConversationFilter,
+) gormgen.IConversationDo {
+	if filter.PublicID != nil {
+		sql = sql.Where(query.Conversation.PublicID.Eq(*filter.PublicID))
+	}
+	if filter.UserID != nil {
+		sql = sql.Where(query.Conversation.UserID.Eq(*filter.UserID))
+	}
+	return sql
+}
+
+func (repo *ConversationGormRepository) Count(ctx context.Context, filter domain.ConversationFilter) (int64, error) {
+	query := repo.db.GetQuery(ctx)
+	q := query.Conversation.WithContext(ctx)
+	q = repo.applyFilter(query, q, filter)
+	return q.Count()
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"menlo.ai/jan-api-gateway/app/interfaces/http/middleware"
-	jan "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan"
 	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	"menlo.ai/jan-api-gateway/app/utils/logger"
 
@@ -18,9 +17,8 @@ import (
 )
 
 type HttpServer struct {
-	engine   *gin.Engine
-	v1Route  *v1.V1Route
-	janRoute *jan.JanRoute
+	engine  *gin.Engine
+	v1Route *v1.V1Route
 }
 
 func (s *HttpServer) bindSwagger() {
@@ -30,7 +28,7 @@ func (s *HttpServer) bindSwagger() {
 		code := c.Query("code")
 		state := c.Query("state")
 		curlCommand := fmt.Sprintf(`curl --request POST \
-  --url 'http://localhost:8080/jan/v1/auth/google/callback' \
+  --url 'http://localhost:8080/v1/auth/google/callback' \
   --header 'Content-Type: application/json' \
   --cookie 'jan_oauth_state=%s' \
   --data '{"code": "%s", "state": "%s"}'`, state, code, state)
@@ -38,14 +36,13 @@ func (s *HttpServer) bindSwagger() {
 	})
 }
 
-func NewHttpServer(v1Route *v1.V1Route, janRoute *jan.JanRoute) *HttpServer {
+func NewHttpServer(v1Route *v1.V1Route) *HttpServer {
 	if os.Getenv("local_dev") == "" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	server := HttpServer{
 		gin.New(),
 		v1Route,
-		janRoute,
 	}
 	// TODO: we should enable cors later
 	server.engine.Use(middleware.CORS())
@@ -61,7 +58,6 @@ func (httpServer *HttpServer) Run() error {
 	port := 8080
 	root := httpServer.engine.Group("/")
 	httpServer.v1Route.RegisterRouter(root)
-	httpServer.janRoute.RegisterRouter(root)
 	if err := httpServer.engine.Run(fmt.Sprintf(":%d", port)); err != nil {
 		return err
 	}

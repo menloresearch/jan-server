@@ -24,3 +24,17 @@ type OwnerRole string
 const (
 	OwnerRoleOwner OwnerObject = "owner"
 )
+
+// @Enum(list)
+type ObjectTypeList string
+
+const ObjectTypeListList ObjectTypeList = "list"
+
+type ListResponse[T any] struct {
+	Object  ObjectTypeList `json:"object"`
+	Data    []T            `json:"data"`
+	FirstID *string        `json:"first_id"`
+	LastID  *string        `json:"last_id"`
+	HasMore bool           `json:"has_more"`
+	Total   int64          `json:"total"`
+}

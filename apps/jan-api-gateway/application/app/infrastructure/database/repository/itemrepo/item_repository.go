@@ -5,8 +5,11 @@ import (
 	"strings"
 
 	domain "menlo.ai/jan-api-gateway/app/domain/conversation"
+	"menlo.ai/jan-api-gateway/app/domain/query"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/dbschema"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/gormgen"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
+	"menlo.ai/jan-api-gateway/app/utils/functional"
 )
 
 type ItemGormRepository struct {
@@ -96,12 +99,6 @@ func (r *ItemGormRepository) Delete(ctx context.Context, id uint) error {
 	return err
 }
 
-func (r *ItemGormRepository) DeleteByPublicID(ctx context.Context, publicID string) error {
-	// Temporary implementation using raw GORM until generated code is updated
-	err := r.db.GetTx(ctx).WithContext(ctx).Where("public_id = ?", publicID).Delete(&dbschema.Item{}).Error
-	return err
-}
-
 // BulkCreate creates multiple items in a single batch operation
 func (r *ItemGormRepository) BulkCreate(ctx context.Context, items []*domain.Item) error {
 	if len(items) == 0 {
@@ -141,4 +138,58 @@ func (r *ItemGormRepository) ExistsByIDAndConversation(ctx context.Context, item
 		Count()
 
 	return count > 0, err
+}
+
+// Count implements conversation.ItemRepository.
+func (repo *ItemGormRepository) Count(ctx context.Context, filter domain.ItemFilter) (int64, error) {
+	query := repo.db.GetQuery(ctx)
+	q := query.Item.WithContext(ctx)
+	q = repo.applyFilter(query, q, filter)
+	return q.Count()
+}
+
+// FindByFilter implements conversation.ItemRepository.
+func (repo *ItemGormRepository) FindByFilter(ctx context.Context, filter domain.ItemFilter, p *query.Pagination) ([]*domain.Item, error) {
+	query := repo.db.GetQuery(ctx)
+	sql := query.Item.WithContext(ctx)
+	sql = repo.applyFilter(query, sql, filter)
+	if p != nil {
+		if p.Limit != nil && *p.Limit > 0 {
+			sql = sql.Limit(*p.Limit)
+		}
+		if p.After != nil {
+			if p.Order == "desc" {
+				sql = sql.Where(query.Item.ID.Lt(*p.After))
+			} else {
+				sql = sql.Where(query.Item.ID.Gt(*p.After))
+			}
+		}
+		if p.Order == "desc" {
+			sql = sql.Order(query.Item.ID.Desc())
+		} else {
+			sql = sql.Order(query.Item.ID.Asc())
+		}
+	}
+	rows, err := sql.Find()
+	if err != nil {
+		return nil, err
+	}
+	result := functional.Map(rows, func(item *dbschema.Item) *domain.Item {
+		return item.EtoD()
+	})
+	return result, nil
+}
+
+func (repo *ItemGormRepository) applyFilter(
+	query *gormgen.Query,
+	sql gormgen.IItemDo,
+	filter domain.ItemFilter,
+) gormgen.IItemDo {
+	if filter.PublicID != nil {
+		sql = sql.Where(query.Item.PublicID.Eq(*filter.PublicID))
+	}
+	if filter.ConversationID != nil {
+		sql = sql.Where(query.Item.ConversationID.Eq(*filter.ConversationID))
+	}
+	return sql
 }

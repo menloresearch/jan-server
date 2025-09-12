@@ -39,7 +39,7 @@ type ChatCompletionResponseSwagger struct {
 // CreateChatCompletion
 // @Summary Create a chat completion
 // @Description Generates a model response for the given chat conversation.
-// @Tags Platform, Platform-Chat
+// @Tags Chat
 // @Security BearerAuth
 // @Accept json
 // @Produce json

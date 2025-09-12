@@ -42,9 +42,8 @@ func (adminApiKeyAPI *AdminApiKeyAPI) RegisterRouter(router *gin.RouterGroup) {
 // GetAdminApiKey godoc
 // @Summary Get Admin API Key
 // @Description Retrieves a specific admin API key by its ID.
-// @Tags Platform, Platform-Organizations
+// @Tags Organizations
 // @Security BearerAuth
-// @Param Authorization header string true "Bearer token" default("Bearer <admin_api_key>")
 // @Param id path string true "ID of the admin API key"
 // @Success 200 {object} OrganizationAdminAPIKeyResponse "Successfully retrieved the admin API key"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - invalid or missing API key"
@@ -86,9 +85,8 @@ func (api *AdminApiKeyAPI) GetAdminApiKey(reqCtx *gin.Context) {
 // GetAdminApiKeys godoc
 // @Summary List Admin API Keys
 // @Description Retrieves a paginated list of all admin API keys for the authenticated organization.
-// @Tags Platform, Platform-Organizations
+// @Tags Organizations
 // @Security BearerAuth
-// @Param Authorization header string true "Bearer token" default("Bearer <admin_api_key>")
 // @Param limit query int false "The maximum number of items to return" default(20)
 // @Param after query string false "A cursor for use in pagination. The ID of the last object from the previous page"
 // @Success 200 {object} AdminApiKeyListResponse "Successfully retrieved the list of admin API keys"
@@ -189,9 +187,8 @@ func (api *AdminApiKeyAPI) GetAdminApiKeys(reqCtx *gin.Context) {
 // DeleteAdminApiKey godoc
 // @Summary Delete Admin API Key
 // @Description Deletes an admin API key by its ID.
-// @Tags Platform, Platform-Organizations
+// @Tags Organizations
 // @Security BearerAuth
-// @Param Authorization header string true "Bearer token" default("Bearer <admin_api_key>")
 // @Param id path string true "ID of the admin API key to delete"
 // @Success 200 {object} AdminAPIKeyDeletedResponse "Successfully deleted the admin API key"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - invalid or missing API key"
@@ -257,11 +254,10 @@ func (api *AdminApiKeyAPI) DeleteAdminApiKey(reqCtx *gin.Context) {
 // CreateAdminApiKey creates a new admin API key for an organization.
 // @Summary Create Admin API Key
 // @Description Creates a new admin API key for an organization. Requires a valid admin API key in the Authorization header.
-// @Tags Platform, Platform-Organizations
+// @Tags Organizations
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param Authorization header string true "Bearer token" default("Bearer <admin_api_key>")
 // @Param body body CreateOrganizationAdminAPIKeyRequest true "API key creation request"
 // @Success 200 {object} OrganizationAdminAPIKeyResponse "Successfully created admin API key"
 // @Failure 400 {object} responses.ErrorResponse "Bad request - invalid payload"
@@ -286,7 +282,7 @@ func (api *AdminApiKeyAPI) CreateAdminApiKey(reqCtx *gin.Context) {
 		return
 	}
 
-	userEntity, err := userService.FindByID(ctx, *adminKeyEntity.OwnerID)
+	userEntity, err := userService.FindByPublicID(ctx, adminKeyEntity.OwnerPublicID)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 			Code:  "f773c7a0-618a-42e1-ab14-3792e6311fe7",
@@ -309,7 +305,7 @@ func (api *AdminApiKeyAPI) CreateAdminApiKey(reqCtx *gin.Context) {
 		Description:    requestPayload.Name,
 		Enabled:        true,
 		ApikeyType:     string(apikey.ApikeyTypeAdmin),
-		OwnerID:        adminKeyEntity.OwnerID,
+		OwnerPublicID:  adminKeyEntity.OwnerPublicID,
 		OrganizationID: adminKeyEntity.OrganizationID,
 		Permissions:    "{}",
 	})

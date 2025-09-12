@@ -38,7 +38,7 @@ func newApiKey(db *gorm.DB, opts ...gen.DOOption) apiKey {
 	_apiKey.Description = field.NewString(tableName, "description")
 	_apiKey.Enabled = field.NewBool(tableName, "enabled")
 	_apiKey.ApikeyType = field.NewString(tableName, "apikey_type")
-	_apiKey.OwnerID = field.NewUint(tableName, "owner_id")
+	_apiKey.OwnerPublicID = field.NewString(tableName, "owner_public_id")
 	_apiKey.OrganizationID = field.NewUint(tableName, "organization_id")
 	_apiKey.ProjectID = field.NewUint(tableName, "project_id")
 	_apiKey.Permissions = field.NewString(tableName, "permissions")
@@ -64,7 +64,7 @@ type apiKey struct {
 	Description    field.String
 	Enabled        field.Bool
 	ApikeyType     field.String
-	OwnerID        field.Uint
+	OwnerPublicID  field.String
 	OrganizationID field.Uint
 	ProjectID      field.Uint
 	Permissions    field.String
@@ -96,7 +96,7 @@ func (a *apiKey) updateTableName(table string) *apiKey {
 	a.Description = field.NewString(table, "description")
 	a.Enabled = field.NewBool(table, "enabled")
 	a.ApikeyType = field.NewString(table, "apikey_type")
-	a.OwnerID = field.NewUint(table, "owner_id")
+	a.OwnerPublicID = field.NewString(table, "owner_public_id")
 	a.OrganizationID = field.NewUint(table, "organization_id")
 	a.ProjectID = field.NewUint(table, "project_id")
 	a.Permissions = field.NewString(table, "permissions")
@@ -129,7 +129,7 @@ func (a *apiKey) fillFieldMap() {
 	a.fieldMap["description"] = a.Description
 	a.fieldMap["enabled"] = a.Enabled
 	a.fieldMap["apikey_type"] = a.ApikeyType
-	a.fieldMap["owner_id"] = a.OwnerID
+	a.fieldMap["owner_public_id"] = a.OwnerPublicID
 	a.fieldMap["organization_id"] = a.OrganizationID
 	a.fieldMap["project_id"] = a.ProjectID
 	a.fieldMap["permissions"] = a.Permissions
