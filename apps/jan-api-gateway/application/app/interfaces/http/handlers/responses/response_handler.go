@@ -152,8 +152,6 @@ func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 		FrequencyPenalty:  request.FrequencyPenalty,
 		LogitBias:         request.LogitBias,
 		ResponseFormat:    request.ResponseFormat,
-		Tools:             request.Tools,
-		ToolChoice:        request.ToolChoice,
 		Metadata:          request.Metadata,
 		Stream:            request.Stream,
 		Background:        request.Background,

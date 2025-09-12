@@ -44,16 +44,19 @@ func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request 
 		reqCtx.AbortWithStatusJSON(
 			http.StatusBadRequest,
 			responsetypes.ErrorResponse{
-				Code:  "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",
+				Code: "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",
 			})
 		return
 	}
 
+	// Process reasoning content
+	var processedResponse *openai.ChatCompletionResponse = response
+
 	// Append assistant's response to conversation
-	if len(response.Choices) > 0 && response.Choices[0].Message.Content != "" {
+	if len(processedResponse.Choices) > 0 && processedResponse.Choices[0].Message.Content != "" {
 		assistantMessage := openai.ChatCompletionMessage{
 			Role:    openai.ChatMessageRoleAssistant,
-			Content: response.Choices[0].Message.Content,
+			Content: processedResponse.Choices[0].Message.Content,
 		}
 		if err := h.appendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}); err != nil {
 			// Log error but don't fail the response
@@ -62,17 +65,25 @@ func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request 
 	}
 
 	// Convert chat completion response to response format
-	responseData := h.convertFromChatCompletionResponse(response, request, conv)
+	responseData := h.convertFromChatCompletionResponse(processedResponse, request, conv)
 	reqCtx.JSON(http.StatusOK, responseData.T)
 }
 
 // convertFromChatCompletionResponse converts a ChatCompletionResponse to a Response
 func (h *NonStreamHandler) convertFromChatCompletionResponse(chatResp *openai.ChatCompletionResponse, req *requesttypes.CreateResponseRequest, conv *conversation.Conversation) responsetypes.OpenAIGeneralResponse[responsetypes.Response] {
 
-	// Extract the content from the first choice
+	// Extract the content and reasoning from the first choice
 	var outputText string
+	var reasoningContent string
+
 	if len(chatResp.Choices) > 0 {
-		outputText = chatResp.Choices[0].Message.Content
+		choice := chatResp.Choices[0]
+		outputText = choice.Message.Content
+
+		// Extract reasoning content if present
+		if choice.Message.ReasoningContent != "" {
+			reasoningContent = choice.Message.ReasoningContent
+		}
 	}
 
 	// Convert input back to the original format for response
@@ -87,14 +98,29 @@ func (h *NonStreamHandler) convertFromChatCompletionResponse(chatResp *openai.Ch
 	}
 
 	// Create output using proper ResponseOutput structure
-	output := []responsetypes.ResponseOutput{
-		{
+	var output []responsetypes.ResponseOutput
+
+	// Add reasoning content if present
+	if reasoningContent != "" {
+		output = append(output, responsetypes.ResponseOutput{
+			Type: responsetypes.OutputTypeReasoning,
+			Reasoning: &responsetypes.ReasoningOutput{
+				Task:   "reasoning",
+				Result: reasoningContent,
+				Steps:  []responsetypes.ReasoningStep{},
+			},
+		})
+	}
+
+	// Add text content if present
+	if outputText != "" {
+		output = append(output, responsetypes.ResponseOutput{
 			Type: responsetypes.OutputTypeText,
 			Text: &responsetypes.TextOutput{
 				Value:       outputText,
 				Annotations: []responsetypes.Annotation{},
 			},
-		},
+		})
 	}
 
 	// Create usage information using proper DetailedUsage struct
@@ -136,8 +162,13 @@ func (h *NonStreamHandler) convertFromChatCompletionResponse(chatResp *openai.Ch
 		ParallelToolCalls:  false,
 		PreviousResponseID: nil,
 		Reasoning: &responsetypes.Reasoning{
-			Effort:  nil,
-			Summary: nil,
+			Effort: nil,
+			Summary: func() *string {
+				if reasoningContent != "" {
+					return &reasoningContent
+				}
+				return nil
+			}(),
 		},
 		Store:       true,
 		Temperature: req.Temperature,
@@ -146,10 +177,6 @@ func (h *NonStreamHandler) convertFromChatCompletionResponse(chatResp *openai.Ch
 				Type: "text",
 			},
 		},
-		ToolChoice: &requesttypes.ToolChoice{
-			Type: "auto",
-		},
-		Tools:      []requesttypes.Tool{},
 		TopP:       req.TopP,
 		Truncation: "disabled",
 		User:       nil,

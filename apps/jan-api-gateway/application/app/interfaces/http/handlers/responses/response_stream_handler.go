@@ -21,27 +21,6 @@ import (
 	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
-// FunctionCallAccumulator handles streaming function call accumulation
-type FunctionCallAccumulator struct {
-	Name      string
-	Arguments string
-	Complete  bool
-}
-
-func (fca *FunctionCallAccumulator) AddChunk(functionCall *openai.FunctionCall) {
-	if functionCall.Name != "" {
-		fca.Name = functionCall.Name
-	}
-	if functionCall.Arguments != "" {
-		fca.Arguments += functionCall.Arguments
-	}
-
-	// More robust completion check
-	fca.Complete = fca.Name != "" && fca.Arguments != "" &&
-		(strings.HasSuffix(fca.Arguments, "}") ||
-			strings.Count(fca.Arguments, "{") == strings.Count(fca.Arguments, "}"))
-}
-
 // StreamHandler handles streaming response requests
 type StreamHandler struct {
 	*ResponseHandler
@@ -117,24 +96,6 @@ func (h *StreamHandler) createTextDeltaEvent(itemID string, sequenceNumber int, 
 		ContentIndex: 0,
 		Delta:        delta,
 		Logprobs:     []responsetypes.Logprob{},
-	}
-}
-
-// createFunctionCallEvent creates a function call delta event
-func (h *StreamHandler) createFunctionCallEvent(itemID string, sequenceNumber int, name string, arguments map[string]any) responsetypes.ResponseOutputFunctionCallsDeltaEvent {
-	return responsetypes.ResponseOutputFunctionCallsDeltaEvent{
-		BaseStreamingEvent: responsetypes.BaseStreamingEvent{
-			Type:           "response.output_function_calls.delta",
-			SequenceNumber: sequenceNumber,
-		},
-		ItemID:       itemID,
-		OutputIndex:  0,
-		ContentIndex: 0,
-		Delta: responsetypes.FunctionCallDelta{
-			Name:      name,
-			Arguments: arguments,
-		},
-		Logprobs: []responsetypes.Logprob{},
 	}
 }
 
@@ -326,32 +287,22 @@ func (h *StreamHandler) processStreamingResponse(reqCtx *gin.Context, _ *janinfe
 type OpenAIStreamData struct {
 	Choices []struct {
 		Delta struct {
-			Content          string               `json:"content"`
-			ReasoningContent string               `json:"reasoning_content"`
-			FunctionCall     *openai.FunctionCall `json:"function_call,omitempty"`
-			ToolCalls        []struct {
-				ID       string `json:"id"`
-				Type     string `json:"type"`
-				Index    int    `json:"index"`
-				Function struct {
-					Name      string `json:"name"`
-					Arguments string `json:"arguments"`
-				} `json:"function"`
-			} `json:"tool_calls,omitempty"`
+			Content          string `json:"content"`
+			ReasoningContent string `json:"reasoning_content"`
 		} `json:"delta"`
 	} `json:"choices"`
 }
 
-// parseOpenAIStreamData parses OpenAI streaming data and extracts content and function call
-func (h *StreamHandler) parseOpenAIStreamData(jsonStr string) (string, *openai.FunctionCall) {
+// parseOpenAIStreamData parses OpenAI streaming data and extracts content
+func (h *StreamHandler) parseOpenAIStreamData(jsonStr string) string {
 	var data OpenAIStreamData
 	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
-		return "", nil
+		return ""
 	}
 
 	// Check if choices array is empty to prevent panic
 	if len(data.Choices) == 0 {
-		return "", nil
+		return ""
 	}
 
 	// Use reasoning_content if content is empty (jan-v1-4b model format)
@@ -360,41 +311,61 @@ func (h *StreamHandler) parseOpenAIStreamData(jsonStr string) (string, *openai.F
 		content = data.Choices[0].Delta.ReasoningContent
 	}
 
-	functionCall := data.Choices[0].Delta.FunctionCall
-
-	// Handle tool_calls format
-	if functionCall == nil && len(data.Choices[0].Delta.ToolCalls) > 0 {
-		toolCall := data.Choices[0].Delta.ToolCalls[0]
-		functionCall = &openai.FunctionCall{
-			Name:      toolCall.Function.Name,
-			Arguments: toolCall.Function.Arguments,
-		}
-	}
-
-	return content, functionCall
+	return content
 }
 
 // extractContentFromOpenAIStream extracts content from OpenAI streaming format
-func (h *StreamHandler) extractContentFromOpenAIStream(chunk string) (string, *openai.FunctionCall) {
+func (h *StreamHandler) extractContentFromOpenAIStream(chunk string) string {
 	// Format 1: data: {"choices":[{"delta":{"content":"chunk"}}]}
 	if len(chunk) >= 6 && chunk[:6] == DataPrefix {
 		return h.parseOpenAIStreamData(chunk[6:])
 	}
 
 	// Format 2: Direct JSON without "data: " prefix
-	if content, functionCall := h.parseOpenAIStreamData(chunk); content != "" || functionCall != nil {
-		return content, functionCall
+	if content := h.parseOpenAIStreamData(chunk); content != "" {
+		return content
 	}
 
 	// Format 3: Simple content string (fallback)
 	if len(chunk) > 0 && chunk[0] == '"' && chunk[len(chunk)-1] == '"' {
 		var content string
 		if err := json.Unmarshal([]byte(chunk), &content); err == nil {
-			return content, nil
+			return content
 		}
 	}
 
-	return "", nil
+	return ""
+}
+
+// extractReasoningContentFromOpenAIStream extracts reasoning content from OpenAI streaming format
+func (h *StreamHandler) extractReasoningContentFromOpenAIStream(chunk string) string {
+	// Format 1: data: {"choices":[{"delta":{"reasoning_content":"chunk"}}]}
+	if len(chunk) >= 6 && chunk[:6] == DataPrefix {
+		return h.parseOpenAIStreamReasoningData(chunk[6:])
+	}
+
+	// Format 2: Direct JSON without "data: " prefix
+	if reasoningContent := h.parseOpenAIStreamReasoningData(chunk); reasoningContent != "" {
+		return reasoningContent
+	}
+
+	return ""
+}
+
+// parseOpenAIStreamReasoningData parses OpenAI streaming data and extracts reasoning content
+func (h *StreamHandler) parseOpenAIStreamReasoningData(jsonStr string) string {
+	var data OpenAIStreamData
+	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
+		return ""
+	}
+
+	// Check if choices array is empty to prevent panic
+	if len(data.Choices) == 0 {
+		return ""
+	}
+
+	// Extract reasoning content
+	return data.Choices[0].Delta.ReasoningContent
 }
 
 // streamResponseToChannel handles the streaming response and sends data/errors to channels
@@ -473,12 +444,17 @@ func (h *StreamHandler) streamResponseToChannel(reqCtx *gin.Context, request ope
 	}
 	defer resp.RawResponse.Body.Close()
 
-	// Use FunctionCallAccumulator for better function call handling
-	accumulator := &FunctionCallAccumulator{}
-
 	// Buffer for accumulating content chunks
 	var contentBuffer strings.Builder
 	var fullResponse strings.Builder
+
+	// Buffer for accumulating reasoning content chunks
+	var reasoningBuffer strings.Builder
+	var fullReasoningResponse strings.Builder
+	var reasoningItemID string
+	var reasoningSequenceNumber int
+	var hasReasoningContent bool
+	var reasoningComplete bool
 
 	// Process the stream line by line
 	scanner := bufio.NewScanner(resp.RawResponse.Body)
@@ -495,46 +471,101 @@ func (h *StreamHandler) streamResponseToChannel(reqCtx *gin.Context, request ope
 				break
 			}
 
-			// Extract content and function call from OpenAI streaming format
-			content, functionCall := h.extractContentFromOpenAIStream(data)
+			// Extract content from OpenAI streaming format
+			content := h.extractContentFromOpenAIStream(data)
 
-			// Handle content
+			// Handle content - buffer until reasoning is complete
 			if content != "" {
 				contentBuffer.WriteString(content)
 				fullResponse.WriteString(content)
 
-				// Check if we have enough words to send
-				bufferedContent := contentBuffer.String()
-				words := strings.Fields(bufferedContent)
+				// Only send content if reasoning is complete or there's no reasoning content
+				if reasoningComplete || !hasReasoningContent {
+					// Check if we have enough words to send
+					bufferedContent := contentBuffer.String()
+					words := strings.Fields(bufferedContent)
 
-				if len(words) >= MinWordsPerChunk {
-					// Create delta event using helper method
-					deltaEvent := h.createTextDeltaEvent(itemID, sequenceNumber, bufferedContent)
-					h.marshalAndSendEvent(dataChan, "response.output_text.delta", deltaEvent)
-					sequenceNumber++
-					// Clear the buffer
-					contentBuffer.Reset()
-				}
-			}
-
-			// Handle function call if present
-			if functionCall != nil && !accumulator.Complete {
-				accumulator.AddChunk(functionCall)
-
-				// If function call is complete, emit function call event
-				if accumulator.Complete {
-					// Parse arguments JSON string to map
-					var arguments map[string]any
-					if err := json.Unmarshal([]byte(accumulator.Arguments), &arguments); err != nil {
-						logger.GetLogger().Errorf("Failed to parse function call arguments: %v", err)
-						arguments = map[string]any{"raw": accumulator.Arguments}
+					if len(words) >= MinWordsPerChunk {
+						// Create delta event using helper method
+						deltaEvent := h.createTextDeltaEvent(itemID, sequenceNumber, bufferedContent)
+						h.marshalAndSendEvent(dataChan, "response.output_text.delta", deltaEvent)
+						sequenceNumber++
+						// Clear the buffer
+						contentBuffer.Reset()
 					}
-
-					functionCallEvent := h.createFunctionCallEvent(itemID, sequenceNumber, accumulator.Name, arguments)
-					h.marshalAndSendEvent(dataChan, "response.output_function_calls.delta", functionCallEvent)
-					sequenceNumber++
 				}
 			}
+
+			// Handle reasoning content separately
+			reasoningContent := h.extractReasoningContentFromOpenAIStream(data)
+			if reasoningContent != "" {
+				// Initialize reasoning item if not already done
+				if !hasReasoningContent {
+					reasoningItemID = fmt.Sprintf("rs_%d", time.Now().UnixNano())
+					reasoningSequenceNumber = sequenceNumber
+					hasReasoningContent = true
+
+					// Emit response.output_item.added event for reasoning
+					reasoningItemAddedEvent := responsetypes.ResponseOutputItemAddedEvent{
+						BaseStreamingEvent: responsetypes.BaseStreamingEvent{
+							Type:           "response.output_item.added",
+							SequenceNumber: reasoningSequenceNumber,
+						},
+						OutputIndex: 0,
+						Item: responsetypes.ResponseOutputItem{
+							ID:      reasoningItemID,
+							Type:    "reasoning",
+							Status:  "in_progress",
+							Content: []responsetypes.ResponseContentPart{},
+							Role:    "assistant",
+						},
+					}
+					eventJSON, _ := json.Marshal(reasoningItemAddedEvent)
+					dataChan <- fmt.Sprintf("event: response.output_item.added\ndata: %s\n\n", string(eventJSON))
+					reasoningSequenceNumber++
+
+					// Emit response.reasoning_summary_part.added event
+					reasoningSummaryPartAddedEvent := responsetypes.ResponseReasoningSummaryPartAddedEvent{
+						BaseStreamingEvent: responsetypes.BaseStreamingEvent{
+							Type:           "response.reasoning_summary_part.added",
+							SequenceNumber: reasoningSequenceNumber,
+						},
+						ItemID:       reasoningItemID,
+						OutputIndex:  0,
+						SummaryIndex: 0,
+						Part: struct {
+							Type string `json:"type"`
+							Text string `json:"text"`
+						}{
+							Type: "summary_text",
+							Text: "",
+						},
+					}
+					eventJSON, _ = json.Marshal(reasoningSummaryPartAddedEvent)
+					dataChan <- fmt.Sprintf("event: response.reasoning_summary_part.added\ndata: %s\n\n", string(eventJSON))
+					reasoningSequenceNumber++
+				}
+
+				reasoningBuffer.WriteString(reasoningContent)
+				fullReasoningResponse.WriteString(reasoningContent)
+
+				// Emit reasoning summary text delta event
+				reasoningSummaryTextDeltaEvent := responsetypes.ResponseReasoningSummaryTextDeltaEvent{
+					BaseStreamingEvent: responsetypes.BaseStreamingEvent{
+						Type:           "response.reasoning_summary_text.delta",
+						SequenceNumber: reasoningSequenceNumber,
+					},
+					ItemID:       reasoningItemID,
+					OutputIndex:  0,
+					SummaryIndex: 0,
+					Delta:        reasoningContent,
+					Obfuscation:  fmt.Sprintf("%x", time.Now().UnixNano())[:10], // Simple obfuscation
+				}
+				eventJSON, _ := json.Marshal(reasoningSummaryTextDeltaEvent)
+				dataChan <- fmt.Sprintf("event: response.reasoning_summary_text.delta\ndata: %s\n\n", string(eventJSON))
+				reasoningSequenceNumber++
+			}
+
 		}
 	}
 
@@ -543,6 +574,56 @@ func (h *StreamHandler) streamResponseToChannel(reqCtx *gin.Context, request ope
 		deltaEvent := h.createTextDeltaEvent(itemID, sequenceNumber, contentBuffer.String())
 		h.marshalAndSendEvent(dataChan, "response.output_text.delta", deltaEvent)
 		sequenceNumber++
+	}
+
+	// Handle reasoning completion events
+	if hasReasoningContent && fullReasoningResponse.Len() > 0 {
+		// Emit reasoning summary text done event
+		reasoningSummaryTextDoneEvent := responsetypes.ResponseReasoningSummaryTextDoneEvent{
+			BaseStreamingEvent: responsetypes.BaseStreamingEvent{
+				Type:           "response.reasoning_summary_text.done",
+				SequenceNumber: reasoningSequenceNumber,
+			},
+			ItemID:       reasoningItemID,
+			OutputIndex:  0,
+			SummaryIndex: 0,
+			Text:         fullReasoningResponse.String(),
+		}
+		eventJSON, _ := json.Marshal(reasoningSummaryTextDoneEvent)
+		dataChan <- fmt.Sprintf("event: response.reasoning_summary_text.done\ndata: %s\n\n", string(eventJSON))
+		reasoningSequenceNumber++
+
+		// Emit reasoning summary part done event
+		reasoningSummaryPartDoneEvent := responsetypes.ResponseReasoningSummaryPartDoneEvent{
+			BaseStreamingEvent: responsetypes.BaseStreamingEvent{
+				Type:           "response.reasoning_summary_part.done",
+				SequenceNumber: reasoningSequenceNumber,
+			},
+			ItemID:       reasoningItemID,
+			OutputIndex:  0,
+			SummaryIndex: 0,
+			Part: struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			}{
+				Type: "summary_text",
+				Text: fullReasoningResponse.String(),
+			},
+		}
+		eventJSON, _ = json.Marshal(reasoningSummaryPartDoneEvent)
+		dataChan <- fmt.Sprintf("event: response.reasoning_summary_part.done\ndata: %s\n\n", string(eventJSON))
+		reasoningSequenceNumber++
+
+		// Mark reasoning as complete
+		reasoningComplete = true
+	}
+
+	// Send any buffered content after reasoning is complete or if there's no reasoning content
+	if (reasoningComplete || !hasReasoningContent) && contentBuffer.Len() > 0 {
+		deltaEvent := h.createTextDeltaEvent(itemID, sequenceNumber, contentBuffer.String())
+		h.marshalAndSendEvent(dataChan, "response.output_text.delta", deltaEvent)
+		sequenceNumber++
+		contentBuffer.Reset()
 	}
 
 	// Append assistant's complete response to conversation

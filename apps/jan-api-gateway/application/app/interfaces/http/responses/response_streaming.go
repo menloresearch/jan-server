@@ -459,3 +459,46 @@ type ResponseErrorEvent struct {
 	// The error data.
 	Data ResponseError `json:"data"`
 }
+
+// ResponseReasoningSummaryPartAddedEvent represents a response.reasoning_summary_part.added event
+type ResponseReasoningSummaryPartAddedEvent struct {
+	BaseStreamingEvent
+	ItemID       string `json:"item_id"`
+	OutputIndex  int    `json:"output_index"`
+	SummaryIndex int    `json:"summary_index"`
+	Part         struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	} `json:"part"`
+}
+
+// ResponseReasoningSummaryTextDeltaEvent represents a response.reasoning_summary_text.delta event
+type ResponseReasoningSummaryTextDeltaEvent struct {
+	BaseStreamingEvent
+	ItemID       string `json:"item_id"`
+	OutputIndex  int    `json:"output_index"`
+	SummaryIndex int    `json:"summary_index"`
+	Delta        string `json:"delta"`
+	Obfuscation  string `json:"obfuscation"`
+}
+
+// ResponseReasoningSummaryTextDoneEvent represents a response.reasoning_summary_text.done event
+type ResponseReasoningSummaryTextDoneEvent struct {
+	BaseStreamingEvent
+	ItemID       string `json:"item_id"`
+	OutputIndex  int    `json:"output_index"`
+	SummaryIndex int    `json:"summary_index"`
+	Text         string `json:"text"`
+}
+
+// ResponseReasoningSummaryPartDoneEvent represents a response.reasoning_summary_part.done event
+type ResponseReasoningSummaryPartDoneEvent struct {
+	BaseStreamingEvent
+	ItemID       string `json:"item_id"`
+	OutputIndex  int    `json:"output_index"`
+	SummaryIndex int    `json:"summary_index"`
+	Part         struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	} `json:"part"`
+}
