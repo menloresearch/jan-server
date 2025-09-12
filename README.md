@@ -69,18 +69,59 @@ The persistent data storage layer with enterprise-grade features.
 ## 🚀 Quick Start
 
 ### Prerequisites
-- **Docker**: For containerization
-- **Minikube**: For local Kubernetes development
-- **Helm**: For package management and deployment
-- **kubectl**: For Kubernetes cluster management
+
+Before setting up Jan Server, ensure you have the following components installed:
+
+#### Required Components
+
+1. **Docker Desktop**
+   - **Windows**: Download from [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/)
+   - **macOS**: Download from [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/)
+   - **Linux**: Follow [Docker Engine installation guide](https://docs.docker.com/engine/install/)
+
+2. **Minikube**
+   - **Windows**: `choco install minikube` or download from [minikube releases](https://github.com/kubernetes/minikube/releases)
+   - **macOS**: `brew install minikube` or download from [minikube releases](https://github.com/kubernetes/minikube/releases)
+   - **Linux**: `curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 && sudo install minikube-linux-amd64 /usr/local/bin/minikube`
+
+3. **Helm**
+   - **Windows**: `choco install kubernetes-helm` or download from [Helm releases](https://github.com/helm/helm/releases)
+   - **macOS**: `brew install helm` or download from [Helm releases](https://github.com/helm/helm/releases)
+   - **Linux**: `curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash`
+
+4. **kubectl**
+   - **Windows**: `choco install kubernetes-cli` or download from [kubectl releases](https://github.com/kubernetes/kubectl/releases)
+   - **macOS**: `brew install kubectl` or download from [kubectl releases](https://github.com/kubernetes/kubectl/releases)
+   - **Linux**: `curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && sudo install kubectl /usr/local/bin/kubectl`
+
+#### Optional: NVIDIA GPU Support (for Real LLM Models) 
+If you plan to run real LLM models (not mock servers) and have an NVIDIA GPU:
+
+1. **Install NVIDIA Container Toolkit**: [NVIDIA toolkit](https://minikube.sigs.k8s.io/docs/tutorials/nvidia/)
+   ```bash
+   # Ubuntu/Debian
+   distribution=$(. /etc/os-release;echo $ID$VERSION_ID) \
+       && curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
+       && curl -s -L https://nvidia.github.io/libnvidia-container/experimental/$distribution/libnvidia-container.list | \
+          sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+          sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+   sudo apt update
+   sudo apt-get install nvidia-container-toolkit=1.10.0~rc.3-1
+   ```
+
+2. **Start Minikube with GPU support**:
+   ```bash
+   minikube start --gpus all
+   ```
 
 ### Local Development Setup
+
+#### Option 1: Mock Server Setup (Recommended for Development)
 
 1. **Start Minikube and configure Docker**:
    ```bash
    minikube start
    eval $(minikube docker-env)
-   alias kubectl="minikube kubectl --"
    ```
 
 2. **Build and deploy all services**:
@@ -93,6 +134,25 @@ The persistent data storage layer with enterprise-grade features.
    - **Swagger UI**: http://localhost:8080/api/swagger/index.html
    - **Health Check**: http://localhost:8080/healthcheck
    - **Version Info**: http://localhost:8080/v1/version
+
+#### Option 2: Real LLM Setup (Requires NVIDIA GPU)
+
+1. **Start Minikube with GPU support**:
+   ```bash
+   minikube start --gpus all
+   eval $(minikube docker-env)
+   ```
+
+2. **Configure GPU memory utilization** (if you have limited RAM):
+   ```bash
+   # Set GPU memory utilization to 70% (default is 90%)
+   export GPU_MEMORY_UTILIZATION=0.7
+   ```
+
+3. **Build and deploy all services**:
+   ```bash
+   ./scripts/run.sh
+   ```
 
 ### Production Deployment
 
@@ -235,12 +295,88 @@ helm upgrade jan-server ./charts/umbrella-chart
 helm uninstall jan-server
 ```
 
+## 🐛 Troubleshooting
+
+### Common Issues and Solutions
+
+### 1. LLM Pod Not Starting (Pending Status)
+
+**Symptoms**: The `jan-server-jan-inference-model` pod stays in `Pending` status.
+
+**Diagnosis Steps**:
+```bash
+# Check pod status
+kubectl get pods
+
+# Get detailed pod information (replace with your actual pod name)
+kubectl describe pod jan-server-jan-inference-model-<POD_ID>
+```
+
+**Common Error Messages and Solutions**:
+
+##### Error: "Insufficient nvidia.com/gpu"
+```
+0/1 nodes are available: 1 Insufficient nvidia.com/gpu. no new claims to deallocate, preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.
+```
+
+***Solution for Mock Server Setup***:
+Remove GPU requirements from the Helm chart:
+```bash
+# Edit the deployment template
+vim charts/apps-charts/jan-inference-model/templates/deployment.yaml
+
+# Remove or comment out these lines:
+# resources:
+#   limits:
+#     nvidia.com/gpu: 1
+
+# Redeploy
+helm uninstall jan-server
+helm install jan-server ./charts/umbrella-chart
+```
+
+**Solution for Real LLM Setup**:
+1. Ensure you have NVIDIA GPU and drivers installed
+2. Install NVIDIA Container Toolkit (see Prerequisites section) 
+3. Start minikube with GPU support:
+   ```bash
+   minikube start --gpus all
+   ```
+
+##### Error: "Insufficient Memory"
+```
+0/1 nodes are available: 1 Insufficient memory.
+```
+
+**Solution**:
+
+**For Real LLM**: Reduce GPU memory utilization:
+   ```bash
+   export GPU_MEMORY_UTILIZATION=0.7  # Use 70% instead of 90%
+   ```
+
+#### 2. Helm Issues
+
+**Symptoms**: Helm commands fail or charts won't install.
+
+**Solutions**:
+```bash
+# Update Helm dependencies
+helm dependency update ./charts/umbrella-chart
+
+# Check Helm status
+helm list
+
+# Uninstall and reinstall
+helm uninstall jan-server
+helm install jan-server ./charts/umbrella-chart
+```
+
 ## 📚 API Documentation
 
 - **Swagger UI**: Available at `/api/swagger/index.html` when running
 - **OpenAPI Specification**: Auto-generated from code annotations
 - **Interactive Testing**: Built-in API testing interface
-
 
 ## 🤝 Contributing
 

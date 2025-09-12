@@ -64,6 +64,18 @@ docker run -d \
   jan-inference-model:mock
 ```
 
+### Checking if vLLM is Ready
+
+After starting the container, check the logs to see when vLLM is ready:
+
+```bash
+# Check container logs
+docker logs jan-inference
+
+# Follow logs in real-time
+docker logs -f jan-inference
+```
+
 ## Manual Setup (Alternative)
 
 If you prefer to set up vLLM manually, follow these steps:
