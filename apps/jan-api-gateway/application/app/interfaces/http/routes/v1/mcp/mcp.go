@@ -70,6 +70,7 @@ func (mcpAPI *MCPAPI) RegisterRouter(router *gin.RouterGroup) {
 	mcpHttpHandler := mcpserver.NewStreamableHTTPServer(mcpAPI.MCPServer)
 	router.Any(
 		"/mcp",
+		mcpAPI.authService.AppUserAuthMiddleware(),
 		MCPMethodGuard(map[string]bool{
 			// Initialization / handshake
 			"initialize":                true,
