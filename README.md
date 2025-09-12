@@ -69,18 +69,48 @@ The persistent data storage layer with enterprise-grade features.
 ## 🚀 Quick Start
 
 ### Prerequisites
-- **Docker**: For containerization
-- **Minikube**: For local Kubernetes development
-- **Helm**: For package management and deployment
-- **kubectl**: For Kubernetes cluster management
+
+Before setting up Jan Server, ensure you have the following components installed:
+
+#### Required Components
+
+> **⚠️ Important**: Windows and macOS users can only run mock servers for development. Real LLM model inference with vLLM is only supported on Linux systems with NVIDIA GPUs.
+
+1. **Docker Desktop**
+   - **Windows**: Download from [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/)
+   - **macOS**: Download from [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/)
+   - **Linux**: Follow [Docker Engine installation guide](https://docs.docker.com/engine/install/)
+
+2. **Minikube**
+   - **Windows**: `choco install minikube` or download from [minikube releases](https://github.com/kubernetes/minikube/releases)
+   - **macOS**: `brew install minikube` or download from [minikube releases](https://github.com/kubernetes/minikube/releases)
+   - **Linux**: `curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 && sudo install minikube-linux-amd64 /usr/local/bin/minikube`
+
+3. **Helm**
+   - **Windows**: `choco install kubernetes-helm` or download from [Helm releases](https://github.com/helm/helm/releases)
+   - **macOS**: `brew install helm` or download from [Helm releases](https://github.com/helm/helm/releases)
+   - **Linux**: `curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash`
+
+4. **kubectl**
+   - **Windows**: `choco install kubernetes-cli` or download from [kubectl releases](https://github.com/kubernetes/kubectl/releases)
+   - **macOS**: `brew install kubectl` or download from [kubectl releases](https://github.com/kubernetes/kubectl/releases)
+   - **Linux**: `curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && sudo install kubectl /usr/local/bin/kubectl`
+
+#### Optional: NVIDIA GPU Support (for Real LLM Models) 
+If you plan to run real LLM models (not mock servers) and have an NVIDIA GPU:
+
+1. **Install NVIDIA Container Toolkit**: Follow the [official NVIDIA Container Toolkit installation guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+
+2. **Configure Minikube for GPU support**: Follow the [official minikube GPU tutorial](https://minikube.sigs.k8s.io/docs/tutorials/nvidia/) for complete setup instructions.
 
 ### Local Development Setup
+
+#### Option 1: Mock Server Setup (Recommended for Development)
 
 1. **Start Minikube and configure Docker**:
    ```bash
    minikube start
    eval $(minikube docker-env)
-   alias kubectl="minikube kubectl --"
    ```
 
 2. **Build and deploy all services**:
@@ -93,6 +123,29 @@ The persistent data storage layer with enterprise-grade features.
    - **Swagger UI**: http://localhost:8080/api/swagger/index.html
    - **Health Check**: http://localhost:8080/healthcheck
    - **Version Info**: http://localhost:8080/v1/version
+
+#### Option 2: Real LLM Setup (Requires NVIDIA GPU)
+
+1. **Start Minikube with GPU support**:
+   ```bash
+   minikube start --gpus all
+   eval $(minikube docker-env)
+   ```
+
+2. **Configure GPU memory utilization** (if you have limited GPU memory):
+   
+   GPU memory utilization is configured in the vLLM Dockerfile. See the [vLLM CLI documentation](https://docs.vllm.ai/en/latest/cli/serve.html) for all available arguments.
+   
+   To modify GPU memory utilization, edit the vLLM launch command in:
+   - `apps/jan-inference-model/Dockerfile` (for Docker builds)
+   - Helm chart values (for Kubernetes deployment)
+
+3. **Build and deploy all services**:
+   ```bash
+   # For GPU setup, modify run.sh to use GPU-enabled minikube
+   # Edit scripts/run.sh and change "minikube start" to "minikube start --gpus all"
+   ./scripts/run.sh
+   ```
 
 ### Production Deployment
 
@@ -235,12 +288,70 @@ helm upgrade jan-server ./charts/umbrella-chart
 helm uninstall jan-server
 ```
 
+## 🐛 Troubleshooting
+
+### Common Issues and Solutions
+
+### 1. LLM Pod Not Starting (Pending Status)
+
+**Symptoms**: The `jan-server-jan-inference-model` pod stays in `Pending` status.
+
+**Diagnosis Steps**:
+```bash
+# Check pod status
+kubectl get pods
+
+# Get detailed pod information (replace with your actual pod name)
+kubectl describe pod jan-server-jan-inference-model-<POD_ID>
+```
+
+**Common Error Messages and Solutions**:
+
+##### Error: "Insufficient nvidia.com/gpu"
+```
+0/1 nodes are available: 1 Insufficient nvidia.com/gpu. no new claims to deallocate, preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.
+```
+**Solution for Real LLM Setup**:
+1. Ensure you have NVIDIA GPU and drivers installed
+2. Install NVIDIA Container Toolkit (see Prerequisites section) 
+3. Start minikube with GPU support:
+   ```bash
+   minikube start --gpus all
+   ```
+
+##### Error: vLLM Pod Keeps Restarting
+```
+# Check pod logs to see the actual error
+kubectl logs jan-server-jan-inference-model-<POD_ID>
+```
+
+**Common vLLM startup issues**:
+1. **CUDA Out of Memory**: Modify vLLM arguments in Dockerfile to reduce memory usage
+2. **Model Loading Errors**: Check if model path is correct and accessible
+3. **GPU Not Detected**: Ensure NVIDIA Container Toolkit is properly installed
+
+#### 2. Helm Issues
+
+**Symptoms**: Helm commands fail or charts won't install.
+
+**Solutions**:
+```bash
+# Update Helm dependencies
+helm dependency update ./charts/umbrella-chart
+
+# Check Helm status
+helm list
+
+# Uninstall and reinstall
+helm uninstall jan-server
+helm install jan-server ./charts/umbrella-chart
+```
+
 ## 📚 API Documentation
 
 - **Swagger UI**: Available at `/api/swagger/index.html` when running
 - **OpenAPI Specification**: Auto-generated from code annotations
 - **Interactive Testing**: Built-in API testing interface
-
 
 ## 🤝 Contributing
 
