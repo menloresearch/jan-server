@@ -2,19 +2,32 @@ package responses
 
 import (
 	"github.com/gin-gonic/gin"
+	"menlo.ai/jan-api-gateway/app/domain/auth"
 	handlerresponses "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/responses"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/middleware"
 )
 
+// CreateResponseRequest represents the request payload for creating a response
+type CreateResponseRequest struct {
+	Model       string                 `json:"model" binding:"required" example:"gpt-4"`
+	Input       map[string]interface{} `json:"input" binding:"required"`
+	Generation  map[string]interface{} `json:"generation,omitempty"`
+	Stream      bool                   `json:"stream,omitempty" example:"false"`
+	Temperature float64                `json:"temperature,omitempty" example:"0.7"`
+	MaxTokens   int                    `json:"max_tokens,omitempty" example:"1000"`
+}
+
 // ResponseRoute represents the response API routes
 type ResponseRoute struct {
-	handler *handlerresponses.ResponseHandler
+	handler     *handlerresponses.ResponseHandler
+	authService *auth.AuthService
 }
 
 // NewResponseRoute creates a new ResponseRoute instance
-func NewResponseRoute(handler *handlerresponses.ResponseHandler) *ResponseRoute {
+func NewResponseRoute(handler *handlerresponses.ResponseHandler, authService *auth.AuthService) *ResponseRoute {
 	return &ResponseRoute{
-		handler: handler,
+		handler:     handler,
+		authService: authService,
 	}
 }
 
@@ -27,7 +40,7 @@ func (responseRoute *ResponseRoute) RegisterRouter(router gin.IRouter) {
 // registerRoutes registers all response routes
 func (responseRoute *ResponseRoute) registerRoutes(router *gin.RouterGroup) {
 	// Apply middleware to the entire group
-	responseGroup := router.Group("", middleware.AuthMiddleware(), responseRoute.handler.UserService.RegisteredUserMiddleware())
+	responseGroup := router.Group("", middleware.AuthMiddleware(), responseRoute.authService.RegisteredUserMiddleware())
 
 	responseGroup.POST("", responseRoute.CreateResponse)
 	responseGroup.GET("/:response_id", responseRoute.GetResponse)
@@ -107,7 +120,7 @@ func (responseRoute *ResponseRoute) registerRoutes(router *gin.RouterGroup) {
 // @Security BearerAuth
 // @Accept json
 // @Produce json
-// @Param request body handlerresponses.CreateResponseRequest true "Request payload containing model, input, and generation parameters"
+// @Param request body CreateResponseRequest true "Request payload containing model, input, and generation parameters"
 // @Success 200 "Successful response with embedded fields"
 // @Success 202 "Response accepted for background processing with embedded fields"
 // @ExampleResponse 200 "Example successful response"

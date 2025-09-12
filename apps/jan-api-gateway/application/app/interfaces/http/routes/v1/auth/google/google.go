@@ -161,7 +161,7 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 		return
 	}
 	if exists == nil {
-		exists, err = googleAuthAPI.authService.RegisterUser(reqCtx.Request.Context(), &user.User{
+		exists, err = googleAuthAPI.userService.RegisterUser(reqCtx.Request.Context(), &user.User{
 			Name:    claims.Name,
 			Email:   claims.Email,
 			Enabled: true,

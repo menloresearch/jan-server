@@ -310,7 +310,7 @@ func (s *ResponseService) DeleteResponse(ctx context.Context, responseID uint) e
 }
 
 // CreateItemsForResponse creates items for a specific response
-func (s *ResponseService) CreateItemsForResponse(ctx context.Context, responseID uint, conversationID uint, items []conversation.ItemCreationData) ([]*conversation.Item, error) {
+func (s *ResponseService) CreateItemsForResponse(ctx context.Context, responseID uint, conversationID uint, items []*conversation.Item) ([]*conversation.Item, error) {
 	response, err := s.responseRepo.FindByID(ctx, responseID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find response: %w", err)

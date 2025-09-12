@@ -27,13 +27,25 @@ func (completionAPI *CompletionAPI) RegisterRouter(router *gin.RouterGroup) {
 }
 
 // ChatCompletionResponseSwagger is a doc-only version without http.Header
+type ChatCompletionChoice struct {
+	Index        int     `json:"index"`
+	Message      Message `json:"message"`
+	FinishReason string  `json:"finish_reason"`
+}
+
+type Usage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+}
+
 type ChatCompletionResponseSwagger struct {
-	ID      string                        `json:"id"`
-	Object  string                        `json:"object"`
-	Created int64                         `json:"created"`
-	Model   string                        `json:"model"`
-	Choices []openai.ChatCompletionChoice `json:"choices"`
-	Usage   openai.Usage                  `json:"usage"`
+	ID      string                 `json:"id"`
+	Object  string                 `json:"object"`
+	Created int64                  `json:"created"`
+	Model   string                 `json:"model"`
+	Choices []ChatCompletionChoice `json:"choices"`
+	Usage   Usage                  `json:"usage"`
 }
 
 // CreateChatCompletion
@@ -43,7 +55,7 @@ type ChatCompletionResponseSwagger struct {
 // @Security BearerAuth
 // @Accept json
 // @Produce json
-// @Param request body openai.ChatCompletionRequest true "Chat completion request payload"
+// @Param request body PostChatCompletionRequest true "Chat completion request payload"
 // @Success 200 {object} ChatCompletionResponseSwagger "Successful response"
 // @Failure 400 {object} responses.ErrorResponse "Invalid request payload"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
@@ -164,12 +176,6 @@ type Choice struct {
 	Index        int             `json:"index"`
 	Message      ResponseMessage `json:"message"`
 	FinishReason string          `json:"finish_reason"`
-}
-
-type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
 }
 
 type PostChatCompletionResponse struct {

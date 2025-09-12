@@ -27,6 +27,7 @@ const (
 // ResponseHandler handles the business logic for response API endpoints
 type ResponseHandler struct {
 	UserService         *user.UserService
+	authService         *auth.AuthService
 	apikeyService       *apikey.ApiKeyService
 	conversationService *conversation.ConversationService
 	responseService     *response.ResponseService
@@ -37,12 +38,14 @@ type ResponseHandler struct {
 // NewResponseHandler creates a new ResponseHandler instance
 func NewResponseHandler(
 	userService *user.UserService,
+	authService *auth.AuthService,
 	apikeyService *apikey.ApiKeyService,
 	conversationService *conversation.ConversationService,
 	responseService *response.ResponseService,
 ) *ResponseHandler {
 	responseHandler := &ResponseHandler{
 		UserService:         userService,
+		authService:         authService,
 		apikeyService:       apikeyService,
 		conversationService: conversationService,
 		responseService:     responseService,
@@ -58,7 +61,7 @@ func NewResponseHandler(
 // CreateResponse handles the business logic for creating a response
 func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 	// Get user from middleware context
-	userEntity, ok := h.UserService.GetUserFromContext(reqCtx)
+	userEntity, ok := auth.GetUserFromContext(reqCtx)
 	if !ok {
 		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "user not found in context")
 		return
@@ -190,7 +193,7 @@ func (h *ResponseHandler) handleConversation(reqCtx *gin.Context, request *reque
 	}
 
 	// Get user from middleware context
-	userEntity, ok := h.UserService.GetUserFromContext(reqCtx)
+	userEntity, ok := auth.GetUserFromContext(reqCtx)
 	if !ok {
 		return nil, fmt.Errorf("user not found in context")
 	}
@@ -249,7 +252,7 @@ func (h *ResponseHandler) appendMessagesToConversation(reqCtx *gin.Context, conv
 	}
 
 	// Convert messages to conversation items
-	itemsToCreate := make([]conversation.ItemCreationData, len(messages))
+	itemsToCreate := make([]*conversation.Item, len(messages))
 	for i, msg := range messages {
 		// Convert OpenAI role to conversation role
 		var role *conversation.ItemRole
@@ -278,7 +281,7 @@ func (h *ResponseHandler) appendMessagesToConversation(reqCtx *gin.Context, conv
 			},
 		}
 
-		itemsToCreate[i] = conversation.ItemCreationData{
+		itemsToCreate[i] = &conversation.Item{
 			Type:    conversation.ItemType("message"),
 			Role:    role,
 			Content: content,
@@ -544,7 +547,7 @@ func (h *ResponseHandler) ListInputItems(reqCtx *gin.Context) {
 // validateUserAndResponseID validates user context and response ID
 func (h *ResponseHandler) validateUserAndResponseID(reqCtx *gin.Context, responseID string) (*user.User, error) {
 	// Get user from middleware context
-	userEntity, ok := h.UserService.GetUserFromContext(reqCtx)
+	userEntity, ok := auth.GetUserFromContext(reqCtx)
 	if !ok {
 		return nil, fmt.Errorf("user not found in context")
 	}
@@ -588,8 +591,8 @@ func (h *ResponseHandler) getAPIKey(reqCtx *gin.Context) (string, error) {
 		}
 
 		apikeyEntities, err := h.apikeyService.Find(reqCtx, apikey.ApiKeyFilter{
-			OwnerID:    &user.ID,
-			ApikeyType: ptr.ToString(string(apikey.ApikeyTypeAdmin)),
+			OwnerPublicID: &user.PublicID,
+			ApikeyType:    ptr.ToString(string(apikey.ApikeyTypeAdmin)),
 		}, nil)
 		if err != nil {
 			return "", fmt.Errorf("failed to find API keys: %w", err)
@@ -608,7 +611,7 @@ func (h *ResponseHandler) getAPIKey(reqCtx *gin.Context) (string, error) {
 				Description:    "Default Key For User",
 				Enabled:        true,
 				ApikeyType:     string(apikey.ApikeyTypeEphemeral),
-				OwnerID:        &user.ID,
+				OwnerPublicID:  user.PublicID,
 				OrganizationID: nil,
 				Permissions:    "{}",
 			})

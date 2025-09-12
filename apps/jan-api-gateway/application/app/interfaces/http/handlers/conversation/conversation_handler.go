@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
+	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
@@ -150,7 +151,7 @@ type CreateItemsRequest struct {
 
 // getUserFromContext gets the authenticated user from the request context
 func (h *ConversationHandler) getUserFromContext(ctx *gin.Context) (*AuthenticatedUser, error) {
-	user, ok := h.userService.GetUserFromContext(ctx)
+	user, ok := auth.GetUserFromContext(ctx)
 	if !ok {
 		return nil, fmt.Errorf("user not found in context")
 	}
@@ -200,7 +201,7 @@ func (h *ConversationHandler) CreateConversation(ctx *gin.Context) {
 	// Add items if provided using batch operation
 	if len(request.Items) > 0 {
 		// Convert all items at once for batch processing
-		itemsToCreate := make([]conversation.ItemCreationData, len(request.Items))
+		itemsToCreate := make([]*conversation.Item, len(request.Items))
 
 		for i, itemReq := range request.Items {
 			// Convert request to domain types
@@ -222,7 +223,7 @@ func (h *ConversationHandler) CreateConversation(ctx *gin.Context) {
 				}
 			}
 
-			itemsToCreate[i] = conversation.ItemCreationData{
+			itemsToCreate[i] = &conversation.Item{
 				Type:    itemType,
 				Role:    role,
 				Content: content,
@@ -384,7 +385,31 @@ func (h *ConversationHandler) DeleteConversation(ctx *gin.Context) {
 		return
 	}
 
-	err = h.conversationService.DeleteConversation(ctx, conversationID, user.ID)
+	// Get conversation first to pass to DeleteConversation
+	convToDelete, err := h.conversationService.GetConversationByPublicIDAndUserID(ctx, conversationID, user.ID)
+	if err != nil {
+		if errors.Is(err, conversation.ErrConversationNotFound) {
+			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
+				Code:  "s9t0u1v2-w3x4-5678-stuv-901234567890",
+				Error: err.Error(),
+			})
+			return
+		}
+		if errors.Is(err, conversation.ErrPrivateConversation) {
+			ctx.JSON(http.StatusForbidden, responses.ErrorResponse{
+				Code:  "t0u1v2w3-x4y5-6789-tuvw-012345678901",
+				Error: err.Error(),
+			})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code:  "u1v2w3x4-y5z6-7890-uvwx-123456789012",
+			Error: err.Error(),
+		})
+		return
+	}
+
+	err = h.conversationService.DeleteConversation(ctx, convToDelete)
 	if err != nil {
 		if errors.Is(err, conversation.ErrConversationNotFound) {
 			ctx.JSON(http.StatusNotFound, responses.ErrorResponse{
@@ -460,7 +485,7 @@ func (h *ConversationHandler) CreateItems(ctx *gin.Context) {
 	}
 
 	// Convert all items at once for batch processing
-	itemsToCreate := make([]conversation.ItemCreationData, len(request.Items))
+	itemsToCreate := make([]*conversation.Item, len(request.Items))
 
 	for i, itemReq := range request.Items {
 		// Convert request to domain types
@@ -482,7 +507,7 @@ func (h *ConversationHandler) CreateItems(ctx *gin.Context) {
 			}
 		}
 
-		itemsToCreate[i] = conversation.ItemCreationData{
+		itemsToCreate[i] = &conversation.Item{
 			Type:    itemType,
 			Role:    role,
 			Content: content,

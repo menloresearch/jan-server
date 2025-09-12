@@ -50,7 +50,7 @@ func (api *ProjectApiKeyRoute) RegisterRouter(router gin.IRouter) {
 // @Produce json
 // @Security BearerAuth
 // @Param project_public_id path string true "Project Public ID"
-// @Success 200 {object} responses.GeneralResponse[ApiKeyResponse] "API key created successfully"
+// @Success 200 {object} ApiKeyCreateResponse "API key created successfully"
 // @Failure 400 {object} responses.ErrorResponse "Bad request, e.g., invalid payload or missing IDs"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized, e.g., invalid or missing token"
 // @Failure 404 {object} responses.ErrorResponse "Not Found, e.g., project or organization not found"
@@ -133,7 +133,7 @@ type CreateApiKeyRequest struct {
 // @Security BearerAuth
 // @Param project_public_id path string true "Project Public ID"
 // @Param requestBody body CreateApiKeyRequest true "Request body for creating an API key"
-// @Success 200 {object} responses.GeneralResponse[ApiKeyResponse] "API key created successfully"
+// @Success 200 {object} ApiKeyCreateResponse "API key created successfully"
 // @Failure 400 {object} responses.ErrorResponse "Bad request, e.g., invalid payload or missing IDs"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized, e.g., invalid or missing token"
 // @Failure 404 {object} responses.ErrorResponse "Not Found, e.g., project or organization not found"
@@ -213,8 +213,8 @@ func (api *ProjectApiKeyRoute) CreateProjectApiKey(reqCtx *gin.Context) {
 		return
 	}
 
-	reqCtx.JSON(http.StatusOK, responses.GeneralResponse[ApiKeyResponse]{
-		Status: responses.ResponseCodeOk,
+	reqCtx.JSON(http.StatusOK, ApiKeyCreateResponse{
+		Status: "ok",
 		Result: ApiKeyResponse{
 			ID:            apikeyEntity.PublicID,
 			Key:           key,
@@ -239,4 +239,9 @@ type ApiKeyResponse struct {
 	Permissions   string     `json:"permissions"`
 	ExpiresAt     *time.Time `json:"expiresAt"`
 	LastUsedAt    *time.Time `json:"last_usedAt"`
+}
+
+type ApiKeyCreateResponse struct {
+	Status string         `json:"status"`
+	Result ApiKeyResponse `json:"result"`
 }
