@@ -74,6 +74,8 @@ Before setting up Jan Server, ensure you have the following components installed
 
 #### Required Components
 
+> **⚠️ Important**: Windows and macOS users can only run mock servers for development. Real LLM model inference with vLLM is only supported on Linux systems with NVIDIA GPUs.
+
 1. **Docker Desktop**
    - **Windows**: Download from [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/)
    - **macOS**: Download from [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/)
@@ -97,22 +99,9 @@ Before setting up Jan Server, ensure you have the following components installed
 #### Optional: NVIDIA GPU Support (for Real LLM Models) 
 If you plan to run real LLM models (not mock servers) and have an NVIDIA GPU:
 
-1. **Install NVIDIA Container Toolkit**: [NVIDIA toolkit](https://minikube.sigs.k8s.io/docs/tutorials/nvidia/)
-   ```bash
-   # Ubuntu/Debian
-   distribution=$(. /etc/os-release;echo $ID$VERSION_ID) \
-       && curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
-       && curl -s -L https://nvidia.github.io/libnvidia-container/experimental/$distribution/libnvidia-container.list | \
-          sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
-          sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-   sudo apt update
-   sudo apt-get install nvidia-container-toolkit=1.10.0~rc.3-1
-   ```
+1. **Install NVIDIA Container Toolkit**: Follow the [official NVIDIA Container Toolkit installation guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 
-2. **Start Minikube with GPU support**:
-   ```bash
-   minikube start --gpus all
-   ```
+2. **Configure Minikube for GPU support**: Follow the [official minikube GPU tutorial](https://minikube.sigs.k8s.io/docs/tutorials/nvidia/) for complete setup instructions.
 
 ### Local Development Setup
 
@@ -143,14 +132,18 @@ If you plan to run real LLM models (not mock servers) and have an NVIDIA GPU:
    eval $(minikube docker-env)
    ```
 
-2. **Configure GPU memory utilization** (if you have limited RAM):
-   ```bash
-   # Set GPU memory utilization to 70% (default is 90%)
-   export GPU_MEMORY_UTILIZATION=0.7
-   ```
+2. **Configure GPU memory utilization** (if you have limited GPU memory):
+   
+   GPU memory utilization is configured in the vLLM Dockerfile. See the [vLLM CLI documentation](https://docs.vllm.ai/en/latest/cli/serve.html) for all available arguments.
+   
+   To modify GPU memory utilization, edit the vLLM launch command in:
+   - `apps/jan-inference-model/Dockerfile` (for Docker builds)
+   - Helm chart values (for Kubernetes deployment)
 
 3. **Build and deploy all services**:
    ```bash
+   # For GPU setup, modify run.sh to use GPU-enabled minikube
+   # Edit scripts/run.sh and change "minikube start" to "minikube start --gpus all"
    ./scripts/run.sh
    ```
 
@@ -318,23 +311,6 @@ kubectl describe pod jan-server-jan-inference-model-<POD_ID>
 ```
 0/1 nodes are available: 1 Insufficient nvidia.com/gpu. no new claims to deallocate, preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.
 ```
-
-***Solution for Mock Server Setup***:
-Remove GPU requirements from the Helm chart:
-```bash
-# Edit the deployment template
-vim charts/apps-charts/jan-inference-model/templates/deployment.yaml
-
-# Remove or comment out these lines:
-# resources:
-#   limits:
-#     nvidia.com/gpu: 1
-
-# Redeploy
-helm uninstall jan-server
-helm install jan-server ./charts/umbrella-chart
-```
-
 **Solution for Real LLM Setup**:
 1. Ensure you have NVIDIA GPU and drivers installed
 2. Install NVIDIA Container Toolkit (see Prerequisites section) 
@@ -343,17 +319,16 @@ helm install jan-server ./charts/umbrella-chart
    minikube start --gpus all
    ```
 
-##### Error: "Insufficient Memory"
+##### Error: vLLM Pod Keeps Restarting
 ```
-0/1 nodes are available: 1 Insufficient memory.
+# Check pod logs to see the actual error
+kubectl logs jan-server-jan-inference-model-<POD_ID>
 ```
 
-**Solution**:
-
-**For Real LLM**: Reduce GPU memory utilization:
-   ```bash
-   export GPU_MEMORY_UTILIZATION=0.7  # Use 70% instead of 90%
-   ```
+**Common vLLM startup issues**:
+1. **CUDA Out of Memory**: Modify vLLM arguments in Dockerfile to reduce memory usage
+2. **Model Loading Errors**: Check if model path is correct and accessible
+3. **GPU Not Detected**: Ensure NVIDIA Container Toolkit is properly installed
 
 #### 2. Helm Issues
 
