@@ -7,15 +7,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	mcpserver "github.com/mark3labs/mcp-go/server"
+	"menlo.ai/jan-api-gateway/app/domain/auth"
 	mcpimpl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 )
 
 func MCPMethodGuard(allowedMethods map[string]bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if c.Request.Header.Get("Mcp-Session-Id") == "" {
-			// TODO: server hack
-			c.Request.Header.Add("Mcp-Session-Id", "mcp-session-60cbe9c6-2b87-4a82-bbaa-5a8fad2bb462")
-		}
 		bodyBytes, err := io.ReadAll(c.Request.Body)
 		if err != nil {
 			c.Abort()
@@ -40,18 +37,20 @@ func MCPMethodGuard(allowedMethods map[string]bool) gin.HandlerFunc {
 }
 
 type MCPAPI struct {
-	SerperMCP *mcpimpl.SerperMCP
-	MCPServer *mcpserver.MCPServer
+	SerperMCP   *mcpimpl.SerperMCP
+	MCPServer   *mcpserver.MCPServer
+	authService *auth.AuthService
 }
 
-func NewMCPAPI(serperMCP *mcpimpl.SerperMCP) *MCPAPI {
+func NewMCPAPI(serperMCP *mcpimpl.SerperMCP, authService *auth.AuthService) *MCPAPI {
 	mcpSrv := mcpserver.NewMCPServer("demo", "0.1.0",
 		mcpserver.WithToolCapabilities(true),
 		mcpserver.WithRecovery(),
 	)
 	return &MCPAPI{
-		SerperMCP: serperMCP,
-		MCPServer: mcpSrv,
+		SerperMCP:   serperMCP,
+		MCPServer:   mcpSrv,
+		authService: authService,
 	}
 }
 
