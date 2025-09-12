@@ -45,6 +45,7 @@ type ResponseOutputTextDeltaEvent struct {
 	ContentIndex int       `json:"content_index"`
 	Delta        string    `json:"delta"`
 	Logprobs     []Logprob `json:"logprobs"`
+	Obfuscation  string    `json:"obfuscation"`
 }
 
 // ResponseOutputItem represents an output item

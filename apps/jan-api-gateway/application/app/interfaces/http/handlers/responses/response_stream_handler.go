@@ -36,7 +36,7 @@ func NewStreamHandler(responseHandler *ResponseHandler) *StreamHandler {
 // Constants for streaming configuration
 const (
 	RequestTimeout    = 120 * time.Second
-	MinWordsPerChunk  = 5
+	MinWordsPerChunk  = 6
 	DataPrefix        = "data: "
 	DoneMarker        = "[DONE]"
 	SSEEventFormat    = "event: %s\ndata: %s\n\n"
@@ -96,6 +96,7 @@ func (h *StreamHandler) createTextDeltaEvent(itemID string, sequenceNumber int, 
 		ContentIndex: 0,
 		Delta:        delta,
 		Logprobs:     []responsetypes.Logprob{},
+		Obfuscation:  fmt.Sprintf("%x", time.Now().UnixNano())[:10], // Simple obfuscation
 	}
 }
 
@@ -549,21 +550,29 @@ func (h *StreamHandler) streamResponseToChannel(reqCtx *gin.Context, request ope
 				reasoningBuffer.WriteString(reasoningContent)
 				fullReasoningResponse.WriteString(reasoningContent)
 
-				// Emit reasoning summary text delta event
-				reasoningSummaryTextDeltaEvent := responsetypes.ResponseReasoningSummaryTextDeltaEvent{
-					BaseStreamingEvent: responsetypes.BaseStreamingEvent{
-						Type:           "response.reasoning_summary_text.delta",
-						SequenceNumber: reasoningSequenceNumber,
-					},
-					ItemID:       reasoningItemID,
-					OutputIndex:  0,
-					SummaryIndex: 0,
-					Delta:        reasoningContent,
-					Obfuscation:  fmt.Sprintf("%x", time.Now().UnixNano())[:10], // Simple obfuscation
+				// Check if we have enough words to send reasoning content
+				bufferedReasoningContent := reasoningBuffer.String()
+				reasoningWords := strings.Fields(bufferedReasoningContent)
+
+				if len(reasoningWords) >= MinWordsPerChunk {
+					// Emit reasoning summary text delta event
+					reasoningSummaryTextDeltaEvent := responsetypes.ResponseReasoningSummaryTextDeltaEvent{
+						BaseStreamingEvent: responsetypes.BaseStreamingEvent{
+							Type:           "response.reasoning_summary_text.delta",
+							SequenceNumber: reasoningSequenceNumber,
+						},
+						ItemID:       reasoningItemID,
+						OutputIndex:  0,
+						SummaryIndex: 0,
+						Delta:        bufferedReasoningContent,
+						Obfuscation:  fmt.Sprintf("%x", time.Now().UnixNano())[:10], // Simple obfuscation
+					}
+					eventJSON, _ := json.Marshal(reasoningSummaryTextDeltaEvent)
+					dataChan <- fmt.Sprintf("event: response.reasoning_summary_text.delta\ndata: %s\n\n", string(eventJSON))
+					reasoningSequenceNumber++
+					// Clear the reasoning buffer
+					reasoningBuffer.Reset()
 				}
-				eventJSON, _ := json.Marshal(reasoningSummaryTextDeltaEvent)
-				dataChan <- fmt.Sprintf("event: response.reasoning_summary_text.delta\ndata: %s\n\n", string(eventJSON))
-				reasoningSequenceNumber++
 			}
 
 		}
@@ -574,6 +583,24 @@ func (h *StreamHandler) streamResponseToChannel(reqCtx *gin.Context, request ope
 		deltaEvent := h.createTextDeltaEvent(itemID, sequenceNumber, contentBuffer.String())
 		h.marshalAndSendEvent(dataChan, "response.output_text.delta", deltaEvent)
 		sequenceNumber++
+	}
+
+	// Send any remaining buffered reasoning content
+	if hasReasoningContent && reasoningBuffer.Len() > 0 {
+		reasoningSummaryTextDeltaEvent := responsetypes.ResponseReasoningSummaryTextDeltaEvent{
+			BaseStreamingEvent: responsetypes.BaseStreamingEvent{
+				Type:           "response.reasoning_summary_text.delta",
+				SequenceNumber: reasoningSequenceNumber,
+			},
+			ItemID:       reasoningItemID,
+			OutputIndex:  0,
+			SummaryIndex: 0,
+			Delta:        reasoningBuffer.String(),
+			Obfuscation:  fmt.Sprintf("%x", time.Now().UnixNano())[:10], // Simple obfuscation
+		}
+		eventJSON, _ := json.Marshal(reasoningSummaryTextDeltaEvent)
+		dataChan <- fmt.Sprintf("event: response.reasoning_summary_text.delta\ndata: %s\n\n", string(eventJSON))
+		reasoningSequenceNumber++
 	}
 
 	// Handle reasoning completion events
