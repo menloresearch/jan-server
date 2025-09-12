@@ -116,7 +116,7 @@ func (responseRoute *ResponseRoute) registerRoutes(router *gin.RouterGroup) {
 // @Failure 422 "Validation error"
 // @Failure 429 "Rate limit exceeded"
 // @Failure 500 "Internal server error"
-// @Router /jan/v1/responses [post]
+// @Router /v1/responses [post]
 func (responseRoute *ResponseRoute) CreateResponse(reqCtx *gin.Context) {
 	responseRoute.handler.CreateResponse(reqCtx)
 }
@@ -145,7 +145,7 @@ func (responseRoute *ResponseRoute) CreateResponse(reqCtx *gin.Context) {
 // @Failure 401  "Unauthorized"
 // @Failure 404  "Response not found"
 // @Failure 500  "Internal server error"
-// @Router /jan/v1/responses/{response_id} [get]
+// @Router /v1/responses/{response_id} [get]
 func (responseRoute *ResponseRoute) GetResponse(reqCtx *gin.Context) {
 	responseRoute.handler.GetResponse(reqCtx)
 }
@@ -174,7 +174,7 @@ func (responseRoute *ResponseRoute) GetResponse(reqCtx *gin.Context) {
 // @Failure 401  "Unauthorized"
 // @Failure 404  "Response not found"
 // @Failure 500  "Internal server error"
-// @Router /jan/v1/responses/{response_id} [delete]
+// @Router /v1/responses/{response_id} [delete]
 func (responseRoute *ResponseRoute) DeleteResponse(reqCtx *gin.Context) {
 	responseRoute.handler.DeleteResponse(reqCtx)
 }
@@ -203,7 +203,7 @@ func (responseRoute *ResponseRoute) DeleteResponse(reqCtx *gin.Context) {
 // @Failure 401  "Unauthorized"
 // @Failure 404  "Response not found"
 // @Failure 500  "Internal server error"
-// @Router /jan/v1/responses/{response_id}/cancel [post]
+// @Router /v1/responses/{response_id}/cancel [post]
 func (responseRoute *ResponseRoute) CancelResponse(reqCtx *gin.Context) {
 	responseRoute.handler.CancelResponse(reqCtx)
 }
@@ -253,7 +253,7 @@ func (responseRoute *ResponseRoute) CancelResponse(reqCtx *gin.Context) {
 // @Failure 401  "Unauthorized"
 // @Failure 404  "Response not found"
 // @Failure 500  "Internal server error"
-// @Router /jan/v1/responses/{response_id}/input_items [get]
+// @Router /v1/responses/{response_id}/input_items [get]
 func (responseRoute *ResponseRoute) ListInputItems(reqCtx *gin.Context) {
 	responseRoute.handler.ListInputItems(reqCtx)
 }

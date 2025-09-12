@@ -37,7 +37,6 @@ import (
 	apikeys2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/api_keys"
 	projects2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects"
 	apikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/organization/projects/api_keys"
-	responses2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/jan/v1/responses"
 	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
@@ -45,6 +44,7 @@ import (
 	mcpimpl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	organization2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
+	responsesRoutePkg "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/responses"
 
 	_ "github.com/grafana/pyroscope-go/godeltaprof/http/pprof"
 
@@ -82,8 +82,12 @@ func CreateApplication() (*Application, error) {
 	modelAPI := v1.NewModelAPI()
 	serperService := serpermcp.NewSerperService()
 	serperMCP := mcpimpl.NewSerperMCP(serperService)
+	responseRepository := responserepo.NewResponseRepository(db)
+	responseService := response.NewResponseService(responseRepository, itemRepository)
+	responseHandler := responses.NewResponseHandler(userService, apiKeyService, conversationService, responseService)
+	responsesRoute := responsesRoutePkg.NewResponseRoute(responseHandler)
 	mcpapi := mcp.NewMCPAPI(serperMCP)
-	v1Route := v1.NewV1Route(organizationRoute, chatRoute, conversationAPI, modelAPI, mcpapi)
+	v1Route := v1.NewV1Route(organizationRoute, chatRoute, conversationAPI, modelAPI, mcpapi, responsesRoute)
 	googleAuthAPI := google.NewGoogleAuthAPI(userService)
 	authRoute := auth.NewAuthRoute(googleAuthAPI, userService)
 	chatCompletionAPI := chat2.NewCompletionAPI(userService, apiKeyService)
@@ -93,12 +97,8 @@ func CreateApplication() (*Application, error) {
 	projectsProjectsRoute := projects2.NewProjectsRoute(userService, projectService, organizationService, projectApiKeyRoute)
 	organizationApiKeyRoute := apikeys2.NewOrganizationApiKeyRouteRoute(organizationService, apiKeyService, userService)
 	organizationOrganizationRoute := organization3.NewOrganizationRoute(organizationService, userService, projectsProjectsRoute, organizationApiKeyRoute)
-	responseRepository := responserepo.NewResponseRepository(db)
-	responseService := response.NewResponseService(responseRepository, itemRepository)
-	responseHandler := responses.NewResponseHandler(userService, apiKeyService, conversationService, responseService)
-	responseRoute := responses2.NewResponseRoute(responseHandler)
 	mcpMCPAPI := mcp2.NewMCPAPI(serperMCP)
-	v1V1Route := v1_2.NewV1Route(authRoute, chatChatRoute, conversationsConversationAPI, organizationOrganizationRoute, responseRoute, mcpMCPAPI)
+	v1V1Route := v1_2.NewV1Route(authRoute, chatChatRoute, conversationsConversationAPI, organizationOrganizationRoute, mcpMCPAPI)
 	janRoute := jan.NewJanRoute(v1V1Route, chatChatRoute)
 	httpServer := http.NewHttpServer(v1Route, janRoute)
 	application := &Application{
