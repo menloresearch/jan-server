@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	mcpserver "github.com/mark3labs/mcp-go/server"
+	"menlo.ai/jan-api-gateway/app/domain/auth"
 	mcpimpl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 )
 
@@ -40,18 +41,20 @@ func MCPMethodGuard(allowedMethods map[string]bool) gin.HandlerFunc {
 }
 
 type MCPAPI struct {
-	SerperMCP *mcpimpl.SerperMCP
-	MCPServer *mcpserver.MCPServer
+	SerperMCP   *mcpimpl.SerperMCP
+	MCPServer   *mcpserver.MCPServer
+	authService *auth.AuthService
 }
 
-func NewMCPAPI(serperMCP *mcpimpl.SerperMCP) *MCPAPI {
+func NewMCPAPI(serperMCP *mcpimpl.SerperMCP, authService *auth.AuthService) *MCPAPI {
 	mcpSrv := mcpserver.NewMCPServer("demo", "0.1.0",
 		mcpserver.WithToolCapabilities(true),
 		mcpserver.WithRecovery(),
 	)
 	return &MCPAPI{
-		SerperMCP: serperMCP,
-		MCPServer: mcpSrv,
+		SerperMCP:   serperMCP,
+		MCPServer:   mcpSrv,
+		authService: authService,
 	}
 }
 
@@ -71,6 +74,7 @@ func (mcpAPI *MCPAPI) RegisterRouter(router *gin.RouterGroup) {
 	mcpHttpHandler := mcpserver.NewStreamableHTTPServer(mcpAPI.MCPServer)
 	router.Any(
 		"/mcp",
+		mcpAPI.authService.AppUserAuthMiddleware(),
 		MCPMethodGuard(map[string]bool{
 			// Initialization / handshake
 			"initialize":                true,
