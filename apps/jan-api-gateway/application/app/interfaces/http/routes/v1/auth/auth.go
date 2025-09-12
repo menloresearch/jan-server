@@ -230,9 +230,8 @@ func (authRoute *AuthRoute) GuestLogin(reqCtx *gin.Context) {
 	name := ""
 	var id string = ""
 	if !ok {
-		userService := authRoute.userService
 		randomStr := strings.ToUpper(uuid.New().String())
-		user, err := userService.RegisterUser(ctx, &user.User{
+		user, err := authRoute.authService.RegisterUser(ctx, &user.User{
 			Name:    fmt.Sprintf("Jan-%s", randomStr),
 			Email:   fmt.Sprintf("Jan-%s@jan.ai", randomStr),
 			Enabled: true,
