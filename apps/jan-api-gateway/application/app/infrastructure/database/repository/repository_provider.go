@@ -2,11 +2,14 @@ package repository
 
 import (
 	"github.com/google/wire"
+	"menlo.ai/jan-api-gateway/app/domain/conversation"
+	"menlo.ai/jan-api-gateway/app/domain/response"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/apikeyrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/conversationrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/itemrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/organizationrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/projectrepo"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/responserepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 )
@@ -18,5 +21,8 @@ var RepositoryProvider = wire.NewSet(
 	userrepo.NewUserGormRepository,
 	conversationrepo.NewConversationGormRepository,
 	itemrepo.NewItemGormRepository,
+	responserepo.NewResponseRepository,
+	wire.Bind(new(response.ResponseRepository), new(*responserepo.ResponseRepository)),
+	wire.Bind(new(conversation.ItemRepository), new(*itemrepo.ItemGormRepository)),
 	transaction.NewDatabase,
 )

@@ -53,7 +53,7 @@ func (s *ConversationService) CreateConversation(ctx context.Context, userID uin
 		return nil, fmt.Errorf("failed to generate public ID: %w", err)
 	}
 
-	now := time.Now().Unix()
+	now := time.Now()
 	conversation := &Conversation{
 		PublicID:  publicID,
 		Title:     title,
@@ -85,6 +85,24 @@ func (s *ConversationService) GetConversationWithAccessAndItems(ctx context.Cont
 // GetConversationWithoutItems retrieves a conversation without loading items for performance
 func (s *ConversationService) GetConversationWithoutItems(ctx context.Context, publicID string, userID uint) (*Conversation, error) {
 	return s.getConversationWithAccessCheck(ctx, publicID, userID, false)
+}
+
+// GetConversationByID retrieves a conversation by its internal ID without user access control
+func (s *ConversationService) GetConversationByID(ctx context.Context, conversationID uint) (*Conversation, error) {
+	// Validate inputs
+	if conversationID == 0 {
+		return nil, fmt.Errorf("conversation ID cannot be zero")
+	}
+
+	conversation, err := s.conversationRepo.FindByID(ctx, conversationID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find conversation: %w", err)
+	}
+	if conversation == nil {
+		return nil, fmt.Errorf("conversation not found")
+	}
+
+	return conversation, nil
 }
 
 // getConversationWithAccessCheck is the internal method that handles conversation retrieval with optional item loading
@@ -150,7 +168,7 @@ func (s *ConversationService) UpdateAndAuthorizeConversation(ctx context.Context
 	if metadata != nil {
 		conversation.Metadata = metadata
 	}
-	conversation.UpdatedAt = time.Now().Unix()
+	conversation.UpdatedAt = time.Now()
 
 	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
 		return nil, fmt.Errorf("failed to update conversation: %w", err)
@@ -196,7 +214,7 @@ func (s *ConversationService) AddItem(ctx context.Context, conversation *Convers
 		return nil, fmt.Errorf("failed to generate item public ID: %w", err)
 	}
 
-	now := time.Now().Unix()
+	now := time.Now()
 	item := &Item{
 		PublicID:    itemPublicID,
 		Type:        itemType,
@@ -309,7 +327,7 @@ func (s *ConversationService) DeleteItem(ctx context.Context, conversation *Conv
 	}
 
 	// Update conversation timestamp
-	conversation.UpdatedAt = time.Now().Unix()
+	conversation.UpdatedAt = time.Now()
 	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
 		return nil, fmt.Errorf("failed to update conversation timestamp: %w", err)
 	}
@@ -360,7 +378,7 @@ func (s *ConversationService) DeleteItemByPublicID(ctx context.Context, conversa
 	}
 
 	// Update conversation timestamp
-	conversation.UpdatedAt = time.Now().Unix()
+	conversation.UpdatedAt = time.Now()
 	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
 		return nil, fmt.Errorf("failed to update conversation: %w", err)
 	}
@@ -393,15 +411,15 @@ func (s *ConversationService) SearchItems(ctx context.Context, publicID string, 
 }
 
 // generateConversationPublicID generates a conversation ID with business rules
-// Business rule: conversations use "conv" prefix with 16 character length for OpenAI compatibility
+// Business rule: conversations use "conv" prefix with 42 character length for OpenAI compatibility
 func (s *ConversationService) generateConversationPublicID() (string, error) {
-	return idgen.GenerateSecureID("conv", 16)
+	return idgen.GenerateSecureID("conv", 42)
 }
 
 // generateItemPublicID generates an item/message ID with business rules
-// Business rule: items/messages use "msg" prefix with 16 character length for OpenAI compatibility
+// Business rule: items/messages use "msg" prefix with 42 character length for OpenAI compatibility
 func (s *ConversationService) generateItemPublicID() (string, error) {
-	return idgen.GenerateSecureID("msg", 16)
+	return idgen.GenerateSecureID("msg", 42)
 }
 
 // AddMultipleItems adds multiple items to a conversation in a single transaction
@@ -419,7 +437,7 @@ func (s *ConversationService) AddMultipleItems(ctx context.Context, conversation
 		return nil, fmt.Errorf("cannot add more than 100 items at once")
 	}
 
-	now := time.Now().Unix()
+	now := time.Now()
 	createdItems := make([]*Item, len(items))
 
 	// Create all items

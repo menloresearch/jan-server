@@ -1,6 +1,7 @@
 package responses
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -10,6 +11,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
+	"menlo.ai/jan-api-gateway/app/domain/response"
 	"menlo.ai/jan-api-gateway/app/domain/user"
 	requesttypes "menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	responsetypes "menlo.ai/jan-api-gateway/app/interfaces/http/responses"
@@ -17,11 +19,17 @@ import (
 	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
+const (
+	// ClientCreatedRootConversationID is the special conversation ID that indicates a new conversation should be created
+	ClientCreatedRootConversationID = "client-created-root"
+)
+
 // ResponseHandler handles the business logic for response API endpoints
 type ResponseHandler struct {
 	UserService         *user.UserService
 	apikeyService       *apikey.ApiKeyService
 	conversationService *conversation.ConversationService
+	responseService     *response.ResponseService
 	streamHandler       *StreamHandler
 	nonStreamHandler    *NonStreamHandler
 }
@@ -31,11 +39,13 @@ func NewResponseHandler(
 	userService *user.UserService,
 	apikeyService *apikey.ApiKeyService,
 	conversationService *conversation.ConversationService,
+	responseService *response.ResponseService,
 ) *ResponseHandler {
 	responseHandler := &ResponseHandler{
 		UserService:         userService,
 		apikeyService:       apikeyService,
 		conversationService: conversationService,
+		responseService:     responseService,
 	}
 
 	// Initialize specialized handlers
@@ -48,7 +58,7 @@ func NewResponseHandler(
 // CreateResponse handles the business logic for creating a response
 func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 	// Get user from middleware context
-	_, ok := h.UserService.GetUserFromContext(reqCtx)
+	userEntity, ok := h.UserService.GetUserFromContext(reqCtx)
 	if !ok {
 		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "user not found in context")
 		return
@@ -70,7 +80,7 @@ func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 	// Get API key for the user
 	key, err := h.getAPIKey(reqCtx)
 	if err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "019929d1-1e85-72c1-a1cf-e151403692dc", err.Error())
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "019929d1-1e85-72c1-a1cf-e151403692dc", "invalid apikey")
 		return
 	}
 
@@ -112,32 +122,109 @@ func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 		return
 	}
 
-	// Append input messages to conversation
-	if err := h.appendMessagesToConversation(reqCtx, conversation, chatCompletionRequest.Messages); err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "b2c3d4e5-f6g7-8901-bcde-f23456789012", err.Error())
+	// Append input messages to conversation (only if conversation exists)
+	if conversation != nil {
+		if err := h.appendMessagesToConversation(reqCtx, conversation, chatCompletionRequest.Messages); err != nil {
+			h.sendErrorResponse(reqCtx, http.StatusBadRequest, "b2c3d4e5-f6g7-8901-bcde-f23456789012", err.Error())
+			return
+		}
+	}
+
+	// If previous_response_id is provided, prepend conversation history to input messages
+	if request.PreviousResponseID != nil && *request.PreviousResponseID != "" {
+		conversationMessages, err := h.convertConversationItemsToMessages(reqCtx, conversation)
+		if err != nil {
+			h.sendErrorResponse(reqCtx, http.StatusBadRequest, "c3d4e5f6-g7h8-9012-cdef-345678901234", err.Error())
+			return
+		}
+		// Prepend conversation history to the input messages
+		chatCompletionRequest.Messages = append(conversationMessages, chatCompletionRequest.Messages...)
+	}
+
+	// Create response parameters
+	responseParams := &response.ResponseParams{
+		MaxTokens:         request.MaxTokens,
+		Temperature:       request.Temperature,
+		TopP:              request.TopP,
+		TopK:              request.TopK,
+		RepetitionPenalty: request.RepetitionPenalty,
+		Seed:              request.Seed,
+		Stop:              request.Stop,
+		PresencePenalty:   request.PresencePenalty,
+		FrequencyPenalty:  request.FrequencyPenalty,
+		LogitBias:         request.LogitBias,
+		ResponseFormat:    request.ResponseFormat,
+		Metadata:          request.Metadata,
+		Stream:            request.Stream,
+		Background:        request.Background,
+		Timeout:           request.Timeout,
+		User:              request.User,
+	}
+
+	// Create response record in database
+	var conversationID *uint
+	if conversation != nil {
+		conversationID = &conversation.ID
+	}
+	responseEntity, err := h.responseService.CreateResponse(reqCtx, userEntity.ID, conversationID, request.Model, request.Input, request.SystemPrompt, responseParams)
+	if err != nil {
+		h.sendErrorResponse(reqCtx, http.StatusInternalServerError, "c7d8e9f0-a1b2-3456-cdef-012345678901", "failed to create response record: "+err.Error())
 		return
 	}
 
 	// Delegate to specialized handlers based on streaming preference
 	if request.Stream != nil && *request.Stream {
 		// Handle streaming response
-		h.streamHandler.CreateStreamResponse(reqCtx, &request, key, conversation)
+		h.streamHandler.CreateStreamResponse(reqCtx, &request, key, conversation, responseEntity, chatCompletionRequest)
 	} else {
 		// Handle non-streaming response
-		h.nonStreamHandler.CreateNonStreamResponse(reqCtx, &request, key, conversation)
+		h.nonStreamHandler.CreateNonStreamResponse(reqCtx, &request, key, conversation, responseEntity, chatCompletionRequest)
 	}
 }
 
 // handleConversation handles conversation creation or loading based on the request
 func (h *ResponseHandler) handleConversation(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest) (*conversation.Conversation, error) {
+	// If store is explicitly set to false, don't create or use any conversation
+	if request.Store != nil && !*request.Store {
+		return nil, nil
+	}
+
 	// Get user from middleware context
 	userEntity, ok := h.UserService.GetUserFromContext(reqCtx)
 	if !ok {
 		return nil, fmt.Errorf("user not found in context")
 	}
 
+	// If previous_response_id is provided, load the conversation from the previous response
+	if request.PreviousResponseID != nil && *request.PreviousResponseID != "" {
+		// Load the previous response
+		previousResponse, err := h.responseService.GetResponseByPublicID(reqCtx, *request.PreviousResponseID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load previous response: %w", err)
+		}
+		if previousResponse == nil {
+			return nil, fmt.Errorf("previous response not found: %s", *request.PreviousResponseID)
+		}
+
+		// Validate that the previous response belongs to the same user
+		if previousResponse.UserID != userEntity.ID {
+			return nil, fmt.Errorf("previous response does not belong to the current user")
+		}
+
+		// Load the conversation from the previous response
+		if previousResponse.ConversationID == nil {
+			return nil, fmt.Errorf("previous response does not belong to any conversation")
+		}
+
+		conv, err := h.conversationService.GetConversationByID(reqCtx, *previousResponse.ConversationID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load conversation from previous response: %w", err)
+		}
+		return conv, nil
+	}
+
 	// Check if conversation is specified and not 'client-created-root'
-	if request.Conversation != nil && *request.Conversation != "" && *request.Conversation != "client-created-root" {
+	if request.Conversation != nil && *request.Conversation != "" && *request.Conversation != ClientCreatedRootConversationID {
 		// Load existing conversation
 		conv, err := h.conversationService.GetConversationByPublicIDAndUserID(reqCtx, *request.Conversation, userEntity.ID)
 		if err != nil {
@@ -329,32 +416,27 @@ func (h *ResponseHandler) GetResponse(reqCtx *gin.Context) {
 		return
 	}
 
-	_ = userEntity // TODO: Use user info if needed
-	// TODO: Get response logic here
-
-	// Create mock response data
-	mockResponse := responsetypes.Response{
-		ID:      responseID,
-		Object:  "response",
-		Created: 1234567890,
-		Model:   "gpt-4",
-		Status:  responsetypes.ResponseStatusCompleted,
-		Input: requesttypes.CreateResponseInput{
-			Type: requesttypes.InputTypeText,
-			Text: ptr.ToString("Hello, world!"),
-		},
-		Output: &responsetypes.ResponseOutput{
-			Type: responsetypes.OutputTypeText,
-			Text: &responsetypes.TextOutput{
-				Value: "Hello! How can I help you today?",
-			},
-		},
-		Conversation: &responsetypes.ConversationInfo{
-			ID: "mock-conversation-id",
-		},
+	// Get response from database
+	responseEntity, err := h.responseService.GetResponseByPublicID(reqCtx, responseID)
+	if err != nil {
+		h.sendErrorResponse(reqCtx, http.StatusInternalServerError, "d8e9f0a1-b2c3-4567-def0-123456789012", "failed to get response: "+err.Error())
+		return
 	}
 
-	h.sendSuccessResponse(reqCtx, mockResponse)
+	if responseEntity == nil {
+		h.sendErrorResponse(reqCtx, http.StatusNotFound, "e9f0a1b2-c3d4-5678-ef01-234567890123", "response not found")
+		return
+	}
+
+	// Check if user owns this response
+	if responseEntity.UserID != userEntity.ID {
+		h.sendErrorResponse(reqCtx, http.StatusForbidden, "f0a1b2c3-d4e5-6789-f012-345678901234", "access denied")
+		return
+	}
+
+	// Convert domain response to API response
+	apiResponse := h.convertDomainResponseToAPIResponse(reqCtx, responseEntity)
+	h.sendSuccessResponse(reqCtx, apiResponse)
 }
 
 // DeleteResponse handles the business logic for deleting a response
@@ -539,4 +621,151 @@ func (h *ResponseHandler) getAPIKey(reqCtx *gin.Context) (string, error) {
 	}
 
 	return key, nil
+}
+
+// convertDomainResponseToAPIResponse converts a domain response to API response format
+func (h *ResponseHandler) convertDomainResponseToAPIResponse(reqCtx *gin.Context, responseEntity *response.Response) responsetypes.Response {
+	apiResponse := responsetypes.Response{
+		ID:      responseEntity.PublicID,
+		Object:  "response",
+		Created: responseEntity.CreatedAt.Unix(),
+		Model:   responseEntity.Model,
+		Status:  responsetypes.ResponseStatus(responseEntity.Status),
+		Input:   responseEntity.Input, // This is already JSON string
+	}
+
+	// Parse and set output if available
+	if responseEntity.Output != nil {
+		apiResponse.Output = responseEntity.Output
+	}
+
+	// Set optional fields
+	if responseEntity.SystemPrompt != nil {
+		apiResponse.SystemPrompt = responseEntity.SystemPrompt
+	}
+	if responseEntity.MaxTokens != nil {
+		apiResponse.MaxTokens = responseEntity.MaxTokens
+	}
+	if responseEntity.Temperature != nil {
+		apiResponse.Temperature = responseEntity.Temperature
+	}
+	if responseEntity.TopP != nil {
+		apiResponse.TopP = responseEntity.TopP
+	}
+	if responseEntity.TopK != nil {
+		apiResponse.TopK = responseEntity.TopK
+	}
+	if responseEntity.RepetitionPenalty != nil {
+		apiResponse.RepetitionPenalty = responseEntity.RepetitionPenalty
+	}
+	if responseEntity.Seed != nil {
+		apiResponse.Seed = responseEntity.Seed
+	}
+	if responseEntity.PresencePenalty != nil {
+		apiResponse.PresencePenalty = responseEntity.PresencePenalty
+	}
+	if responseEntity.FrequencyPenalty != nil {
+		apiResponse.FrequencyPenalty = responseEntity.FrequencyPenalty
+	}
+	if responseEntity.Stream != nil {
+		apiResponse.Stream = responseEntity.Stream
+	}
+	if responseEntity.Background != nil {
+		apiResponse.Background = responseEntity.Background
+	}
+	if responseEntity.Timeout != nil {
+		apiResponse.Timeout = responseEntity.Timeout
+	}
+	if responseEntity.User != nil {
+		apiResponse.User = responseEntity.User
+	}
+	// Parse usage and error from JSON strings if available
+	if responseEntity.Usage != nil {
+		var usage responsetypes.DetailedUsage
+		if err := json.Unmarshal([]byte(*responseEntity.Usage), &usage); err == nil {
+			apiResponse.Usage = &usage
+		}
+	}
+	if responseEntity.Error != nil {
+		var errorResp responsetypes.ResponseError
+		if err := json.Unmarshal([]byte(*responseEntity.Error), &errorResp); err == nil {
+			apiResponse.Error = &errorResp
+		}
+	}
+
+	// Set timestamps
+	if responseEntity.CompletedAt != nil {
+		completedAt := responseEntity.CompletedAt.Unix()
+		apiResponse.CompletedAt = &completedAt
+	}
+	if responseEntity.CancelledAt != nil {
+		cancelledAt := responseEntity.CancelledAt.Unix()
+		apiResponse.CancelledAt = &cancelledAt
+	}
+	if responseEntity.FailedAt != nil {
+		failedAt := responseEntity.FailedAt.Unix()
+		apiResponse.FailedAt = &failedAt
+	}
+
+	// Set conversation info if available
+	if responseEntity.ConversationID != nil {
+		// Get conversation to retrieve its public ID
+		conv, err := h.conversationService.GetConversationByID(reqCtx, *responseEntity.ConversationID)
+		if err == nil && conv != nil {
+			apiResponse.Conversation = &responsetypes.ConversationInfo{
+				ID: conv.PublicID,
+			}
+		}
+	}
+
+	return apiResponse
+}
+
+// convertConversationItemsToMessages converts conversation items to OpenAI chat completion messages
+func (h *ResponseHandler) convertConversationItemsToMessages(reqCtx *gin.Context, conv *conversation.Conversation) ([]openai.ChatCompletionMessage, error) {
+	// Load conversation with items
+	convWithItems, err := h.conversationService.GetConversationByPublicIDAndUserID(reqCtx, conv.PublicID, conv.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load conversation with items: %w", err)
+	}
+
+	// Convert items to messages
+	messages := make([]openai.ChatCompletionMessage, 0, len(convWithItems.Items))
+	for _, item := range convWithItems.Items {
+		// Skip items that don't have a role or content
+		if item.Role == nil || len(item.Content) == 0 {
+			continue
+		}
+
+		// Convert conversation role to OpenAI role
+		var openaiRole string
+		switch *item.Role {
+		case conversation.ItemRoleSystem:
+			openaiRole = openai.ChatMessageRoleSystem
+		case conversation.ItemRoleUser:
+			openaiRole = openai.ChatMessageRoleUser
+		case conversation.ItemRoleAssistant:
+			openaiRole = openai.ChatMessageRoleAssistant
+		default:
+			openaiRole = openai.ChatMessageRoleUser
+		}
+
+		// Extract text content from the item
+		var content string
+		for _, contentPart := range item.Content {
+			if contentPart.Type == "text" && contentPart.Text != nil {
+				content += contentPart.Text.Value
+			}
+		}
+
+		// Only add messages with content
+		if content != "" {
+			messages = append(messages, openai.ChatCompletionMessage{
+				Role:    openaiRole,
+				Content: content,
+			})
+		}
+	}
+
+	return messages, nil
 }

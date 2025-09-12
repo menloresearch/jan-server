@@ -1,52 +1,86 @@
 package responses
 
-// StreamingEvent represents a streaming event
-// Reference: https://platform.openai.com/docs/api-reference/responses/streaming
-type StreamingEvent struct {
+// BaseStreamingEvent represents the base structure for all streaming events
+type BaseStreamingEvent struct {
 	// The type of event.
-	Event string `json:"event"`
+	Type string `json:"type"`
 
-	// The Unix timestamp (in seconds) when the event was created.
-	Created int64 `json:"created"`
-
-	// The ID of the response this event belongs to.
-	ResponseID string `json:"response_id"`
-
-	// The data for the event.
-	Data interface{} `json:"data"`
+	// The sequence number of the event.
+	SequenceNumber int `json:"sequence_number"`
 }
 
 // ResponseCreatedEvent represents a response.created event
 type ResponseCreatedEvent struct {
-	// The type of event, always "response.created".
-	Event string `json:"event"`
+	BaseStreamingEvent
+	Response Response `json:"response"`
+}
 
-	// The Unix timestamp (in seconds) when the event was created.
-	Created int64 `json:"created"`
+// ResponseInProgressEvent represents a response.in_progress event
+type ResponseInProgressEvent struct {
+	BaseStreamingEvent
+	Response map[string]interface{} `json:"response"`
+}
 
-	// The ID of the response this event belongs to.
-	ResponseID string `json:"response_id"`
+// ResponseOutputItemAddedEvent represents a response.output_item.added event
+type ResponseOutputItemAddedEvent struct {
+	BaseStreamingEvent
+	OutputIndex int                `json:"output_index"`
+	Item        ResponseOutputItem `json:"item"`
+}
 
-	// The response data.
-	Data Response `json:"data"`
+// ResponseContentPartAddedEvent represents a response.content_part.added event
+type ResponseContentPartAddedEvent struct {
+	BaseStreamingEvent
+	ItemID       string              `json:"item_id"`
+	OutputIndex  int                 `json:"output_index"`
+	ContentIndex int                 `json:"content_index"`
+	Part         ResponseContentPart `json:"part"`
 }
 
 // ResponseOutputTextDeltaEvent represents a response.output_text.delta event
 type ResponseOutputTextDeltaEvent struct {
-	// The type of event, always "response.output_text.delta".
-	Event string `json:"event"`
-
-	// The Unix timestamp (in seconds) when the event was created.
-	Created int64 `json:"created"`
-
-	// The ID of the response this event belongs to.
-	ResponseID string `json:"response_id"`
-
-	// The delta data.
-	Data TextDelta `json:"data"`
+	BaseStreamingEvent
+	ItemID       string    `json:"item_id"`
+	OutputIndex  int       `json:"output_index"`
+	ContentIndex int       `json:"content_index"`
+	Delta        string    `json:"delta"`
+	Logprobs     []Logprob `json:"logprobs"`
+	Obfuscation  string    `json:"obfuscation"`
 }
 
-// TextDelta represents a delta for text output
+// ResponseOutputItem represents an output item
+type ResponseOutputItem struct {
+	ID      string                `json:"id"`
+	Type    string                `json:"type"`
+	Status  string                `json:"status"`
+	Content []ResponseContentPart `json:"content"`
+	Role    string                `json:"role"`
+}
+
+// ResponseContentPart represents a content part
+type ResponseContentPart struct {
+	Type        string       `json:"type"`
+	Annotations []Annotation `json:"annotations"`
+	Logprobs    []Logprob    `json:"logprobs"`
+	Text        string       `json:"text"`
+}
+
+// Logprob represents log probability data
+type Logprob struct {
+	Token       string       `json:"token"`
+	Logprob     float64      `json:"logprob"`
+	Bytes       []int        `json:"bytes,omitempty"`
+	TopLogprobs []TopLogprob `json:"top_logprobs,omitempty"`
+}
+
+// TopLogprob represents top log probability data
+type TopLogprob struct {
+	Token   string  `json:"token"`
+	Logprob float64 `json:"logprob"`
+	Bytes   []int   `json:"bytes,omitempty"`
+}
+
+// TextDelta represents a delta for text output (legacy)
 type TextDelta struct {
 	// The delta text.
 	Delta string `json:"delta"`
@@ -57,17 +91,34 @@ type TextDelta struct {
 
 // ResponseOutputTextDoneEvent represents a response.output_text.done event
 type ResponseOutputTextDoneEvent struct {
-	// The type of event, always "response.output_text.done".
-	Event string `json:"event"`
+	BaseStreamingEvent
+	ItemID       string    `json:"item_id"`
+	OutputIndex  int       `json:"output_index"`
+	ContentIndex int       `json:"content_index"`
+	Text         string    `json:"text"`
+	Logprobs     []Logprob `json:"logprobs"`
+}
 
-	// The Unix timestamp (in seconds) when the event was created.
-	Created int64 `json:"created"`
+// ResponseContentPartDoneEvent represents a response.content_part.done event
+type ResponseContentPartDoneEvent struct {
+	BaseStreamingEvent
+	ItemID       string              `json:"item_id"`
+	OutputIndex  int                 `json:"output_index"`
+	ContentIndex int                 `json:"content_index"`
+	Part         ResponseContentPart `json:"part"`
+}
 
-	// The ID of the response this event belongs to.
-	ResponseID string `json:"response_id"`
+// ResponseOutputItemDoneEvent represents a response.output_item.done event
+type ResponseOutputItemDoneEvent struct {
+	BaseStreamingEvent
+	OutputIndex int                `json:"output_index"`
+	Item        ResponseOutputItem `json:"item"`
+}
 
-	// The completion data.
-	Data TextCompletion `json:"data"`
+// ResponseCompletedEvent represents a response.completed event
+type ResponseCompletedEvent struct {
+	BaseStreamingEvent
+	Response Response `json:"response"`
 }
 
 // TextCompletion represents the completion of text output
@@ -291,17 +342,18 @@ type StreamingCompletion struct {
 
 // ResponseOutputFunctionCallsDeltaEvent represents a response.output_function_calls.delta event
 type ResponseOutputFunctionCallsDeltaEvent struct {
-	// The type of event, always "response.output_function_calls.delta".
-	Event string `json:"event"`
+	BaseStreamingEvent
+	ItemID       string            `json:"item_id"`
+	OutputIndex  int               `json:"output_index"`
+	ContentIndex int               `json:"content_index"`
+	Delta        FunctionCallDelta `json:"delta"`
+	Logprobs     []Logprob         `json:"logprobs"`
+}
 
-	// The Unix timestamp (in seconds) when the event was created.
-	Created int64 `json:"created"`
-
-	// The ID of the response this event belongs to.
-	ResponseID string `json:"response_id"`
-
-	// The delta data.
-	Data FunctionCallsDelta `json:"data"`
+// FunctionCallDelta represents a delta for function call
+type FunctionCallDelta struct {
+	Name      string                 `json:"name"`
+	Arguments map[string]interface{} `json:"arguments"`
 }
 
 // FunctionCallsDelta represents a delta for function calls output
@@ -407,4 +459,47 @@ type ResponseErrorEvent struct {
 
 	// The error data.
 	Data ResponseError `json:"data"`
+}
+
+// ResponseReasoningSummaryPartAddedEvent represents a response.reasoning_summary_part.added event
+type ResponseReasoningSummaryPartAddedEvent struct {
+	BaseStreamingEvent
+	ItemID       string `json:"item_id"`
+	OutputIndex  int    `json:"output_index"`
+	SummaryIndex int    `json:"summary_index"`
+	Part         struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	} `json:"part"`
+}
+
+// ResponseReasoningSummaryTextDeltaEvent represents a response.reasoning_summary_text.delta event
+type ResponseReasoningSummaryTextDeltaEvent struct {
+	BaseStreamingEvent
+	ItemID       string `json:"item_id"`
+	OutputIndex  int    `json:"output_index"`
+	SummaryIndex int    `json:"summary_index"`
+	Delta        string `json:"delta"`
+	Obfuscation  string `json:"obfuscation"`
+}
+
+// ResponseReasoningSummaryTextDoneEvent represents a response.reasoning_summary_text.done event
+type ResponseReasoningSummaryTextDoneEvent struct {
+	BaseStreamingEvent
+	ItemID       string `json:"item_id"`
+	OutputIndex  int    `json:"output_index"`
+	SummaryIndex int    `json:"summary_index"`
+	Text         string `json:"text"`
+}
+
+// ResponseReasoningSummaryPartDoneEvent represents a response.reasoning_summary_part.done event
+type ResponseReasoningSummaryPartDoneEvent struct {
+	BaseStreamingEvent
+	ItemID       string `json:"item_id"`
+	OutputIndex  int    `json:"output_index"`
+	SummaryIndex int    `json:"summary_index"`
+	Part         struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	} `json:"part"`
 }

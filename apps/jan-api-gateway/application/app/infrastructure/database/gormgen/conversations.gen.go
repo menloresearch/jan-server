@@ -85,6 +85,35 @@ func newConversation(db *gorm.DB, opts ...gen.DOOption) conversation {
 				RelationField: field.NewRelation("Items.Conversation.Items", "dbschema.Item"),
 			},
 		},
+		Response: struct {
+			field.RelationField
+			UserEntity struct {
+				field.RelationField
+			}
+			Conversation struct {
+				field.RelationField
+			}
+			Items struct {
+				field.RelationField
+			}
+		}{
+			RelationField: field.NewRelation("Items.Response", "dbschema.Response"),
+			UserEntity: struct {
+				field.RelationField
+			}{
+				RelationField: field.NewRelation("Items.Response.UserEntity", "dbschema.User"),
+			},
+			Conversation: struct {
+				field.RelationField
+			}{
+				RelationField: field.NewRelation("Items.Response.Conversation", "dbschema.Conversation"),
+			},
+			Items: struct {
+				field.RelationField
+			}{
+				RelationField: field.NewRelation("Items.Response.Items", "dbschema.Item"),
+			},
+		},
 	}
 
 	_conversation.User = conversationBelongsToUser{
@@ -202,6 +231,18 @@ type conversationHasManyItems struct {
 			Projects struct {
 				field.RelationField
 			}
+		}
+		Items struct {
+			field.RelationField
+		}
+	}
+	Response struct {
+		field.RelationField
+		UserEntity struct {
+			field.RelationField
+		}
+		Conversation struct {
+			field.RelationField
 		}
 		Items struct {
 			field.RelationField

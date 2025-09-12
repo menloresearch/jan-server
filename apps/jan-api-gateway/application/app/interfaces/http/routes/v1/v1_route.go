@@ -8,6 +8,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/responses"
 	"menlo.ai/jan-api-gateway/config"
 )
 
@@ -17,6 +18,7 @@ type V1Route struct {
 	conversationAPI   *conversations.ConversationAPI
 	modelAPI          *ModelAPI
 	mcpAPI            *mcp.MCPAPI
+	responsesRoute    *responses.ResponseRoute
 }
 
 func NewV1Route(
@@ -25,6 +27,7 @@ func NewV1Route(
 	conversationAPI *conversations.ConversationAPI,
 	modelAPI *ModelAPI,
 	mcpAPI *mcp.MCPAPI,
+	responsesRoute *responses.ResponseRoute,
 ) *V1Route {
 	return &V1Route{
 		organizationRoute,
@@ -32,6 +35,7 @@ func NewV1Route(
 		conversationAPI,
 		modelAPI,
 		mcpAPI,
+		responsesRoute,
 	}
 }
 
@@ -43,6 +47,7 @@ func (v1Route *V1Route) RegisterRouter(router gin.IRouter) {
 	v1Route.modelAPI.RegisterRouter(v1Router)
 	v1Route.mcpAPI.RegisterRouter(v1Router)
 	v1Route.organizationRoute.RegisterRouter(v1Router)
+	v1Route.responsesRoute.RegisterRouter(v1Router)
 }
 
 // GetVersion godoc

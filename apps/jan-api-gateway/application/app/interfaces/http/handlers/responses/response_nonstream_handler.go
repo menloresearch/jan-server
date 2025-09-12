@@ -2,16 +2,17 @@ package responses
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
+	"menlo.ai/jan-api-gateway/app/domain/response"
 	requesttypes "menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	responsetypes "menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
+	"menlo.ai/jan-api-gateway/app/utils/logger"
 )
 
 const (
@@ -32,16 +33,7 @@ func NewNonStreamHandler(responseHandler *ResponseHandler) *NonStreamHandler {
 }
 
 // CreateNonStreamResponse handles the business logic for creating a non-streaming response
-func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation) {
-	// Convert response request to chat completion request
-	chatCompletionRequest := h.convertToChatCompletionRequest(request)
-	if chatCompletionRequest == nil {
-		reqCtx.JSON(http.StatusBadRequest, responsetypes.ErrorResponse{
-			Code:  "019929ec-6f89-76c5-8ed4-bd0eb1c6c8db",
-			Error: "unsupported input type for chat completion",
-		})
-		return
-	}
+func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *response.Response, chatCompletionRequest *openai.ChatCompletionRequest) {
 
 	// Process with Jan inference client for non-streaming with timeout
 	janInferenceClient := janinference.NewJanInferenceClient(reqCtx)
@@ -52,36 +44,46 @@ func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request 
 		reqCtx.AbortWithStatusJSON(
 			http.StatusBadRequest,
 			responsetypes.ErrorResponse{
-				Code:  "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",
-				Error: err.Error(),
+				Code: "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",
 			})
 		return
 	}
 
-	// Append assistant's response to conversation
-	if len(response.Choices) > 0 && response.Choices[0].Message.Content != "" {
+	// Process reasoning content
+	var processedResponse *openai.ChatCompletionResponse = response
+
+	// Append assistant's response to conversation (only if conversation exists)
+	if conv != nil && len(processedResponse.Choices) > 0 && processedResponse.Choices[0].Message.Content != "" {
 		assistantMessage := openai.ChatCompletionMessage{
 			Role:    openai.ChatMessageRoleAssistant,
-			Content: response.Choices[0].Message.Content,
+			Content: processedResponse.Choices[0].Message.Content,
 		}
 		if err := h.appendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}); err != nil {
 			// Log error but don't fail the response
-			fmt.Printf("Failed to append assistant response to conversation: %v\n", err)
+			logger.GetLogger().Errorf("Failed to append assistant response to conversation: %v", err)
 		}
 	}
 
 	// Convert chat completion response to response format
-	responseData := h.convertFromChatCompletionResponse(response, request, conv)
+	responseData := h.convertFromChatCompletionResponse(processedResponse, request, conv)
 	reqCtx.JSON(http.StatusOK, responseData.T)
 }
 
 // convertFromChatCompletionResponse converts a ChatCompletionResponse to a Response
 func (h *NonStreamHandler) convertFromChatCompletionResponse(chatResp *openai.ChatCompletionResponse, req *requesttypes.CreateResponseRequest, conv *conversation.Conversation) responsetypes.OpenAIGeneralResponse[responsetypes.Response] {
 
-	// Extract the content from the first choice
+	// Extract the content and reasoning from the first choice
 	var outputText string
+	var reasoningContent string
+
 	if len(chatResp.Choices) > 0 {
-		outputText = chatResp.Choices[0].Message.Content
+		choice := chatResp.Choices[0]
+		outputText = choice.Message.Content
+
+		// Extract reasoning content if present
+		if choice.Message.ReasoningContent != "" {
+			reasoningContent = choice.Message.ReasoningContent
+		}
 	}
 
 	// Convert input back to the original format for response
@@ -96,14 +98,29 @@ func (h *NonStreamHandler) convertFromChatCompletionResponse(chatResp *openai.Ch
 	}
 
 	// Create output using proper ResponseOutput structure
-	output := []responsetypes.ResponseOutput{
-		{
+	var output []responsetypes.ResponseOutput
+
+	// Add reasoning content if present
+	if reasoningContent != "" {
+		output = append(output, responsetypes.ResponseOutput{
+			Type: responsetypes.OutputTypeReasoning,
+			Reasoning: &responsetypes.ReasoningOutput{
+				Task:   "reasoning",
+				Result: reasoningContent,
+				Steps:  []responsetypes.ReasoningStep{},
+			},
+		})
+	}
+
+	// Add text content if present
+	if outputText != "" {
+		output = append(output, responsetypes.ResponseOutput{
 			Type: responsetypes.OutputTypeText,
 			Text: &responsetypes.TextOutput{
 				Value:       outputText,
 				Annotations: []responsetypes.Annotation{},
 			},
-		},
+		})
 	}
 
 	// Create usage information using proper DetailedUsage struct
@@ -145,8 +162,13 @@ func (h *NonStreamHandler) convertFromChatCompletionResponse(chatResp *openai.Ch
 		ParallelToolCalls:  false,
 		PreviousResponseID: nil,
 		Reasoning: &responsetypes.Reasoning{
-			Effort:  nil,
-			Summary: nil,
+			Effort: nil,
+			Summary: func() *string {
+				if reasoningContent != "" {
+					return &reasoningContent
+				}
+				return nil
+			}(),
 		},
 		Store:       true,
 		Temperature: req.Temperature,
@@ -155,10 +177,6 @@ func (h *NonStreamHandler) convertFromChatCompletionResponse(chatResp *openai.Ch
 				Type: "text",
 			},
 		},
-		ToolChoice: &requesttypes.ToolChoice{
-			Type: "auto",
-		},
-		Tools:      []requesttypes.Tool{},
 		TopP:       req.TopP,
 		Truncation: "disabled",
 		User:       nil,

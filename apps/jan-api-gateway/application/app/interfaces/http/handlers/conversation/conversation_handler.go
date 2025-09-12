@@ -689,7 +689,7 @@ func (h *ConversationHandler) domainToConversationResponse(entity *conversation.
 	return &ConversationResponse{
 		ID:        entity.PublicID,
 		Object:    "conversation",
-		CreatedAt: entity.CreatedAt,
+		CreatedAt: entity.CreatedAt.Unix(),
 		Metadata:  metadata,
 	}
 }
@@ -728,7 +728,7 @@ func (h *ConversationHandler) domainToConversationItemResponse(entity conversati
 		Object:    "conversation.item",
 		Type:      string(entity.Type),
 		Status:    entity.Status,
-		CreatedAt: entity.CreatedAt,
+		CreatedAt: entity.CreatedAt.Unix(),
 		Content:   h.domainToContentResponse(entity.Content),
 	}
 

@@ -2,6 +2,7 @@ package dbschema
 
 import (
 	"encoding/json"
+	"time"
 
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database"
@@ -27,16 +28,18 @@ type Conversation struct {
 
 type Item struct {
 	BaseModel
-	PublicID          string       `gorm:"type:varchar(50);uniqueIndex;not null"` // OpenAI-compatible string ID
+	PublicID          string       `gorm:"type:varchar(50);uniqueIndex;not null"`
 	ConversationID    uint         `gorm:"not null;index"`
+	ResponseID        *uint        `gorm:"index"`
 	Type              string       `gorm:"type:varchar(50);not null"`
 	Role              string       `gorm:"type:varchar(20)"`
 	Content           string       `gorm:"type:text"`
 	Status            string       `gorm:"type:varchar(50)"`
-	IncompleteAt      *int64       `gorm:"type:bigint"`
+	IncompleteAt      *time.Time   `gorm:"type:timestamp"`
 	IncompleteDetails string       `gorm:"type:text"`
-	CompletedAt       *int64       `gorm:"type:bigint"`
+	CompletedAt       *time.Time   `gorm:"type:timestamp"`
 	Conversation      Conversation `gorm:"foreignKey:ConversationID"`
+	Response          *Response    `gorm:"foreignKey:ResponseID"`
 }
 
 func NewSchemaConversation(c *conversation.Conversation) *Conversation {
@@ -79,8 +82,8 @@ func (c *Conversation) EtoD() *conversation.Conversation {
 		Status:    conversation.ConversationStatus(c.Status),
 		Metadata:  metadata,
 		IsPrivate: c.IsPrivate,
-		CreatedAt: c.CreatedAt.Unix(), // Convert time.Time to Unix timestamp
-		UpdatedAt: c.UpdatedAt.Unix(), // Convert time.Time to Unix timestamp
+		CreatedAt: c.CreatedAt, // Convert time.Time to Unix timestamp
+		UpdatedAt: c.UpdatedAt, // Convert time.Time to Unix timestamp
 	}
 }
 
@@ -104,6 +107,8 @@ func NewSchemaItem(i *conversation.Item) *Item {
 			ID: i.ID,
 		},
 		PublicID:          i.PublicID, // Add PublicID field
+		ConversationID:    i.ConversationID,
+		ResponseID:        i.ResponseID,
 		Type:              string(i.Type),
 		Role:              stringPtrToString((*string)(i.Role)),
 		Content:           contentJSON,
@@ -138,7 +143,9 @@ func (i *Item) EtoD() *conversation.Item {
 		IncompleteAt:      i.IncompleteAt,
 		IncompleteDetails: incompleteDetails,
 		CompletedAt:       i.CompletedAt,
-		CreatedAt:         i.CreatedAt.Unix(), // Convert time.Time to Unix timestamp
+		ConversationID:    i.ConversationID,
+		ResponseID:        i.ResponseID,
+		CreatedAt:         i.CreatedAt, // Convert time.Time to Unix timestamp
 	}
 }
 
