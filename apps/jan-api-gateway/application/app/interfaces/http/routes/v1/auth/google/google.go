@@ -24,9 +24,10 @@ type GoogleAuthAPI struct {
 	oAuth2Config *oauth2.Config
 	oidcProvider *oidc.Provider
 	userService  *user.UserService
+	authService  *auth.AuthService
 }
 
-func NewGoogleAuthAPI(userService *user.UserService) *GoogleAuthAPI {
+func NewGoogleAuthAPI(userService *user.UserService, authService *auth.AuthService) *GoogleAuthAPI {
 	oauth2Config := &oauth2.Config{
 		ClientID:     environment_variables.EnvironmentVariables.OAUTH2_GOOGLE_CLIENT_ID,
 		ClientSecret: environment_variables.EnvironmentVariables.OAUTH2_GOOGLE_CLIENT_SECRET,
@@ -43,6 +44,7 @@ func NewGoogleAuthAPI(userService *user.UserService) *GoogleAuthAPI {
 		oauth2Config,
 		provider,
 		userService,
+		authService,
 	}
 }
 
@@ -159,7 +161,7 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 		return
 	}
 	if exists == nil {
-		exists, err = userService.RegisterUser(reqCtx.Request.Context(), &user.User{
+		exists, err = googleAuthAPI.authService.RegisterUser(reqCtx.Request.Context(), &user.User{
 			Name:    claims.Name,
 			Email:   claims.Email,
 			Enabled: true,

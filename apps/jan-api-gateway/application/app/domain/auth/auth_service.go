@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -39,6 +40,16 @@ const (
 	UserContextKeyEntity UserContextKey = "UserContextKeyEntity"
 	UserContextKeyID     UserContextKey = "UserContextKeyID"
 )
+
+func (s *AuthService) RegisterUser(ctx context.Context, user *user.User) (*user.User, error) {
+	s.userService.RegisterUser(ctx, user)
+	s.organizationService.CreateOrganizationWithPublicID(ctx, &organization.Organization{
+		Name:    "Default",
+		Enabled: true,
+		OwnerID: user.ID,
+	})
+	return user, nil
+}
 
 func (s *AuthService) JWTAuthMiddleware() gin.HandlerFunc {
 	return func(reqCtx *gin.Context) {

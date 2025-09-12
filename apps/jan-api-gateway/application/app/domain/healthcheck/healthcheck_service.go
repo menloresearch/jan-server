@@ -7,6 +7,7 @@ import (
 	inferencemodel "menlo.ai/jan-api-gateway/app/domain/inference_model"
 	inference_model_registry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
+	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
 type HealthcheckCrontabService struct {
@@ -25,6 +26,7 @@ func (hs *HealthcheckCrontabService) Start(ctx context.Context, ctab *crontab.Cr
 	hs.CheckInferenceModels(ctx)
 	ctab.AddJob("* * * * *", func() {
 		hs.CheckInferenceModels(ctx)
+		environment_variables.EnvironmentVariables.LoadFromEnv()
 	})
 }
 

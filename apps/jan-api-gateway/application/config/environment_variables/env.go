@@ -6,6 +6,9 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
+
+	"menlo.ai/jan-api-gateway/config"
 )
 
 type EnvironmentVariable struct {
@@ -56,6 +59,7 @@ func (ev *EnvironmentVariable) LoadFromEnv() {
 			}
 		}
 	}
+	config.EnvReloadedAt = time.Now()
 }
 
 // Singleton

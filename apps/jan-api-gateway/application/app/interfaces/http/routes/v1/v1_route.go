@@ -59,6 +59,7 @@ func (v1Route *V1Route) RegisterRouter(router gin.IRouter) {
 // @Router      /v1/version [get]
 func GetVersion(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"version": config.Version,
+		"version":         config.Version,
+		"env_reloaded_at": config.EnvReloadedAt,
 	})
 }
