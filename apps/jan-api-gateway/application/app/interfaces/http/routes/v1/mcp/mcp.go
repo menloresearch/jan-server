@@ -3,12 +3,11 @@ package mcp
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	mcpserver "github.com/mark3labs/mcp-go/server"
+	"menlo.ai/jan-api-gateway/app/domain/auth"
 	mcpimpl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 )
 
@@ -16,14 +15,6 @@ func MCPMethodGuard(allowedMethods map[string]bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		bodyBytes, err := io.ReadAll(c.Request.Body)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"jsonrpc": "2.0",
-				"error": map[string]interface{}{
-					"code":    -32600,
-					"message": "Invalid request body",
-				},
-				"id": nil,
-			})
 			c.Abort()
 			return
 		}
@@ -33,27 +24,11 @@ func MCPMethodGuard(allowedMethods map[string]bool) gin.HandlerFunc {
 		}
 
 		if err := json.Unmarshal(bodyBytes, &req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"jsonrpc": "2.0",
-				"error": map[string]interface{}{
-					"code":    -32600,
-					"message": "Invalid JSON-RPC request",
-				},
-				"id": nil,
-			})
 			c.Abort()
 			return
 		}
 
 		if !allowedMethods[req.Method] {
-			c.JSON(http.StatusOK, gin.H{
-				"jsonrpc": "2.0",
-				"error": map[string]interface{}{
-					"code":    -32601, // Method not found
-					"message": fmt.Sprintf("Method '%s' not found", req.Method),
-				},
-				"id": nil,
-			})
 			c.Abort()
 			return
 		}
@@ -62,17 +37,20 @@ func MCPMethodGuard(allowedMethods map[string]bool) gin.HandlerFunc {
 }
 
 type MCPAPI struct {
-	SerperMCP *mcpimpl.SerperMCP
-	MCPServer *mcpserver.MCPServer
+	SerperMCP   *mcpimpl.SerperMCP
+	MCPServer   *mcpserver.MCPServer
+	authService *auth.AuthService
 }
 
-func NewMCPAPI(serperMCP *mcpimpl.SerperMCP) *MCPAPI {
+func NewMCPAPI(serperMCP *mcpimpl.SerperMCP, authService *auth.AuthService) *MCPAPI {
 	mcpSrv := mcpserver.NewMCPServer("demo", "0.1.0",
 		mcpserver.WithToolCapabilities(true),
+		mcpserver.WithRecovery(),
 	)
 	return &MCPAPI{
-		SerperMCP: serperMCP,
-		MCPServer: mcpSrv,
+		SerperMCP:   serperMCP,
+		MCPServer:   mcpSrv,
+		authService: authService,
 	}
 }
 
@@ -92,6 +70,7 @@ func (mcpAPI *MCPAPI) RegisterRouter(router *gin.RouterGroup) {
 	mcpHttpHandler := mcpserver.NewStreamableHTTPServer(mcpAPI.MCPServer)
 	router.Any(
 		"/mcp",
+		mcpAPI.authService.AppUserAuthMiddleware(),
 		MCPMethodGuard(map[string]bool{
 			// Initialization / handshake
 			"initialize":                true,

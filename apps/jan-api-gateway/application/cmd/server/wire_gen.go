@@ -70,7 +70,7 @@ func CreateApplication() (*Application, error) {
 	modelAPI := v1.NewModelAPI()
 	serperService := serpermcp.NewSerperService()
 	serperMCP := mcpimpl.NewSerperMCP(serperService)
-	mcpapi := mcp.NewMCPAPI(serperMCP)
+	mcpapi := mcp.NewMCPAPI(serperMCP, authService)
 	googleAuthAPI := google.NewGoogleAuthAPI(userService)
 	authRoute := auth2.NewAuthRoute(googleAuthAPI, userService, authService)
 	v1Route := v1.NewV1Route(organizationRoute, chatRoute, conversationAPI, modelAPI, mcpapi, authRoute)
