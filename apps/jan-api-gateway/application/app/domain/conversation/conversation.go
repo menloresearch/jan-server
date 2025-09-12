@@ -2,7 +2,19 @@ package conversation
 
 import (
 	"context"
+	"errors"
 	"time"
+
+	"menlo.ai/jan-api-gateway/app/domain/query"
+)
+
+// Error constants
+var (
+	ErrConversationNotFound  = errors.New("conversation not found")
+	ErrAccessDenied          = errors.New("access denied")
+	ErrPrivateConversation   = errors.New("private conversation access denied")
+	ErrItemNotFound          = errors.New("item not found")
+	ErrItemNotInConversation = errors.New("item not in conversation")
 )
 
 type ConversationStatus string
@@ -13,6 +25,7 @@ const (
 	ConversationStatusDeleted  ConversationStatus = "deleted"
 )
 
+// @Enum(message, function_call, function_call_output)
 type ItemType string
 
 const (
@@ -21,6 +34,16 @@ const (
 	ItemTypeFunctionCall ItemType = "function_call_output"
 )
 
+func ValidateItemType(input string) bool {
+	switch ItemType(input) {
+	case ItemTypeMessage, ItemTypeFunction, ItemTypeFunctionCall:
+		return true
+	default:
+		return false
+	}
+}
+
+// @Enum(system, user, assistant)
 type ItemRole string
 
 const (
@@ -29,8 +52,18 @@ const (
 	ItemRoleAssistant ItemRole = "assistant"
 )
 
+func ValidateItemRole(input string) bool {
+	switch ItemRole(input) {
+	case ItemRoleSystem, ItemRoleUser, ItemRoleAssistant:
+		return true
+	default:
+		return false
+	}
+}
+
 type Item struct {
-	ID                uint               `json:"-"`  // Internal DB ID (hidden from JSON)
+	ID                uint               `json:"-"` // Internal DB ID (hidden from JSON)
+	ConversationID    uint               `json:"-"`
 	PublicID          string             `json:"id"` // OpenAI-compatible string ID like "msg_abc123"
 	Type              ItemType           `json:"type"`
 	Role              *ItemRole          `json:"role,omitempty"`
@@ -39,17 +72,8 @@ type Item struct {
 	IncompleteAt      *time.Time         `json:"incomplete_at,omitempty"`
 	IncompleteDetails *IncompleteDetails `json:"incomplete_details,omitempty"`
 	CompletedAt       *time.Time         `json:"completed_at,omitempty"`
-	ConversationID    uint               `json:"-"`          // Internal conversation ID (hidden from JSON)
 	ResponseID        *uint              `json:"-"`          // Internal response ID (hidden from JSON)
 	CreatedAt         time.Time          `json:"created_at"` // Unix timestamp for OpenAI compatibility
-}
-
-// ItemCreationData represents the data needed to create a new conversation item
-// This excludes system-generated fields like ID, PublicID, CreatedAt, etc.
-type ItemCreationData struct {
-	Type    ItemType  `json:"type"`
-	Role    *ItemRole `json:"role,omitempty"`
-	Content []Content `json:"content"`
 }
 
 type Content struct {
@@ -129,18 +153,27 @@ type Conversation struct {
 	UpdatedAt time.Time          `json:"updated_at"` // Unix timestamp for OpenAI compatibility
 }
 
+type ConversationFilter struct {
+	PublicID *string
+	UserID   *uint
+}
+
+type ItemFilter struct {
+	PublicID       *string
+	ConversationID *uint
+}
+
 type ConversationRepository interface {
 	Create(ctx context.Context, conversation *Conversation) error
+	FindByFilter(ctx context.Context, filter ConversationFilter, pagination *query.Pagination) ([]*Conversation, error)
+	Count(ctx context.Context, filter ConversationFilter) (int64, error)
 	FindByID(ctx context.Context, id uint) (*Conversation, error)
 	FindByPublicID(ctx context.Context, publicID string) (*Conversation, error)
-
 	Update(ctx context.Context, conversation *Conversation) error
 	Delete(ctx context.Context, id uint) error
 	AddItem(ctx context.Context, conversationID uint, item *Item) error
 	SearchItems(ctx context.Context, conversationID uint, query string) ([]*Item, error)
-
 	BulkAddItems(ctx context.Context, conversationID uint, items []*Item) error
-	CountItemsByConversation(ctx context.Context, conversationID uint) (int64, error)
 }
 
 type ItemRepository interface {
@@ -150,9 +183,9 @@ type ItemRepository interface {
 	FindByConversationID(ctx context.Context, conversationID uint) ([]*Item, error)
 	Search(ctx context.Context, conversationID uint, query string) ([]*Item, error)
 	Delete(ctx context.Context, id uint) error
-	DeleteByPublicID(ctx context.Context, publicID string) error // Delete by OpenAI-compatible string ID
-
 	BulkCreate(ctx context.Context, items []*Item) error
 	CountByConversation(ctx context.Context, conversationID uint) (int64, error)
 	ExistsByIDAndConversation(ctx context.Context, itemID uint, conversationID uint) (bool, error)
+	FindByFilter(ctx context.Context, filter ItemFilter, pagination *query.Pagination) ([]*Item, error)
+	Count(ctx context.Context, filter ItemFilter) (int64, error)
 }

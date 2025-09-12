@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/net/context"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
-	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
@@ -37,11 +36,6 @@ func (s *UserService) RegisterUser(ctx context.Context, user *User) (*User, erro
 	if err := s.userrepo.Create(ctx, user); err != nil {
 		return nil, err
 	}
-	s.organizationService.CreateOrganizationWithPublicID(ctx, &organization.Organization{
-		Name:    "Default",
-		Enabled: true,
-		OwnerID: user.ID,
-	})
 	return user, nil
 }
 
@@ -65,52 +59,19 @@ func (s *UserService) FindByID(ctx context.Context, id uint) (*User, error) {
 	return s.userrepo.FindByID(ctx, id)
 }
 
+func (s *UserService) FindByPublicID(ctx context.Context, publicID string) (*User, error) {
+	userEntities, err := s.userrepo.FindByFilter(ctx, UserFilter{PublicID: &publicID}, nil)
+	if err != nil {
+		return nil, err
+	}
+	if len(userEntities) != 1 {
+		return nil, fmt.Errorf("user does not exist")
+	}
+	return userEntities[0], nil
+}
+
 func (s *UserService) generatePublicID() (string, error) {
-	return idgen.GenerateSecureID("user", 16)
-}
-
-type UserContextKey string
-
-const (
-	UserContextKeyEntity UserContextKey = "UserContextKeyEntity"
-)
-
-func (s *UserService) RegisteredUserMiddleware() gin.HandlerFunc {
-	return func(reqCtx *gin.Context) {
-		ctx := reqCtx.Request.Context()
-		userClaim, err := auth.GetUserClaimFromRequestContext(reqCtx)
-		if err != nil {
-			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-				Code:  "9715151d-02ab-4759-bfb7-89d717f05cd3",
-				Error: err.Error(),
-			})
-			return
-		}
-		user, err := s.FindByEmail(ctx, userClaim.Email)
-		if err != nil {
-			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-				Code:  "edf9dd05-aad4-4c1e-9795-98bf60ecf57c",
-				Error: err.Error(),
-			})
-			return
-		}
-		if user == nil {
-			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-				Code: "417cff16-0325-45f7-9826-8ab24d2fef29",
-			})
-			return
-		}
-		reqCtx.Set(string(UserContextKeyEntity), user)
-		reqCtx.Next()
-	}
-}
-
-func (s *UserService) GetUserFromContext(reqCtx *gin.Context) (*User, bool) {
-	user, ok := reqCtx.Get(string(UserContextKeyEntity))
-	if !ok {
-		return nil, false
-	}
-	return user.(*User), true
+	return idgen.GenerateSecureID("user", 24)
 }
 
 // RegisteredApiKeyUserMiddleware validates API key and ensures the associated user is registered
@@ -148,7 +109,7 @@ func (s *UserService) RegisteredApiKeyUserMiddleware() gin.HandlerFunc {
 		}
 
 		// Check if API key has an owner (user)
-		if apiKeyEntity.OwnerID == nil {
+		if apiKeyEntity.OwnerPublicID == "" {
 			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 				Code:  "019928bd-78cb-734e-8b2c-d0ba0c43cb73",
 				Error: "API key has no associated user",
@@ -156,8 +117,8 @@ func (s *UserService) RegisteredApiKeyUserMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Fetch the user by ID
-		userEntity, err := s.FindByID(ctx, *apiKeyEntity.OwnerID)
+		// Fetch the user by public ID
+		userEntity, err := s.FindByPublicID(ctx, apiKeyEntity.OwnerPublicID)
 		if err != nil {
 			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 				Code:  "019928bd-89dc-735f-8c3d-e1cb1d44dc84",
@@ -167,7 +128,7 @@ func (s *UserService) RegisteredApiKeyUserMiddleware() gin.HandlerFunc {
 		}
 
 		// Store user in context for later use
-		reqCtx.Set(string(UserContextKeyEntity), userEntity)
+		reqCtx.Set("UserContextKeyEntity", userEntity)
 		reqCtx.Next()
 	}
 }

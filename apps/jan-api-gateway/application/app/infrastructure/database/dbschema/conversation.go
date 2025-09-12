@@ -82,8 +82,8 @@ func (c *Conversation) EtoD() *conversation.Conversation {
 		Status:    conversation.ConversationStatus(c.Status),
 		Metadata:  metadata,
 		IsPrivate: c.IsPrivate,
-		CreatedAt: c.CreatedAt, // Convert time.Time to Unix timestamp
-		UpdatedAt: c.UpdatedAt, // Convert time.Time to Unix timestamp
+		CreatedAt: c.CreatedAt,
+		UpdatedAt: c.UpdatedAt,
 	}
 }
 
@@ -145,7 +145,7 @@ func (i *Item) EtoD() *conversation.Item {
 		CompletedAt:       i.CompletedAt,
 		ConversationID:    i.ConversationID,
 		ResponseID:        i.ResponseID,
-		CreatedAt:         i.CreatedAt, // Convert time.Time to Unix timestamp
+		CreatedAt:         i.CreatedAt,
 	}
 }
 

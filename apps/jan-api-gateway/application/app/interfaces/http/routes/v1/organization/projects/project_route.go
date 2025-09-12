@@ -10,22 +10,28 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/query"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses/openai"
+	projectApikeyRoute "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects/api_keys"
 	"menlo.ai/jan-api-gateway/app/utils/functional"
 	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
 type ProjectsRoute struct {
-	projectService *project.ProjectService
-	apiKeyService  *apikey.ApiKeyService
+	projectService     *project.ProjectService
+	apiKeyService      *apikey.ApiKeyService
+	projectApiKeyRoute *projectApikeyRoute.ProjectApiKeyRoute
 }
 
-func NewProjectsRoute(projectService *project.ProjectService, apiKeyService *apikey.ApiKeyService) *ProjectsRoute {
+func NewProjectsRoute(
+	projectService *project.ProjectService,
+	apiKeyService *apikey.ApiKeyService,
+	projectApiKeyRoute *projectApikeyRoute.ProjectApiKeyRoute,
+) *ProjectsRoute {
 	return &ProjectsRoute{
 		projectService,
 		apiKeyService,
+		projectApiKeyRoute,
 	}
 }
 
@@ -33,17 +39,19 @@ func (projectsRoute *ProjectsRoute) RegisterRouter(router gin.IRouter) {
 	projectsRouter := router.Group("/projects")
 	projectsRouter.GET("", projectsRoute.GetProjects)
 	projectsRouter.POST("", projectsRoute.CreateProject)
-	projectsRouter.GET("/:project_id", projectsRoute.GetProject)
-	projectsRouter.POST("/:project_id", projectsRoute.UpdateProject)
-	projectsRouter.POST("/:project_id/archive", projectsRoute.ArchiveProject)
+
+	projectIdRouter := projectsRouter.Group(fmt.Sprintf("/:%s", project.ProjectContextKeyPublicID), projectsRoute.projectService.ProjectMiddleware())
+	projectIdRouter.GET("", projectsRoute.GetProject)
+	projectIdRouter.POST("", projectsRoute.UpdateProject)
+	projectIdRouter.POST("/archive", projectsRoute.ArchiveProject)
+	projectsRoute.projectApiKeyRoute.RegisterRouter(projectIdRouter)
 }
 
 // GetProjects godoc
 // @Summary List Projects
 // @Description Retrieves a paginated list of all projects for the authenticated organization.
-// @Tags Platform, Platform-Organizations
+// @Tags Organizations
 // @Security BearerAuth
-// @Param Authorization header string true "Bearer token" default("Bearer <api_key>")
 // @Param limit query int false "The maximum number of items to return" default(20)
 // @Param after query string false "A cursor for use in pagination. The ID of the last object from the previous page"
 // @Param include_archived query string false "Whether to include archived projects."
@@ -64,10 +72,6 @@ func (api *ProjectsRoute) GetProjects(reqCtx *gin.Context) {
 	}
 
 	ctx := reqCtx.Request.Context()
-	adminKey, err := api.validateAdminKey(reqCtx)
-	if err != nil {
-		return
-	}
 
 	pagination, err := query.GetPaginationFromQuery(reqCtx)
 	if err != nil {
@@ -103,7 +107,7 @@ func (api *ProjectsRoute) GetProjects(reqCtx *gin.Context) {
 	}
 
 	projectFilter := project.ProjectFilter{
-		OrganizationID: adminKey.OrganizationID,
+		// TODO: Fix this in project/member branch
 	}
 	if !includeArchived {
 		projectFilter.Archived = ptr.ToBool(false)
@@ -157,11 +161,10 @@ func (api *ProjectsRoute) GetProjects(reqCtx *gin.Context) {
 // CreateProject godoc
 // @Summary Create Project
 // @Description Creates a new project for an organization.
-// @Tags Platform, Platform-Organizations
+// @Tags Organizations
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param Authorization header string true "Bearer token" default("Bearer <api_key>")
 // @Param body body CreateProjectRequest true "Project creation request"
 // @Success 200 {object} ProjectResponse "Successfully created project"
 // @Failure 400 {object} responses.ErrorResponse "Bad request - invalid payload"
@@ -181,15 +184,11 @@ func (api *ProjectsRoute) CreateProject(reqCtx *gin.Context) {
 		return
 	}
 
-	adminKey, err := api.validateAdminKey(reqCtx)
-	if err != nil {
-		return
-	}
-
+	// TODO: fix this in project/member
 	projectEntity, err := projectService.CreateProjectWithPublicID(ctx, &project.Project{
-		Name:           requestPayload.Name,
-		OrganizationID: *adminKey.OrganizationID,
-		Status:         string(project.ProjectStatusActive),
+		Name: requestPayload.Name,
+		// OrganizationID: *adminKey.OrganizationID,
+		Status: string(project.ProjectStatusActive),
 	})
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
@@ -206,9 +205,8 @@ func (api *ProjectsRoute) CreateProject(reqCtx *gin.Context) {
 // GetProject godoc
 // @Summary Get Project
 // @Description Retrieves a specific project by its ID.
-// @Tags Platform, Platform-Organizations
+// @Tags Organizations
 // @Security BearerAuth
-// @Param Authorization header string true "Bearer token" default("Bearer <api_key>")
 // @Param project_id path string true "ID of the project"
 // @Success 200 {object} ProjectResponse "Successfully retrieved the project"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - invalid or missing API key"
@@ -217,11 +215,6 @@ func (api *ProjectsRoute) CreateProject(reqCtx *gin.Context) {
 func (api *ProjectsRoute) GetProject(reqCtx *gin.Context) {
 	projectService := api.projectService
 	ctx := reqCtx.Request.Context()
-
-	adminKey, err := api.validateAdminKey(reqCtx)
-	if err != nil {
-		return
-	}
 
 	projectID := reqCtx.Param("project_id")
 	if projectID == "" {
@@ -241,13 +234,14 @@ func (api *ProjectsRoute) GetProject(reqCtx *gin.Context) {
 		return
 	}
 
-	if entity.OrganizationID != *adminKey.OrganizationID {
-		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  "752f93d3-21f1-45a3-ba13-0157d069aca2",
-			Error: "project not found in organization",
-		})
-		return
-	}
+	// TODO: project/member
+	// if entity.OrganizationID != *adminKey.OrganizationID {
+	// 	reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
+	// 		Code:  "752f93d3-21f1-45a3-ba13-0157d069aca2",
+	// 		Error: "project not found in organization",
+	// 	})
+	// 	return
+	// }
 
 	reqCtx.JSON(http.StatusOK, domainToProjectResponse(entity))
 }
@@ -255,11 +249,10 @@ func (api *ProjectsRoute) GetProject(reqCtx *gin.Context) {
 // UpdateProject godoc
 // @Summary Update Project
 // @Description Updates a specific project by its ID.
-// @Tags Platform, Platform-Organizations
+// @Tags Organizations
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param Authorization header string true "Bearer token" default("Bearer <api_key>")
 // @Param project_id path string true "ID of the project to update"
 // @Param body body UpdateProjectRequest true "Project update request"
 // @Success 200 {object} ProjectResponse "Successfully updated the project"
@@ -280,11 +273,6 @@ func (api *ProjectsRoute) UpdateProject(reqCtx *gin.Context) {
 		return
 	}
 
-	adminKey, err := api.validateAdminKey(reqCtx)
-	if err != nil {
-		return
-	}
-
 	projectID := reqCtx.Param("project_id")
 	if projectID == "" {
 		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
@@ -299,14 +287,6 @@ func (api *ProjectsRoute) UpdateProject(reqCtx *gin.Context) {
 		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
 			Code:  "4ee156ce-6425-425b-b9fd-d95165456b6c",
 			Error: "project not found",
-		})
-		return
-	}
-
-	if entity.OrganizationID != *adminKey.OrganizationID {
-		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  "bd69b6c5-2a54-421e-b3b9-b740d4a92f19",
-			Error: "project not found in organization",
 		})
 		return
 	}
@@ -331,9 +311,8 @@ func (api *ProjectsRoute) UpdateProject(reqCtx *gin.Context) {
 // ArchiveProject godoc
 // @Summary Archive Project
 // @Description Archives a specific project by its ID, making it inactive.
-// @Tags Platform, Platform-Organizations
+// @Tags Organizations
 // @Security BearerAuth
-// @Param Authorization header string true "Bearer token" default("Bearer <api_key>")
 // @Param project_id path string true "ID of the project to archive"
 // @Success 200 {object} ProjectResponse "Successfully archived the project"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - invalid or missing API key"
@@ -342,11 +321,6 @@ func (api *ProjectsRoute) UpdateProject(reqCtx *gin.Context) {
 func (api *ProjectsRoute) ArchiveProject(reqCtx *gin.Context) {
 	projectService := api.projectService
 	ctx := reqCtx.Request.Context()
-
-	adminKey, err := api.validateAdminKey(reqCtx)
-	if err != nil {
-		return
-	}
 
 	projectID := reqCtx.Param("project_id")
 	if projectID == "" {
@@ -366,13 +340,14 @@ func (api *ProjectsRoute) ArchiveProject(reqCtx *gin.Context) {
 		return
 	}
 
-	if entity.OrganizationID != *adminKey.OrganizationID {
-		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  "4b656858-4212-451a-9ab6-23bc09dcc357",
-			Error: "project not found in organization",
-		})
-		return
-	}
+	// TODO: project/member
+	// if entity.OrganizationID != *adminKey.OrganizationID {
+	// 	reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
+	// 		Code:  "4b656858-4212-451a-9ab6-23bc09dcc357",
+	// 		Error: "project not found in organization",
+	// 	})
+	// 	return
+	// }
 
 	// Set archived status
 	entity.Status = string(project.ProjectStatusArchived)
@@ -387,39 +362,6 @@ func (api *ProjectsRoute) ArchiveProject(reqCtx *gin.Context) {
 	}
 
 	reqCtx.JSON(http.StatusOK, domainToProjectResponse(updatedEntity))
-}
-
-// TODO: move to middleware
-func (api *ProjectsRoute) validateAdminKey(reqCtx *gin.Context) (*apikey.ApiKey, error) {
-	apikeyService := api.apiKeyService
-	ctx := reqCtx.Request.Context()
-	adminKey, ok := requests.GetTokenFromBearer(reqCtx)
-	if !ok {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "704ff768-2681-4ba0-bc6b-600c6f10df25",
-			Error: "invalid or missing API key",
-		})
-		return nil, fmt.Errorf("invalid token")
-	}
-
-	// Verify the provided admin API key
-	adminKeyEntity, err := apikeyService.FindByKey(ctx, adminKey)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "af7eb57f-8a57-45c8-8ad7-e60c1c68cb6f",
-			Error: "invalid or missing API key",
-		})
-		return nil, err
-	}
-
-	if adminKeyEntity.ApikeyType != string(apikey.ApikeyTypeAdmin) {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "2f83ee2f-3054-40de-afd0-82f06d3fb6cb",
-			Error: "invalid or missing API key",
-		})
-		return nil, fmt.Errorf("invalid or missing API key")
-	}
-	return adminKeyEntity, nil
 }
 
 // ProjectResponse defines the response structure for a project.

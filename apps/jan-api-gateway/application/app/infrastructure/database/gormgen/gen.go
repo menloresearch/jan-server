@@ -19,6 +19,7 @@ var (
 	Q                  = new(Query)
 	ApiKey             *apiKey
 	Conversation       *conversation
+	DatabaseMigration  *databaseMigration
 	Item               *item
 	Organization       *organization
 	OrganizationMember *organizationMember
@@ -32,6 +33,7 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	*Q = *Use(db, opts...)
 	ApiKey = &Q.ApiKey
 	Conversation = &Q.Conversation
+	DatabaseMigration = &Q.DatabaseMigration
 	Item = &Q.Item
 	Organization = &Q.Organization
 	OrganizationMember = &Q.OrganizationMember
@@ -46,6 +48,7 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		db:                 db,
 		ApiKey:             newApiKey(db, opts...),
 		Conversation:       newConversation(db, opts...),
+		DatabaseMigration:  newDatabaseMigration(db, opts...),
 		Item:               newItem(db, opts...),
 		Organization:       newOrganization(db, opts...),
 		OrganizationMember: newOrganizationMember(db, opts...),
@@ -61,6 +64,7 @@ type Query struct {
 
 	ApiKey             apiKey
 	Conversation       conversation
+	DatabaseMigration  databaseMigration
 	Item               item
 	Organization       organization
 	OrganizationMember organizationMember
@@ -77,6 +81,7 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		db:                 db,
 		ApiKey:             q.ApiKey.clone(db),
 		Conversation:       q.Conversation.clone(db),
+		DatabaseMigration:  q.DatabaseMigration.clone(db),
 		Item:               q.Item.clone(db),
 		Organization:       q.Organization.clone(db),
 		OrganizationMember: q.OrganizationMember.clone(db),
@@ -100,6 +105,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		db:                 db,
 		ApiKey:             q.ApiKey.replaceDB(db),
 		Conversation:       q.Conversation.replaceDB(db),
+		DatabaseMigration:  q.DatabaseMigration.replaceDB(db),
 		Item:               q.Item.replaceDB(db),
 		Organization:       q.Organization.replaceDB(db),
 		OrganizationMember: q.OrganizationMember.replaceDB(db),
@@ -113,6 +119,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 type queryCtx struct {
 	ApiKey             IApiKeyDo
 	Conversation       IConversationDo
+	DatabaseMigration  IDatabaseMigrationDo
 	Item               IItemDo
 	Organization       IOrganizationDo
 	OrganizationMember IOrganizationMemberDo
@@ -126,6 +133,7 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
 		ApiKey:             q.ApiKey.WithContext(ctx),
 		Conversation:       q.Conversation.WithContext(ctx),
+		DatabaseMigration:  q.DatabaseMigration.WithContext(ctx),
 		Item:               q.Item.WithContext(ctx),
 		Organization:       q.Organization.WithContext(ctx),
 		OrganizationMember: q.OrganizationMember.WithContext(ctx),

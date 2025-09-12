@@ -5,8 +5,9 @@ import (
 )
 
 type ErrorResponse struct {
-	Code  string `json:"code"`
-	Error string `json:"error"`
+	Code          string `json:"code"`
+	Error         string `json:"error"`
+	ErrorInstance error  `json:"-"`
 }
 
 type GeneralResponse[T any] struct {
@@ -15,9 +16,12 @@ type GeneralResponse[T any] struct {
 }
 
 type ListResponse[T any] struct {
-	Status  string `json:"status"`
-	Total   int64  `json:"total"`
-	Results []T    `json:"results"`
+	Status  string  `json:"status"`
+	Total   int64   `json:"total"`
+	Results []T     `json:"results"`
+	FirstID *string `json:"first_id"`
+	LastID  *string `json:"last_id"`
+	HasMore bool    `json:"has_more"`
 }
 
 // OpenAIGeneralResponse includes common fields and inline embedding

@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
+	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/query"
@@ -44,28 +45,23 @@ func (api *ProjectApiKeyRoute) RegisterRouter(router gin.IRouter) {
 
 // @Summary List new project API key
 // @Description List API keys for a specific project.
-// @Tags Jan, Jan-Organizations
+// @Tags Organizations
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param org_public_id path string true "Organization Public ID"
 // @Param project_public_id path string true "Project Public ID"
 // @Success 200 {object} responses.GeneralResponse[ApiKeyResponse] "API key created successfully"
 // @Failure 400 {object} responses.ErrorResponse "Bad request, e.g., invalid payload or missing IDs"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized, e.g., invalid or missing token"
 // @Failure 404 {object} responses.ErrorResponse "Not Found, e.g., project or organization not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
-// @Router /jan/v1/organizations/{org_public_id}/projects/{project_public_id}/api_keys [get]
+// @Router /v1/organization/projects/{project_public_id}/api_keys [get]
 func (api *ProjectApiKeyRoute) ListProjectApiKey(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
-	user, ok := api.userService.GetUserFromContext(reqCtx)
+	user, ok := auth.GetUserFromContext(reqCtx)
 	if !ok {
-		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code: "a3be84ac-132e-4af1-a4ca-9f70aa49fd70",
-		})
 		return
 	}
-
 	organizationEntity, ok := api.organizationService.GetOrganizationFromContext(reqCtx)
 	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
@@ -73,7 +69,6 @@ func (api *ProjectApiKeyRoute) ListProjectApiKey(reqCtx *gin.Context) {
 		})
 		return
 	}
-
 	if organizationEntity.OwnerID != user.ID {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code: "6d2d10f9-3bab-4d2d-8076-d573d829e397",
@@ -100,7 +95,6 @@ func (api *ProjectApiKeyRoute) ListProjectApiKey(reqCtx *gin.Context) {
 		OrganizationID: &organizationEntity.ID,
 		ProjectID:      &project.ID,
 	}
-
 	apikeyEntities, err := api.apikeyService.Find(ctx, filter, pagination)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
@@ -133,11 +127,10 @@ type CreateApiKeyRequest struct {
 
 // @Summary Create a new project API key
 // @Description Creates a new API key for a specific project.
-// @Tags Jan, Jan-Organizations
+// @Tags Organizations
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param org_public_id path string true "Organization Public ID"
 // @Param project_public_id path string true "Project Public ID"
 // @Param requestBody body CreateApiKeyRequest true "Request body for creating an API key"
 // @Success 200 {object} responses.GeneralResponse[ApiKeyResponse] "API key created successfully"
@@ -145,7 +138,7 @@ type CreateApiKeyRequest struct {
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized, e.g., invalid or missing token"
 // @Failure 404 {object} responses.ErrorResponse "Not Found, e.g., project or organization not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
-// @Router /jan/v1/organizations/{org_public_id}/projects/{project_public_id}/api_keys [post]
+// @Router /v1/organization/projects/{project_public_id}/api_keys [post]
 func (api *ProjectApiKeyRoute) CreateProjectApiKey(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
 	var req CreateApiKeyRequest
@@ -159,7 +152,7 @@ func (api *ProjectApiKeyRoute) CreateProjectApiKey(reqCtx *gin.Context) {
 		return
 	}
 
-	user, ok := api.userService.GetUserFromContext(reqCtx)
+	user, ok := auth.GetUserFromContext(reqCtx)
 	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code: "a3be84ac-132e-4af1-a4ca-9f70aa49fd70",
@@ -205,7 +198,7 @@ func (api *ProjectApiKeyRoute) CreateProjectApiKey(reqCtx *gin.Context) {
 		Description:    req.Description,
 		Enabled:        true,
 		ApikeyType:     string(apikey.ApikeyTypeProject),
-		OwnerID:        &user.ID,
+		OwnerPublicID:  user.PublicID,
 		ProjectID:      &project.ID,
 		OrganizationID: &organizationEntity.ID,
 		Permissions:    "{}",

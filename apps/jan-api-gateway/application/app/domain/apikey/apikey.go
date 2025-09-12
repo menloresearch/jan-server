@@ -25,7 +25,7 @@ type ApiKey struct {
 	Description    string
 	Enabled        bool
 	ApikeyType     string // "admin","project","service","organization","ephemeral"
-	OwnerID        *uint
+	OwnerPublicID  string
 	ProjectID      *uint
 	OrganizationID *uint
 	Permissions    string //json
@@ -54,7 +54,7 @@ type ApiKeyFilter struct {
 	KeyHash        *string
 	PublicID       *string
 	ApikeyType     *string
-	OwnerID        *uint
+	OwnerPublicID  *string
 	ProjectID      *uint
 	UserID         *uint
 	OrganizationID *uint
