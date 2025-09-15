@@ -1,12 +1,14 @@
 package response
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
@@ -18,26 +20,35 @@ import (
 	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
-// ResponseHandler handles the business logic for response API endpoints
-type ResponseHandler struct {
-	UserService         *user.UserService
-	authService         *auth.AuthService
-	apikeyService       *apikey.ApiKeyService
-	conversationService *conversation.ConversationService
-	responseService     *ResponseService
-	streamHandler       *StreamHandler
-	nonStreamHandler    *NonStreamHandler
+// ResponseCreationResult represents the result of creating a response
+type ResponseCreationResult struct {
+	Response              *Response
+	Conversation          *conversation.Conversation
+	ChatCompletionRequest *openai.ChatCompletionRequest
+	APIKey                string
+	IsStreaming           bool
 }
 
-// NewResponseHandler creates a new ResponseHandler instance
-func NewResponseHandler(
+// ResponseModelService handles the business logic for response API endpoints
+type ResponseModelService struct {
+	UserService           *user.UserService
+	authService           *auth.AuthService
+	apikeyService         *apikey.ApiKeyService
+	conversationService   *conversation.ConversationService
+	responseService       *ResponseService
+	streamModelService    *StreamModelService
+	nonStreamModelService *NonStreamModelService
+}
+
+// NewResponseModelService creates a new ResponseModelService instance
+func NewResponseModelService(
 	userService *user.UserService,
 	authService *auth.AuthService,
 	apikeyService *apikey.ApiKeyService,
 	conversationService *conversation.ConversationService,
 	responseService *ResponseService,
-) *ResponseHandler {
-	responseHandler := &ResponseHandler{
+) *ResponseModelService {
+	responseModelService := &ResponseModelService{
 		UserService:         userService,
 		authService:         authService,
 		apikeyService:       apikeyService,
@@ -46,39 +57,24 @@ func NewResponseHandler(
 	}
 
 	// Initialize specialized handlers
-	responseHandler.streamHandler = NewStreamHandler(responseHandler)
-	responseHandler.nonStreamHandler = NewNonStreamHandler(responseHandler)
+	responseModelService.streamModelService = NewStreamModelService(responseModelService)
+	responseModelService.nonStreamModelService = NewNonStreamModelService(responseModelService)
 
-	return responseHandler
+	return responseModelService
 }
 
 // CreateResponse handles the business logic for creating a response
-func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
-	// Get user from middleware context
-	userEntity, ok := auth.GetUserFromContext(reqCtx)
-	if !ok {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "user not found in context")
-		return
-	}
-
-	// Parse and validate the request body
-	var request requesttypes.CreateResponseRequest
-	if err := reqCtx.ShouldBindJSON(&request); err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "j0k1l2m3-n4o5-6789-jklm-012345678901", "invalid request body: "+err.Error())
-		return
-	}
-
+// Returns domain objects and business logic results, no HTTP concerns
+func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, request *requesttypes.CreateResponseRequest) (*ResponseCreationResult, error) {
 	// Validate the request
-	if validationErrors := ValidateCreateResponseRequest(&request); validationErrors != nil {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "k1l2m3n4-o5p6-7890-klmn-123456789012", "validation failed")
-		return
+	if validationErrors := ValidateCreateResponseRequest(request); validationErrors != nil {
+		return nil, fmt.Errorf("validation failed: %v", validationErrors)
 	}
 
 	// Get API key for the user
-	key, err := h.getAPIKey(reqCtx)
+	key, err := h.getAPIKeyForUser(ctx, userID)
 	if err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "019929d1-1e85-72c1-a1cf-e151403692dc", "invalid apikey")
-		return
+		return nil, fmt.Errorf("invalid apikey: %w", err)
 	}
 
 	// Check if model exists in registry
@@ -86,19 +82,17 @@ func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 	mToE := modelRegistry.GetModelToEndpoints()
 	endpoints, ok := mToE[request.Model]
 	if !ok {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "59253517-df33-44bf-9333-c927402e4e2e", fmt.Sprintf("Model: %s does not exist", request.Model))
-		return
+		return nil, fmt.Errorf("model %s does not exist", request.Model)
 	}
 
 	// Convert response request to chat completion request using domain service
-	chatCompletionRequest := h.responseService.ConvertToChatCompletionRequest(&request)
+	chatCompletionRequest := h.responseService.ConvertToChatCompletionRequest(request)
 	if chatCompletionRequest == nil {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "019929e6-c3ee-76e3-b0fd-b046611b79ad", "unsupported input type for chat completion")
-		return
+		return nil, fmt.Errorf("unsupported input type for chat completion")
 	}
 
 	// Check if model endpoint exists
-	janInferenceClient := janinference.NewJanInferenceClient(reqCtx)
+	janInferenceClient := janinference.NewJanInferenceClient(ctx)
 	endpointExists := false
 	for _, endpoint := range endpoints {
 		if endpoint == janInferenceClient.BaseURL {
@@ -108,23 +102,20 @@ func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 	}
 
 	if !endpointExists {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "6c6e4ea0-53d2-4c6c-8617-3a645af59f43", "Client does not exist")
-		return
+		return nil, fmt.Errorf("client does not exist")
 	}
 
 	// Handle conversation logic using domain service
-	conversation, err := h.responseService.HandleConversation(reqCtx, userEntity.ID, &request)
+	conversation, err := h.responseService.HandleConversation(ctx, userID, request)
 	if err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "a1b2c3d4-e5f6-7890-abcd-ef1234567890", err.Error())
-		return
+		return nil, fmt.Errorf("failed to handle conversation: %w", err)
 	}
 
 	// If previous_response_id is provided, prepend conversation history to input messages
 	if request.PreviousResponseID != nil && *request.PreviousResponseID != "" {
-		conversationMessages, err := h.responseService.ConvertConversationItemsToMessages(reqCtx, conversation)
+		conversationMessages, err := h.responseService.ConvertConversationItemsToMessages(ctx, conversation)
 		if err != nil {
-			h.sendErrorResponse(reqCtx, http.StatusBadRequest, "c3d4e5f6-g7h8-9012-cdef-345678901234", err.Error())
-			return
+			return nil, fmt.Errorf("failed to convert conversation items to messages: %w", err)
 		}
 		// Prepend conversation history to the input messages
 		chatCompletionRequest.Messages = append(conversationMessages, chatCompletionRequest.Messages...)
@@ -155,38 +146,37 @@ func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 	if conversation != nil {
 		conversationID = &conversation.ID
 	}
-	responseEntity, err := h.responseService.CreateResponse(reqCtx, userEntity.ID, conversationID, request.Model, request.Input, request.SystemPrompt, responseParams)
+	responseEntity, err := h.responseService.CreateResponse(ctx, userID, conversationID, request.Model, request.Input, request.SystemPrompt, responseParams)
 	if err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusInternalServerError, "c7d8e9f0-a1b2-3456-cdef-012345678901", "failed to create response record: "+err.Error())
-		return
+		return nil, fmt.Errorf("failed to create response record: %w", err)
 	}
 
 	// Append input messages to conversation (only if conversation exists)
 	if conversation != nil {
-		if err := h.responseService.AppendMessagesToConversation(reqCtx, conversation, chatCompletionRequest.Messages, &responseEntity.ID); err != nil {
-			h.sendErrorResponse(reqCtx, http.StatusBadRequest, "b2c3d4e5-f6g7-8901-bcde-f23456789012", err.Error())
-			return
+		if err := h.responseService.AppendMessagesToConversation(ctx, conversation, chatCompletionRequest.Messages, &responseEntity.ID); err != nil {
+			return nil, fmt.Errorf("failed to append messages to conversation: %w", err)
 		}
 	}
 
-	// Delegate to specialized handlers based on streaming preference
-	if request.Stream != nil && *request.Stream {
-		// Handle streaming response
-		h.streamHandler.CreateStreamResponse(reqCtx, &request, key, conversation, responseEntity, chatCompletionRequest)
-	} else {
-		// Handle non-streaming response
-		h.nonStreamHandler.CreateNonStreamResponse(reqCtx, &request, key, conversation, responseEntity, chatCompletionRequest)
-	}
+	// Return the result for the interface layer to handle
+	isStreaming := request.Stream != nil && *request.Stream
+	return &ResponseCreationResult{
+		Response:              responseEntity,
+		Conversation:          conversation,
+		ChatCompletionRequest: chatCompletionRequest,
+		APIKey:                key,
+		IsStreaming:           isStreaming,
+	}, nil
 }
 
 // handleConversation handles conversation creation or loading based on the request
 
 // GetResponse handles the business logic for getting a response
-func (h *ResponseHandler) GetResponse(reqCtx *gin.Context) {
+func (h *ResponseModelService) GetResponse(reqCtx *gin.Context) {
 	// Get response from middleware context
 	responseEntity, ok := GetResponseFromContext(reqCtx)
 	if !ok {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc", "response not found in context")
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "response not found in context")
 		return
 	}
 
@@ -196,17 +186,17 @@ func (h *ResponseHandler) GetResponse(reqCtx *gin.Context) {
 }
 
 // DeleteResponse handles the business logic for deleting a response
-func (h *ResponseHandler) DeleteResponse(reqCtx *gin.Context) {
+func (h *ResponseModelService) DeleteResponse(reqCtx *gin.Context) {
 	// Get response from middleware context
 	responseEntity, ok := GetResponseFromContext(reqCtx)
 	if !ok {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc", "response not found in context")
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "b2c3d4e5-f6g7-8901-bcde-f23456789012", "response not found in context")
 		return
 	}
 
 	// Delete the response from database
 	if err := h.responseService.DeleteResponse(reqCtx, responseEntity.ID); err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusInternalServerError, "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc", "failed to delete response: "+err.Error())
+		h.sendErrorResponse(reqCtx, http.StatusInternalServerError, "c3d4e5f6-g7h8-9012-cdef-345678901234", "failed to delete response: "+err.Error())
 		return
 	}
 
@@ -224,11 +214,11 @@ func (h *ResponseHandler) DeleteResponse(reqCtx *gin.Context) {
 }
 
 // CancelResponse handles the business logic for cancelling a response
-func (h *ResponseHandler) CancelResponse(reqCtx *gin.Context) {
+func (h *ResponseModelService) CancelResponse(reqCtx *gin.Context) {
 	// Get response from middleware context
 	responseEntity, ok := GetResponseFromContext(reqCtx)
 	if !ok {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc", "response not found in context")
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "d4e5f6g7-h8i9-0123-defg-456789012345", "response not found in context")
 		return
 	}
 
@@ -247,11 +237,11 @@ func (h *ResponseHandler) CancelResponse(reqCtx *gin.Context) {
 }
 
 // ListInputItems handles the business logic for listing input items
-func (h *ResponseHandler) ListInputItems(reqCtx *gin.Context) {
+func (h *ResponseModelService) ListInputItems(reqCtx *gin.Context) {
 	// Get response from middleware context
 	responseEntity, ok := GetResponseFromContext(reqCtx)
 	if !ok {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc", "response not found in context")
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "e5f6g7h8-i9j0-1234-efgh-567890123456", "response not found in context")
 		return
 	}
 
@@ -267,7 +257,7 @@ func (h *ResponseHandler) ListInputItems(reqCtx *gin.Context) {
 	userRole := conversation.ItemRole("user")
 	items, err := h.responseService.GetItemsForResponse(reqCtx, responseEntity.ID, &userRole)
 	if err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusInternalServerError, "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc", "failed to get input items: "+err.Error())
+		h.sendErrorResponse(reqCtx, http.StatusInternalServerError, "f6g7h8i9-j0k1-2345-fghi-678901234567", "failed to get input items: "+err.Error())
 		return
 	}
 
@@ -341,7 +331,7 @@ func (h *ResponseHandler) ListInputItems(reqCtx *gin.Context) {
 }
 
 // sendErrorResponse sends a standardized error response
-func (h *ResponseHandler) sendErrorResponse(reqCtx *gin.Context, statusCode int, errorCode, errorMessage string) {
+func (h *ResponseModelService) sendErrorResponse(reqCtx *gin.Context, statusCode int, errorCode, errorMessage string) {
 	reqCtx.AbortWithStatusJSON(statusCode, responsetypes.ErrorResponse{
 		Code:  errorCode,
 		Error: errorMessage,
@@ -349,7 +339,7 @@ func (h *ResponseHandler) sendErrorResponse(reqCtx *gin.Context, statusCode int,
 }
 
 // sendSuccessResponse sends a standardized success response
-func (h *ResponseHandler) sendSuccessResponse(reqCtx *gin.Context, data interface{}) {
+func (h *ResponseModelService) sendSuccessResponse(reqCtx *gin.Context, data interface{}) {
 	status := responsetypes.ResponseCodeOk
 	objectType := responsetypes.ObjectTypeResponse
 	reqCtx.JSON(http.StatusOK, responsetypes.OpenAIGeneralResponse[responsetypes.Response]{
@@ -359,49 +349,35 @@ func (h *ResponseHandler) sendSuccessResponse(reqCtx *gin.Context, data interfac
 	})
 }
 
-// getAPIKey retrieves the API key for the user
-func (h *ResponseHandler) getAPIKey(reqCtx *gin.Context) (string, error) {
-	userClaim, _ := auth.GetUserClaimFromRequestContext(reqCtx)
-	key := "AnonymousUserKey"
-
-	if userClaim != nil {
-		user, err := h.UserService.FindByEmail(reqCtx, userClaim.Email)
-		if err != nil {
-			return "", fmt.Errorf("failed to find user: %w", err)
-		}
-
-		apikeyEntities, err := h.apikeyService.Find(reqCtx, apikey.ApiKeyFilter{
-			OwnerPublicID: &user.PublicID,
-			ApikeyType:    ptr.ToString(string(apikey.ApikeyTypeAdmin)),
-		}, nil)
-		if err != nil {
-			return "", fmt.Errorf("failed to find API keys: %w", err)
-		}
-
-		// Generate default key if none exists
-		if len(apikeyEntities) == 0 {
-			key, hash, err := h.apikeyService.GenerateKeyAndHash(reqCtx, apikey.ApikeyTypeEphemeral)
-			if err != nil {
-				return "", fmt.Errorf("failed to generate API key: %w", err)
-			}
-
-			entity, err := h.apikeyService.CreateApiKey(reqCtx, &apikey.ApiKey{
-				KeyHash:        hash,
-				PlaintextHint:  fmt.Sprintf("sk-..%s", key[len(key)-3:]),
-				Description:    "Default Key For User",
-				Enabled:        true,
-				ApikeyType:     string(apikey.ApikeyTypeEphemeral),
-				OwnerPublicID:  user.PublicID,
-				OrganizationID: nil,
-				Permissions:    "{}",
-			})
-			if err != nil {
-				return "", fmt.Errorf("failed to create API key: %w", err)
-			}
-			apikeyEntities = []*apikey.ApiKey{entity}
-		}
-		key = apikeyEntities[0].KeyHash
+// getAPIKeyForUser retrieves the API key for the user (domain method)
+func (h *ResponseModelService) getAPIKeyForUser(ctx context.Context, userID uint) (string, error) {
+	// Get user by ID
+	user, err := h.UserService.FindByID(ctx, userID)
+	if err != nil {
+		return "", fmt.Errorf("failed to find user: %w", err)
+	}
+	if user == nil {
+		return "", fmt.Errorf("user not found")
 	}
 
+	// Always generate a new ephemeral key for each request
+	key, hash, err := h.apikeyService.GenerateKeyAndHash(ctx, apikey.ApikeyTypeEphemeral)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate API key: %w", err)
+	}
+
+	_, err = h.apikeyService.CreateApiKey(ctx, &apikey.ApiKey{
+		KeyHash:        hash,
+		PlaintextHint:  fmt.Sprintf("sk-..%s", key[len(key)-3:]),
+		Description:    "Default Key For User",
+		Enabled:        true,
+		ApikeyType:     string(apikey.ApikeyTypeEphemeral),
+		OwnerPublicID:  user.PublicID,
+		OrganizationID: nil,
+		Permissions:    "{}",
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to create API key: %w", err)
+	}
 	return key, nil
 }

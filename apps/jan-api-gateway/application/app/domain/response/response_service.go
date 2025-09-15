@@ -13,7 +13,6 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/query"
 	requesttypes "menlo.ai/jan-api-gateway/app/interfaces/http/requests"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	responsetypes "menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
 	"menlo.ai/jan-api-gateway/app/utils/ptr"
@@ -124,7 +123,12 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID
 				return nil, fmt.Errorf("failed to marshal stop sequences: %w", err)
 			}
 			stopStr := string(stopJSON)
-			response.Stop = &stopStr
+			// For JSON columns, use null for empty arrays/objects
+			if stopStr == "[]" || stopStr == "{}" {
+				response.Stop = nil
+			} else {
+				response.Stop = &stopStr
+			}
 		}
 
 		if params.LogitBias != nil {
@@ -133,7 +137,12 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID
 				return nil, fmt.Errorf("failed to marshal logit bias: %w", err)
 			}
 			logitBiasStr := string(logitBiasJSON)
-			response.LogitBias = &logitBiasStr
+			// For JSON columns, use null for empty arrays/objects
+			if logitBiasStr == "[]" || logitBiasStr == "{}" {
+				response.LogitBias = nil
+			} else {
+				response.LogitBias = &logitBiasStr
+			}
 		}
 
 		if params.ResponseFormat != nil {
@@ -142,7 +151,12 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID
 				return nil, fmt.Errorf("failed to marshal response format: %w", err)
 			}
 			responseFormatStr := string(responseFormatJSON)
-			response.ResponseFormat = &responseFormatStr
+			// For JSON columns, use null for empty arrays/objects
+			if responseFormatStr == "[]" || responseFormatStr == "{}" {
+				response.ResponseFormat = nil
+			} else {
+				response.ResponseFormat = &responseFormatStr
+			}
 		}
 
 		if params.Tools != nil {
@@ -151,7 +165,12 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID
 				return nil, fmt.Errorf("failed to marshal tools: %w", err)
 			}
 			toolsStr := string(toolsJSON)
-			response.Tools = &toolsStr
+			// For JSON columns, use null for empty arrays/objects
+			if toolsStr == "[]" || toolsStr == "{}" {
+				response.Tools = nil
+			} else {
+				response.Tools = &toolsStr
+			}
 		}
 
 		if params.ToolChoice != nil {
@@ -160,7 +179,12 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID
 				return nil, fmt.Errorf("failed to marshal tool choice: %w", err)
 			}
 			toolChoiceStr := string(toolChoiceJSON)
-			response.ToolChoice = &toolChoiceStr
+			// For JSON columns, use null for empty arrays/objects
+			if toolChoiceStr == "[]" || toolChoiceStr == "{}" {
+				response.ToolChoice = nil
+			} else {
+				response.ToolChoice = &toolChoiceStr
+			}
 		}
 
 		if params.Metadata != nil {
@@ -169,7 +193,12 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID
 				return nil, fmt.Errorf("failed to marshal metadata: %w", err)
 			}
 			metadataStr := string(metadataJSON)
-			response.Metadata = &metadataStr
+			// For JSON columns, use null for empty arrays/objects
+			if metadataStr == "[]" || metadataStr == "{}" {
+				response.Metadata = nil
+			} else {
+				response.Metadata = &metadataStr
+			}
 		}
 	}
 
@@ -228,7 +257,12 @@ func (s *ResponseService) UpdateResponseOutput(ctx context.Context, responseID u
 	}
 
 	outputStr := string(outputJSON)
-	response.Output = &outputStr
+	// For JSON columns, use null for empty arrays/objects
+	if outputStr == "[]" || outputStr == "{}" {
+		response.Output = nil
+	} else {
+		response.Output = &outputStr
+	}
 	response.UpdatedAt = time.Now()
 
 	if err := s.responseRepo.Update(ctx, response); err != nil {
@@ -255,7 +289,12 @@ func (s *ResponseService) UpdateResponseUsage(ctx context.Context, responseID ui
 	}
 
 	usageStr := string(usageJSON)
-	response.Usage = &usageStr
+	// For JSON columns, use null for empty arrays/objects
+	if usageStr == "[]" || usageStr == "{}" {
+		response.Usage = nil
+	} else {
+		response.Usage = &usageStr
+	}
 	response.UpdatedAt = time.Now()
 
 	if err := s.responseRepo.Update(ctx, response); err != nil {
@@ -282,7 +321,12 @@ func (s *ResponseService) UpdateResponseError(ctx context.Context, responseID ui
 	}
 
 	errorStr := string(errorJSON)
-	response.Error = &errorStr
+	// For JSON columns, use null for empty arrays/objects
+	if errorStr == "[]" || errorStr == "{}" {
+		response.Error = nil
+	} else {
+		response.Error = &errorStr
+	}
 	response.Status = ResponseStatusFailed
 	response.UpdatedAt = time.Now()
 	now := time.Now()
@@ -446,16 +490,16 @@ func (s *ResponseService) GetResponseMiddleWare() gin.HandlerFunc {
 		ctx := reqCtx.Request.Context()
 		publicID := reqCtx.Param(string(ResponseContextKeyPublicID))
 		if publicID == "" {
-			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-				Code:  "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc",
+			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responsetypes.ErrorResponse{
+				Code:  "r8s9t0u1-v2w3-4567-rstu-890123456789",
 				Error: "missing response public ID",
 			})
 			return
 		}
 		user, ok := auth.GetUserFromContext(reqCtx)
 		if !ok {
-			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-				Code: "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc",
+			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responsetypes.ErrorResponse{
+				Code: "s9t0u1v2-w3x4-5678-stuv-901234567890",
 			})
 			return
 		}
@@ -465,16 +509,16 @@ func (s *ResponseService) GetResponseMiddleWare() gin.HandlerFunc {
 		}, nil)
 
 		if err != nil {
-			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-				Code:  "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc",
+			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responsetypes.ErrorResponse{
+				Code:  "t0u1v2w3-x4y5-6789-tuvw-012345678901",
 				Error: err.Error(),
 			})
 			return
 		}
 
 		if len(entities) == 0 {
-			reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-				Code: "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc",
+			reqCtx.AbortWithStatusJSON(http.StatusNotFound, responsetypes.ErrorResponse{
+				Code: "u1v2w3x4-y5z6-7890-uvwx-123456789012",
 			})
 			return
 		}

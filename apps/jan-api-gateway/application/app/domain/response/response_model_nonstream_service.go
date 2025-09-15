@@ -20,20 +20,20 @@ const (
 	DefaultTimeout = 60 * time.Second
 )
 
-// NonStreamHandler handles non-streaming response requests
-type NonStreamHandler struct {
-	*ResponseHandler
+// NonStreamModelService handles non-streaming response requests
+type NonStreamModelService struct {
+	*ResponseModelService
 }
 
-// NewNonStreamHandler creates a new NonStreamHandler instance
-func NewNonStreamHandler(responseHandler *ResponseHandler) *NonStreamHandler {
-	return &NonStreamHandler{
-		ResponseHandler: responseHandler,
+// NewNonStreamModelService creates a new NonStreamModelService instance
+func NewNonStreamModelService(responseModelService *ResponseModelService) *NonStreamModelService {
+	return &NonStreamModelService{
+		ResponseModelService: responseModelService,
 	}
 }
 
 // CreateNonStreamResponse handles the business logic for creating a non-streaming response
-func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *Response, chatCompletionRequest *openai.ChatCompletionRequest) {
+func (h *NonStreamModelService) CreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *Response, chatCompletionRequest *openai.ChatCompletionRequest) {
 
 	// Process with Jan inference client for non-streaming with timeout
 	janInferenceClient := janinference.NewJanInferenceClient(reqCtx)
@@ -89,7 +89,7 @@ func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request 
 }
 
 // convertFromChatCompletionResponse converts a ChatCompletionResponse to a Response
-func (h *NonStreamHandler) convertFromChatCompletionResponse(chatResp *openai.ChatCompletionResponse, req *requesttypes.CreateResponseRequest, conv *conversation.Conversation, responseEntity *Response) responsetypes.OpenAIGeneralResponse[responsetypes.Response] {
+func (h *NonStreamModelService) convertFromChatCompletionResponse(chatResp *openai.ChatCompletionResponse, req *requesttypes.CreateResponseRequest, conv *conversation.Conversation, responseEntity *Response) responsetypes.OpenAIGeneralResponse[responsetypes.Response] {
 
 	// Extract the content and reasoning from the first choice
 	var outputText string

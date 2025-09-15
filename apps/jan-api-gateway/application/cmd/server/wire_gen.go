@@ -25,20 +25,21 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
-	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	auth2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth/google"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
-	mcpimpl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	organization2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
-	apikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects/api_keys"
-	responses2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/responses"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects/api_keys"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/responses"
+)
 
+import (
 	_ "github.com/grafana/pyroscope-go/godeltaprof/http/pprof"
-
 	_ "net/http/pprof"
 )
 
@@ -77,8 +78,10 @@ func CreateApplication() (*Application, error) {
 	authRoute := auth2.NewAuthRoute(googleAuthAPI, userService, authService)
 	responseRepository := responserepo.NewResponseRepository(db)
 	responseService := response.NewResponseService(responseRepository, itemRepository, conversationService)
-	responseHandler := response.NewResponseHandler(userService, authService, apiKeyService, conversationService, responseService)
-	responseRoute := responses2.NewResponseRoute(responseHandler, authService, responseService)
+	responseModelService := response.NewResponseModelService(userService, authService, apiKeyService, conversationService, responseService)
+	streamModelService := response.NewStreamModelService(responseModelService)
+	nonStreamModelService := response.NewNonStreamModelService(responseModelService)
+	responseRoute := responses.NewResponseRoute(responseModelService, authService, responseService, streamModelService, nonStreamModelService)
 	v1Route := v1.NewV1Route(organizationRoute, chatRoute, conversationAPI, modelAPI, mcpapi, authRoute, responseRoute)
 	httpServer := http.NewHttpServer(v1Route)
 	application := &Application{

@@ -21,15 +21,15 @@ import (
 	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
-// StreamHandler handles streaming response requests
-type StreamHandler struct {
-	*ResponseHandler
+// StreamModelService handles streaming response requests
+type StreamModelService struct {
+	*ResponseModelService
 }
 
-// NewStreamHandler creates a new StreamHandler instance
-func NewStreamHandler(responseHandler *ResponseHandler) *StreamHandler {
-	return &StreamHandler{
-		ResponseHandler: responseHandler,
+// NewStreamModelService creates a new StreamModelService instance
+func NewStreamModelService(responseModelService *ResponseModelService) *StreamModelService {
+	return &StreamModelService{
+		ResponseModelService: responseModelService,
 	}
 }
 
@@ -46,7 +46,7 @@ const (
 )
 
 // validateRequest validates the incoming request
-func (h *StreamHandler) validateRequest(request *requesttypes.CreateResponseRequest) error {
+func (h *StreamModelService) validateRequest(request *requesttypes.CreateResponseRequest) error {
 	if request.Model == "" {
 		return fmt.Errorf("model is required")
 	}
@@ -57,7 +57,7 @@ func (h *StreamHandler) validateRequest(request *requesttypes.CreateResponseRequ
 }
 
 // checkContextCancellation checks if context was cancelled and sends error to channel
-func (h *StreamHandler) checkContextCancellation(ctx context.Context, errChan chan<- error) bool {
+func (h *StreamModelService) checkContextCancellation(ctx context.Context, errChan chan<- error) bool {
 	select {
 	case <-ctx.Done():
 		errChan <- ctx.Err()
@@ -68,7 +68,7 @@ func (h *StreamHandler) checkContextCancellation(ctx context.Context, errChan ch
 }
 
 // marshalAndSendEvent marshals data and sends it to the data channel with proper error handling
-func (h *StreamHandler) marshalAndSendEvent(dataChan chan<- string, eventType string, data any) {
+func (h *StreamModelService) marshalAndSendEvent(dataChan chan<- string, eventType string, data any) {
 	eventJSON, err := json.Marshal(data)
 	if err != nil {
 		logger.GetLogger().Errorf("Failed to marshal event: %v", err)
@@ -78,14 +78,14 @@ func (h *StreamHandler) marshalAndSendEvent(dataChan chan<- string, eventType st
 }
 
 // logStreamingMetrics logs streaming completion metrics
-func (h *StreamHandler) logStreamingMetrics(responseID string, startTime time.Time, wordCount int) {
+func (h *StreamModelService) logStreamingMetrics(responseID string, startTime time.Time, wordCount int) {
 	duration := time.Since(startTime)
 	logger.GetLogger().Infof("Streaming completed - ID: %s, Duration: %v, Words: %d",
 		responseID, duration, wordCount)
 }
 
 // createTextDeltaEvent creates a text delta event
-func (h *StreamHandler) createTextDeltaEvent(itemID string, sequenceNumber int, delta string) responsetypes.ResponseOutputTextDeltaEvent {
+func (h *StreamModelService) createTextDeltaEvent(itemID string, sequenceNumber int, delta string) responsetypes.ResponseOutputTextDeltaEvent {
 	return responsetypes.ResponseOutputTextDeltaEvent{
 		BaseStreamingEvent: responsetypes.BaseStreamingEvent{
 			Type:           "response.output_text.delta",
@@ -101,7 +101,7 @@ func (h *StreamHandler) createTextDeltaEvent(itemID string, sequenceNumber int, 
 }
 
 // CreateStreamResponse handles the business logic for creating a streaming response
-func (h *StreamHandler) CreateStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *Response, chatCompletionRequest *openai.ChatCompletionRequest) {
+func (h *StreamModelService) CreateStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *Response, chatCompletionRequest *openai.ChatCompletionRequest) {
 	// Validate request
 	if err := h.validateRequest(request); err != nil {
 		reqCtx.JSON(http.StatusBadRequest, responsetypes.ErrorResponse{
@@ -222,7 +222,7 @@ func (h *StreamHandler) CreateStreamResponse(reqCtx *gin.Context, request *reque
 }
 
 // emitStreamEvent emits a streaming event (matching completion API SSE format)
-func (h *StreamHandler) emitStreamEvent(reqCtx *gin.Context, eventType string, data any) {
+func (h *StreamModelService) emitStreamEvent(reqCtx *gin.Context, eventType string, data any) {
 	// Marshal the data directly without wrapping
 	eventJSON, err := json.Marshal(data)
 	if err != nil {
@@ -236,7 +236,7 @@ func (h *StreamHandler) emitStreamEvent(reqCtx *gin.Context, eventType string, d
 }
 
 // processStreamingResponse processes the streaming response from Jan inference using two channels
-func (h *StreamHandler) processStreamingResponse(reqCtx *gin.Context, _ *janinference.JanInferenceClient, _ string, request openai.ChatCompletionRequest, responseID string, conv *conversation.Conversation) error {
+func (h *StreamModelService) processStreamingResponse(reqCtx *gin.Context, _ *janinference.JanInferenceClient, _ string, request openai.ChatCompletionRequest, responseID string, conv *conversation.Conversation) error {
 	// Create buffered channels for data and errors
 	dataChan := make(chan string, ChannelBufferSize)
 	errChan := make(chan error, ErrorBufferSize)
@@ -295,7 +295,7 @@ type OpenAIStreamData struct {
 }
 
 // parseOpenAIStreamData parses OpenAI streaming data and extracts content
-func (h *StreamHandler) parseOpenAIStreamData(jsonStr string) string {
+func (h *StreamModelService) parseOpenAIStreamData(jsonStr string) string {
 	var data OpenAIStreamData
 	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
 		return ""
@@ -316,7 +316,7 @@ func (h *StreamHandler) parseOpenAIStreamData(jsonStr string) string {
 }
 
 // extractContentFromOpenAIStream extracts content from OpenAI streaming format
-func (h *StreamHandler) extractContentFromOpenAIStream(chunk string) string {
+func (h *StreamModelService) extractContentFromOpenAIStream(chunk string) string {
 	// Format 1: data: {"choices":[{"delta":{"content":"chunk"}}]}
 	if len(chunk) >= 6 && chunk[:6] == DataPrefix {
 		return h.parseOpenAIStreamData(chunk[6:])
@@ -339,7 +339,7 @@ func (h *StreamHandler) extractContentFromOpenAIStream(chunk string) string {
 }
 
 // extractReasoningContentFromOpenAIStream extracts reasoning content from OpenAI streaming format
-func (h *StreamHandler) extractReasoningContentFromOpenAIStream(chunk string) string {
+func (h *StreamModelService) extractReasoningContentFromOpenAIStream(chunk string) string {
 	// Format 1: data: {"choices":[{"delta":{"reasoning_content":"chunk"}}]}
 	if len(chunk) >= 6 && chunk[:6] == DataPrefix {
 		return h.parseOpenAIStreamReasoningData(chunk[6:])
@@ -354,7 +354,7 @@ func (h *StreamHandler) extractReasoningContentFromOpenAIStream(chunk string) st
 }
 
 // parseOpenAIStreamReasoningData parses OpenAI streaming data and extracts reasoning content
-func (h *StreamHandler) parseOpenAIStreamReasoningData(jsonStr string) string {
+func (h *StreamModelService) parseOpenAIStreamReasoningData(jsonStr string) string {
 	var data OpenAIStreamData
 	if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
 		return ""
@@ -370,7 +370,7 @@ func (h *StreamHandler) parseOpenAIStreamReasoningData(jsonStr string) string {
 }
 
 // streamResponseToChannel handles the streaming response and sends data/errors to channels
-func (h *StreamHandler) streamResponseToChannel(reqCtx *gin.Context, request openai.ChatCompletionRequest, dataChan chan<- string, errChan chan<- error, responseID string, conv *conversation.Conversation, wg *sync.WaitGroup) {
+func (h *StreamModelService) streamResponseToChannel(reqCtx *gin.Context, request openai.ChatCompletionRequest, dataChan chan<- string, errChan chan<- error, responseID string, conv *conversation.Conversation, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	startTime := time.Now()
