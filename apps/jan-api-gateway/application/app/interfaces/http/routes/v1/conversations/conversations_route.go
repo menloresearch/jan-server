@@ -444,15 +444,6 @@ type AnnotationResponse struct {
 	Index      int    `json:"index,omitempty"`
 }
 
-// ConversationItemListResponse represents the response for item lists
-type ConversationItemListResponse struct {
-	Object  string                      `json:"object"`
-	Data    []*ConversationItemResponse `json:"data"`
-	HasMore bool                        `json:"has_more"`
-	FirstID *string                     `json:"first_id,omitempty"`
-	LastID  *string                     `json:"last_id,omitempty"`
-}
-
 // createItems handles item creation
 // @Summary Create items in a conversation
 // @Description Adds multiple items to a conversation
@@ -537,7 +528,7 @@ func (api *ConversationAPI) createItems(reqCtx *gin.Context) {
 // @Param limit query int false "Number of items to return (1-100)"
 // @Param cursor query string false "Cursor for pagination"
 // @Param order query string false "Order of items (asc/desc)"
-// @Success 200 {object} ConversationItemListResponse "List of items"
+// @Success 200 {object} ListResponse[ConversationItemResponse] "List of items"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
@@ -788,11 +779,6 @@ func domainToAnnotationResponse(annotations []conversation.Annotation) []Annotat
 		}
 	}
 	return result
-}
-
-// AuthenticatedUser represents an authenticated user context
-type AuthenticatedUser struct {
-	ID uint
 }
 
 // CreateConversationRequest represents the input for creating a conversation

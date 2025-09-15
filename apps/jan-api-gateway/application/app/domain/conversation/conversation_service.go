@@ -46,14 +46,6 @@ func NewService(conversationRepo ConversationRepository, itemRepo ItemRepository
 	}
 }
 
-func NewServiceWithValidator(conversationRepo ConversationRepository, itemRepo ItemRepository, validator *ConversationValidator) *ConversationService {
-	return &ConversationService{
-		conversationRepo: conversationRepo,
-		itemRepo:         itemRepo,
-		validator:        validator,
-	}
-}
-
 func (s *ConversationService) FindConversationsByFilter(ctx context.Context, filter ConversationFilter, pagination *query.Pagination) ([]*Conversation, error) {
 	return s.conversationRepo.FindByFilter(ctx, filter, pagination)
 }
@@ -96,16 +88,6 @@ func (s *ConversationService) GetConversationByPublicIDAndUserID(ctx context.Con
 	return s.getConversationWithAccessCheck(ctx, publicID, userID, true)
 }
 
-// GetConversationWithAccessAndItems is an alias for backward compatibility
-func (s *ConversationService) GetConversationWithAccessAndItems(ctx context.Context, publicID string, userID uint) (*Conversation, error) {
-	return s.GetConversationByPublicIDAndUserID(ctx, publicID, userID)
-}
-
-// GetConversationWithoutItems retrieves a conversation without loading items for performance
-func (s *ConversationService) GetConversationWithoutItems(ctx context.Context, publicID string, userID uint) (*Conversation, error) {
-	return s.getConversationWithAccessCheck(ctx, publicID, userID, false)
-}
-
 // GetConversationByID retrieves a conversation by its internal ID without user access control
 func (s *ConversationService) GetConversationByID(ctx context.Context, conversationID uint) (*Conversation, error) {
 	// Validate inputs
@@ -142,38 +124,6 @@ func (s *ConversationService) getConversationWithAccessCheck(ctx context.Context
 		return nil, fmt.Errorf("conversation not found")
 	}
 	return convs[0], nil
-}
-
-// UpdateAndAuthorizeConversation retrieves a conversation by its public ID, checks access permissions,
-// updates the conversation fields, and persists the changes.
-func (s *ConversationService) UpdateAndAuthorizeConversation(ctx context.Context, publicID string, userID uint, title *string, metadata map[string]string) (*Conversation, error) {
-	conversation, err := s.conversationRepo.FindByPublicID(ctx, publicID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find conversation: %w", err)
-	}
-
-	if conversation == nil {
-		return nil, errors.New("conversation not found")
-	}
-
-	// Check access permissions
-	if conversation.UserID != userID {
-		return nil, errors.New("access denied")
-	}
-
-	// Update fields
-	if title != nil {
-		conversation.Title = title
-	}
-	if metadata != nil {
-		conversation.Metadata = metadata
-	}
-	conversation.UpdatedAt = time.Now()
-
-	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
-		return nil, fmt.Errorf("failed to update conversation: %w", err)
-	}
-	return conversation, nil
 }
 
 func (s *ConversationService) UpdateConversation(ctx context.Context, entity *Conversation) (*Conversation, error) {
@@ -330,46 +280,6 @@ func (s *ConversationService) DeleteItem(ctx context.Context, conversation *Conv
 	}
 
 	return updatedConversation, nil
-}
-
-// DeleteItemByPublicID deletes an item by its public ID with efficient verification
-func (s *ConversationService) DeleteItemByPublicID(ctx context.Context, conversation *Conversation, itemPublicID string, userID uint) (*Conversation, error) {
-	// Check access permissions
-	if conversation.IsPrivate && conversation.UserID != userID {
-		return nil, errors.New("private conversation access denied")
-	}
-
-	if conversation.UserID != userID {
-		return nil, errors.New("access denied")
-	}
-
-	// Find item by public ID
-	item, err := s.itemRepo.FindByPublicID(ctx, itemPublicID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find item: %w", err)
-	}
-
-	if item == nil {
-		return nil, errors.New("item not found")
-	}
-
-	// Use efficient existence check instead of loading all items
-	exists, err := s.itemRepo.ExistsByIDAndConversation(ctx, item.ID, conversation.ID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to verify item ownership: %w", err)
-	}
-
-	if !exists {
-		return nil, errors.New("item not in conversation")
-	}
-
-	// Delete the item
-	if err := s.itemRepo.Delete(ctx, item.ID); err != nil {
-		return nil, fmt.Errorf("failed to delete item: %w", err)
-	}
-
-	// Update conversation timestamp
-	return nil, nil
 }
 
 // DeleteItemWithConversation deletes an item by its ID and updates the conversation accordingly.
