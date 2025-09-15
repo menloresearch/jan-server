@@ -8,17 +8,22 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/query"
+	requesttypes "menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
+	responsetypes "menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
+	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
 // ResponseService handles business logic for responses
 type ResponseService struct {
-	responseRepo ResponseRepository
-	itemRepo     conversation.ItemRepository
+	responseRepo        ResponseRepository
+	itemRepo            conversation.ItemRepository
+	conversationService *conversation.ConversationService
 }
 
 // ResponseContextKey represents context keys for responses
@@ -27,13 +32,17 @@ type ResponseContextKey string
 const (
 	ResponseContextKeyPublicID ResponseContextKey = "response_id"
 	ResponseContextEntity      ResponseContextKey = "ResponseContextEntity"
+
+	// ClientCreatedRootConversationID is the special conversation ID that indicates a new conversation should be created
+	ClientCreatedRootConversationID = "client-created-root"
 )
 
 // NewResponseService creates a new response service
-func NewResponseService(responseRepo ResponseRepository, itemRepo conversation.ItemRepository) *ResponseService {
+func NewResponseService(responseRepo ResponseRepository, itemRepo conversation.ItemRepository, conversationService *conversation.ConversationService) *ResponseService {
 	return &ResponseService{
-		responseRepo: responseRepo,
-		itemRepo:     itemRepo,
+		responseRepo:        responseRepo,
+		itemRepo:            itemRepo,
+		conversationService: conversationService,
 	}
 }
 
@@ -488,4 +497,326 @@ func GetResponseFromContext(reqCtx *gin.Context) (*Response, bool) {
 	}
 	response, ok := resp.(*Response)
 	return response, ok
+}
+
+// ProcessResponseRequest processes a response request and returns the appropriate handler
+func (s *ResponseService) ProcessResponseRequest(ctx context.Context, userID uint, req *ResponseRequest) (*Response, error) {
+	// Create response from request
+	responseEntity, err := s.CreateResponseFromRequest(ctx, userID, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create response: %w", err)
+	}
+
+	return responseEntity, nil
+}
+
+// ConvertDomainResponseToAPIResponse converts a domain response to API response format
+func (s *ResponseService) ConvertDomainResponseToAPIResponse(responseEntity *Response) responsetypes.Response {
+	apiResponse := responsetypes.Response{
+		ID:      responseEntity.PublicID,
+		Object:  "response",
+		Created: responseEntity.CreatedAt.Unix(),
+		Model:   responseEntity.Model,
+		Status:  responsetypes.ResponseStatus(responseEntity.Status),
+		Input:   responseEntity.Input,
+	}
+
+	// Add conversation if exists
+	if responseEntity.ConversationID != nil {
+		apiResponse.Conversation = &responsetypes.ConversationInfo{
+			ID: fmt.Sprintf("conv_%d", *responseEntity.ConversationID),
+		}
+	}
+
+	// Add timestamps
+	if responseEntity.CompletedAt != nil {
+		apiResponse.CompletedAt = ptr.ToInt64(responseEntity.CompletedAt.Unix())
+	}
+	if responseEntity.CancelledAt != nil {
+		apiResponse.CancelledAt = ptr.ToInt64(responseEntity.CancelledAt.Unix())
+	}
+	if responseEntity.FailedAt != nil {
+		apiResponse.FailedAt = ptr.ToInt64(responseEntity.FailedAt.Unix())
+	}
+
+	// Parse output if exists
+	if responseEntity.Output != nil {
+		var output interface{}
+		if err := json.Unmarshal([]byte(*responseEntity.Output), &output); err == nil {
+			apiResponse.Output = output
+		}
+	}
+
+	// Parse usage if exists
+	if responseEntity.Usage != nil {
+		var usage responsetypes.DetailedUsage
+		if err := json.Unmarshal([]byte(*responseEntity.Usage), &usage); err == nil {
+			apiResponse.Usage = &usage
+		}
+	}
+
+	// Parse error if exists
+	if responseEntity.Error != nil {
+		var errorData responsetypes.ResponseError
+		if err := json.Unmarshal([]byte(*responseEntity.Error), &errorData); err == nil {
+			apiResponse.Error = &errorData
+		}
+	}
+
+	return apiResponse
+}
+
+// ConvertConversationItemToInputItem converts a conversation item to input item format
+func (s *ResponseService) ConvertConversationItemToInputItem(item *conversation.Item) responsetypes.InputItem {
+	inputItem := responsetypes.InputItem{
+		ID:      item.PublicID,
+		Object:  "input_item",
+		Created: item.CreatedAt.Unix(),
+		Type:    requesttypes.InputType(item.Type),
+	}
+
+	if len(item.Content) > 0 {
+		for _, content := range item.Content {
+			if content.Type == "text" && content.Text != nil {
+				inputItem.Text = &content.Text.Value
+				break
+			} else if content.Type == "input_text" && content.InputText != nil {
+				inputItem.Text = content.InputText
+				break
+			}
+		}
+	}
+
+	return inputItem
+}
+
+// HandleConversation handles conversation creation and management for responses
+func (s *ResponseService) HandleConversation(ctx context.Context, userID uint, request *requesttypes.CreateResponseRequest) (*conversation.Conversation, error) {
+	// If store is explicitly set to false, don't create or use any conversation
+	if request.Store != nil && !*request.Store {
+		return nil, nil
+	}
+
+	// If previous_response_id is provided, load the conversation from the previous response
+	if request.PreviousResponseID != nil && *request.PreviousResponseID != "" {
+		// Load the previous response
+		previousResponse, err := s.GetResponseByPublicID(ctx, *request.PreviousResponseID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load previous response: %w", err)
+		}
+		if previousResponse == nil {
+			return nil, fmt.Errorf("previous response not found: %s", *request.PreviousResponseID)
+		}
+
+		// Validate that the previous response belongs to the same user
+		if previousResponse.UserID != userID {
+			return nil, fmt.Errorf("previous response does not belong to the current user")
+		}
+
+		// Load the conversation from the previous response
+		if previousResponse.ConversationID == nil {
+			return nil, fmt.Errorf("previous response does not belong to any conversation")
+		}
+
+		conv, err := s.conversationService.GetConversationByID(ctx, *previousResponse.ConversationID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load conversation from previous response: %w", err)
+		}
+		return conv, nil
+	}
+
+	// Check if conversation is specified and not 'client-created-root'
+	if request.Conversation != nil && *request.Conversation != "" && *request.Conversation != ClientCreatedRootConversationID {
+		// Load existing conversation
+		conv, err := s.conversationService.GetConversationByPublicIDAndUserID(ctx, *request.Conversation, userID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load conversation: %w", err)
+		}
+		return conv, nil
+	}
+
+	// Create new conversation
+	conv, err := s.conversationService.CreateConversation(ctx, userID, nil, true, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create conversation: %w", err)
+	}
+
+	return conv, nil
+}
+
+// AppendMessagesToConversation appends messages to a conversation
+func (s *ResponseService) AppendMessagesToConversation(ctx context.Context, conv *conversation.Conversation, messages []openai.ChatCompletionMessage, responseID *uint) error {
+	// Convert OpenAI messages to conversation items
+	items := make([]*conversation.Item, 0, len(messages))
+	for _, msg := range messages {
+		// Generate public ID for the item
+		publicID, err := idgen.GenerateSecureID("msg", 42)
+		if err != nil {
+			return fmt.Errorf("failed to generate item ID: %w", err)
+		}
+
+		// Convert role
+		var role conversation.ItemRole
+		switch msg.Role {
+		case openai.ChatMessageRoleSystem:
+			role = conversation.ItemRoleSystem
+		case openai.ChatMessageRoleUser:
+			role = conversation.ItemRoleUser
+		case openai.ChatMessageRoleAssistant:
+			role = conversation.ItemRoleAssistant
+		default:
+			role = conversation.ItemRoleUser
+		}
+
+		// Convert content
+		content := make([]conversation.Content, 0, len(msg.MultiContent))
+		for _, contentPart := range msg.MultiContent {
+			if contentPart.Type == openai.ChatMessagePartTypeText {
+				content = append(content, conversation.Content{
+					Type: "text",
+					Text: &conversation.Text{
+						Value: contentPart.Text,
+					},
+				})
+			}
+		}
+
+		// If no multi-content, use simple text content
+		if len(content) == 0 && msg.Content != "" {
+			content = append(content, conversation.Content{
+				Type: "text",
+				Text: &conversation.Text{
+					Value: msg.Content,
+				},
+			})
+		}
+
+		item := &conversation.Item{
+			PublicID:       publicID,
+			Type:           conversation.ItemType("message"),
+			Role:           &role,
+			Content:        content,
+			ConversationID: conv.ID,
+			ResponseID:     responseID,
+			CreatedAt:      time.Now(),
+		}
+
+		items = append(items, item)
+	}
+
+	// Add items to conversation
+	if len(items) > 0 {
+		_, err := s.conversationService.AddMultipleItems(ctx, conv, conv.UserID, items)
+		if err != nil {
+			return fmt.Errorf("failed to add items to conversation: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// ConvertToChatCompletionRequest converts a response request to OpenAI chat completion request
+func (s *ResponseService) ConvertToChatCompletionRequest(req *requesttypes.CreateResponseRequest) *openai.ChatCompletionRequest {
+	chatReq := &openai.ChatCompletionRequest{
+		Model:    req.Model,
+		Messages: make([]openai.ChatCompletionMessage, 0),
+	}
+
+	// Add system message if provided
+	if req.SystemPrompt != nil && *req.SystemPrompt != "" {
+		chatReq.Messages = append(chatReq.Messages, openai.ChatCompletionMessage{
+			Role:    openai.ChatMessageRoleSystem,
+			Content: *req.SystemPrompt,
+		})
+	}
+
+	// Add user input as message
+	if req.Input != nil {
+		// Try to parse input as JSON array of messages first
+		var messages []openai.ChatCompletionMessage
+		if err := json.Unmarshal([]byte(fmt.Sprintf("%v", req.Input)), &messages); err == nil {
+			// Input is an array of messages
+			chatReq.Messages = append(chatReq.Messages, messages...)
+		} else {
+			// Input is a single string message
+			chatReq.Messages = append(chatReq.Messages, openai.ChatCompletionMessage{
+				Role:    openai.ChatMessageRoleUser,
+				Content: fmt.Sprintf("%v", req.Input),
+			})
+		}
+	}
+
+	// Set optional parameters
+	if req.MaxTokens != nil {
+		chatReq.MaxTokens = *req.MaxTokens
+	}
+	if req.Temperature != nil {
+		chatReq.Temperature = float32(*req.Temperature)
+	}
+	if req.TopP != nil {
+		chatReq.TopP = float32(*req.TopP)
+	}
+	if req.Stop != nil {
+		chatReq.Stop = req.Stop
+	}
+	if req.PresencePenalty != nil {
+		chatReq.PresencePenalty = float32(*req.PresencePenalty)
+	}
+	if req.FrequencyPenalty != nil {
+		chatReq.FrequencyPenalty = float32(*req.FrequencyPenalty)
+	}
+	if req.User != nil {
+		chatReq.User = *req.User
+	}
+
+	return chatReq
+}
+
+// ConvertConversationItemsToMessages converts conversation items to OpenAI chat completion messages
+func (s *ResponseService) ConvertConversationItemsToMessages(ctx context.Context, conv *conversation.Conversation) ([]openai.ChatCompletionMessage, error) {
+	// Load conversation with items
+	convWithItems, err := s.conversationService.GetConversationByPublicIDAndUserID(ctx, conv.PublicID, conv.UserID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load conversation with items: %w", err)
+	}
+
+	// Convert items to messages
+	messages := make([]openai.ChatCompletionMessage, 0, len(convWithItems.Items))
+	for _, item := range convWithItems.Items {
+		// Skip items that don't have a role or content
+		if item.Role == nil || len(item.Content) == 0 {
+			continue
+		}
+
+		// Convert conversation role to OpenAI role
+		var openaiRole string
+		switch *item.Role {
+		case conversation.ItemRoleSystem:
+			openaiRole = openai.ChatMessageRoleSystem
+		case conversation.ItemRoleUser:
+			openaiRole = openai.ChatMessageRoleUser
+		case conversation.ItemRoleAssistant:
+			openaiRole = openai.ChatMessageRoleAssistant
+		default:
+			openaiRole = openai.ChatMessageRoleUser
+		}
+
+		// Extract text content from the item
+		var content string
+		for _, contentPart := range item.Content {
+			if contentPart.Type == "text" && contentPart.Text != nil {
+				content += contentPart.Text.Value
+			}
+		}
+
+		// Only add message if it has content
+		if content != "" {
+			messages = append(messages, openai.ChatCompletionMessage{
+				Role:    openaiRole,
+				Content: content,
+			})
+		}
+	}
+
+	return messages, nil
 }

@@ -1,4 +1,4 @@
-package responses
+package response
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
-	"menlo.ai/jan-api-gateway/app/domain/response"
 	requesttypes "menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	responsetypes "menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
@@ -34,7 +33,7 @@ func NewNonStreamHandler(responseHandler *ResponseHandler) *NonStreamHandler {
 }
 
 // CreateNonStreamResponse handles the business logic for creating a non-streaming response
-func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *response.Response, chatCompletionRequest *openai.ChatCompletionRequest) {
+func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *Response, chatCompletionRequest *openai.ChatCompletionRequest) {
 
 	// Process with Jan inference client for non-streaming with timeout
 	janInferenceClient := janinference.NewJanInferenceClient(reqCtx)
@@ -59,14 +58,14 @@ func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request 
 			Role:    openai.ChatMessageRoleAssistant,
 			Content: processedResponse.Choices[0].Message.Content,
 		}
-		if err := h.appendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}, &responseEntity.ID); err != nil {
+		if err := h.responseService.AppendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}, &responseEntity.ID); err != nil {
 			// Log error but don't fail the response
 			logger.GetLogger().Errorf("Failed to append assistant response to conversation: %v", err)
 		}
 	}
 
 	// Update response status to completed
-	if err := h.responseService.UpdateResponseStatus(reqCtx, responseEntity.ID, response.ResponseStatusCompleted); err != nil {
+	if err := h.responseService.UpdateResponseStatus(reqCtx, responseEntity.ID, ResponseStatusCompleted); err != nil {
 		// Log error but don't fail the request since response is already generated
 		fmt.Printf("Failed to update response status to completed: %v\n", err)
 	}
@@ -90,7 +89,7 @@ func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request 
 }
 
 // convertFromChatCompletionResponse converts a ChatCompletionResponse to a Response
-func (h *NonStreamHandler) convertFromChatCompletionResponse(chatResp *openai.ChatCompletionResponse, req *requesttypes.CreateResponseRequest, conv *conversation.Conversation, responseEntity *response.Response) responsetypes.OpenAIGeneralResponse[responsetypes.Response] {
+func (h *NonStreamHandler) convertFromChatCompletionResponse(chatResp *openai.ChatCompletionResponse, req *requesttypes.CreateResponseRequest, conv *conversation.Conversation, responseEntity *Response) responsetypes.OpenAIGeneralResponse[responsetypes.Response] {
 
 	// Extract the content and reasoning from the first choice
 	var outputText string

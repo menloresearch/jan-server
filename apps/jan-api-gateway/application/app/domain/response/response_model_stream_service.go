@@ -1,4 +1,4 @@
-package responses
+package response
 
 import (
 	"bufio"
@@ -13,7 +13,6 @@ import (
 	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
-	"menlo.ai/jan-api-gateway/app/domain/response"
 	requesttypes "menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	responsetypes "menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
@@ -102,7 +101,7 @@ func (h *StreamHandler) createTextDeltaEvent(itemID string, sequenceNumber int, 
 }
 
 // CreateStreamResponse handles the business logic for creating a streaming response
-func (h *StreamHandler) CreateStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *response.Response, chatCompletionRequest *openai.ChatCompletionRequest) {
+func (h *StreamHandler) CreateStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *Response, chatCompletionRequest *openai.ChatCompletionRequest) {
 	// Validate request
 	if err := h.validateRequest(request); err != nil {
 		reqCtx.JSON(http.StatusBadRequest, responsetypes.ErrorResponse{
@@ -656,7 +655,7 @@ func (h *StreamHandler) streamResponseToChannel(reqCtx *gin.Context, request ope
 		// Get response entity to get the internal ID
 		responseEntity, err := h.responseService.GetResponseByPublicID(reqCtx, responseID)
 		if err == nil && responseEntity != nil {
-			if err := h.appendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}, &responseEntity.ID); err != nil {
+			if err := h.responseService.AppendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}, &responseEntity.ID); err != nil {
 				// Log error but don't fail the response
 				logger.GetLogger().Errorf("Failed to append assistant response to conversation: %v", err)
 			}
@@ -735,7 +734,7 @@ func (h *StreamHandler) streamResponseToChannel(reqCtx *gin.Context, request ope
 	responseEntity, err := h.responseService.GetResponseByPublicID(reqCtx, responseID)
 	if err == nil && responseEntity != nil {
 		// Update status to completed
-		if updateErr := h.responseService.UpdateResponseStatus(reqCtx, responseEntity.ID, response.ResponseStatusCompleted); updateErr != nil {
+		if updateErr := h.responseService.UpdateResponseStatus(reqCtx, responseEntity.ID, ResponseStatusCompleted); updateErr != nil {
 			// Log error but don't fail the request since streaming is already complete
 			fmt.Printf("Failed to update response status to completed: %v\n", updateErr)
 		}

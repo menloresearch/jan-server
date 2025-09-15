@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/response"
-	handlerresponses "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/responses"
+	handlerresponses "menlo.ai/jan-api-gateway/app/domain/response"
 )
 
 // CreateResponseRequest represents the request payload for creating a response

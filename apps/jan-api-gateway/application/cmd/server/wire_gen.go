@@ -25,7 +25,6 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/handlers/responses"
 	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	auth2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth/google"
@@ -58,7 +57,7 @@ func CreateApplication() (*Application, error) {
 	apiKeyRepository := apikeyrepo.NewApiKeyGormRepository(transactionDatabase)
 	apiKeyService := apikey.NewService(apiKeyRepository)
 	userRepository := userrepo.NewUserGormRepository(transactionDatabase)
-	userService := user.NewService(userRepository, organizationService, apiKeyService)
+	userService := user.NewService(userRepository)
 	adminApiKeyAPI := organization2.NewAdminApiKeyAPI(organizationService, apiKeyService, userService)
 	projectApiKeyRoute := apikeys.NewProjectApiKeyRoute(organizationService, projectService, apiKeyService, userService)
 	projectsRoute := projects.NewProjectsRoute(projectService, apiKeyService, projectApiKeyRoute)
@@ -77,8 +76,8 @@ func CreateApplication() (*Application, error) {
 	googleAuthAPI := google.NewGoogleAuthAPI(userService, authService)
 	authRoute := auth2.NewAuthRoute(googleAuthAPI, userService, authService)
 	responseRepository := responserepo.NewResponseRepository(db)
-	responseService := response.NewResponseService(responseRepository, itemRepository)
-	responseHandler := responses.NewResponseHandler(userService, authService, apiKeyService, conversationService, responseService)
+	responseService := response.NewResponseService(responseRepository, itemRepository, conversationService)
+	responseHandler := response.NewResponseHandler(userService, authService, apiKeyService, conversationService, responseService)
 	responseRoute := responses2.NewResponseRoute(responseHandler, authService, responseService)
 	v1Route := v1.NewV1Route(organizationRoute, chatRoute, conversationAPI, modelAPI, mcpapi, authRoute, responseRoute)
 	httpServer := http.NewHttpServer(v1Route)
