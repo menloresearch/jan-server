@@ -52,9 +52,9 @@ func ValidateItemRole(input string) bool {
 }
 
 type Item struct {
-	ID                uint               `json:"-"` // Internal DB ID (hidden from JSON)
+	ID                uint               `json:"-"`
 	ConversationID    uint               `json:"-"`
-	PublicID          string             `json:"id"` // OpenAI-compatible string ID like "msg_abc123"
+	PublicID          string             `json:"id"`
 	Type              ItemType           `json:"type"`
 	Role              *ItemRole          `json:"role,omitempty"`
 	Content           []Content          `json:"content,omitempty"`
@@ -62,8 +62,8 @@ type Item struct {
 	IncompleteAt      *time.Time         `json:"incomplete_at,omitempty"`
 	IncompleteDetails *IncompleteDetails `json:"incomplete_details,omitempty"`
 	CompletedAt       *time.Time         `json:"completed_at,omitempty"`
-	ResponseID        *uint              `json:"-"`          // Internal response ID (hidden from JSON)
-	CreatedAt         time.Time          `json:"created_at"` // Unix timestamp for OpenAI compatibility
+	ResponseID        *uint              `json:"-"`
+	CreatedAt         time.Time          `json:"created_at"`
 }
 
 type Content struct {
@@ -131,10 +131,10 @@ type IncompleteDetails struct {
 }
 
 type Conversation struct {
-	ID        uint               `json:"-"`  // Internal DB ID (hidden from JSON)
+	ID        uint               `json:"-"`
 	PublicID  string             `json:"id"` // OpenAI-compatible string ID like "conv_abc123"
 	Title     *string            `json:"title,omitempty"`
-	UserID    uint               `json:"-"` // Internal user ID (hidden from JSON)
+	UserID    uint               `json:"-"`
 	Status    ConversationStatus `json:"status"`
 	Items     []Item             `json:"items,omitempty"`
 	Metadata  map[string]string  `json:"metadata,omitempty"`

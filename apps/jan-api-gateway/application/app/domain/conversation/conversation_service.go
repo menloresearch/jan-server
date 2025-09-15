@@ -85,7 +85,7 @@ func (s *ConversationService) CreateConversation(ctx context.Context, userID uin
 
 // GetConversation retrieves a conversation by its public ID with access control and items loaded
 func (s *ConversationService) GetConversationByPublicIDAndUserID(ctx context.Context, publicID string, userID uint) (*Conversation, error) {
-	return s.getConversationWithAccessCheck(ctx, publicID, userID, true)
+	return s.getConversationWithAccessCheck(ctx, publicID, userID)
 }
 
 // GetConversationByID retrieves a conversation by its internal ID without user access control
@@ -107,7 +107,7 @@ func (s *ConversationService) GetConversationByID(ctx context.Context, conversat
 }
 
 // getConversationWithAccessCheck is the internal method that handles conversation retrieval with optional item loading
-func (s *ConversationService) getConversationWithAccessCheck(ctx context.Context, publicID string, userID uint, loadItems bool) (*Conversation, error) {
+func (s *ConversationService) getConversationWithAccessCheck(ctx context.Context, publicID string, userID uint) (*Conversation, error) {
 	// Validate inputs
 	if publicID == "" {
 		return nil, fmt.Errorf("public ID cannot be empty")

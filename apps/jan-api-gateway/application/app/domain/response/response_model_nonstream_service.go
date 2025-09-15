@@ -17,7 +17,7 @@ import (
 
 const (
 	// DefaultTimeout is the default timeout for non-streaming requests
-	DefaultTimeout = 60 * time.Second
+	DefaultTimeout = 120 * time.Second
 )
 
 // NonStreamModelService handles non-streaming response requests
