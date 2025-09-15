@@ -1,8 +1,6 @@
 package conversation
 
 import (
-	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -214,26 +212,26 @@ func (s *ConversationService) GetItem(ctx context.Context, conversation *Convers
 		return nil, common.NewError("v2w3x4y5-z6a7-8901-vwxy-234567890123", "Item not found")
 	}
 
-	if err := s.verifyItemBelongsToConversation(ctx, itemID, conversation.ID); err != nil {
-		return nil, common.NewError("w3x4y5z6-a7b8-9012-wxyz-345678901234", "Item verification failed")
+	if err := s.verifyItemBelongsToConversation(ctx, itemID, conversation.ID); !err.IsEmpty() {
+		return nil, err
 	}
 
 	return item, common.EmptyError
 }
 
 // verifyItemBelongsToConversation efficiently checks if an item belongs to a conversation
-func (s *ConversationService) verifyItemBelongsToConversation(ctx context.Context, itemID uint, conversationID uint) error {
+func (s *ConversationService) verifyItemBelongsToConversation(ctx context.Context, itemID uint, conversationID uint) *common.Error {
 	// Use the efficient exists check instead of loading all items
 	exists, err := s.itemRepo.ExistsByIDAndConversation(ctx, itemID, conversationID)
 	if err != nil {
-		return fmt.Errorf("failed to verify item ownership: %w", err)
+		return common.NewError("n0o1p2q3-r4s5-6789-nopq-012345678901", "Failed to verify item ownership")
 	}
 
 	if !exists {
-		return errors.New("item not in conversation")
+		return common.NewError("o1p2q3r4-s5t6-7890-opqr-123456789012", "Item not in conversation")
 	}
 
-	return nil
+	return common.EmptyError
 }
 
 func (s *ConversationService) DeleteItem(ctx context.Context, conversation *Conversation, itemID uint, userID uint) (*Conversation, *common.Error) {
@@ -398,7 +396,8 @@ func (s *ConversationService) GetConversationMiddleWare() gin.HandlerFunc {
 		user, ok := auth.GetUserFromContext(reqCtx)
 		if !ok {
 			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-				Code: "f5742805-2c6e-45a8-b6a8-95091b9d46f0",
+				Code:  "01994c96-38fb-7426-9c45-37c8df6c757f",
+				Error: "user not found",
 			})
 			return
 		}
@@ -417,7 +416,8 @@ func (s *ConversationService) GetConversationMiddleWare() gin.HandlerFunc {
 
 		if len(entities) == 0 {
 			reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-				Code: "e91636c2-fced-4a89-bf08-55309005365f",
+				Code:  "e91636c2-fced-4a89-bf08-55309005365f",
+				Error: "conversation not found",
 			})
 			return
 		}
@@ -449,7 +449,8 @@ func (s *ConversationService) GetConversationItemMiddleWare() gin.HandlerFunc {
 		conv, ok := GetConversationFromContext(reqCtx)
 		if !ok {
 			reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-				Code: "0f5c3304-bf46-45ce-8719-7c03a3485b37",
+				Code:  "0f5c3304-bf46-45ce-8719-7c03a3485b37",
+				Error: "conversation not found",
 			})
 			return
 		}
@@ -476,7 +477,8 @@ func (s *ConversationService) GetConversationItemMiddleWare() gin.HandlerFunc {
 
 		if len(entities) == 0 {
 			reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-				Code: "25647b40-4967-497e-9cbd-a85243ccef58",
+				Code:  "25647b40-4967-497e-9cbd-a85243ccef58",
+				Error: "conversation item not found",
 			})
 			return
 		}

@@ -2,7 +2,6 @@ package response
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -81,7 +80,7 @@ func (h *NonStreamModelService) doCreateNonStreamResponse(reqCtx *gin.Context, r
 	success, updateErr := h.responseService.UpdateResponseStatus(reqCtx, responseEntity.ID, ResponseStatusCompleted)
 	if !success {
 		// Log error but don't fail the request since response is already generated
-		fmt.Printf("Failed to update response status to completed: %s - %s\n", updateErr.Code, updateErr.Message)
+		logger.GetLogger().Errorf("Failed to update response status to completed: %s - %s\n", updateErr.Code, updateErr.Message)
 	}
 
 	// Convert chat completion response to response format
@@ -91,13 +90,13 @@ func (h *NonStreamModelService) doCreateNonStreamResponse(reqCtx *gin.Context, r
 	if responseData.T.Output != nil {
 		success, outputErr := h.responseService.UpdateResponseOutput(reqCtx, responseEntity.ID, responseData.T.Output)
 		if !success {
-			fmt.Printf("Failed to update response output: %s - %s\n", outputErr.Code, outputErr.Message)
+			logger.GetLogger().Errorf("Failed to update response output: %s - %s\n", outputErr.Code, outputErr.Message)
 		}
 	}
 	if responseData.T.Usage != nil {
 		success, usageErr := h.responseService.UpdateResponseUsage(reqCtx, responseEntity.ID, responseData.T.Usage)
 		if !success {
-			fmt.Printf("Failed to update response usage: %s - %s\n", usageErr.Code, usageErr.Message)
+			logger.GetLogger().Errorf("Failed to update response usage: %s - %s\n", usageErr.Code, usageErr.Message)
 		}
 	}
 
