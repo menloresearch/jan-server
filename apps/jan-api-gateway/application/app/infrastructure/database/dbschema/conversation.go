@@ -106,7 +106,7 @@ func NewSchemaItem(i *conversation.Item) *Item {
 		BaseModel: BaseModel{
 			ID: i.ID,
 		},
-		PublicID:          i.PublicID, // Add PublicID field
+		PublicID:          i.PublicID,
 		ConversationID:    i.ConversationID,
 		ResponseID:        i.ResponseID,
 		Type:              string(i.Type),

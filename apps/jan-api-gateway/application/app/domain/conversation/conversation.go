@@ -2,19 +2,9 @@ package conversation
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"menlo.ai/jan-api-gateway/app/domain/query"
-)
-
-// Error constants
-var (
-	ErrConversationNotFound  = errors.New("conversation not found")
-	ErrAccessDenied          = errors.New("access denied")
-	ErrPrivateConversation   = errors.New("private conversation access denied")
-	ErrItemNotFound          = errors.New("item not found")
-	ErrItemNotInConversation = errors.New("item not in conversation")
 )
 
 type ConversationStatus string

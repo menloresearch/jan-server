@@ -1,6 +1,7 @@
 package conversation
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -152,12 +153,12 @@ func (s *ConversationService) UpdateAndAuthorizeConversation(ctx context.Context
 	}
 
 	if conversation == nil {
-		return nil, ErrConversationNotFound
+		return nil, errors.New("conversation not found")
 	}
 
 	// Check access permissions
 	if conversation.UserID != userID {
-		return nil, ErrAccessDenied
+		return nil, errors.New("access denied")
 	}
 
 	// Update fields
@@ -192,7 +193,7 @@ func (s *ConversationService) DeleteConversation(ctx context.Context, conv *Conv
 func (s *ConversationService) AddItem(ctx context.Context, conversation *Conversation, userID uint, itemType ItemType, role *ItemRole, content []Content) (*Item, error) {
 	// Check access permissions
 	if conversation.IsPrivate && conversation.UserID != userID {
-		return nil, ErrPrivateConversation
+		return nil, errors.New("private conversation access denied")
 	}
 
 	if err := s.validator.ValidateItemContent(content); err != nil {
@@ -231,7 +232,7 @@ func (s *ConversationService) AddItem(ctx context.Context, conversation *Convers
 func (s *ConversationService) GetItem(ctx context.Context, conversation *Conversation, itemID uint, userID uint) (*Item, error) {
 	// Check access permissions
 	if conversation.IsPrivate && conversation.UserID != userID {
-		return nil, ErrPrivateConversation
+		return nil, errors.New("private conversation access denied")
 	}
 
 	// More efficient: check if item exists in the already loaded conversation items
@@ -241,7 +242,7 @@ func (s *ConversationService) GetItem(ctx context.Context, conversation *Convers
 				return &item, nil
 			}
 		}
-		return nil, ErrItemNotFound
+		return nil, errors.New("item not found")
 	}
 
 	// Fallback: if items aren't loaded, get the item and verify ownership
@@ -251,7 +252,7 @@ func (s *ConversationService) GetItem(ctx context.Context, conversation *Convers
 	}
 
 	if item == nil {
-		return nil, ErrItemNotFound
+		return nil, errors.New("item not found")
 	}
 
 	if err := s.verifyItemBelongsToConversation(ctx, itemID, conversation.ID); err != nil {
@@ -270,7 +271,7 @@ func (s *ConversationService) verifyItemBelongsToConversation(ctx context.Contex
 	}
 
 	if !exists {
-		return ErrItemNotInConversation
+		return errors.New("item not in conversation")
 	}
 
 	return nil
@@ -279,7 +280,7 @@ func (s *ConversationService) verifyItemBelongsToConversation(ctx context.Contex
 func (s *ConversationService) DeleteItem(ctx context.Context, conversation *Conversation, itemID uint, userID uint) (*Conversation, error) {
 	// Check access permissions - only owner can delete items
 	if conversation.UserID != userID {
-		return nil, ErrAccessDenied
+		return nil, errors.New("access denied")
 	}
 
 	// Get the item to verify it exists and belongs to this conversation
@@ -289,7 +290,7 @@ func (s *ConversationService) DeleteItem(ctx context.Context, conversation *Conv
 	}
 
 	if item == nil {
-		return nil, ErrItemNotFound
+		return nil, errors.New("item not found")
 	}
 
 	// Verify the item belongs to the conversation
@@ -308,7 +309,7 @@ func (s *ConversationService) DeleteItem(ctx context.Context, conversation *Conv
 	}
 
 	if !itemFound {
-		return nil, ErrItemNotInConversation
+		return nil, errors.New("item not in conversation")
 	}
 
 	// Delete the item
@@ -335,11 +336,11 @@ func (s *ConversationService) DeleteItem(ctx context.Context, conversation *Conv
 func (s *ConversationService) DeleteItemByPublicID(ctx context.Context, conversation *Conversation, itemPublicID string, userID uint) (*Conversation, error) {
 	// Check access permissions
 	if conversation.IsPrivate && conversation.UserID != userID {
-		return nil, ErrPrivateConversation
+		return nil, errors.New("private conversation access denied")
 	}
 
 	if conversation.UserID != userID {
-		return nil, ErrAccessDenied
+		return nil, errors.New("access denied")
 	}
 
 	// Find item by public ID
@@ -349,7 +350,7 @@ func (s *ConversationService) DeleteItemByPublicID(ctx context.Context, conversa
 	}
 
 	if item == nil {
-		return nil, ErrItemNotFound
+		return nil, errors.New("item not found")
 	}
 
 	// Use efficient existence check instead of loading all items
@@ -359,7 +360,7 @@ func (s *ConversationService) DeleteItemByPublicID(ctx context.Context, conversa
 	}
 
 	if !exists {
-		return nil, ErrItemNotInConversation
+		return nil, errors.New("item not in conversation")
 	}
 
 	// Delete the item

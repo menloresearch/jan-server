@@ -3,6 +3,7 @@ package dbschema
 import (
 	"time"
 
+	"menlo.ai/jan-api-gateway/app/domain/response"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database"
 )
 
@@ -55,4 +56,86 @@ func (Response) TableName() string {
 
 func init() {
 	database.RegisterSchemaForAutoMigrate(Response{})
+}
+
+// NewSchemaResponse converts domain Response to database Response
+func NewSchemaResponse(r *response.Response) *Response {
+	return &Response{
+		BaseModel: BaseModel{
+			ID: r.ID,
+		},
+		PublicID:           r.PublicID,
+		UserID:             r.UserID,
+		ConversationID:     r.ConversationID,
+		PreviousResponseID: r.PreviousResponseID,
+		Model:              r.Model,
+		Status:             string(r.Status),
+		Input:              r.Input,
+		Output:             r.Output,
+		SystemPrompt:       r.SystemPrompt,
+		MaxTokens:          r.MaxTokens,
+		Temperature:        r.Temperature,
+		TopP:               r.TopP,
+		TopK:               r.TopK,
+		RepetitionPenalty:  r.RepetitionPenalty,
+		Seed:               r.Seed,
+		Stop:               r.Stop,
+		PresencePenalty:    r.PresencePenalty,
+		FrequencyPenalty:   r.FrequencyPenalty,
+		LogitBias:          r.LogitBias,
+		ResponseFormat:     r.ResponseFormat,
+		Tools:              r.Tools,
+		ToolChoice:         r.ToolChoice,
+		Metadata:           r.Metadata,
+		Stream:             r.Stream,
+		Background:         r.Background,
+		Timeout:            r.Timeout,
+		User:               r.User,
+		Usage:              r.Usage,
+		Error:              r.Error,
+		CompletedAt:        r.CompletedAt,
+		CancelledAt:        r.CancelledAt,
+		FailedAt:           r.FailedAt,
+	}
+}
+
+// EtoD converts database Response to domain Response
+func (r *Response) EtoD() *response.Response {
+	return &response.Response{
+		ID:                 r.ID,
+		PublicID:           r.PublicID,
+		UserID:             r.UserID,
+		ConversationID:     r.ConversationID,
+		PreviousResponseID: r.PreviousResponseID,
+		Model:              r.Model,
+		Status:             response.ResponseStatus(r.Status),
+		Input:              r.Input,
+		Output:             r.Output,
+		SystemPrompt:       r.SystemPrompt,
+		MaxTokens:          r.MaxTokens,
+		Temperature:        r.Temperature,
+		TopP:               r.TopP,
+		TopK:               r.TopK,
+		RepetitionPenalty:  r.RepetitionPenalty,
+		Seed:               r.Seed,
+		Stop:               r.Stop,
+		PresencePenalty:    r.PresencePenalty,
+		FrequencyPenalty:   r.FrequencyPenalty,
+		LogitBias:          r.LogitBias,
+		ResponseFormat:     r.ResponseFormat,
+		Tools:              r.Tools,
+		ToolChoice:         r.ToolChoice,
+		Metadata:           r.Metadata,
+		Stream:             r.Stream,
+		Background:         r.Background,
+		Timeout:            r.Timeout,
+		User:               r.User,
+		Usage:              r.Usage,
+		Error:              r.Error,
+		CompletedAt:        r.CompletedAt,
+		CancelledAt:        r.CancelledAt,
+		FailedAt:           r.FailedAt,
+		CreatedAt:          r.CreatedAt,
+		UpdatedAt:          r.UpdatedAt,
+	}
 }
