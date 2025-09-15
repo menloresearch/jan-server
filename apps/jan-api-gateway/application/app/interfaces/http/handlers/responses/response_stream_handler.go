@@ -17,6 +17,7 @@ import (
 	requesttypes "menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	responsetypes "menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
+	"menlo.ai/jan-api-gateway/app/utils/idgen"
 	"menlo.ai/jan-api-gateway/app/utils/logger"
 	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
@@ -376,7 +377,7 @@ func (h *StreamHandler) streamResponseToChannel(reqCtx *gin.Context, request ope
 	startTime := time.Now()
 
 	// Generate item ID for the message
-	itemID := fmt.Sprintf("msg_%d", time.Now().UnixNano())
+	itemID, _ := idgen.GenerateSecureID("msg", 42)
 	sequenceNumber := 1
 
 	// Emit response.in_progress event
@@ -578,13 +579,6 @@ func (h *StreamHandler) streamResponseToChannel(reqCtx *gin.Context, request ope
 		}
 	}
 
-	// Send any remaining buffered content
-	if contentBuffer.Len() > 0 {
-		deltaEvent := h.createTextDeltaEvent(itemID, sequenceNumber, contentBuffer.String())
-		h.marshalAndSendEvent(dataChan, "response.output_text.delta", deltaEvent)
-		sequenceNumber++
-	}
-
 	// Send any remaining buffered reasoning content
 	if hasReasoningContent && reasoningBuffer.Len() > 0 {
 		reasoningSummaryTextDeltaEvent := responsetypes.ResponseReasoningSummaryTextDeltaEvent{
@@ -645,7 +639,7 @@ func (h *StreamHandler) streamResponseToChannel(reqCtx *gin.Context, request ope
 		reasoningComplete = true
 	}
 
-	// Send any buffered content after reasoning is complete or if there's no reasoning content
+	// Send any remaining buffered content (only once, after reasoning is complete or if there's no reasoning content)
 	if (reasoningComplete || !hasReasoningContent) && contentBuffer.Len() > 0 {
 		deltaEvent := h.createTextDeltaEvent(itemID, sequenceNumber, contentBuffer.String())
 		h.marshalAndSendEvent(dataChan, "response.output_text.delta", deltaEvent)

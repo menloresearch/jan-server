@@ -228,7 +228,8 @@ func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
 	ok, errorCode := api.conversationService.ValidateItems(ctx, itemsToCreate)
 	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code: *errorCode,
+			Code:          "0502c02c-ea2d-429e-933c-1243d4e2bcb2",
+			ErrorInstance: errorCode,
 		})
 		return
 	}
@@ -248,7 +249,7 @@ func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
 		_, err := api.conversationService.AddMultipleItems(ctx, conv, userId, itemsToCreate)
 		if err != nil {
 			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:          "8fc529d7-f384-40f2-ac15-cd1f1e109316",
+				Code:          "019948b0-a1c0-73b7-b1f1-52a1ce82b538",
 				ErrorInstance: err,
 			})
 			return
@@ -258,7 +259,7 @@ func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
 		conv, err = api.conversationService.GetConversationByPublicIDAndUserID(ctx, conv.PublicID, userId)
 		if err != nil {
 			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:          "8fc529d7-f384-40f2-ac15-cd1f1e109316",
+				Code:          "019948b0-bb8b-75fb-9419-dacefb318ef0",
 				ErrorInstance: err,
 			})
 			return
@@ -492,13 +493,11 @@ func (api *ConversationAPI) createItems(reqCtx *gin.Context) {
 		itemsToCreate[i] = item
 	}
 
-	ok, errorCode := api.conversationService.ValidateItems(ctx, itemsToCreate)
+	ok, err := api.conversationService.ValidateItems(ctx, itemsToCreate)
 	if !ok {
-		if errorCode == nil {
-			errorCode = ptr.ToString("41b80303-0e55-4a24-a079-d2d9340d713b")
-		}
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code: *errorCode,
+			Code:          "01994aa5-679b-733c-a1e7-b31cfcce35b3",
+			ErrorInstance: err,
 		})
 		return
 	}
@@ -506,7 +505,7 @@ func (api *ConversationAPI) createItems(reqCtx *gin.Context) {
 	createdItems, err := api.conversationService.AddMultipleItems(ctx, conv, conv.UserID, itemsToCreate)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:          *errorCode,
+			Code:          "01994aa5-7758-722d-9cfa-4adeb8f098e1",
 			ErrorInstance: err,
 		})
 		return

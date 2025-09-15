@@ -327,7 +327,7 @@ func (s *ResponseService) CreateItemsForResponse(ctx context.Context, responseID
 	var createdItems []*conversation.Item
 	for _, itemData := range items {
 		// Generate public ID for the item
-		publicID, err := idgen.GenerateSecureID("msg", 16)
+		publicID, err := idgen.GenerateSecureID("msg", 42)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate item ID: %w", err)
 		}

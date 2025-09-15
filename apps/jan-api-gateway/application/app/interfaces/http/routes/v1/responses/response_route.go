@@ -4,7 +4,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	handlerresponses "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/responses"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/middleware"
 )
 
 // CreateResponseRequest represents the request payload for creating a response
@@ -40,7 +39,10 @@ func (responseRoute *ResponseRoute) RegisterRouter(router gin.IRouter) {
 // registerRoutes registers all response routes
 func (responseRoute *ResponseRoute) registerRoutes(router *gin.RouterGroup) {
 	// Apply middleware to the entire group
-	responseGroup := router.Group("", middleware.AuthMiddleware(), responseRoute.authService.RegisteredUserMiddleware())
+	responseGroup := router.Group("",
+		responseRoute.authService.AppUserAuthMiddleware(),
+		responseRoute.authService.RegisteredUserMiddleware(),
+	)
 
 	responseGroup.POST("", responseRoute.CreateResponse)
 	responseGroup.GET("/:response_id", responseRoute.GetResponse)

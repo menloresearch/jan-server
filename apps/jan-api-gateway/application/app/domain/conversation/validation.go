@@ -7,7 +7,6 @@ import (
 	"unicode/utf8"
 
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
-	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
 // ValidationConfig holds conversation validation rules
@@ -74,18 +73,18 @@ func (v *ConversationValidator) ValidateConversationInput(title *string, metadat
 }
 
 // ValidateItemContent performs comprehensive content validation
-func (v *ConversationValidator) ValidateItemContent(content []Content) *string {
+func (v *ConversationValidator) ValidateItemContent(content []Content) error {
 	if len(content) == 0 {
-		return ptr.ToString("aa497939-edbb-416a-899c-a8acc387247e")
+		return fmt.Errorf("aa497939-edbb-416a-899c-a8acc387247e")
 	}
 
 	if len(content) > v.config.MaxContentBlocks {
-		return ptr.ToString("6dbdb6a2-72f0-430a-909c-9f8ca5dd3397")
+		return fmt.Errorf("6dbdb6a2-72f0-430a-909c-9f8ca5dd3397")
 	}
 
 	for _, c := range content {
 		if err := v.validateContentBlock(c); err != nil {
-			return ptr.ToString("c67847d7-9011-41c0-9a05-520c9c670a28")
+			return fmt.Errorf("c67847d7-9011-41c0-9a05-520c9c670a28")
 		}
 	}
 

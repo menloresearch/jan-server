@@ -65,12 +65,12 @@ func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request 
 	}
 
 	// Convert chat completion response to response format
-	responseData := h.convertFromChatCompletionResponse(processedResponse, request, conv)
+	responseData := h.convertFromChatCompletionResponse(processedResponse, request, conv, responseEntity)
 	reqCtx.JSON(http.StatusOK, responseData.T)
 }
 
 // convertFromChatCompletionResponse converts a ChatCompletionResponse to a Response
-func (h *NonStreamHandler) convertFromChatCompletionResponse(chatResp *openai.ChatCompletionResponse, req *requesttypes.CreateResponseRequest, conv *conversation.Conversation) responsetypes.OpenAIGeneralResponse[responsetypes.Response] {
+func (h *NonStreamHandler) convertFromChatCompletionResponse(chatResp *openai.ChatCompletionResponse, req *requesttypes.CreateResponseRequest, conv *conversation.Conversation, responseEntity *response.Response) responsetypes.OpenAIGeneralResponse[responsetypes.Response] {
 
 	// Extract the content and reasoning from the first choice
 	var outputText string
@@ -145,7 +145,7 @@ func (h *NonStreamHandler) convertFromChatCompletionResponse(chatResp *openai.Ch
 	}
 
 	response := responsetypes.Response{
-		ID:           chatResp.ID,
+		ID:           responseEntity.PublicID,
 		Object:       "response",
 		Created:      chatResp.Created,
 		Model:        chatResp.Model,

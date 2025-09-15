@@ -397,9 +397,9 @@ func (s *ConversationService) generateItemPublicID() (string, error) {
 	return idgen.GenerateSecureID("msg", 42)
 }
 
-func (s *ConversationService) ValidateItems(ctx context.Context, items []*Item) (bool, *string) {
+func (s *ConversationService) ValidateItems(ctx context.Context, items []*Item) (bool, error) {
 	if len(items) > 100 {
-		return false, ptr.ToString("0502c02c-ea2d-429e-933c-1243d4e2bcb2")
+		return false, fmt.Errorf("failed to validate items: too many items")
 	}
 	for _, itemData := range items {
 		if errCode := s.validator.ValidateItemContent(itemData.Content); errCode != nil {

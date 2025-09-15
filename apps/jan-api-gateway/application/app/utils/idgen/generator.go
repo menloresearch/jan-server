@@ -9,10 +9,8 @@ import (
 // GenerateSecureID generates a cryptographically secure ID with the given prefix and length
 // This is a pure utility function that only handles the crypto and formatting logic
 func GenerateSecureID(prefix string, length int) (string, error) {
-	// The byte length required is about 3/4 of the desired string length.
-	// We add 2 to be safe and avoid rounding issues or insufficient bytes.
-	byteLength := (length * 3 / 4) + 2
-	bytes := make([]byte, byteLength)
+	// Use larger byte array for better entropy
+	bytes := make([]byte, length*2) // Use more bytes to ensure we have enough entropy
 	_, err := rand.Read(bytes)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate random bytes: %w", err)
