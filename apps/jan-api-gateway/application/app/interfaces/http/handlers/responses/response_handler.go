@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -126,14 +127,6 @@ func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 		return
 	}
 
-	// Append input messages to conversation (only if conversation exists)
-	if conversation != nil {
-		if err := h.appendMessagesToConversation(reqCtx, conversation, chatCompletionRequest.Messages); err != nil {
-			h.sendErrorResponse(reqCtx, http.StatusBadRequest, "b2c3d4e5-f6g7-8901-bcde-f23456789012", err.Error())
-			return
-		}
-	}
-
 	// If previous_response_id is provided, prepend conversation history to input messages
 	if request.PreviousResponseID != nil && *request.PreviousResponseID != "" {
 		conversationMessages, err := h.convertConversationItemsToMessages(reqCtx, conversation)
@@ -174,6 +167,14 @@ func (h *ResponseHandler) CreateResponse(reqCtx *gin.Context) {
 	if err != nil {
 		h.sendErrorResponse(reqCtx, http.StatusInternalServerError, "c7d8e9f0-a1b2-3456-cdef-012345678901", "failed to create response record: "+err.Error())
 		return
+	}
+
+	// Append input messages to conversation (only if conversation exists)
+	if conversation != nil {
+		if err := h.appendMessagesToConversation(reqCtx, conversation, chatCompletionRequest.Messages, &responseEntity.ID); err != nil {
+			h.sendErrorResponse(reqCtx, http.StatusBadRequest, "b2c3d4e5-f6g7-8901-bcde-f23456789012", err.Error())
+			return
+		}
 	}
 
 	// Delegate to specialized handlers based on streaming preference
@@ -247,7 +248,7 @@ func (h *ResponseHandler) handleConversation(reqCtx *gin.Context, request *reque
 }
 
 // appendMessagesToConversation converts chat completion messages to conversation items and appends them
-func (h *ResponseHandler) appendMessagesToConversation(reqCtx *gin.Context, conv *conversation.Conversation, messages []openai.ChatCompletionMessage) error {
+func (h *ResponseHandler) appendMessagesToConversation(reqCtx *gin.Context, conv *conversation.Conversation, messages []openai.ChatCompletionMessage, responseID *uint) error {
 	if len(messages) == 0 {
 		return nil
 	}
@@ -283,9 +284,10 @@ func (h *ResponseHandler) appendMessagesToConversation(reqCtx *gin.Context, conv
 		}
 
 		itemsToCreate[i] = &conversation.Item{
-			Type:    conversation.ItemType("message"),
-			Role:    role,
-			Content: content,
+			Type:       conversation.ItemType("message"),
+			Role:       role,
+			Content:    content,
+			ResponseID: responseID,
 		}
 	}
 
@@ -483,25 +485,117 @@ func (h *ResponseHandler) ListInputItems(reqCtx *gin.Context) {
 		return
 	}
 
-	// TODO: Implement actual input items listing logic
-	// For now, return mock data
+	// Parse pagination parameters
+	limit := 20 // default limit
+	if limitStr := reqCtx.Query("limit"); limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 && parsedLimit <= 100 {
+			limit = parsedLimit
+		}
+	}
+
+	// Get input items for the response (only user role messages)
+	userRole := conversation.ItemRole("user")
+	items, err := h.responseService.GetItemsForResponse(reqCtx, responseEntity.ID, &userRole)
+	if err != nil {
+		h.sendErrorResponse(reqCtx, http.StatusInternalServerError, "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc", "failed to get input items: "+err.Error())
+		return
+	}
+
+	// Convert conversation items to input items
+	inputItems := make([]responsetypes.InputItem, 0, len(items))
+	for _, item := range items {
+		inputItem := h.convertConversationItemToInputItem(item)
+		inputItems = append(inputItems, inputItem)
+	}
+
+	// Apply pagination (simple implementation - in production you'd want cursor-based pagination)
+	after := reqCtx.Query("after")
+	before := reqCtx.Query("before")
+
+	var paginatedItems []responsetypes.InputItem
+	var hasMore bool
+
+	if after != "" {
+		// Find items after the specified ID
+		found := false
+		for _, item := range inputItems {
+			if found {
+				paginatedItems = append(paginatedItems, item)
+				if len(paginatedItems) >= limit {
+					break
+				}
+			}
+			if item.ID == after {
+				found = true
+			}
+		}
+	} else if before != "" {
+		// Find items before the specified ID
+		for _, item := range inputItems {
+			if item.ID == before {
+				break
+			}
+			paginatedItems = append(paginatedItems, item)
+			if len(paginatedItems) >= limit {
+				break
+			}
+		}
+	} else {
+		// No pagination, return first N items
+		if len(inputItems) > limit {
+			paginatedItems = inputItems[:limit]
+			hasMore = true
+		} else {
+			paginatedItems = inputItems
+		}
+	}
+
+	// Set pagination metadata
+	var firstID, lastID *string
+	if len(paginatedItems) > 0 {
+		firstID = &paginatedItems[0].ID
+		lastID = &paginatedItems[len(paginatedItems)-1].ID
+	}
+
 	status := responsetypes.ResponseCodeOk
 	objectType := responsetypes.ObjectTypeList
-	hasMore := false
+
 	reqCtx.JSON(http.StatusOK, responsetypes.OpenAIListResponse[responsetypes.InputItem]{
 		JanStatus: &status,
 		Object:    &objectType,
 		HasMore:   &hasMore,
-		T: []responsetypes.InputItem{
-			{
-				ID:      "input_1234567890",
-				Object:  "input_item",
-				Created: responseEntity.CreatedAt.Unix(),
-				Type:    requesttypes.InputTypeText,
-				Text:    ptr.ToString("Mock input item"),
-			},
-		},
+		FirstID:   firstID,
+		LastID:    lastID,
+		T:         paginatedItems,
 	})
+}
+
+// convertConversationItemToInputItem converts a conversation item to an input item
+func (h *ResponseHandler) convertConversationItemToInputItem(item *conversation.Item) responsetypes.InputItem {
+	inputItem := responsetypes.InputItem{
+		ID:      item.PublicID,
+		Object:  "input_item",
+		Created: item.CreatedAt.Unix(),
+		Type:    requesttypes.InputType(item.Type),
+	}
+
+	// Extract text content from the item
+	if len(item.Content) > 0 {
+		for _, content := range item.Content {
+			if content.Type == "text" && content.Text != nil {
+				inputItem.Text = &content.Text.Value
+				break
+			} else if content.Type == "input_text" && content.InputText != nil {
+				inputItem.Text = content.InputText
+				break
+			}
+		}
+	}
+
+	// TODO: Handle other content types (image, file, web_search, etc.)
+	// This would require mapping the conversation.Item content to the appropriate InputItem fields
+
+	return inputItem
 }
 
 // sendErrorResponse sends a standardized error response

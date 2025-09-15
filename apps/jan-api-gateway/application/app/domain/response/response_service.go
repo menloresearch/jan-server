@@ -364,8 +364,8 @@ func (s *ResponseService) CreateItemsForResponse(ctx context.Context, responseID
 	return createdItems, nil
 }
 
-// GetItemsForResponse gets all items that belong to a specific response
-func (s *ResponseService) GetItemsForResponse(ctx context.Context, responseID uint) ([]*conversation.Item, error) {
+// GetItemsForResponse gets items that belong to a specific response, optionally filtered by role
+func (s *ResponseService) GetItemsForResponse(ctx context.Context, responseID uint, itemRole *conversation.ItemRole) ([]*conversation.Item, error) {
 	response, err := s.responseRepo.FindByID(ctx, responseID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find response: %w", err)
@@ -374,21 +374,20 @@ func (s *ResponseService) GetItemsForResponse(ctx context.Context, responseID ui
 		return nil, fmt.Errorf("response not found")
 	}
 
-	// Get items by conversation ID and filter by response ID
-	items, err := s.itemRepo.FindByConversationID(ctx, *response.ConversationID)
+	// Create filter for database query
+	filter := conversation.ItemFilter{
+		ConversationID: response.ConversationID,
+		ResponseID:     &responseID,
+		Role:           itemRole,
+	}
+
+	// Get items using database filter (more efficient than in-memory filtering)
+	items, err := s.itemRepo.FindByFilter(ctx, filter, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get items: %w", err)
 	}
 
-	// Filter items that belong to this response
-	var responseItems []*conversation.Item
-	for _, item := range items {
-		if item.ResponseID != nil && *item.ResponseID == responseID {
-			responseItems = append(responseItems, item)
-		}
-	}
-
-	return responseItems, nil
+	return items, nil
 }
 
 // CreateResponseFromRequest creates a response from an API request structure

@@ -438,6 +438,7 @@ func (s *ConversationService) AddMultipleItems(ctx context.Context, conversation
 			Status:      ptr.ToString("completed"),
 			CreatedAt:   now,
 			CompletedAt: &now,
+			ResponseID:  itemData.ResponseID,
 		}
 
 		if err := s.conversationRepo.AddItem(ctx, conversation.ID, item); err != nil {

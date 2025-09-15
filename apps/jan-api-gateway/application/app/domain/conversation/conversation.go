@@ -161,6 +161,8 @@ type ConversationFilter struct {
 type ItemFilter struct {
 	PublicID       *string
 	ConversationID *uint
+	Role           *ItemRole
+	ResponseID     *uint
 }
 
 type ConversationRepository interface {

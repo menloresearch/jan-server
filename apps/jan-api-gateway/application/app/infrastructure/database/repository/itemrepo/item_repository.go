@@ -191,5 +191,11 @@ func (repo *ItemGormRepository) applyFilter(
 	if filter.ConversationID != nil {
 		sql = sql.Where(query.Item.ConversationID.Eq(*filter.ConversationID))
 	}
+	if filter.Role != nil {
+		sql = sql.Where(query.Item.Role.Eq(string(*filter.Role)))
+	}
+	if filter.ResponseID != nil {
+		sql = sql.Where(query.Item.ResponseID.Eq(*filter.ResponseID))
+	}
 	return sql
 }

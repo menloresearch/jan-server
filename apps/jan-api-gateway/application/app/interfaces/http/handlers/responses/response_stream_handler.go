@@ -653,9 +653,13 @@ func (h *StreamHandler) streamResponseToChannel(reqCtx *gin.Context, request ope
 			Role:    openai.ChatMessageRoleAssistant,
 			Content: fullResponse.String(),
 		}
-		if err := h.appendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}); err != nil {
-			// Log error but don't fail the response
-			logger.GetLogger().Errorf("Failed to append assistant response to conversation: %v", err)
+		// Get response entity to get the internal ID
+		responseEntity, err := h.responseService.GetResponseByPublicID(reqCtx, responseID)
+		if err == nil && responseEntity != nil {
+			if err := h.appendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}, &responseEntity.ID); err != nil {
+				// Log error but don't fail the response
+				logger.GetLogger().Errorf("Failed to append assistant response to conversation: %v", err)
+			}
 		}
 	}
 

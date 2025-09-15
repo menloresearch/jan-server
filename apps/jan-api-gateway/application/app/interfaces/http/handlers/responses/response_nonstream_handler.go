@@ -59,7 +59,7 @@ func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request 
 			Role:    openai.ChatMessageRoleAssistant,
 			Content: processedResponse.Choices[0].Message.Content,
 		}
-		if err := h.appendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}); err != nil {
+		if err := h.appendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}, &responseEntity.ID); err != nil {
 			// Log error but don't fail the response
 			logger.GetLogger().Errorf("Failed to append assistant response to conversation: %v", err)
 		}
