@@ -348,8 +348,9 @@ func (responseRoute *ResponseRoute) CancelResponse(reqCtx *gin.Context) {
 		return
 	}
 
+	// TODO
+	// Cancel the stream if it is streaming in go routine and update response status in go routine
 	err := responseRoute.responseService.UpdateResponseStatus(ctx, resp.ID, response.ResponseStatusCancelled)
-
 
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{

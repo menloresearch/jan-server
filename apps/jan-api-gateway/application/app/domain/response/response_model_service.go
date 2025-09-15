@@ -2,7 +2,6 @@ package response
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -71,11 +70,8 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 		return nil, "i9j0k1l2-m3n4-5678-ijkl-901234567890" // Input validation error
 	}
 
-	// Get API key for the user
-	key, errorCode := h.getAPIKeyForUser(ctx, userID)
-	if errorCode != "" {
-		return nil, errorCode
-	}
+	// TODO add the logic to get the API key for the user
+	key := ""
 
 	// Check if model exists in registry
 	modelRegistry := inferencemodelregistry.GetInstance()
@@ -108,14 +104,14 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 	// Handle conversation logic using domain service
 	conversation, err := h.responseService.HandleConversation(ctx, userID, request)
 	if err != nil {
-		return nil, "j0k1l2m3-n4o5-6789-jklm-012345678901" // Domain service error
+		return nil, "01994c47-05a5-7751-853c-a3cde21c8549" // Domain service error
 	}
 
 	// If previous_response_id is provided, prepend conversation history to input messages
 	if request.PreviousResponseID != nil && *request.PreviousResponseID != "" {
 		conversationMessages, err := h.responseService.ConvertConversationItemsToMessages(ctx, conversation)
 		if err != nil {
-			return nil, "j0k1l2m3-n4o5-6789-jklm-012345678901" // Domain service error
+			return nil, "01994c47-185f-7413-bc15-94b9b9defbd4" // Domain service error
 		}
 		// Prepend conversation history to the input messages
 		chatCompletionRequest.Messages = append(conversationMessages, chatCompletionRequest.Messages...)
@@ -148,13 +144,13 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 	}
 	responseEntity, err := h.responseService.CreateResponse(ctx, userID, conversationID, request.Model, request.Input, request.SystemPrompt, responseParams)
 	if err != nil {
-		return nil, "j0k1l2m3-n4o5-6789-jklm-012345678901" // Domain service error
+		return nil, "01994c47-4491-71a8-9ec3-33c18b377136" // Domain service error
 	}
 
 	// Append input messages to conversation (only if conversation exists)
 	if conversation != nil {
 		if err := h.responseService.AppendMessagesToConversation(ctx, conversation, chatCompletionRequest.Messages, &responseEntity.ID); err != nil {
-			return nil, "j0k1l2m3-n4o5-6789-jklm-012345678901" // Domain service error
+			return nil, "01994c47-3205-704c-9588-aeaa236e8060" // Domain service error
 		}
 	}
 
@@ -347,37 +343,4 @@ func (h *ResponseModelService) sendSuccessResponse(reqCtx *gin.Context, data int
 		Object:    &objectType,
 		T:         data.(responsetypes.Response),
 	})
-}
-
-// getAPIKeyForUser retrieves the API key for the user (domain method)
-func (h *ResponseModelService) getAPIKeyForUser(ctx context.Context, userID uint) (string, string) {
-	// Get user by ID
-	user, err := h.UserService.FindByID(ctx, userID)
-	if err != nil {
-		return "", "j0k1l2m3-n4o5-6789-jklm-012345678901" // Domain service error
-	}
-	if user == nil {
-		return "", "j0k1l2m3-n4o5-6789-jklm-012345678901" // Domain service error
-	}
-
-	// Always generate a new ephemeral key for each request
-	key, hash, err := h.apikeyService.GenerateKeyAndHash(ctx, apikey.ApikeyTypeEphemeral)
-	if err != nil {
-		return "", "j0k1l2m3-n4o5-6789-jklm-012345678901" // Domain service error
-	}
-
-	_, err = h.apikeyService.CreateApiKey(ctx, &apikey.ApiKey{
-		KeyHash:        hash,
-		PlaintextHint:  fmt.Sprintf("sk-..%s", key[len(key)-3:]),
-		Description:    "Default Key For User",
-		Enabled:        true,
-		ApikeyType:     string(apikey.ApikeyTypeEphemeral),
-		OwnerPublicID:  user.PublicID,
-		OrganizationID: nil,
-		Permissions:    "{}",
-	})
-	if err != nil {
-		return "", "j0k1l2m3-n4o5-6789-jklm-012345678901" // Domain service error
-	}
-	return key, ""
 }
