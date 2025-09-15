@@ -1,8 +1,11 @@
 package responses
 
 import (
+	"fmt"
+
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
+	"menlo.ai/jan-api-gateway/app/domain/response"
 	handlerresponses "menlo.ai/jan-api-gateway/app/interfaces/http/handlers/responses"
 )
 
@@ -18,15 +21,17 @@ type CreateResponseRequest struct {
 
 // ResponseRoute represents the response API routes
 type ResponseRoute struct {
-	handler     *handlerresponses.ResponseHandler
-	authService *auth.AuthService
+	handler         *handlerresponses.ResponseHandler
+	authService     *auth.AuthService
+	responseService *response.ResponseService
 }
 
 // NewResponseRoute creates a new ResponseRoute instance
-func NewResponseRoute(handler *handlerresponses.ResponseHandler, authService *auth.AuthService) *ResponseRoute {
+func NewResponseRoute(handler *handlerresponses.ResponseHandler, authService *auth.AuthService, responseService *response.ResponseService) *ResponseRoute {
 	return &ResponseRoute{
-		handler:     handler,
-		authService: authService,
+		handler:         handler,
+		authService:     authService,
+		responseService: responseService,
 	}
 }
 
@@ -45,10 +50,13 @@ func (responseRoute *ResponseRoute) registerRoutes(router *gin.RouterGroup) {
 	)
 
 	responseGroup.POST("", responseRoute.CreateResponse)
-	responseGroup.GET("/:response_id", responseRoute.GetResponse)
-	responseGroup.DELETE("/:response_id", responseRoute.DeleteResponse)
-	responseGroup.POST("/:response_id/cancel", responseRoute.CancelResponse)
-	responseGroup.GET("/:response_id/input_items", responseRoute.ListInputItems)
+
+	// Apply response middleware for routes that need response context
+	responseMiddleWare := responseRoute.responseService.GetResponseMiddleWare()
+	responseGroup.GET(fmt.Sprintf("/:%s", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.GetResponse)
+	responseGroup.DELETE(fmt.Sprintf("/:%s", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.DeleteResponse)
+	responseGroup.POST(fmt.Sprintf("/:%s/cancel", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.CancelResponse)
+	responseGroup.GET(fmt.Sprintf("/:%s/input_items", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.ListInputItems)
 }
 
 // CreateResponse creates a new response from LLM

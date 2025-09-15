@@ -4,10 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/query"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
 )
 
@@ -16,6 +20,14 @@ type ResponseService struct {
 	responseRepo ResponseRepository
 	itemRepo     conversation.ItemRepository
 }
+
+// ResponseContextKey represents context keys for responses
+type ResponseContextKey string
+
+const (
+	ResponseContextKeyPublicID ResponseContextKey = "response_id"
+	ResponseContextEntity      ResponseContextKey = "ResponseContextEntity"
+)
 
 // NewResponseService creates a new response service
 func NewResponseService(responseRepo ResponseRepository, itemRepo conversation.ItemRepository) *ResponseService {
@@ -418,4 +430,63 @@ type ResponseParams struct {
 	Background        *bool
 	Timeout           *int
 	User              *string
+}
+
+// GetResponseMiddleWare creates middleware to load response by public ID and set it in context
+func (s *ResponseService) GetResponseMiddleWare() gin.HandlerFunc {
+	return func(reqCtx *gin.Context) {
+		ctx := reqCtx.Request.Context()
+		publicID := reqCtx.Param(string(ResponseContextKeyPublicID))
+		if publicID == "" {
+			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+				Code:  "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc",
+				Error: "missing response public ID",
+			})
+			return
+		}
+		user, ok := auth.GetUserFromContext(reqCtx)
+		if !ok {
+			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+				Code: "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc",
+			})
+			return
+		}
+		entities, err := s.responseRepo.FindByFilter(ctx, ResponseFilter{
+			PublicID: &publicID,
+			UserID:   &user.ID,
+		}, nil)
+
+		if err != nil {
+			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+				Code:  "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc",
+				Error: err.Error(),
+			})
+			return
+		}
+
+		if len(entities) == 0 {
+			reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
+				Code: "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc",
+			})
+			return
+		}
+
+		SetResponseFromContext(reqCtx, entities[0])
+		reqCtx.Next()
+	}
+}
+
+// SetResponseFromContext sets a response in the gin context
+func SetResponseFromContext(reqCtx *gin.Context, resp *Response) {
+	reqCtx.Set(string(ResponseContextEntity), resp)
+}
+
+// GetResponseFromContext gets a response from the gin context
+func GetResponseFromContext(reqCtx *gin.Context) (*Response, bool) {
+	resp, ok := reqCtx.Get(string(ResponseContextEntity))
+	if !ok {
+		return nil, false
+	}
+	response, ok := resp.(*Response)
+	return response, ok
 }

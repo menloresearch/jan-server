@@ -79,7 +79,7 @@ func CreateApplication() (*Application, error) {
 	responseRepository := responserepo.NewResponseRepository(db)
 	responseService := response.NewResponseService(responseRepository, itemRepository)
 	responseHandler := responses.NewResponseHandler(userService, authService, apiKeyService, conversationService, responseService)
-	responseRoute := responses2.NewResponseRoute(responseHandler, authService)
+	responseRoute := responses2.NewResponseRoute(responseHandler, authService, responseService)
 	v1Route := v1.NewV1Route(organizationRoute, chatRoute, conversationAPI, modelAPI, mcpapi, authRoute, responseRoute)
 	httpServer := http.NewHttpServer(v1Route)
 	application := &Application{

@@ -2,6 +2,7 @@ package responses
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -39,7 +40,7 @@ func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request 
 	janInferenceClient := janinference.NewJanInferenceClient(reqCtx)
 	ctx, cancel := context.WithTimeout(reqCtx.Request.Context(), DefaultTimeout)
 	defer cancel()
-	response, err := janInferenceClient.CreateChatCompletion(ctx, key, *chatCompletionRequest)
+	chatResponse, err := janInferenceClient.CreateChatCompletion(ctx, key, *chatCompletionRequest)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(
 			http.StatusBadRequest,
@@ -50,7 +51,7 @@ func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request 
 	}
 
 	// Process reasoning content
-	var processedResponse *openai.ChatCompletionResponse = response
+	var processedResponse *openai.ChatCompletionResponse = chatResponse
 
 	// Append assistant's response to conversation (only if conversation exists)
 	if conv != nil && len(processedResponse.Choices) > 0 && processedResponse.Choices[0].Message.Content != "" {
@@ -64,8 +65,27 @@ func (h *NonStreamHandler) CreateNonStreamResponse(reqCtx *gin.Context, request 
 		}
 	}
 
+	// Update response status to completed
+	if err := h.responseService.UpdateResponseStatus(reqCtx, responseEntity.ID, response.ResponseStatusCompleted); err != nil {
+		// Log error but don't fail the request since response is already generated
+		fmt.Printf("Failed to update response status to completed: %v\n", err)
+	}
+
 	// Convert chat completion response to response format
 	responseData := h.convertFromChatCompletionResponse(processedResponse, request, conv, responseEntity)
+
+	// Save output and usage to database
+	if responseData.T.Output != nil {
+		if err := h.responseService.UpdateResponseOutput(reqCtx, responseEntity.ID, responseData.T.Output); err != nil {
+			fmt.Printf("Failed to update response output: %v\n", err)
+		}
+	}
+	if responseData.T.Usage != nil {
+		if err := h.responseService.UpdateResponseUsage(reqCtx, responseEntity.ID, responseData.T.Usage); err != nil {
+			fmt.Printf("Failed to update response usage: %v\n", err)
+		}
+	}
+
 	reqCtx.JSON(http.StatusOK, responseData.T)
 }
 

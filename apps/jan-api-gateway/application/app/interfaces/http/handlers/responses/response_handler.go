@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
@@ -410,30 +411,10 @@ func (h *ResponseHandler) convertToChatCompletionRequest(req *requesttypes.Creat
 
 // GetResponse handles the business logic for getting a response
 func (h *ResponseHandler) GetResponse(reqCtx *gin.Context) {
-	responseID := reqCtx.Param("response_id")
-
-	// Validate user and response ID
-	userEntity, err := h.validateUserAndResponseID(reqCtx, responseID)
-	if err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "b2c3d4e5-f6g7-8901-bcde-f23456789012", err.Error())
-		return
-	}
-
-	// Get response from database
-	responseEntity, err := h.responseService.GetResponseByPublicID(reqCtx, responseID)
-	if err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusInternalServerError, "d8e9f0a1-b2c3-4567-def0-123456789012", "failed to get response: "+err.Error())
-		return
-	}
-
-	if responseEntity == nil {
-		h.sendErrorResponse(reqCtx, http.StatusNotFound, "e9f0a1b2-c3d4-5678-ef01-234567890123", "response not found")
-		return
-	}
-
-	// Check if user owns this response
-	if responseEntity.UserID != userEntity.ID {
-		h.sendErrorResponse(reqCtx, http.StatusForbidden, "f0a1b2c3-d4e5-6789-f012-345678901234", "access denied")
+	// Get response from middleware context
+	responseEntity, ok := response.GetResponseFromContext(reqCtx)
+	if !ok {
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc", "response not found in context")
 		return
 	}
 
@@ -444,67 +425,50 @@ func (h *ResponseHandler) GetResponse(reqCtx *gin.Context) {
 
 // DeleteResponse handles the business logic for deleting a response
 func (h *ResponseHandler) DeleteResponse(reqCtx *gin.Context) {
-	responseID := reqCtx.Param("response_id")
-
-	// Validate user and response ID
-	userEntity, err := h.validateUserAndResponseID(reqCtx, responseID)
-	if err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "d4e5f6g7-h8i9-0123-defg-456789012345", err.Error())
+	// Get response from middleware context
+	responseEntity, ok := response.GetResponseFromContext(reqCtx)
+	if !ok {
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc", "response not found in context")
 		return
 	}
 
-	_ = userEntity // TODO: Use user info if needed
-	// TODO: Delete response logic here
-
-	// Create mock deleted response data
-	mockResponse := responsetypes.Response{
-		ID:      responseID,
-		Object:  "response",
-		Created: 1234567890,
-		Model:   "gpt-4",
-		Status:  responsetypes.ResponseStatusCancelled,
-		Input: requesttypes.CreateResponseInput{
-			Type: requesttypes.InputTypeText,
-			Text: ptr.ToString("Hello, world!"),
-		},
-		CancelledAt: ptr.ToInt64(1234567890),
-		Conversation: &responsetypes.ConversationInfo{
-			ID: "mock-conversation-id",
-		},
+	// Delete the response from database
+	if err := h.responseService.DeleteResponse(reqCtx, responseEntity.ID); err != nil {
+		h.sendErrorResponse(reqCtx, http.StatusInternalServerError, "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc", "failed to delete response: "+err.Error())
+		return
 	}
 
-	h.sendSuccessResponse(reqCtx, mockResponse)
+	// Return the deleted response data
+	deletedResponse := responsetypes.Response{
+		ID:          responseEntity.PublicID,
+		Object:      "response",
+		Created:     responseEntity.CreatedAt.Unix(),
+		Model:       responseEntity.Model,
+		Status:      responsetypes.ResponseStatusCancelled,
+		CancelledAt: ptr.ToInt64(time.Now().Unix()),
+	}
+
+	h.sendSuccessResponse(reqCtx, deletedResponse)
 }
 
 // CancelResponse handles the business logic for cancelling a response
 func (h *ResponseHandler) CancelResponse(reqCtx *gin.Context) {
-	responseID := reqCtx.Param("response_id")
-
-	// Validate user and response ID
-	userEntity, err := h.validateUserAndResponseID(reqCtx, responseID)
-	if err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "f6g7h8i9-j0k1-2345-fghi-678901234567", err.Error())
+	// Get response from middleware context
+	responseEntity, ok := response.GetResponseFromContext(reqCtx)
+	if !ok {
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc", "response not found in context")
 		return
 	}
 
-	_ = userEntity // TODO: Use user info if needed
-	// TODO: Cancel response logic here
-
-	// Create mock cancelled response data
+	// TODO: Implement actual cancellation logic
+	// For now, return the response with cancelled status
 	mockResponse := responsetypes.Response{
-		ID:      responseID,
-		Object:  "response",
-		Created: 1234567890,
-		Model:   "gpt-4",
-		Status:  responsetypes.ResponseStatusCancelled,
-		Input: requesttypes.CreateResponseInput{
-			Type: requesttypes.InputTypeText,
-			Text: ptr.ToString("Hello, world!"),
-		},
-		CancelledAt: ptr.ToInt64(1234567890),
-		Conversation: &responsetypes.ConversationInfo{
-			ID: "mock-conversation-id",
-		},
+		ID:          responseEntity.PublicID,
+		Object:      "response",
+		Created:     responseEntity.CreatedAt.Unix(),
+		Model:       responseEntity.Model,
+		Status:      responsetypes.ResponseStatusCancelled,
+		CancelledAt: ptr.ToInt64(time.Now().Unix()),
 	}
 
 	h.sendSuccessResponse(reqCtx, mockResponse)
@@ -512,19 +476,15 @@ func (h *ResponseHandler) CancelResponse(reqCtx *gin.Context) {
 
 // ListInputItems handles the business logic for listing input items
 func (h *ResponseHandler) ListInputItems(reqCtx *gin.Context) {
-	responseID := reqCtx.Param("response_id")
-
-	// Validate user and response ID
-	userEntity, err := h.validateUserAndResponseID(reqCtx, responseID)
-	if err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "h8i9j0k1-l2m3-4567-hijk-890123456789", err.Error())
+	// Get response from middleware context
+	responseEntity, ok := response.GetResponseFromContext(reqCtx)
+	if !ok {
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc", "response not found in context")
 		return
 	}
 
-	_ = userEntity // TODO: Use user info if needed
-	// TODO: List input items logic here
-
-	// Create mock input items data
+	// TODO: Implement actual input items listing logic
+	// For now, return mock data
 	status := responsetypes.ResponseCodeOk
 	objectType := responsetypes.ObjectTypeList
 	hasMore := false
@@ -536,28 +496,12 @@ func (h *ResponseHandler) ListInputItems(reqCtx *gin.Context) {
 			{
 				ID:      "input_1234567890",
 				Object:  "input_item",
-				Created: 1234567890,
+				Created: responseEntity.CreatedAt.Unix(),
 				Type:    requesttypes.InputTypeText,
-				Text:    ptr.ToString("Hello, world!"),
+				Text:    ptr.ToString("Mock input item"),
 			},
 		},
 	})
-}
-
-// validateUserAndResponseID validates user context and response ID
-func (h *ResponseHandler) validateUserAndResponseID(reqCtx *gin.Context, responseID string) (*user.User, error) {
-	// Get user from middleware context
-	userEntity, ok := auth.GetUserFromContext(reqCtx)
-	if !ok {
-		return nil, fmt.Errorf("user not found in context")
-	}
-
-	// Validate response ID
-	if validationError := ValidateResponseID(responseID); validationError != nil {
-		return nil, fmt.Errorf("validation error: %s", validationError.Message)
-	}
-
-	return userEntity, nil
 }
 
 // sendErrorResponse sends a standardized error response

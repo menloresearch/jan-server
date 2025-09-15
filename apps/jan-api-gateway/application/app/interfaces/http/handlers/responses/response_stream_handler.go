@@ -726,6 +726,30 @@ func (h *StreamHandler) streamResponseToChannel(reqCtx *gin.Context, request ope
 	// Send [DONE] to close the stream
 	dataChan <- fmt.Sprintf(SSEDataFormat, DoneMarker)
 
+	// Update response status to completed and save output
+	// Get response entity by public ID to update status
+	responseEntity, err := h.responseService.GetResponseByPublicID(reqCtx, responseID)
+	if err == nil && responseEntity != nil {
+		// Update status to completed
+		if updateErr := h.responseService.UpdateResponseStatus(reqCtx, responseEntity.ID, response.ResponseStatusCompleted); updateErr != nil {
+			// Log error but don't fail the request since streaming is already complete
+			fmt.Printf("Failed to update response status to completed: %v\n", updateErr)
+		}
+
+		// Save the output to database
+		outputData := map[string]interface{}{
+			"type": "text",
+			"text": map[string]interface{}{
+				"value": fullResponse.String(),
+			},
+		}
+		if updateErr := h.responseService.UpdateResponseOutput(reqCtx, responseEntity.ID, outputData); updateErr != nil {
+			fmt.Printf("Failed to update response output: %v\n", updateErr)
+		}
+	} else {
+		fmt.Printf("Failed to get response entity for status update: %v\n", err)
+	}
+
 	// Log streaming metrics
 	wordCount := len(strings.Fields(fullResponse.String()))
 	h.logStreamingMetrics(responseID, startTime, wordCount)
