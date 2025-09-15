@@ -195,11 +195,11 @@ func (responseRoute *ResponseRoute) CreateResponse(reqCtx *gin.Context) {
 	}
 
 	// Call domain service (pure business logic)
-	result, errorCode := responseRoute.responseModelService.CreateResponse(ctx, userID, domainRequest)
-	if errorCode != "" {
+	result, err := responseRoute.responseModelService.CreateResponse(ctx, userID, domainRequest)
+	if !err.IsEmpty() {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  errorCode,
-			Error: "Request processing failed",
+			Code:  err.Code,
+			Error: err.Message,
 		})
 		return
 	}
@@ -299,11 +299,11 @@ func (responseRoute *ResponseRoute) DeleteResponse(reqCtx *gin.Context) {
 		return
 	}
 
-	err := responseRoute.responseService.DeleteResponse(ctx, resp.ID)
-	if err != nil {
+	success, err := responseRoute.responseService.DeleteResponse(ctx, resp.ID)
+	if !success {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "l2m3n4o5-p6q7-8901-lmno-234567890123",
-			Error: "Failed to delete response",
+			Code:  err.Code,
+			Error: err.Message,
 		})
 		return
 	}
@@ -350,22 +350,21 @@ func (responseRoute *ResponseRoute) CancelResponse(reqCtx *gin.Context) {
 
 	// TODO
 	// Cancel the stream if it is streaming in go routine and update response status in go routine
-	err := responseRoute.responseService.UpdateResponseStatus(ctx, resp.ID, response.ResponseStatusCancelled)
-
-	if err != nil {
+	success, err := responseRoute.responseService.UpdateResponseStatus(ctx, resp.ID, response.ResponseStatusCancelled)
+	if !success {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "n4o5p6q7-r8s9-0123-nopq-456789012345",
-			Error: "Failed to update response status",
+			Code:  err.Code,
+			Error: err.Message,
 		})
 		return
 	}
 
 	// Reload the response to get updated status
 	updatedResp, err := responseRoute.responseService.GetResponseByPublicID(ctx, resp.PublicID)
-	if err != nil {
+	if !err.IsEmpty() {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "o5p6q7r8-s9t0-1234-opqr-567890123456",
-			Error: "Failed to reload response",
+			Code:  err.Code,
+			Error: err.Message,
 		})
 		return
 	}
@@ -433,10 +432,10 @@ func (responseRoute *ResponseRoute) ListInputItems(reqCtx *gin.Context) {
 
 	// Get items for this response using the response service
 	items, err := responseRoute.responseService.GetItemsForResponse(ctx, resp.ID, nil)
-	if err != nil {
+	if !err.IsEmpty() {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "q7r8s9t0-u1v2-3456-qrst-789012345678",
-			Error: "Failed to get input items",
+			Code:  err.Code,
+			Error: err.Message,
 		})
 		return
 	}

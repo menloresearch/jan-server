@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"menlo.ai/jan-api-gateway/app/domain/common"
 	requesttypes "menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 )
 
@@ -19,128 +20,95 @@ type ValidationErrors struct {
 }
 
 // ValidateCreateResponseRequest validates a CreateResponseRequest
-func ValidateCreateResponseRequest(req *requesttypes.CreateResponseRequest) *ValidationErrors {
-	var errors []ValidationError
-
+func ValidateCreateResponseRequest(req *requesttypes.CreateResponseRequest) (bool, *common.Error) {
 	// Validate model
 	if req.Model == "" {
-		errors = append(errors, ValidationError{
-			Field:   "model",
-			Message: "model is required",
-		})
+		return false, common.NewError("a1b2c3d4-e5f6-7890-abcd-ef1234567890", "model is required")
 	}
 
 	// Validate input
 	if err := validateInput(req.Input); err != nil {
-		errors = append(errors, *err...)
+		return false, common.NewError("b2c3d4e5-f6g7-8901-bcde-f23456789012", "input validation error")
 	}
 
 	// Validate temperature
 	if req.Temperature != nil {
 		if *req.Temperature < 0 || *req.Temperature > 2 {
-			errors = append(errors, ValidationError{
-				Field:   "temperature",
-				Message: "temperature must be between 0 and 2",
-			})
+			return false, common.NewError("c3d4e5f6-g7h8-9012-cdef-345678901234", "temperature must be between 0 and 2")
 		}
 	}
 
 	// Validate top_p
 	if req.TopP != nil {
 		if *req.TopP < 0 || *req.TopP > 1 {
-			errors = append(errors, ValidationError{
-				Field:   "top_p",
-				Message: "top_p must be between 0 and 1",
-			})
+			return false, common.NewError("d4e5f6g7-h8i9-0123-defg-456789012345", "top_p must be between 0 and 1")
 		}
 	}
 
 	// Validate top_k
 	if req.TopK != nil {
 		if *req.TopK < 1 {
-			errors = append(errors, ValidationError{
-				Field:   "top_k",
-				Message: "top_k must be greater than 0",
-			})
+			return false, common.NewError("e5f6g7h8-i9j0-1234-efgh-567890123456", "top_k must be greater than 0")
 		}
 	}
 
 	// Validate repetition_penalty
 	if req.RepetitionPenalty != nil {
 		if *req.RepetitionPenalty < 0 || *req.RepetitionPenalty > 2 {
-			errors = append(errors, ValidationError{
-				Field:   "repetition_penalty",
-				Message: "repetition_penalty must be between 0 and 2",
-			})
+			return false, common.NewError("f6g7h8i9-j0k1-2345-fghi-678901234567", "repetition_penalty must be between 0 and 2")
 		}
 	}
 
 	// Validate presence_penalty
 	if req.PresencePenalty != nil {
 		if *req.PresencePenalty < -2 || *req.PresencePenalty > 2 {
-			errors = append(errors, ValidationError{
-				Field:   "presence_penalty",
-				Message: "presence_penalty must be between -2 and 2",
-			})
+			return false, common.NewError("g7h8i9j0-k1l2-3456-ghij-789012345678", "presence_penalty must be between -2 and 2")
 		}
 	}
 
 	// Validate frequency_penalty
 	if req.FrequencyPenalty != nil {
 		if *req.FrequencyPenalty < -2 || *req.FrequencyPenalty > 2 {
-			errors = append(errors, ValidationError{
-				Field:   "frequency_penalty",
-				Message: "frequency_penalty must be between -2 and 2",
-			})
+			return false, common.NewError("h8i9j0k1-l2m3-4567-hijk-890123456789", "frequency_penalty must be between -2 and 2")
 		}
 	}
 
 	// Validate max_tokens
 	if req.MaxTokens != nil {
 		if *req.MaxTokens < 1 {
-			errors = append(errors, ValidationError{
-				Field:   "max_tokens",
-				Message: "max_tokens must be greater than 0",
-			})
+			return false, common.NewError("i9j0k1l2-m3n4-5678-ijkl-901234567890", "max_tokens must be greater than 0")
 		}
 	}
 
 	// Validate timeout
 	if req.Timeout != nil {
 		if *req.Timeout < 1 {
-			errors = append(errors, ValidationError{
-				Field:   "timeout",
-				Message: "timeout must be greater than 0",
-			})
+			return false, common.NewError("j0k1l2m3-n4o5-6789-jklm-012345678901", "timeout must be greater than 0")
 		}
 	}
 
 	// Validate response_format
 	if req.ResponseFormat != nil {
 		if err := validateResponseFormat(req.ResponseFormat); err != nil {
-			errors = append(errors, *err...)
+			return false, common.NewError("k1l2m3n4-o5p6-7890-klmn-123456789012", "response_format validation error")
 		}
 	}
 
 	// Validate tools
 	if req.Tools != nil {
 		if err := validateTools(req.Tools); err != nil {
-			errors = append(errors, *err...)
+			return false, common.NewError("l2m3n4o5-p6q7-8901-lmno-234567890123", "tools validation error")
 		}
 	}
 
 	// Validate tool_choice
 	if req.ToolChoice != nil {
 		if err := validateToolChoice(req.ToolChoice); err != nil {
-			errors = append(errors, *err...)
+			return false, common.NewError("m3n4o5p6-q7r8-9012-mnop-345678901234", "tool_choice validation error")
 		}
 	}
 
-	if len(errors) > 0 {
-		return &ValidationErrors{Errors: errors}
-	}
-
-	return nil
+	return true, common.EmptyError
 }
 
 // validateInput validates the input field (can be string, array of strings, or structured CreateResponseInput)

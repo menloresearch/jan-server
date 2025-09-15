@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
+	"menlo.ai/jan-api-gateway/app/domain/common"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	requesttypes "menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	responsetypes "menlo.ai/jan-api-gateway/app/interfaces/http/responses"
@@ -46,14 +47,14 @@ const (
 )
 
 // validateRequest validates the incoming request
-func (h *StreamModelService) validateRequest(request *requesttypes.CreateResponseRequest) error {
+func (h *StreamModelService) validateRequest(request *requesttypes.CreateResponseRequest) (bool, *common.Error) {
 	if request.Model == "" {
-		return fmt.Errorf("model is required")
+		return false, common.NewError("a1b2c3d4-e5f6-7890-abcd-ef1234567890", "Model is required")
 	}
 	if request.Input == nil {
-		return fmt.Errorf("input is required")
+		return false, common.NewError("b2c3d4e5-f6g7-8901-bcde-f23456789012", "Input is required")
 	}
-	return nil
+	return true, common.EmptyError
 }
 
 // checkContextCancellation checks if context was cancelled and sends error to channel
@@ -103,9 +104,11 @@ func (h *StreamModelService) createTextDeltaEvent(itemID string, sequenceNumber 
 // CreateStreamResponse handles the business logic for creating a streaming response
 func (h *StreamModelService) CreateStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *Response, chatCompletionRequest *openai.ChatCompletionRequest) {
 	// Validate request
-	if err := h.validateRequest(request); err != nil {
+	success, err := h.validateRequest(request)
+	if !success {
 		reqCtx.JSON(http.StatusBadRequest, responsetypes.ErrorResponse{
-			Code: "019929ec-6f89-76c5-8ed4-bd0eb1c6c8db",
+			Code:  err.Code,
+			Error: err.Message,
 		})
 		return
 	}
@@ -176,8 +179,8 @@ func (h *StreamModelService) CreateStreamResponse(reqCtx *gin.Context, request *
 
 	// Process with Jan inference client for streaming
 	janInferenceClient := janinference.NewJanInferenceClient(reqCtx)
-	err := h.processStreamingResponse(reqCtx, janInferenceClient, key, *chatCompletionRequest, responseID, conv)
-	if err != nil {
+	streamErr := h.processStreamingResponse(reqCtx, janInferenceClient, key, *chatCompletionRequest, responseID, conv)
+	if streamErr != nil {
 		// Check if context was cancelled (timeout)
 		if reqCtx.Request.Context().Err() == context.DeadlineExceeded {
 			h.emitStreamEvent(reqCtx, "response.error", responsetypes.ResponseErrorEvent{
@@ -654,10 +657,11 @@ func (h *StreamModelService) streamResponseToChannel(reqCtx *gin.Context, reques
 		}
 		// Get response entity to get the internal ID
 		responseEntity, err := h.responseService.GetResponseByPublicID(reqCtx, responseID)
-		if err == nil && responseEntity != nil {
-			if err := h.responseService.AppendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}, &responseEntity.ID); err != nil {
+		if err.IsEmpty() && responseEntity != nil {
+			success, err := h.responseService.AppendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}, &responseEntity.ID)
+			if !success {
 				// Log error but don't fail the response
-				logger.GetLogger().Errorf("Failed to append assistant response to conversation: %v", err)
+				logger.GetLogger().Errorf("Failed to append assistant response to conversation: %s - %s", err.Code, err.Message)
 			}
 		}
 	}
@@ -731,12 +735,13 @@ func (h *StreamModelService) streamResponseToChannel(reqCtx *gin.Context, reques
 
 	// Update response status to completed and save output
 	// Get response entity by public ID to update status
-	responseEntity, err := h.responseService.GetResponseByPublicID(reqCtx, responseID)
-	if err == nil && responseEntity != nil {
+	responseEntity, getErr := h.responseService.GetResponseByPublicID(reqCtx, responseID)
+	if getErr.IsEmpty() && responseEntity != nil {
 		// Update status to completed
-		if updateErr := h.responseService.UpdateResponseStatus(reqCtx, responseEntity.ID, ResponseStatusCompleted); updateErr != nil {
+		success, updateErr := h.responseService.UpdateResponseStatus(reqCtx, responseEntity.ID, ResponseStatusCompleted)
+		if !success {
 			// Log error but don't fail the request since streaming is already complete
-			fmt.Printf("Failed to update response status to completed: %v\n", updateErr)
+			fmt.Printf("Failed to update response status to completed: %s - %s\n", updateErr.Code, updateErr.Message)
 		}
 
 		// Save the output to database
@@ -746,11 +751,12 @@ func (h *StreamModelService) streamResponseToChannel(reqCtx *gin.Context, reques
 				"value": fullResponse.String(),
 			},
 		}
-		if updateErr := h.responseService.UpdateResponseOutput(reqCtx, responseEntity.ID, outputData); updateErr != nil {
-			fmt.Printf("Failed to update response output: %v\n", updateErr)
+		success, outputErr := h.responseService.UpdateResponseOutput(reqCtx, responseEntity.ID, outputData)
+		if !success {
+			fmt.Printf("Failed to update response output: %s - %s\n", outputErr.Code, outputErr.Message)
 		}
 	} else {
-		fmt.Printf("Failed to get response entity for status update: %v\n", err)
+		fmt.Printf("Failed to get response entity for status update: %s - %s\n", getErr.Code, getErr.Message)
 	}
 
 	// Log streaming metrics

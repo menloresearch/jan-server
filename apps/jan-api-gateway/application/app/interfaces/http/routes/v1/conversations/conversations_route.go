@@ -1,11 +1,13 @@
 package conversations
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
+	"menlo.ai/jan-api-gateway/app/domain/common"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/query"
 
@@ -87,13 +89,28 @@ func (api *ConversationAPI) listConversations(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
 	user, _ := auth.GetUserFromContext(reqCtx)
 	userID := user.ID
+
+	result, err := api.doListConversations(ctx, userID, reqCtx)
+	if !err.IsEmpty() {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  err.Code,
+			Error: err.Message,
+		})
+		return
+	}
+
+	reqCtx.JSON(http.StatusOK, result)
+}
+
+// doListConversations performs the business logic for listing conversations
+func (api *ConversationAPI) doListConversations(ctx context.Context, userID uint, reqCtx *gin.Context) (*ListResponse[*ConversationResponse], *common.Error) {
 	pagination, err := query.GetCursorPaginationFromQuery(reqCtx, func(lastID string) (*uint, error) {
-		convs, err := api.conversationService.FindConversationsByFilter(ctx, conversation.ConversationFilter{
+		convs, convErr := api.conversationService.FindConversationsByFilter(ctx, conversation.ConversationFilter{
 			UserID:   &userID,
 			PublicID: &lastID,
 		}, nil)
-		if err != nil {
-			return nil, err
+		if !convErr.IsEmpty() {
+			return nil, convErr
 		}
 		if len(convs) != 1 {
 			return nil, fmt.Errorf("invalid conversation")
@@ -101,31 +118,19 @@ func (api *ConversationAPI) listConversations(reqCtx *gin.Context) {
 		return &convs[0].ID, nil
 	})
 	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "5f89e23d-d4a0-45ce-ba43-ae2a9be0ca64",
-			Error: "Invalid pagination parameters",
-		})
-		return
+		return nil, common.NewError("5f89e23d-d4a0-45ce-ba43-ae2a9be0ca64", "Invalid pagination parameters")
 	}
 
 	filter := conversation.ConversationFilter{
 		UserID: &userID,
 	}
-	conversations, err := api.conversationService.FindConversationsByFilter(ctx, filter, pagination)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "ac74fc61-fd96-4d5b-a630-e7a8e1e46575",
-			Error: "Failed to retrieve conversations",
-		})
-		return
+	conversations, convErr := api.conversationService.FindConversationsByFilter(ctx, filter, pagination)
+	if !convErr.IsEmpty() {
+		return nil, convErr
 	}
-	count, err := api.conversationService.CountConversationsByFilter(ctx, filter)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "ae349271-d67e-4f76-a220-6945d802cbe2",
-			Error: "Failed to count conversations",
-		})
-		return
+	count, countErr := api.conversationService.CountConversationsByFilter(ctx, filter)
+	if !countErr.IsEmpty() {
+		return nil, countErr
 	}
 	var firstId *string
 	var lastId *string
@@ -133,31 +138,27 @@ func (api *ConversationAPI) listConversations(reqCtx *gin.Context) {
 	if len(conversations) > 0 {
 		firstId = &conversations[0].PublicID
 		lastId = &conversations[len(conversations)-1].PublicID
-		moreRecords, err := api.conversationService.FindConversationsByFilter(ctx, filter, &query.Pagination{
+		moreRecords, moreErr := api.conversationService.FindConversationsByFilter(ctx, filter, &query.Pagination{
 			Order: pagination.Order,
 			Limit: ptr.ToInt(1),
 			After: &conversations[len(conversations)-1].ID,
 		})
-		if err != nil {
-			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:  "0b6b667c-aa25-4863-8494-a4ae2e5d12c4",
-				Error: "Failed to check for more conversations",
-			})
-			return
+		if !moreErr.IsEmpty() {
+			return nil, moreErr
 		}
 		if len(moreRecords) != 0 {
 			hasMore = true
 		}
 	}
 
-	reqCtx.JSON(http.StatusOK, ListResponse[*ConversationResponse]{
+	return &ListResponse[*ConversationResponse]{
 		Object:  "list",
 		FirstID: firstId,
 		LastID:  lastId,
 		Total:   count,
 		HasMore: hasMore,
 		Data:    functional.Map(conversations, domainToConversationResponse),
-	})
+	}, common.EmptyError
 }
 
 // ListResponse represents a paginated list response
@@ -205,11 +206,22 @@ func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
 		return
 	}
 
-	if len(request.Items) > 20 {
+	result, err := api.doCreateConversation(ctx, userId, request)
+	if !err.IsEmpty() {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code: "0e5b8426-b1d2-4114-ac81-d3982dc497cf",
+			Code:  err.Code,
+			Error: err.Message,
 		})
 		return
+	}
+
+	reqCtx.JSON(http.StatusOK, result)
+}
+
+// doCreateConversation performs the business logic for creating a conversation
+func (api *ConversationAPI) doCreateConversation(ctx context.Context, userId uint, request CreateConversationRequest) (*ConversationResponse, *common.Error) {
+	if len(request.Items) > 20 {
+		return nil, common.NewError("0e5b8426-b1d2-4114-ac81-d3982dc497cf", "Too many items")
 	}
 
 	itemsToCreate := make([]*conversation.Item, len(request.Items))
@@ -217,56 +229,37 @@ func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
 	for i, itemReq := range request.Items {
 		item, ok := NewItemFromConversationItemRequest(itemReq)
 		if !ok {
-			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-				Code: "1fe8d03b-9e1e-4e52-b5b5-77a25954fc43",
-			})
-			return
+			return nil, common.NewError("1fe8d03b-9e1e-4e52-b5b5-77a25954fc43", "Invalid item format")
 		}
 		itemsToCreate[i] = item
 	}
 
-	ok, _ := api.conversationService.ValidateItems(ctx, itemsToCreate)
+	ok, err := api.conversationService.ValidateItems(ctx, itemsToCreate)
 	if !ok {
-		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "0502c02c-ea2d-429e-933c-1243d4e2bcb2",
-			Error: "Item validation failed",
-		})
-		return
+		return nil, err
 	}
 
 	// Create conversation
 	conv, err := api.conversationService.CreateConversation(ctx, userId, &request.Title, true, request.Metadata)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "8fc529d7-f384-40f2-ac15-cd1f1e109316",
-			Error: "Failed to create conversation",
-		})
-		return
+	if !err.IsEmpty() {
+		return nil, err
 	}
 
 	// Add items if provided using batch operation
 	if len(request.Items) > 0 {
 		_, err := api.conversationService.AddMultipleItems(ctx, conv, userId, itemsToCreate)
-		if err != nil {
-			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:  "019948b0-a1c0-73b7-b1f1-52a1ce82b538",
-				Error: "Failed to add items to conversation",
-			})
-			return
+		if !err.IsEmpty() {
+			return nil, err
 		}
 
 		// Reload conversation with items
 		conv, err = api.conversationService.GetConversationByPublicIDAndUserID(ctx, conv.PublicID, userId)
-		if err != nil {
-			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:  "019948b0-bb8b-75fb-9419-dacefb318ef0",
-				Error: "Failed to reload conversation",
-			})
-			return
+		if !err.IsEmpty() {
+			return nil, err
 		}
 	}
 
-	reqCtx.JSON(http.StatusOK, domainToConversationResponse(conv))
+	return domainToConversationResponse(conv), common.EmptyError
 }
 
 // getConversation handles conversation retrieval
@@ -287,7 +280,22 @@ func (api *ConversationAPI) getConversation(reqCtx *gin.Context) {
 	if !ok {
 		return
 	}
-	reqCtx.JSON(http.StatusOK, domainToConversationResponse(conv))
+
+	result, err := api.doGetConversation(conv)
+	if !err.IsEmpty() {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  err.Code,
+			Error: err.Message,
+		})
+		return
+	}
+
+	reqCtx.JSON(http.StatusOK, result)
+}
+
+// doGetConversation performs the business logic for getting a conversation
+func (api *ConversationAPI) doGetConversation(conv *conversation.Conversation) (*ConversationResponse, *common.Error) {
+	return domainToConversationResponse(conv), common.EmptyError
 }
 
 type UpdateConversationRequest struct {
@@ -327,6 +335,20 @@ func (api *ConversationAPI) updateConversation(reqCtx *gin.Context) {
 		return
 	}
 
+	result, err := api.doUpdateConversation(ctx, conv, request)
+	if !err.IsEmpty() {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  err.Code,
+			Error: err.Message,
+		})
+		return
+	}
+
+	reqCtx.JSON(http.StatusOK, result)
+}
+
+// doUpdateConversation performs the business logic for updating a conversation
+func (api *ConversationAPI) doUpdateConversation(ctx context.Context, conv *conversation.Conversation, request UpdateConversationRequest) (*ConversationResponse, *common.Error) {
 	if request.Title != nil {
 		conv.Title = request.Title
 	}
@@ -335,15 +357,11 @@ func (api *ConversationAPI) updateConversation(reqCtx *gin.Context) {
 	}
 
 	conv, err := api.conversationService.UpdateConversation(ctx, conv)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "3901c185-94fa-4bbc-97ef-6031939ba8c2",
-			Error: "Failed to update conversation",
-		})
-		return
+	if !err.IsEmpty() {
+		return nil, err
 	}
 
-	reqCtx.JSON(http.StatusOK, domainToConversationResponse(conv))
+	return domainToConversationResponse(conv), common.EmptyError
 }
 
 // DeletedConversationResponse represents the deleted conversation response
@@ -375,15 +393,26 @@ func (api *ConversationAPI) deleteConversation(reqCtx *gin.Context) {
 		})
 		return
 	}
-	err := api.conversationService.DeleteConversation(ctx, conv)
-	if err != nil {
+
+	result, err := api.doDeleteConversation(ctx, conv)
+	if !err.IsEmpty() {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "2d5345ba-a6db-441b-b52e-74cf358bdfcd",
-			Error: "Failed to delete conversation",
+			Code:  err.Code,
+			Error: err.Message,
 		})
 		return
 	}
-	reqCtx.JSON(http.StatusOK, domainToDeletedConversationResponse(conv))
+
+	reqCtx.JSON(http.StatusOK, result)
+}
+
+// doDeleteConversation performs the business logic for deleting a conversation
+func (api *ConversationAPI) doDeleteConversation(ctx context.Context, conv *conversation.Conversation) (*DeletedConversationResponse, *common.Error) {
+	success, err := api.conversationService.DeleteConversation(ctx, conv)
+	if !success {
+		return nil, err
+	}
+	return domainToDeletedConversationResponse(conv), common.EmptyError
 }
 
 // ConversationItemResponse represents an item in the response
@@ -472,34 +501,38 @@ func (api *ConversationAPI) createItems(reqCtx *gin.Context) {
 		})
 		return
 	}
+
+	result, err := api.doCreateItems(ctx, conv, request)
+	if !err.IsEmpty() {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  err.Code,
+			Error: err.Message,
+		})
+		return
+	}
+
+	reqCtx.JSON(http.StatusOK, result)
+}
+
+// doCreateItems performs the business logic for creating items
+func (api *ConversationAPI) doCreateItems(ctx context.Context, conv *conversation.Conversation, request CreateItemsRequest) (*ListResponse[*ConversationItemResponse], *common.Error) {
 	itemsToCreate := make([]*conversation.Item, len(request.Items))
 	for i, itemReq := range request.Items {
 		item, ok := NewItemFromConversationItemRequest(itemReq)
 		if !ok {
-			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-				Code: "a4fb6e9b-00c8-423c-9836-a83080e34d28",
-			})
-			return
+			return nil, common.NewError("a4fb6e9b-00c8-423c-9836-a83080e34d28", "Invalid item format")
 		}
 		itemsToCreate[i] = item
 	}
 
-	ok, _ := api.conversationService.ValidateItems(ctx, itemsToCreate)
+	ok, err := api.conversationService.ValidateItems(ctx, itemsToCreate)
 	if !ok {
-		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "01994aa5-679b-733c-a1e7-b31cfcce35b3",
-			Error: "Item validation failed",
-		})
-		return
+		return nil, err
 	}
 
 	createdItems, err := api.conversationService.AddMultipleItems(ctx, conv, conv.UserID, itemsToCreate)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "01994aa5-7758-722d-9cfa-4adeb8f098e1",
-			Error: "Failed to add items to conversation",
-		})
-		return
+	if !err.IsEmpty() {
+		return nil, err
 	}
 	var firstId *string
 	var lastId *string
@@ -508,14 +541,14 @@ func (api *ConversationAPI) createItems(reqCtx *gin.Context) {
 		lastId = &createdItems[len(createdItems)-1].PublicID
 	}
 
-	reqCtx.JSON(http.StatusOK, ListResponse[*ConversationItemResponse]{
+	return &ListResponse[*ConversationItemResponse]{
 		Object:  "list",
 		Data:    functional.Map(createdItems, domainToConversationItemResponse),
 		FirstID: firstId,
 		LastID:  lastId,
 		HasMore: false,
 		Total:   int64(len(createdItems)),
-	})
+	}, common.EmptyError
 }
 
 // listItems handles item listing with optional pagination
@@ -538,13 +571,27 @@ func (api *ConversationAPI) listItems(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
 	conv, _ := conversation.GetConversationFromContext(reqCtx)
 
+	result, err := api.doListItems(ctx, conv, reqCtx)
+	if !err.IsEmpty() {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  err.Code,
+			Error: err.Message,
+		})
+		return
+	}
+
+	reqCtx.JSON(http.StatusOK, result)
+}
+
+// doListItems performs the business logic for listing items
+func (api *ConversationAPI) doListItems(ctx context.Context, conv *conversation.Conversation, reqCtx *gin.Context) (*ListResponse[*ConversationItemResponse], *common.Error) {
 	pagination, err := query.GetCursorPaginationFromQuery(reqCtx, func(lastID string) (*uint, error) {
 		items, err := api.conversationService.FindItemsByFilter(ctx, conversation.ItemFilter{
 			PublicID:       &lastID,
 			ConversationID: &conv.ID,
 		}, nil)
-		if err != nil {
-			return nil, err
+		if !err.IsEmpty() {
+			return nil, fmt.Errorf("%s: %s", err.Code, err.Message)
 		}
 		if len(items) != 1 {
 			return nil, fmt.Errorf("invalid conversation")
@@ -552,23 +599,15 @@ func (api *ConversationAPI) listItems(reqCtx *gin.Context) {
 		return &items[0].ID, nil
 	})
 	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "e9144b73-6fc1-4b16-b9c7-460d8a4ecf6b",
-			Error: "Invalid pagination parameters",
-		})
-		return
+		return nil, common.NewError("e9144b73-6fc1-4b16-b9c7-460d8a4ecf6b", "Invalid pagination parameters")
 	}
 
 	filter := conversation.ItemFilter{
 		ConversationID: &conv.ID,
 	}
-	itemEntities, err := api.conversationService.FindItemsByFilter(ctx, filter, pagination)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "49530db0-0c1c-414c-a769-a7a4811dd650",
-			Error: "Failed to retrieve conversation items",
-		})
-		return
+	itemEntities, filterErr := api.conversationService.FindItemsByFilter(ctx, filter, pagination)
+	if !filterErr.IsEmpty() {
+		return nil, filterErr
 	}
 
 	var firstId *string
@@ -577,31 +616,27 @@ func (api *ConversationAPI) listItems(reqCtx *gin.Context) {
 	if len(itemEntities) > 0 {
 		firstId = &itemEntities[0].PublicID
 		lastId = &itemEntities[len(itemEntities)-1].PublicID
-		moreRecords, err := api.conversationService.FindItemsByFilter(ctx, filter, &query.Pagination{
+		moreRecords, moreErr := api.conversationService.FindItemsByFilter(ctx, filter, &query.Pagination{
 			Order: pagination.Order,
 			Limit: ptr.ToInt(1),
 			After: &itemEntities[len(itemEntities)-1].ID,
 		})
-		if err != nil {
-			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:  "f3cefed4-6f86-4e26-9e74-e858601627ca",
-				Error: "Failed to check for more items",
-			})
-			return
+		if !moreErr.IsEmpty() {
+			return nil, moreErr
 		}
 		if len(moreRecords) != 0 {
 			hasMore = true
 		}
 	}
 
-	reqCtx.JSON(http.StatusOK, ListResponse[*ConversationItemResponse]{
+	return &ListResponse[*ConversationItemResponse]{
 		Object:  "list",
 		Data:    functional.Map(itemEntities, domainToConversationItemResponse),
 		FirstID: firstId,
 		LastID:  lastId,
 		HasMore: hasMore,
 		Total:   int64(len(itemEntities)),
-	})
+	}, common.EmptyError
 }
 
 // getItem handles single item retrieval
@@ -623,7 +658,22 @@ func (api *ConversationAPI) getItem(reqCtx *gin.Context) {
 	if !ok {
 		return
 	}
-	reqCtx.JSON(http.StatusOK, domainToConversationItemResponse(item))
+
+	result, err := api.doGetItem(item)
+	if !err.IsEmpty() {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  err.Code,
+			Error: err.Message,
+		})
+		return
+	}
+
+	reqCtx.JSON(http.StatusOK, result)
+}
+
+// doGetItem performs the business logic for getting an item
+func (api *ConversationAPI) doGetItem(item *conversation.Item) (*ConversationItemResponse, *common.Error) {
+	return domainToConversationItemResponse(item), common.EmptyError
 }
 
 // deleteItem handles item deletion
@@ -657,15 +707,26 @@ func (api *ConversationAPI) deleteItem(reqCtx *gin.Context) {
 		return
 	}
 
-	// Use efficient deletion with item public ID instead of loading all items
-	itemDeleted, err := api.conversationService.DeleteItemWithConversation(ctx, conv, item)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code: "9c9cdf48-715b-44b9-9be1-6bb19e2401f8",
+	result, err := api.doDeleteItem(ctx, conv, item)
+	if !err.IsEmpty() {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  err.Code,
+			Error: err.Message,
 		})
 		return
 	}
-	reqCtx.JSON(http.StatusOK, domainToConversationItemResponse(itemDeleted))
+
+	reqCtx.JSON(http.StatusOK, result)
+}
+
+// doDeleteItem performs the business logic for deleting an item
+func (api *ConversationAPI) doDeleteItem(ctx context.Context, conv *conversation.Conversation, item *conversation.Item) (*ConversationItemResponse, *common.Error) {
+	// Use efficient deletion with item public ID instead of loading all items
+	itemDeleted, err := api.conversationService.DeleteItemWithConversation(ctx, conv, item)
+	if !err.IsEmpty() {
+		return nil, err
+	}
+	return domainToConversationItemResponse(itemDeleted), common.EmptyError
 }
 
 func domainToConversationResponse(entity *conversation.Conversation) *ConversationResponse {

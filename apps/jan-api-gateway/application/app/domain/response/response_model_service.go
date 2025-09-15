@@ -10,6 +10,7 @@ import (
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
+	"menlo.ai/jan-api-gateway/app/domain/common"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
 	"menlo.ai/jan-api-gateway/app/domain/user"
@@ -64,10 +65,11 @@ func NewResponseModelService(
 
 // CreateResponse handles the business logic for creating a response
 // Returns domain objects and business logic results, no HTTP concerns
-func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, request *requesttypes.CreateResponseRequest) (*ResponseCreationResult, string) {
+func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, request *requesttypes.CreateResponseRequest) (*ResponseCreationResult, *common.Error) {
 	// Validate the request
-	if validationErrors := ValidateCreateResponseRequest(request); validationErrors != nil {
-		return nil, "i9j0k1l2-m3n4-5678-ijkl-901234567890" // Input validation error
+	success, err := ValidateCreateResponseRequest(request)
+	if !success {
+		return nil, err
 	}
 
 	// TODO add the logic to get the API key for the user
@@ -78,13 +80,13 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 	mToE := modelRegistry.GetModelToEndpoints()
 	endpoints, ok := mToE[request.Model]
 	if !ok {
-		return nil, "h8i9j0k1-l2m3-4567-hijk-890123456789" // Model validation error
+		return nil, common.NewError("h8i9j0k1-l2m3-4567-hijk-890123456789", "Model validation error")
 	}
 
 	// Convert response request to chat completion request using domain service
 	chatCompletionRequest := h.responseService.ConvertToChatCompletionRequest(request)
 	if chatCompletionRequest == nil {
-		return nil, "i9j0k1l2-m3n4-5678-ijkl-901234567890" // Input validation error
+		return nil, common.NewError("i9j0k1l2-m3n4-5678-ijkl-901234567890", "Input validation error")
 	}
 
 	// Check if model endpoint exists
@@ -98,20 +100,20 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 	}
 
 	if !endpointExists {
-		return nil, "h8i9j0k1-l2m3-4567-hijk-890123456789" // Model validation error
+		return nil, common.NewError("h8i9j0k1-l2m3-4567-hijk-890123456789", "Model validation error")
 	}
 
 	// Handle conversation logic using domain service
 	conversation, err := h.responseService.HandleConversation(ctx, userID, request)
-	if err != nil {
-		return nil, "01994c47-05a5-7751-853c-a3cde21c8549" // Domain service error
+	if !err.IsEmpty() {
+		return nil, err
 	}
 
 	// If previous_response_id is provided, prepend conversation history to input messages
 	if request.PreviousResponseID != nil && *request.PreviousResponseID != "" {
 		conversationMessages, err := h.responseService.ConvertConversationItemsToMessages(ctx, conversation)
-		if err != nil {
-			return nil, "01994c47-185f-7413-bc15-94b9b9defbd4" // Domain service error
+		if !err.IsEmpty() {
+			return nil, err
 		}
 		// Prepend conversation history to the input messages
 		chatCompletionRequest.Messages = append(conversationMessages, chatCompletionRequest.Messages...)
@@ -143,14 +145,15 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 		conversationID = &conversation.ID
 	}
 	responseEntity, err := h.responseService.CreateResponse(ctx, userID, conversationID, request.Model, request.Input, request.SystemPrompt, responseParams)
-	if err != nil {
-		return nil, "01994c47-4491-71a8-9ec3-33c18b377136" // Domain service error
+	if !err.IsEmpty() {
+		return nil, err
 	}
 
 	// Append input messages to conversation (only if conversation exists)
 	if conversation != nil {
-		if err := h.responseService.AppendMessagesToConversation(ctx, conversation, chatCompletionRequest.Messages, &responseEntity.ID); err != nil {
-			return nil, "01994c47-3205-704c-9588-aeaa236e8060" // Domain service error
+		success, err := h.responseService.AppendMessagesToConversation(ctx, conversation, chatCompletionRequest.Messages, &responseEntity.ID)
+		if !success {
+			return nil, err
 		}
 	}
 
@@ -162,7 +165,7 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 		ChatCompletionRequest: chatCompletionRequest,
 		APIKey:                key,
 		IsStreaming:           isStreaming,
-	}, ""
+	}, common.EmptyError
 }
 
 // handleConversation handles conversation creation or loading based on the request
@@ -176,9 +179,20 @@ func (h *ResponseModelService) GetResponse(reqCtx *gin.Context) {
 		return
 	}
 
+	result, err := h.doGetResponse(responseEntity)
+	if !err.IsEmpty() {
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.Code, err.Message)
+		return
+	}
+
+	h.sendSuccessResponse(reqCtx, result)
+}
+
+// doGetResponse performs the business logic for getting a response
+func (h *ResponseModelService) doGetResponse(responseEntity *Response) (responsetypes.Response, *common.Error) {
 	// Convert domain response to API response using domain service
 	apiResponse := h.responseService.ConvertDomainResponseToAPIResponse(responseEntity)
-	h.sendSuccessResponse(reqCtx, apiResponse)
+	return apiResponse, common.EmptyError
 }
 
 // DeleteResponse handles the business logic for deleting a response
@@ -190,10 +204,21 @@ func (h *ResponseModelService) DeleteResponse(reqCtx *gin.Context) {
 		return
 	}
 
-	// Delete the response from database
-	if err := h.responseService.DeleteResponse(reqCtx, responseEntity.ID); err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusInternalServerError, "c3d4e5f6-g7h8-9012-cdef-345678901234", "failed to delete response: "+err.Error())
+	result, err := h.doDeleteResponse(reqCtx, responseEntity)
+	if !err.IsEmpty() {
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.Code, err.Message)
 		return
+	}
+
+	h.sendSuccessResponse(reqCtx, result)
+}
+
+// doDeleteResponse performs the business logic for deleting a response
+func (h *ResponseModelService) doDeleteResponse(reqCtx *gin.Context, responseEntity *Response) (responsetypes.Response, *common.Error) {
+	// Delete the response from database
+	success, err := h.responseService.DeleteResponse(reqCtx, responseEntity.ID)
+	if !success {
+		return responsetypes.Response{}, err
 	}
 
 	// Return the deleted response data
@@ -206,7 +231,7 @@ func (h *ResponseModelService) DeleteResponse(reqCtx *gin.Context) {
 		CancelledAt: ptr.ToInt64(time.Now().Unix()),
 	}
 
-	h.sendSuccessResponse(reqCtx, deletedResponse)
+	return deletedResponse, common.EmptyError
 }
 
 // CancelResponse handles the business logic for cancelling a response
@@ -218,6 +243,17 @@ func (h *ResponseModelService) CancelResponse(reqCtx *gin.Context) {
 		return
 	}
 
+	result, err := h.doCancelResponse(responseEntity)
+	if !err.IsEmpty() {
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.Code, err.Message)
+		return
+	}
+
+	h.sendSuccessResponse(reqCtx, result)
+}
+
+// doCancelResponse performs the business logic for cancelling a response
+func (h *ResponseModelService) doCancelResponse(responseEntity *Response) (responsetypes.Response, *common.Error) {
 	// TODO: Implement actual cancellation logic
 	// For now, return the response with cancelled status
 	mockResponse := responsetypes.Response{
@@ -229,7 +265,7 @@ func (h *ResponseModelService) CancelResponse(reqCtx *gin.Context) {
 		CancelledAt: ptr.ToInt64(time.Now().Unix()),
 	}
 
-	h.sendSuccessResponse(reqCtx, mockResponse)
+	return mockResponse, common.EmptyError
 }
 
 // ListInputItems handles the business logic for listing input items
@@ -241,6 +277,17 @@ func (h *ResponseModelService) ListInputItems(reqCtx *gin.Context) {
 		return
 	}
 
+	result, err := h.doListInputItems(reqCtx, responseEntity)
+	if !err.IsEmpty() {
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.Code, err.Message)
+		return
+	}
+
+	reqCtx.JSON(http.StatusOK, result)
+}
+
+// doListInputItems performs the business logic for listing input items
+func (h *ResponseModelService) doListInputItems(reqCtx *gin.Context, responseEntity *Response) (responsetypes.OpenAIListResponse[responsetypes.InputItem], *common.Error) {
 	// Parse pagination parameters
 	limit := 20 // default limit
 	if limitStr := reqCtx.Query("limit"); limitStr != "" {
@@ -252,9 +299,8 @@ func (h *ResponseModelService) ListInputItems(reqCtx *gin.Context) {
 	// Get input items for the response (only user role messages)
 	userRole := conversation.ItemRole("user")
 	items, err := h.responseService.GetItemsForResponse(reqCtx, responseEntity.ID, &userRole)
-	if err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusInternalServerError, "f6g7h8i9-j0k1-2345-fghi-678901234567", "failed to get input items: "+err.Error())
-		return
+	if !err.IsEmpty() {
+		return responsetypes.OpenAIListResponse[responsetypes.InputItem]{}, err
 	}
 
 	// Convert conversation items to input items using domain service
@@ -316,14 +362,14 @@ func (h *ResponseModelService) ListInputItems(reqCtx *gin.Context) {
 	status := responsetypes.ResponseCodeOk
 	objectType := responsetypes.ObjectTypeList
 
-	reqCtx.JSON(http.StatusOK, responsetypes.OpenAIListResponse[responsetypes.InputItem]{
+	return responsetypes.OpenAIListResponse[responsetypes.InputItem]{
 		JanStatus: &status,
 		Object:    &objectType,
 		HasMore:   &hasMore,
 		FirstID:   firstID,
 		LastID:    lastID,
 		T:         paginatedItems,
-	})
+	}, common.EmptyError
 }
 
 // sendErrorResponse sends a standardized error response

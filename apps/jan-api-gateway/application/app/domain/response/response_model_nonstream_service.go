@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
+	"menlo.ai/jan-api-gateway/app/domain/common"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	requesttypes "menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	responsetypes "menlo.ai/jan-api-gateway/app/interfaces/http/responses"
@@ -35,18 +36,29 @@ func NewNonStreamModelService(responseModelService *ResponseModelService) *NonSt
 // CreateNonStreamResponse handles the business logic for creating a non-streaming response
 func (h *NonStreamModelService) CreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *Response, chatCompletionRequest *openai.ChatCompletionRequest) {
 
+	result, err := h.doCreateNonStreamResponse(reqCtx, request, key, conv, responseEntity, chatCompletionRequest)
+	if !err.IsEmpty() {
+		reqCtx.AbortWithStatusJSON(
+			http.StatusBadRequest,
+			responsetypes.ErrorResponse{
+				Code:  err.Code,
+				Error: err.Message,
+			})
+		return
+	}
+
+	reqCtx.JSON(http.StatusOK, result)
+}
+
+// doCreateNonStreamResponse performs the business logic for creating a non-streaming response
+func (h *NonStreamModelService) doCreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *Response, chatCompletionRequest *openai.ChatCompletionRequest) (responsetypes.Response, *common.Error) {
 	// Process with Jan inference client for non-streaming with timeout
 	janInferenceClient := janinference.NewJanInferenceClient(reqCtx)
 	ctx, cancel := context.WithTimeout(reqCtx.Request.Context(), DefaultTimeout)
 	defer cancel()
 	chatResponse, err := janInferenceClient.CreateChatCompletion(ctx, key, *chatCompletionRequest)
 	if err != nil {
-		reqCtx.AbortWithStatusJSON(
-			http.StatusBadRequest,
-			responsetypes.ErrorResponse{
-				Code: "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",
-			})
-		return
+		return responsetypes.Response{}, common.NewError("bc82d69c-685b-4556-9d1f-2a4a80ae8ca4", "Failed to create chat completion")
 	}
 
 	// Process reasoning content
@@ -58,16 +70,18 @@ func (h *NonStreamModelService) CreateNonStreamResponse(reqCtx *gin.Context, req
 			Role:    openai.ChatMessageRoleAssistant,
 			Content: processedResponse.Choices[0].Message.Content,
 		}
-		if err := h.responseService.AppendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}, &responseEntity.ID); err != nil {
+		success, err := h.responseService.AppendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}, &responseEntity.ID)
+		if !success {
 			// Log error but don't fail the response
-			logger.GetLogger().Errorf("Failed to append assistant response to conversation: %v", err)
+			logger.GetLogger().Errorf("Failed to append assistant response to conversation: %s - %s", err.Code, err.Message)
 		}
 	}
 
 	// Update response status to completed
-	if err := h.responseService.UpdateResponseStatus(reqCtx, responseEntity.ID, ResponseStatusCompleted); err != nil {
+	success, updateErr := h.responseService.UpdateResponseStatus(reqCtx, responseEntity.ID, ResponseStatusCompleted)
+	if !success {
 		// Log error but don't fail the request since response is already generated
-		fmt.Printf("Failed to update response status to completed: %v\n", err)
+		fmt.Printf("Failed to update response status to completed: %s - %s\n", updateErr.Code, updateErr.Message)
 	}
 
 	// Convert chat completion response to response format
@@ -75,17 +89,19 @@ func (h *NonStreamModelService) CreateNonStreamResponse(reqCtx *gin.Context, req
 
 	// Save output and usage to database
 	if responseData.T.Output != nil {
-		if err := h.responseService.UpdateResponseOutput(reqCtx, responseEntity.ID, responseData.T.Output); err != nil {
-			fmt.Printf("Failed to update response output: %v\n", err)
+		success, outputErr := h.responseService.UpdateResponseOutput(reqCtx, responseEntity.ID, responseData.T.Output)
+		if !success {
+			fmt.Printf("Failed to update response output: %s - %s\n", outputErr.Code, outputErr.Message)
 		}
 	}
 	if responseData.T.Usage != nil {
-		if err := h.responseService.UpdateResponseUsage(reqCtx, responseEntity.ID, responseData.T.Usage); err != nil {
-			fmt.Printf("Failed to update response usage: %v\n", err)
+		success, usageErr := h.responseService.UpdateResponseUsage(reqCtx, responseEntity.ID, responseData.T.Usage)
+		if !success {
+			fmt.Printf("Failed to update response usage: %s - %s\n", usageErr.Code, usageErr.Message)
 		}
 	}
 
-	reqCtx.JSON(http.StatusOK, responseData.T)
+	return responseData.T, common.EmptyError
 }
 
 // convertFromChatCompletionResponse converts a ChatCompletionResponse to a Response
