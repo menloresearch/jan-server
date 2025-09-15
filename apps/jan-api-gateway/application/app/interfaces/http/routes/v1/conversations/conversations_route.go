@@ -102,8 +102,8 @@ func (api *ConversationAPI) listConversations(reqCtx *gin.Context) {
 	})
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:          "5f89e23d-d4a0-45ce-ba43-ae2a9be0ca64",
-			ErrorInstance: err,
+			Code:  "5f89e23d-d4a0-45ce-ba43-ae2a9be0ca64",
+			Error: "Invalid pagination parameters",
 		})
 		return
 	}
@@ -114,16 +114,16 @@ func (api *ConversationAPI) listConversations(reqCtx *gin.Context) {
 	conversations, err := api.conversationService.FindConversationsByFilter(ctx, filter, pagination)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:          "ac74fc61-fd96-4d5b-a630-e7a8e1e46575",
-			ErrorInstance: err,
+			Code:  "ac74fc61-fd96-4d5b-a630-e7a8e1e46575",
+			Error: "Failed to retrieve conversations",
 		})
 		return
 	}
 	count, err := api.conversationService.CountConversationsByFilter(ctx, filter)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:          "ae349271-d67e-4f76-a220-6945d802cbe2",
-			ErrorInstance: err,
+			Code:  "ae349271-d67e-4f76-a220-6945d802cbe2",
+			Error: "Failed to count conversations",
 		})
 		return
 	}
@@ -140,8 +140,8 @@ func (api *ConversationAPI) listConversations(reqCtx *gin.Context) {
 		})
 		if err != nil {
 			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:          "0b6b667c-aa25-4863-8494-a4ae2e5d12c4",
-				ErrorInstance: err,
+				Code:  "0b6b667c-aa25-4863-8494-a4ae2e5d12c4",
+				Error: "Failed to check for more conversations",
 			})
 			return
 		}
@@ -199,8 +199,8 @@ func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
 	var request CreateConversationRequest
 	if err := reqCtx.ShouldBindJSON(&request); err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:          "e5c96a9e-7ff9-4408-9514-9d206ca85b33",
-			ErrorInstance: err,
+			Code:  "e5c96a9e-7ff9-4408-9514-9d206ca85b33",
+			Error: "Invalid request payload",
 		})
 		return
 	}
@@ -225,11 +225,11 @@ func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
 		itemsToCreate[i] = item
 	}
 
-	ok, errorCode := api.conversationService.ValidateItems(ctx, itemsToCreate)
+	ok, _ := api.conversationService.ValidateItems(ctx, itemsToCreate)
 	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:          "0502c02c-ea2d-429e-933c-1243d4e2bcb2",
-			ErrorInstance: errorCode,
+			Code:  "0502c02c-ea2d-429e-933c-1243d4e2bcb2",
+			Error: "Item validation failed",
 		})
 		return
 	}
@@ -238,8 +238,8 @@ func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
 	conv, err := api.conversationService.CreateConversation(ctx, userId, &request.Title, true, request.Metadata)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:          "8fc529d7-f384-40f2-ac15-cd1f1e109316",
-			ErrorInstance: err,
+			Code:  "8fc529d7-f384-40f2-ac15-cd1f1e109316",
+			Error: "Failed to create conversation",
 		})
 		return
 	}
@@ -249,8 +249,8 @@ func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
 		_, err := api.conversationService.AddMultipleItems(ctx, conv, userId, itemsToCreate)
 		if err != nil {
 			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:          "019948b0-a1c0-73b7-b1f1-52a1ce82b538",
-				ErrorInstance: err,
+				Code:  "019948b0-a1c0-73b7-b1f1-52a1ce82b538",
+				Error: "Failed to add items to conversation",
 			})
 			return
 		}
@@ -259,8 +259,8 @@ func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
 		conv, err = api.conversationService.GetConversationByPublicIDAndUserID(ctx, conv.PublicID, userId)
 		if err != nil {
 			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:          "019948b0-bb8b-75fb-9419-dacefb318ef0",
-				ErrorInstance: err,
+				Code:  "019948b0-bb8b-75fb-9419-dacefb318ef0",
+				Error: "Failed to reload conversation",
 			})
 			return
 		}
@@ -321,8 +321,8 @@ func (api *ConversationAPI) updateConversation(reqCtx *gin.Context) {
 	var request UpdateConversationRequest
 	if err := reqCtx.ShouldBindJSON(&request); err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:          "4183e285-08ef-4a79-8a68-d53cddd0c0e2",
-			ErrorInstance: err,
+			Code:  "4183e285-08ef-4a79-8a68-d53cddd0c0e2",
+			Error: "Invalid request payload",
 		})
 		return
 	}
@@ -337,8 +337,8 @@ func (api *ConversationAPI) updateConversation(reqCtx *gin.Context) {
 	conv, err := api.conversationService.UpdateConversation(ctx, conv)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:          "3901c185-94fa-4bbc-97ef-6031939ba8c2",
-			ErrorInstance: err,
+			Code:  "3901c185-94fa-4bbc-97ef-6031939ba8c2",
+			Error: "Failed to update conversation",
 		})
 		return
 	}
@@ -378,8 +378,8 @@ func (api *ConversationAPI) deleteConversation(reqCtx *gin.Context) {
 	err := api.conversationService.DeleteConversation(ctx, conv)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:          "2d5345ba-a6db-441b-b52e-74cf358bdfcd",
-			ErrorInstance: err,
+			Code:  "2d5345ba-a6db-441b-b52e-74cf358bdfcd",
+			Error: "Failed to delete conversation",
 		})
 		return
 	}
@@ -467,8 +467,8 @@ func (api *ConversationAPI) createItems(reqCtx *gin.Context) {
 	var request CreateItemsRequest
 	if err := reqCtx.ShouldBindJSON(&request); err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:          "a4fb6e9b-00c8-423c-9836-a83080e34d28",
-			ErrorInstance: err,
+			Code:  "a4fb6e9b-00c8-423c-9836-a83080e34d28",
+			Error: "Invalid request payload",
 		})
 		return
 	}
@@ -484,11 +484,11 @@ func (api *ConversationAPI) createItems(reqCtx *gin.Context) {
 		itemsToCreate[i] = item
 	}
 
-	ok, err := api.conversationService.ValidateItems(ctx, itemsToCreate)
+	ok, _ := api.conversationService.ValidateItems(ctx, itemsToCreate)
 	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:          "01994aa5-679b-733c-a1e7-b31cfcce35b3",
-			ErrorInstance: err,
+			Code:  "01994aa5-679b-733c-a1e7-b31cfcce35b3",
+			Error: "Item validation failed",
 		})
 		return
 	}
@@ -496,8 +496,8 @@ func (api *ConversationAPI) createItems(reqCtx *gin.Context) {
 	createdItems, err := api.conversationService.AddMultipleItems(ctx, conv, conv.UserID, itemsToCreate)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:          "01994aa5-7758-722d-9cfa-4adeb8f098e1",
-			ErrorInstance: err,
+			Code:  "01994aa5-7758-722d-9cfa-4adeb8f098e1",
+			Error: "Failed to add items to conversation",
 		})
 		return
 	}
@@ -553,8 +553,8 @@ func (api *ConversationAPI) listItems(reqCtx *gin.Context) {
 	})
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:          "e9144b73-6fc1-4b16-b9c7-460d8a4ecf6b",
-			ErrorInstance: err,
+			Code:  "e9144b73-6fc1-4b16-b9c7-460d8a4ecf6b",
+			Error: "Invalid pagination parameters",
 		})
 		return
 	}
@@ -565,8 +565,8 @@ func (api *ConversationAPI) listItems(reqCtx *gin.Context) {
 	itemEntities, err := api.conversationService.FindItemsByFilter(ctx, filter, pagination)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:          "49530db0-0c1c-414c-a769-a7a4811dd650",
-			ErrorInstance: err,
+			Code:  "49530db0-0c1c-414c-a769-a7a4811dd650",
+			Error: "Failed to retrieve conversation items",
 		})
 		return
 	}
@@ -584,8 +584,8 @@ func (api *ConversationAPI) listItems(reqCtx *gin.Context) {
 		})
 		if err != nil {
 			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:          "f3cefed4-6f86-4e26-9e74-e858601627ca",
-				ErrorInstance: err,
+				Code:  "f3cefed4-6f86-4e26-9e74-e858601627ca",
+				Error: "Failed to check for more items",
 			})
 			return
 		}

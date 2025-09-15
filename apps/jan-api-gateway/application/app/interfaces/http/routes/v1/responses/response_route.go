@@ -146,8 +146,7 @@ func (responseRoute *ResponseRoute) CreateResponse(reqCtx *gin.Context) {
 	var request requesttypes.CreateResponseRequest
 	if err := reqCtx.ShouldBindJSON(&request); err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:          "g7h8i9j0-k1l2-3456-ghij-789012345678",
-			ErrorInstance: err,
+			Code: "g7h8i9j0-k1l2-3456-ghij-789012345678",
 		})
 		return
 	}
@@ -196,11 +195,11 @@ func (responseRoute *ResponseRoute) CreateResponse(reqCtx *gin.Context) {
 	}
 
 	// Call domain service (pure business logic)
-	result, err := responseRoute.responseModelService.CreateResponse(ctx, userID, domainRequest)
-	if err != nil {
+	result, errorCode := responseRoute.responseModelService.CreateResponse(ctx, userID, domainRequest)
+	if errorCode != "" {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:          "j0k1l2m3-n4o5-6789-jklm-012345678901",
-			ErrorInstance: err,
+			Code:  errorCode,
+			Error: "Request processing failed",
 		})
 		return
 	}
@@ -303,8 +302,8 @@ func (responseRoute *ResponseRoute) DeleteResponse(reqCtx *gin.Context) {
 	err := responseRoute.responseService.DeleteResponse(ctx, resp.ID)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:          "l2m3n4o5-p6q7-8901-lmno-234567890123",
-			ErrorInstance: err,
+			Code:  "l2m3n4o5-p6q7-8901-lmno-234567890123",
+			Error: "Failed to delete response",
 		})
 		return
 	}
@@ -350,10 +349,12 @@ func (responseRoute *ResponseRoute) CancelResponse(reqCtx *gin.Context) {
 	}
 
 	err := responseRoute.responseService.UpdateResponseStatus(ctx, resp.ID, response.ResponseStatusCancelled)
+
+
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:          "n4o5p6q7-r8s9-0123-nopq-456789012345",
-			ErrorInstance: err,
+			Code:  "n4o5p6q7-r8s9-0123-nopq-456789012345",
+			Error: "Failed to update response status",
 		})
 		return
 	}
@@ -362,8 +363,8 @@ func (responseRoute *ResponseRoute) CancelResponse(reqCtx *gin.Context) {
 	updatedResp, err := responseRoute.responseService.GetResponseByPublicID(ctx, resp.PublicID)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:          "o5p6q7r8-s9t0-1234-opqr-567890123456",
-			ErrorInstance: err,
+			Code:  "o5p6q7r8-s9t0-1234-opqr-567890123456",
+			Error: "Failed to reload response",
 		})
 		return
 	}
@@ -433,8 +434,8 @@ func (responseRoute *ResponseRoute) ListInputItems(reqCtx *gin.Context) {
 	items, err := responseRoute.responseService.GetItemsForResponse(ctx, resp.ID, nil)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:          "q7r8s9t0-u1v2-3456-qrst-789012345678",
-			ErrorInstance: err,
+			Code:  "q7r8s9t0-u1v2-3456-qrst-789012345678",
+			Error: "Failed to get input items",
 		})
 		return
 	}

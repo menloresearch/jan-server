@@ -65,16 +65,16 @@ func NewResponseModelService(
 
 // CreateResponse handles the business logic for creating a response
 // Returns domain objects and business logic results, no HTTP concerns
-func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, request *requesttypes.CreateResponseRequest) (*ResponseCreationResult, error) {
+func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, request *requesttypes.CreateResponseRequest) (*ResponseCreationResult, string) {
 	// Validate the request
 	if validationErrors := ValidateCreateResponseRequest(request); validationErrors != nil {
-		return nil, fmt.Errorf("validation failed: %v", validationErrors)
+		return nil, "i9j0k1l2-m3n4-5678-ijkl-901234567890" // Input validation error
 	}
 
 	// Get API key for the user
-	key, err := h.getAPIKeyForUser(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid apikey: %w", err)
+	key, errorCode := h.getAPIKeyForUser(ctx, userID)
+	if errorCode != "" {
+		return nil, errorCode
 	}
 
 	// Check if model exists in registry
@@ -82,13 +82,13 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 	mToE := modelRegistry.GetModelToEndpoints()
 	endpoints, ok := mToE[request.Model]
 	if !ok {
-		return nil, fmt.Errorf("model %s does not exist", request.Model)
+		return nil, "h8i9j0k1-l2m3-4567-hijk-890123456789" // Model validation error
 	}
 
 	// Convert response request to chat completion request using domain service
 	chatCompletionRequest := h.responseService.ConvertToChatCompletionRequest(request)
 	if chatCompletionRequest == nil {
-		return nil, fmt.Errorf("unsupported input type for chat completion")
+		return nil, "i9j0k1l2-m3n4-5678-ijkl-901234567890" // Input validation error
 	}
 
 	// Check if model endpoint exists
@@ -102,20 +102,20 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 	}
 
 	if !endpointExists {
-		return nil, fmt.Errorf("client does not exist")
+		return nil, "h8i9j0k1-l2m3-4567-hijk-890123456789" // Model validation error
 	}
 
 	// Handle conversation logic using domain service
 	conversation, err := h.responseService.HandleConversation(ctx, userID, request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to handle conversation: %w", err)
+		return nil, "j0k1l2m3-n4o5-6789-jklm-012345678901" // Domain service error
 	}
 
 	// If previous_response_id is provided, prepend conversation history to input messages
 	if request.PreviousResponseID != nil && *request.PreviousResponseID != "" {
 		conversationMessages, err := h.responseService.ConvertConversationItemsToMessages(ctx, conversation)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert conversation items to messages: %w", err)
+			return nil, "j0k1l2m3-n4o5-6789-jklm-012345678901" // Domain service error
 		}
 		// Prepend conversation history to the input messages
 		chatCompletionRequest.Messages = append(conversationMessages, chatCompletionRequest.Messages...)
@@ -148,13 +148,13 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 	}
 	responseEntity, err := h.responseService.CreateResponse(ctx, userID, conversationID, request.Model, request.Input, request.SystemPrompt, responseParams)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create response record: %w", err)
+		return nil, "j0k1l2m3-n4o5-6789-jklm-012345678901" // Domain service error
 	}
 
 	// Append input messages to conversation (only if conversation exists)
 	if conversation != nil {
 		if err := h.responseService.AppendMessagesToConversation(ctx, conversation, chatCompletionRequest.Messages, &responseEntity.ID); err != nil {
-			return nil, fmt.Errorf("failed to append messages to conversation: %w", err)
+			return nil, "j0k1l2m3-n4o5-6789-jklm-012345678901" // Domain service error
 		}
 	}
 
@@ -166,7 +166,7 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 		ChatCompletionRequest: chatCompletionRequest,
 		APIKey:                key,
 		IsStreaming:           isStreaming,
-	}, nil
+	}, ""
 }
 
 // handleConversation handles conversation creation or loading based on the request
@@ -350,20 +350,20 @@ func (h *ResponseModelService) sendSuccessResponse(reqCtx *gin.Context, data int
 }
 
 // getAPIKeyForUser retrieves the API key for the user (domain method)
-func (h *ResponseModelService) getAPIKeyForUser(ctx context.Context, userID uint) (string, error) {
+func (h *ResponseModelService) getAPIKeyForUser(ctx context.Context, userID uint) (string, string) {
 	// Get user by ID
 	user, err := h.UserService.FindByID(ctx, userID)
 	if err != nil {
-		return "", fmt.Errorf("failed to find user: %w", err)
+		return "", "j0k1l2m3-n4o5-6789-jklm-012345678901" // Domain service error
 	}
 	if user == nil {
-		return "", fmt.Errorf("user not found")
+		return "", "j0k1l2m3-n4o5-6789-jklm-012345678901" // Domain service error
 	}
 
 	// Always generate a new ephemeral key for each request
 	key, hash, err := h.apikeyService.GenerateKeyAndHash(ctx, apikey.ApikeyTypeEphemeral)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate API key: %w", err)
+		return "", "j0k1l2m3-n4o5-6789-jklm-012345678901" // Domain service error
 	}
 
 	_, err = h.apikeyService.CreateApiKey(ctx, &apikey.ApiKey{
@@ -377,7 +377,7 @@ func (h *ResponseModelService) getAPIKeyForUser(ctx context.Context, userID uint
 		Permissions:    "{}",
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to create API key: %w", err)
+		return "", "j0k1l2m3-n4o5-6789-jklm-012345678901" // Domain service error
 	}
-	return key, nil
+	return key, ""
 }
