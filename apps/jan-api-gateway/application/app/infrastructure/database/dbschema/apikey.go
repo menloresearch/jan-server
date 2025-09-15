@@ -20,7 +20,7 @@ type ApiKey struct {
 	Enabled       bool   `gorm:"default:true;index"`
 
 	ApikeyType     string `gorm:"size:32;index;not null"` // "admin","project","service","organization","ephemeral"
-	OwnerPublicID  string `gorm:"type:varchar(50);uniqueIndex;not null"`
+	OwnerPublicID  string `gorm:"type:varchar(50);not null"`
 	OrganizationID *uint  `gorm:"index"`
 	ProjectID      *uint  `gorm:"index"`
 

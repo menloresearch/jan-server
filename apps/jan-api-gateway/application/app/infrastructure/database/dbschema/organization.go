@@ -12,7 +12,7 @@ func init() {
 
 type Organization struct {
 	BaseModel
-	Name     string               `gorm:"size:128;not null;uniqueIndex"`
+	Name     string               `gorm:"size:128;not null"`
 	PublicID string               `gorm:"size:64;not null;uniqueIndex"`
 	Enabled  bool                 `gorm:"default:true;index"`
 	Members  []OrganizationMember `gorm:"foreignKey:OrganizationID"`
@@ -47,7 +47,7 @@ func NewSchemaOrganizationMember(o *organization.OrganizationMember) *Organizati
 		},
 		UserID:         o.UserID,
 		OrganizationID: o.OrganizationID,
-		Role:           o.Role,
+		Role:           string(o.Role),
 		IsPrimary:      o.IsPrimary,
 	}
 }
@@ -69,7 +69,7 @@ func (o *OrganizationMember) EtoD() *organization.OrganizationMember {
 		ID:             o.ID,
 		UserID:         o.UserID,
 		OrganizationID: o.OrganizationID,
-		Role:           o.Role,
+		Role:           organization.OrganizationMemberRole(o.Role),
 		IsPrimary:      o.IsPrimary,
 		CreatedAt:      o.CreatedAt,
 	}

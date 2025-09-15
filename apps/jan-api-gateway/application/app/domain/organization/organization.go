@@ -17,11 +17,18 @@ type Organization struct {
 	OwnerID   uint
 }
 
+type OrganizationMemberRole string
+
+const (
+	OrganizationMemberRoleOwner  OrganizationMemberRole = "owner"
+	OrganizationMemberRoleReader OrganizationMemberRole = "reader"
+)
+
 type OrganizationMember struct {
 	ID             uint
 	UserID         uint
 	OrganizationID uint
-	Role           string
+	Role           OrganizationMemberRole
 	IsPrimary      bool
 	CreatedAt      time.Time
 }

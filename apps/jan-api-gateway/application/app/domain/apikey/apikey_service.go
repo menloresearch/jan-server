@@ -32,15 +32,14 @@ func NewService(
 const ApikeyPrefix = "sk"
 
 func (s *ApiKeyService) GenerateKeyAndHash(ctx context.Context, ownerType ApikeyType) (string, string, error) {
-	baseKey, err := idgen.GenerateSecureID(ApikeyPrefix, 24)
+	prefix := fmt.Sprintf("%s-%s", ApikeyPrefix, ownerType)
+	baseKey, err := idgen.GenerateSecureID(prefix, 24)
 	if err != nil {
 		return "", "", err
 	}
 
-	// Business rule: Format as sk_<ownerType>-<random> for identification
-	apikey := fmt.Sprintf("%s-%s", ownerType, baseKey)
-	hash := s.HashKey(ctx, apikey)
-	return apikey, hash, nil
+	hash := s.HashKey(ctx, baseKey)
+	return baseKey, hash, nil
 }
 
 func (s *ApiKeyService) generatePublicID() (string, error) {

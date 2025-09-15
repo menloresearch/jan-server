@@ -43,11 +43,20 @@ const (
 
 func (s *AuthService) RegisterUser(ctx context.Context, user *user.User) (*user.User, error) {
 	s.userService.RegisterUser(ctx, user)
-	s.organizationService.CreateOrganizationWithPublicID(ctx, &organization.Organization{
+	orgEntity, err := s.organizationService.CreateOrganizationWithPublicID(ctx, &organization.Organization{
 		Name:    "Default",
 		Enabled: true,
 		OwnerID: user.ID,
 	})
+	s.organizationService.AddMember(ctx, &organization.OrganizationMember{
+		UserID:         user.ID,
+		OrganizationID: orgEntity.ID,
+		Role:           organization.OrganizationMemberRoleOwner,
+		IsPrimary:      true,
+	})
+	if err != nil {
+		return nil, err
+	}
 	return user, nil
 }
 
@@ -80,7 +89,7 @@ func (s *AuthService) AppUserAuthMiddleware() gin.HandlerFunc {
 		}
 
 		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code: "4026757e-d5a4-4cf7-8914-2c96f011084f",
+			Code: "38ac131c-90f4-4b36-bc19-5ad0b63b002f",
 		})
 	}
 }
@@ -160,7 +169,7 @@ func (s *AuthService) RegisteredOrganizationMiddleware() gin.HandlerFunc {
 			})
 			return
 		}
-		SetAdminOrganizationFromContext(reqCtx, org)
+		SetAdminOrganizationToContext(reqCtx, org)
 		reqCtx.Next()
 	}
 }
@@ -215,12 +224,8 @@ func (s *AuthService) getUserIDFromAdminkey(reqCtx *gin.Context) (string, bool) 
 	if !strings.HasPrefix(tokenString, apikey.ApikeyPrefix) {
 		return "", false
 	}
-	token, ok := requests.GetTokenFromBearer(reqCtx)
-	if !ok {
-		return "", false
-	}
 	ctx := reqCtx.Request.Context()
-	hashed := s.apiKeyService.HashKey(reqCtx, token)
+	hashed := s.apiKeyService.HashKey(reqCtx, tokenString)
 	apikeyEntity, err := s.apiKeyService.FindByKeyHash(ctx, hashed)
 	if err != nil {
 		return "", false
@@ -285,27 +290,30 @@ func (s *AuthService) GetAdminApiKeyFromQuery() gin.HandlerFunc {
 			})
 			return
 		}
-
 		adminKeyEntity, err := s.apiKeyService.FindOneByFilter(ctx, apikey.ApiKeyFilter{
 			PublicID: &publicID,
 		})
+
 		if adminKeyEntity == nil || err != nil {
 			reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
 				Code: "f4f47443-0c80-4c7a-bedc-ac30ec49f494",
 			})
 			return
 		}
+
 		memberEntity, err := s.organizationService.FindOneMemberByFilter(ctx, organization.OrganizationMemberFilter{
 			UserID:         &user.ID,
 			OrganizationID: adminKeyEntity.OrganizationID,
 		})
+
 		if memberEntity == nil || err != nil {
 			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 				Code: "56a9fa87-ddd7-40b7-b2d6-94ae41a600f8",
 			})
 			return
 		}
-		SetAdminKeyFromContext(reqCtx, adminKeyEntity)
+		SetAdminKeyToContext(reqCtx, adminKeyEntity)
+		SetAdminOrganizationRoleToContext(reqCtx, &memberEntity.Role)
 	}
 }
 
@@ -321,7 +329,7 @@ func GetAdminKeyFromContext(reqCtx *gin.Context) (*apikey.ApiKey, bool) {
 	return v, true
 }
 
-func SetAdminKeyFromContext(reqCtx *gin.Context, apiKey *apikey.ApiKey) {
+func SetAdminKeyToContext(reqCtx *gin.Context, apiKey *apikey.ApiKey) {
 	reqCtx.Set(string(ApikeyContextKeyEntity), apiKey)
 }
 
@@ -330,6 +338,7 @@ type OrganizationContextKey string
 const (
 	OrganizationContextKeyEntity   ApikeyContextKey = "OrganizationContextKeyEntity"
 	OrganizationContextKeyPublicID ApikeyContextKey = "org_public_id"
+	OrganizationContextKeyRole     ApikeyContextKey = "OrganizationContextKeyRole"
 )
 
 func GetAdminOrganizationFromContext(reqCtx *gin.Context) (*organization.Organization, bool) {
@@ -344,6 +353,22 @@ func GetAdminOrganizationFromContext(reqCtx *gin.Context) (*organization.Organiz
 	return v, true
 }
 
-func SetAdminOrganizationFromContext(reqCtx *gin.Context, org *organization.Organization) {
+func SetAdminOrganizationToContext(reqCtx *gin.Context, org *organization.Organization) {
 	reqCtx.Set(string(OrganizationContextKeyEntity), org)
+}
+
+func GetAdminOrganizationRoleFromContext(reqCtx *gin.Context) (*organization.OrganizationMemberRole, bool) {
+	role, ok := reqCtx.Get(string(OrganizationContextKeyRole))
+	if !ok {
+		return nil, false
+	}
+	v, ok := role.(*organization.OrganizationMemberRole)
+	if !ok {
+		return nil, false
+	}
+	return v, true
+}
+
+func SetAdminOrganizationRoleToContext(reqCtx *gin.Context, role *organization.OrganizationMemberRole) {
+	reqCtx.Set(string(OrganizationContextKeyRole), role)
 }

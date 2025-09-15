@@ -24,6 +24,7 @@ func (organizationRoute *OrganizationRoute) RegisterRouter(router gin.IRouter) {
 	organizationRouter := router.Group("/organization",
 		organizationRoute.authService.AdminUserAuthMiddleware(),
 		organizationRoute.authService.RegisteredUserMiddleware(),
+		organizationRoute.authService.RegisteredOrganizationMiddleware(),
 	)
 	// TODO: Access via admin key instead of API key.
 	organizationRoute.adminApiKeyAPI.RegisterRouter(organizationRouter)

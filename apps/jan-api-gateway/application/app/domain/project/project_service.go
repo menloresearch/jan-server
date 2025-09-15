@@ -79,6 +79,17 @@ func (s *ProjectService) Find(ctx context.Context, filter ProjectFilter, paginat
 	return s.repo.FindByFilter(ctx, filter, pagination)
 }
 
+func (s *ProjectService) FindOne(ctx context.Context, filter ProjectFilter) (*Project, error) {
+	projectEntities, err := s.repo.FindByFilter(ctx, filter, nil)
+	if err != nil {
+		return nil, err
+	}
+	if len(projectEntities) != 1 {
+		return nil, err
+	}
+	return projectEntities[0], nil
+}
+
 // CountProjects counts the number of projects matching a given filter.
 func (s *ProjectService) CountProjects(ctx context.Context, filter ProjectFilter) (int64, error) {
 	return s.repo.Count(ctx, filter)

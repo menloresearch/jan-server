@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
+	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/query"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
@@ -60,6 +61,10 @@ func (projectsRoute *ProjectsRoute) RegisterRouter(router gin.IRouter) {
 // @Failure 500 {object} responses.ErrorResponse "Internal Server Error"
 // @Router /v1/organization/projects [get]
 func (api *ProjectsRoute) GetProjects(reqCtx *gin.Context) {
+	orgEntity, ok := auth.GetAdminOrganizationFromContext(reqCtx)
+	if !ok {
+		return
+	}
 	projectService := api.projectService
 	includeArchivedStr := reqCtx.DefaultQuery("include_archived", "false")
 	includeArchived, err := strconv.ParseBool(includeArchivedStr)
@@ -70,10 +75,16 @@ func (api *ProjectsRoute) GetProjects(reqCtx *gin.Context) {
 		})
 		return
 	}
-
 	ctx := reqCtx.Request.Context()
-
-	pagination, err := query.GetPaginationFromQuery(reqCtx)
+	pagination, err := query.GetCursorPaginationFromQuery(reqCtx, func(after string) (*uint, error) {
+		entity, err := projectService.FindOne(ctx, project.ProjectFilter{
+			PublicID: &after,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &entity.ID, nil
+	})
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  "4434f5ed-89f4-4a62-9fef-8ca53336dcda",
@@ -82,32 +93,8 @@ func (api *ProjectsRoute) GetProjects(reqCtx *gin.Context) {
 		return
 	}
 
-	afterStr := reqCtx.Query("after")
-	if afterStr != "" {
-		entity, err := projectService.Find(ctx, project.ProjectFilter{
-			PublicID: &afterStr,
-		}, &query.Pagination{
-			Limit: ptr.ToInt(1),
-		})
-		if err != nil {
-			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:  "20f37a43-1c2e-4efe-9f5b-c1d0b1ccdd58",
-				Error: err.Error(),
-			})
-			return
-		}
-		if len(entity) == 0 {
-			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-				Code:  "a8a65f59-7b92-4b09-87eb-993eb19188e6",
-				Error: "failed to retrieve projects",
-			})
-			return
-		}
-		pagination.After = &entity[0].ID
-	}
-
 	projectFilter := project.ProjectFilter{
-		// TODO: Fix this in project/member branch
+		OrganizationID: &orgEntity.ID,
 	}
 	if !includeArchived {
 		projectFilter.Archived = ptr.ToBool(false)
