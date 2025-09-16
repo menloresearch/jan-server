@@ -1,11 +1,14 @@
 package invite
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"html/template"
 	"time"
 
 	"menlo.ai/jan-api-gateway/app/domain/query"
+	"menlo.ai/jan-api-gateway/app/utils/emailservice"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
 )
 
@@ -83,9 +86,47 @@ func (s *InviteService) CountInvites(ctx context.Context, filter InvitesFilter) 
 	return s.repo.Count(ctx, filter)
 }
 
+type EmailMetadata struct {
+	InviterEmail string
+	OrgName      string
+	OrgPublicID  string
+	InviteLink   string
+}
 
-// You were invited to the organization Personal on OpenAI
-
-// jinjie@menlo.ai invited you to be a member of the organization Personal (org-Rmx8M8dJK289NhXKASwIoObE) on the OpenAI API.
-
-// This invite will expire in 7 days. If you don't recognize this, you may safely ignore it. If you have any additional questions or concerns, please visit our help center.
+func (s *InviteService) SendInviteEmail(ctx context.Context, e EmailMetadata, to string) error {
+	templateString := `<html><body><div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
+    <div style="background-color: #f7f7f7; padding: 20px; text-align: center; border-bottom: 1px solid #ddd;">
+        <h2 style="margin: 0; color: #333;">You were invited to the organization {{.OrgName}} on JanAI</h2>
+    </div>
+    <div style="padding: 20px; background-color: #ffffff;">
+        <p style="font-size: 16px; color: #555; line-height: 1.6;">
+            <strong>{{.InviterEmail}}</strong> invited you to be a member of the organization {{.OrgName}} ({{.OrgPublicID}}) on the JanAI API.
+        </p>
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{{.InviteLink}}" style="background-color: #007bff; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-size: 16px; font-weight: bold;">
+                Accept Invite
+            </a>
+        </div>
+        <p style="font-size: 14px; color: #888; text-align: center; margin-top: 20px;">
+            This invite will expire in 7 days.
+        </p>
+    </div>
+    <div style="background-color: #f7f7f7; padding: 15px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #ddd;">
+        If you don't recognize this, you may safely ignore it. If you have any additional questions or concerns, please visit our help center.
+    </div>
+</div></body></html>`
+	tmpl, err := template.New("email").Parse(templateString)
+	if err != nil {
+		return err
+	}
+	var buffer bytes.Buffer
+	if err := tmpl.Execute(&buffer, e); err != nil {
+		return err
+	}
+	emailBody := buffer.String()
+	return emailservice.SendEmail(
+		to,
+		fmt.Sprintf("You were invited to the organization %s on JanAI", e.OrgName),
+		emailBody,
+	)
+}

@@ -23,6 +23,7 @@ type HttpServer struct {
 
 func (s *HttpServer) bindSwagger() {
 	g := s.engine.Group("/")
+
 	g.GET("/api/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	g.GET("/google/testcallback", func(c *gin.Context) {
 		code := c.Query("code")

@@ -13,6 +13,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/invite"
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/query"
+	"menlo.ai/jan-api-gateway/config/environment_variables"
 
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses/openai"
@@ -167,6 +168,13 @@ type CreateInviteUserRequest struct {
 // @Router /v1/organization/invites [post]
 func (api *InvitesRoute) CreateInvite(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
+	userEntity, ok := auth.GetUserFromContext(reqCtx)
+	if !ok {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code: "0c781396-68a9-4177-97a8-342af883f7c3",
+		})
+		return
+	}
 	orgEntity, ok := auth.GetAdminOrganizationFromContext(reqCtx)
 	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
@@ -241,6 +249,24 @@ func (api *InvitesRoute) CreateInvite(reqCtx *gin.Context) {
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Code: "f7957c66-77d6-494f-9ee9-8fa54408a604",
+		})
+		return
+	}
+
+	err = api.inviteService.SendInviteEmail(ctx, invite.EmailMetadata{
+		InviterEmail: userEntity.Email,
+		OrgName:      orgEntity.Name,
+		OrgPublicID:  orgEntity.PublicID,
+		InviteLink: fmt.Sprintf(
+			"%s?code=%s",
+			environment_variables.EnvironmentVariables.INVITE_REDIRECT_URL,
+			*inviteEntity.Secrets,
+		),
+	}, requestPayload.Email)
+	if err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code:          "8432e05b-bc3e-4432-b3cb-ade6353edacc",
+			ErrorInstance: err,
 		})
 		return
 	}

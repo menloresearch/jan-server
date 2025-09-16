@@ -27,6 +27,7 @@ type EnvironmentVariable struct {
 	SMTP_USERNAME               string
 	SMTP_PASSWORD               string
 	SMTP_SENDER_EMAIL           string
+	INVITE_REDIRECT_URL         string
 }
 
 func (ev *EnvironmentVariable) LoadFromEnv() {
@@ -43,6 +44,13 @@ func (ev *EnvironmentVariable) LoadFromEnv() {
 			switch v.Field(i).Kind() {
 			case reflect.String:
 				v.Field(i).SetString(envValue)
+			case reflect.Int:
+				intV, err := strconv.Atoi(envValue)
+				if err != nil {
+					fmt.Printf("Invalid int value for %s: %s\n", envKey, envValue)
+				} else {
+					v.Field(i).SetInt(int64(intV))
+				}
 			case reflect.Bool:
 				boolVal, err := strconv.ParseBool(envValue)
 				if err != nil {
