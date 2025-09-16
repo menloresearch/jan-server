@@ -22,6 +22,11 @@ type EnvironmentVariable struct {
 	DB_POSTGRESQL_READ1_DSN     string
 	APIKEY_SECRET               string
 	ALLOWED_CORS_HOSTS          []string
+	SMTP_HOST                   string
+	SMTP_PORT                   int
+	SMTP_USERNAME               string
+	SMTP_PASSWORD               string
+	SMTP_SENDER_EMAIL           string
 }
 
 func (ev *EnvironmentVariable) LoadFromEnv() {

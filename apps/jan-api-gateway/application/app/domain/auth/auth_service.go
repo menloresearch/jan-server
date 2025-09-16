@@ -9,7 +9,10 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
+	"menlo.ai/jan-api-gateway/app/domain/invite"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
+	"menlo.ai/jan-api-gateway/app/domain/project"
+
 	"menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
@@ -20,17 +23,23 @@ type AuthService struct {
 	userService         *user.UserService
 	apiKeyService       *apikey.ApiKeyService
 	organizationService *organization.OrganizationService
+	projectService      *project.ProjectService
+	inviteService       *invite.InviteService
 }
 
 func NewAuthService(
 	userService *user.UserService,
 	apiKeyService *apikey.ApiKeyService,
 	organizationService *organization.OrganizationService,
+	projectService *project.ProjectService,
+	inviteService *invite.InviteService,
 ) *AuthService {
 	return &AuthService{
 		userService,
 		apiKeyService,
 		organizationService,
+		projectService,
+		inviteService,
 	}
 }
 
@@ -48,7 +57,10 @@ func (s *AuthService) RegisterUser(ctx context.Context, user *user.User) (*user.
 		Enabled: true,
 		OwnerID: user.ID,
 	})
-	s.organizationService.AddMember(ctx, &organization.OrganizationMember{
+	if err != nil {
+		return nil, err
+	}
+	err = s.organizationService.AddMember(ctx, &organization.OrganizationMember{
 		UserID:         user.ID,
 		OrganizationID: orgEntity.ID,
 		Role:           organization.OrganizationMemberRoleOwner,
@@ -57,7 +69,41 @@ func (s *AuthService) RegisterUser(ctx context.Context, user *user.User) (*user.
 	if err != nil {
 		return nil, err
 	}
+	projEntity, err := s.projectService.CreateProjectWithPublicID(ctx, &project.Project{
+		Name:           "Default Project",
+		Status:         string(project.ProjectStatusActive),
+		OrganizationID: orgEntity.ID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.projectService.AddMember(ctx, projEntity.ID, user.ID, string(project.ProjectMemberRoleOwner))
+	if err != nil {
+		return nil, err
+	}
 	return user, nil
+}
+
+func (s *AuthService) HasOrganizationUser(ctx context.Context, email string, orgID uint) (bool, error) {
+	user, err := s.userService.FindByEmail(ctx, email)
+	if err != nil {
+		return false, err
+	}
+	if user == nil {
+		return false, nil
+	}
+	member, err := s.organizationService.FindOneMemberByFilter(ctx, organization.OrganizationMemberFilter{
+		UserID:         &user.ID,
+		OrganizationID: &orgID,
+	})
+	if err != nil {
+		return false, err
+	}
+	if member != nil {
+		return true, nil
+	}
+	return false, nil
 }
 
 func (s *AuthService) JWTAuthMiddleware() gin.HandlerFunc {
@@ -169,6 +215,12 @@ func (s *AuthService) RegisteredOrganizationMiddleware() gin.HandlerFunc {
 			})
 			return
 		}
+		if org == nil {
+			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+				Code: "cf6ad4c4-efa1-4d9c-97af-8c111cd771fd",
+			})
+			return
+		}
 		SetAdminOrganizationToContext(reqCtx, org)
 		reqCtx.Next()
 	}
@@ -233,6 +285,7 @@ func (s *AuthService) getUserIDFromAdminkey(reqCtx *gin.Context) (string, bool) 
 	if apikeyEntity == nil || apikeyEntity.ApikeyType != string(apikey.ApikeyTypeAdmin) {
 		return "", false
 	}
+
 	return apikeyEntity.OwnerPublicID, true
 }
 
@@ -313,7 +366,6 @@ func (s *AuthService) GetAdminApiKeyFromQuery() gin.HandlerFunc {
 			return
 		}
 		SetAdminKeyToContext(reqCtx, adminKeyEntity)
-		SetAdminOrganizationRoleToContext(reqCtx, &memberEntity.Role)
 	}
 }
 
@@ -338,7 +390,6 @@ type OrganizationContextKey string
 const (
 	OrganizationContextKeyEntity   ApikeyContextKey = "OrganizationContextKeyEntity"
 	OrganizationContextKeyPublicID ApikeyContextKey = "org_public_id"
-	OrganizationContextKeyRole     ApikeyContextKey = "OrganizationContextKeyRole"
 )
 
 func GetAdminOrganizationFromContext(reqCtx *gin.Context) (*organization.Organization, bool) {
@@ -357,18 +408,108 @@ func SetAdminOrganizationToContext(reqCtx *gin.Context, org *organization.Organi
 	reqCtx.Set(string(OrganizationContextKeyEntity), org)
 }
 
-func GetAdminOrganizationRoleFromContext(reqCtx *gin.Context) (*organization.OrganizationMemberRole, bool) {
-	role, ok := reqCtx.Get(string(OrganizationContextKeyRole))
+type ProjectContextKey string
+
+const (
+	ProjectContextKeyPublicID ProjectContextKey = "proj_public_id"
+	ProjectContextKeyEntity   ProjectContextKey = "ProjectContextKeyEntity"
+)
+
+func GetProjectFromContext(reqCtx *gin.Context) (*project.Project, bool) {
+	proj, ok := reqCtx.Get(string(ProjectContextKeyEntity))
 	if !ok {
 		return nil, false
 	}
-	v, ok := role.(*organization.OrganizationMemberRole)
+	return proj.(*project.Project), true
+}
+
+func SetProjectToContext(reqCtx *gin.Context, project *project.Project) {
+	reqCtx.Set(string(ProjectContextKeyEntity), project)
+}
+
+func (s *AuthService) AdminProjectMiddleware() gin.HandlerFunc {
+	return func(reqCtx *gin.Context) {
+		ctx := reqCtx.Request.Context()
+		orgEntity, ok := GetAdminOrganizationFromContext(reqCtx)
+		if !ok {
+			return
+		}
+		publicID := reqCtx.Param(string(ProjectContextKeyPublicID))
+		if publicID == "" {
+			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+				Code:  "5cbdb58e-6228-4d9a-9893-7f744608a9e8",
+				Error: "missing project public ID",
+			})
+			return
+		}
+
+		proj, err := s.projectService.FindOne(ctx, project.ProjectFilter{
+			PublicID:       &publicID,
+			OrganizationID: &orgEntity.ID,
+		})
+		if err != nil || proj == nil {
+			reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
+				Code:  "121ef112-cb39-4235-9500-b116adb69984",
+				Error: "proj not found",
+			})
+			return
+		}
+		SetProjectToContext(reqCtx, proj)
+		reqCtx.Next()
+	}
+}
+
+type InviteContextKey string
+
+const (
+	InviteContextKeyPublicID InviteContextKey = "invite_public_id"
+	InviteContextKeyEntity   InviteContextKey = "InviteContextKeyEntity"
+)
+
+func GetAdminInviteFromContext(reqCtx *gin.Context) (*invite.Invite, bool) {
+	i, ok := reqCtx.Get(string(InviteContextKeyEntity))
+	if !ok {
+		return nil, false
+	}
+	v, ok := i.(*invite.Invite)
 	if !ok {
 		return nil, false
 	}
 	return v, true
 }
 
-func SetAdminOrganizationRoleToContext(reqCtx *gin.Context, role *organization.OrganizationMemberRole) {
-	reqCtx.Set(string(OrganizationContextKeyRole), role)
+func SetAdminInviteToContext(reqCtx *gin.Context, i *invite.Invite) {
+	reqCtx.Set(string(InviteContextKeyEntity), i)
+}
+
+func (s *AuthService) AdminInviteMiddleware() gin.HandlerFunc {
+	return func(reqCtx *gin.Context) {
+		ctx := reqCtx.Request.Context()
+		orgEntity, ok := GetAdminOrganizationFromContext(reqCtx)
+		if !ok {
+			return
+		}
+		publicID := reqCtx.Param(string(InviteContextKeyPublicID))
+		if publicID == "" {
+			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+				Code:  "5cbdb58e-6228-4d9a-9893-7f744608a9e8",
+				Error: "missing project public ID",
+			})
+			return
+		}
+
+		inviteEntity, err := s.inviteService.FindOne(ctx, invite.InvitesFilter{
+			PublicID:       &publicID,
+			OrganizationID: &orgEntity.ID,
+		})
+		if err != nil || inviteEntity == nil {
+			reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
+				Code:  "121ef112-cb39-4235-9500-b116adb69984",
+				Error: "proj not found",
+			})
+			return
+		}
+		SetAdminInviteToContext(reqCtx, inviteEntity)
+		reqCtx.Next()
+	}
 }

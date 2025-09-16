@@ -176,16 +176,7 @@ func (api *AdminApiKeyAPI) DeleteAdminApiKey(reqCtx *gin.Context) {
 	if !ok {
 		return
 	}
-	role, ok := auth.GetAdminOrganizationRoleFromContext(reqCtx)
-	if !ok {
-		return
-	}
-	if *role != organization.OrganizationMemberRoleOwner {
-		reqCtx.AbortWithStatusJSON(http.StatusForbidden, responses.ErrorResponse{
-			Code: "e5d02597-9c3f-4aa6-9ac3-f5981e5f4589",
-		})
-		return
-	}
+
 	err := api.apiKeyService.Delete(ctx, entity)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{

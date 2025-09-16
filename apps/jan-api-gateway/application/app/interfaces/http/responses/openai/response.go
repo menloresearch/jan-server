@@ -1,7 +1,5 @@
 package openai
 
-import "context"
-
 type ObjectKey string
 
 const (
@@ -41,28 +39,8 @@ type ListResponse[T any] struct {
 	Total   int64          `json:"total"`
 }
 
-type NextFunc[T any] func(ctx context.Context, last T) ([]T, error)
-
-func NewPaginator[T any](
-	ctx context.Context,
-	items []T,
-	getID func(T) string,
-	next NextFunc[T],
-) (*ListResponse[T], error) {
-	p := &ListResponse[T]{Data: items}
-	if len(items) > 0 {
-		firstID := getID(items[0])
-		lastID := getID(items[len(items)-1])
-		p.FirstID = &firstID
-		p.LastID = &lastID
-		more, err := next(ctx, items[len(items)-1])
-		if err != nil {
-			return nil, err
-		}
-		if len(more) > 0 {
-			p.HasMore = true
-		}
-	}
-
-	return p, nil
+type DeleteResponse struct {
+	Object  string `json:"object"`
+	ID      string `json:"id"`
+	Deleted bool   `json:"deleted"`
 }

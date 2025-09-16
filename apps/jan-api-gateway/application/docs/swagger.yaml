@@ -331,6 +331,47 @@ definitions:
         example: user
         type: string
     type: object
+  app_interfaces_http_routes_v1_organization_invites.CreateInviteUserRequest:
+    properties:
+      email:
+        type: string
+      projects:
+        items:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_invites.InviteProject'
+        type: array
+      role:
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_organization_invites.InviteProject:
+    properties:
+      id:
+        type: string
+      role:
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_organization_invites.InviteResponse:
+    properties:
+      accepted_at:
+        type: string
+      email:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      invited_at:
+        type: string
+      object:
+        type: string
+      projects:
+        items:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_invites.InviteProject'
+        type: array
+      role:
+        type: string
+      status:
+        type: string
+    type: object
   app_interfaces_http_routes_v1_organization_projects.CreateProjectRequest:
     properties:
       name:
@@ -433,6 +474,15 @@ definitions:
       status:
         type: string
     type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.DeleteResponse:
+    properties:
+      deleted:
+        type: boolean
+      id:
+        type: string
+      object:
+        type: string
+    type: object
   ? menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ConversationItemResponse
   : properties:
       data:
@@ -455,6 +505,23 @@ definitions:
       data:
         items:
           $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.ConversationResponse'
+        type: array
+      first_id:
+        type: string
+      has_more:
+        type: boolean
+      last_id:
+        type: string
+      object:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ObjectTypeList'
+      total:
+        type: integer
+    type: object
+  ? menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_organization_invites_InviteResponse
+  : properties:
+      data:
+        items:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_invites.InviteResponse'
         type: array
       first_id:
         type: string
@@ -1665,6 +1732,133 @@ paths:
       security:
       - BearerAuth: []
       summary: Get Admin API Key
+      tags:
+      - Organizations
+  /v1/organization/invites:
+    get:
+      description: Retrieves a paginated list of invites for the current organization.
+      parameters:
+      - description: Cursor pointing to a record after which to fetch results
+        in: query
+        name: after
+        type: string
+      - description: Maximum number of results to return
+        in: query
+        name: limit
+        type: integer
+      responses:
+        "200":
+          description: Successfully retrieved list of invites
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_organization_invites_InviteResponse'
+        "400":
+          description: Invalid or missing query parameter
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List Organization Invites
+      tags:
+      - Organizations
+    post:
+      consumes:
+      - application/json
+      description: Creates a new invite for a user to join the organization.
+      parameters:
+      - description: Invite request payload
+        in: body
+        name: invite
+        required: true
+        schema:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_invites.CreateInviteUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully created invite
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_invites.InviteResponse'
+        "400":
+          description: Invalid request payload or user already exists
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create Invite
+      tags:
+      - Organizations
+  /v1/organization/invites/{invite_id}:
+    delete:
+      description: Deletes a specific invite by its ID. Only organization owners can
+        delete invites.
+      parameters:
+      - description: Public ID of the invite
+        in: path
+        name: invite_id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: Successfully deleted invite
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.DeleteResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "403":
+          description: Forbidden - only owners can delete invites
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Invite not found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete Invite
+      tags:
+      - Organizations
+    get:
+      description: Retrieves a specific invite by its ID.
+      parameters:
+      - description: Public ID of the invite
+        in: path
+        name: invite_id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: Successfully retrieved invite
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_invites.InviteResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Invite not found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Retrieve Invite
       tags:
       - Organizations
   /v1/organization/projects:

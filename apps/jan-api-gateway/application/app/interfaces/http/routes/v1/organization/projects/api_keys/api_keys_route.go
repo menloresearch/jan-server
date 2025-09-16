@@ -76,7 +76,7 @@ func (api *ProjectApiKeyRoute) ListProjectApiKey(reqCtx *gin.Context) {
 		return
 	}
 
-	project, ok := api.projectService.GetProjectFromContext(reqCtx)
+	project, ok := auth.GetProjectFromContext(reqCtx)
 	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code: "e50b3d93-f508-401a-b55e-50ffec69e087",
@@ -175,7 +175,7 @@ func (api *ProjectApiKeyRoute) CreateProjectApiKey(reqCtx *gin.Context) {
 		return
 	}
 
-	project, ok := api.projectService.GetProjectFromContext(reqCtx)
+	project, ok := auth.GetProjectFromContext(reqCtx)
 	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code: "e50b3d93-f508-401a-b55e-50ffec69e087",

@@ -3,6 +3,7 @@ package invite
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"menlo.ai/jan-api-gateway/app/domain/query"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
@@ -32,6 +33,7 @@ func (s *InviteService) CreateInviteWithPublicID(ctx context.Context, invite *In
 		return nil, err
 	}
 	invite.PublicID = publicID
+	invite.ExpiresAt = time.Now().Add(7 * 24 * time.Hour)
 	if err := s.repo.Create(ctx, invite); err != nil {
 		return nil, err
 	}
@@ -62,7 +64,28 @@ func (s *InviteService) FindInvites(ctx context.Context, filter InvitesFilter, p
 	return s.repo.FindByFilter(ctx, filter, pagination)
 }
 
+func (s *InviteService) FindOne(ctx context.Context, filter InvitesFilter) (*Invite, error) {
+	entities, err := s.repo.FindByFilter(ctx, filter, nil)
+	if err != nil {
+		return nil, err
+	}
+	if len(entities) == 0 {
+		return nil, nil
+	}
+	if len(entities) != 1 {
+		return nil, fmt.Errorf("more than one record")
+	}
+	return entities[0], err
+}
+
 // CountInvites counts the number of invitations matching a given filter.
 func (s *InviteService) CountInvites(ctx context.Context, filter InvitesFilter) (int64, error) {
 	return s.repo.Count(ctx, filter)
 }
+
+
+// You were invited to the organization Personal on OpenAI
+
+// jinjie@menlo.ai invited you to be a member of the organization Personal (org-Rmx8M8dJK289NhXKASwIoObE) on the OpenAI API.
+
+// This invite will expire in 7 days. If you don't recognize this, you may safely ignore it. If you have any additional questions or concerns, please visit our help center.

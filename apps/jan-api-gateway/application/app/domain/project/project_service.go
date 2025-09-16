@@ -3,11 +3,8 @@ package project
 import (
 	"context"
 	"fmt"
-	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/query"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
 )
 
@@ -101,45 +98,4 @@ func (s *ProjectService) AddMember(ctx context.Context, projectID, userID uint, 
 		ProjectID: projectID,
 		Role:      role,
 	})
-}
-
-type ProjectContextKey string
-
-const (
-	ProjectContextKeyPublicID ProjectContextKey = "proj_public_id"
-	ProjectContextKeyEntity   ProjectContextKey = "ProjectContextKeyEntity"
-)
-
-func (s *ProjectService) ProjectMiddleware() gin.HandlerFunc {
-	return func(reqCtx *gin.Context) {
-		ctx := reqCtx.Request.Context()
-		publicID := reqCtx.Param(string(ProjectContextKeyPublicID))
-
-		if publicID == "" {
-			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-				Code:  "5cbdb58e-6228-4d9a-9893-7f744608a9e8",
-				Error: "missing project public ID",
-			})
-			return
-		}
-
-		proj, err := s.FindProjectByPublicID(ctx, publicID)
-		if err != nil || proj == nil {
-			reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-				Code:  "121ef112-cb39-4235-9500-b116adb69984",
-				Error: "proj not found",
-			})
-			return
-		}
-		reqCtx.Set(string(ProjectContextKeyEntity), proj)
-		reqCtx.Next()
-	}
-}
-
-func (s *ProjectService) GetProjectFromContext(reqCtx *gin.Context) (*Project, bool) {
-	proj, ok := reqCtx.Get(string(ProjectContextKeyEntity))
-	if !ok {
-		return nil, false
-	}
-	return proj.(*Project), true
 }

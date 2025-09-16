@@ -21,17 +21,20 @@ import (
 type ProjectsRoute struct {
 	projectService     *project.ProjectService
 	apiKeyService      *apikey.ApiKeyService
+	authService        *auth.AuthService
 	projectApiKeyRoute *projectApikeyRoute.ProjectApiKeyRoute
 }
 
 func NewProjectsRoute(
 	projectService *project.ProjectService,
 	apiKeyService *apikey.ApiKeyService,
+	authService *auth.AuthService,
 	projectApiKeyRoute *projectApikeyRoute.ProjectApiKeyRoute,
 ) *ProjectsRoute {
 	return &ProjectsRoute{
 		projectService,
 		apiKeyService,
+		authService,
 		projectApiKeyRoute,
 	}
 }
@@ -41,7 +44,10 @@ func (projectsRoute *ProjectsRoute) RegisterRouter(router gin.IRouter) {
 	projectsRouter.GET("", projectsRoute.GetProjects)
 	projectsRouter.POST("", projectsRoute.CreateProject)
 
-	projectIdRouter := projectsRouter.Group(fmt.Sprintf("/:%s", project.ProjectContextKeyPublicID), projectsRoute.projectService.ProjectMiddleware())
+	projectIdRouter := projectsRouter.Group(
+		fmt.Sprintf("/:%s", auth.ProjectContextKeyPublicID),
+		projectsRoute.authService.AdminProjectMiddleware(),
+	)
 	projectIdRouter.GET("", projectsRoute.GetProject)
 	projectIdRouter.POST("", projectsRoute.UpdateProject)
 	projectIdRouter.POST("/archive", projectsRoute.ArchiveProject)
@@ -108,39 +114,40 @@ func (api *ProjectsRoute) GetProjects(reqCtx *gin.Context) {
 		return
 	}
 
-	var firstId *string
-	var lastId *string
-	hasMore := false
-	if len(projects) > 0 {
-		firstId = &projects[0].PublicID
-		lastId = &projects[len(projects)-1].PublicID
-		moreRecords, err := projectService.Find(ctx, projectFilter, &query.Pagination{
-			Order: pagination.Order,
-			Limit: ptr.ToInt(1),
-			After: &projects[len(projects)-1].ID,
-		})
-		if err != nil {
-			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:  "1be3dfc2-f2ce-4b0e-a385-1cc6f4324398",
-				Error: "failed to retrieve API keys",
+	pageCursor, err := responses.BuildCursorPage(
+		projects,
+		func(t *project.Project) *string {
+			return &t.PublicID
+		},
+		func() ([]*project.Project, error) {
+			return projectService.Find(ctx, projectFilter, &query.Pagination{
+				Order: pagination.Order,
+				Limit: ptr.ToInt(1),
+				After: &projects[len(projects)-1].ID,
 			})
-			return
-		}
-		if len(moreRecords) != 0 {
-			hasMore = true
-		}
+		},
+		func() (int64, error) {
+			return projectService.CountProjects(ctx, projectFilter)
+		},
+	)
+	if err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code: "6a0ee74e-d6fd-4be8-91b3-03a594b8cd2e",
+		})
+		return
 	}
 
 	result := functional.Map(projects, func(project *project.Project) ProjectResponse {
 		return domainToProjectResponse(project)
 	})
 
-	response := ProjectListResponse{
+	response := openai.ListResponse[ProjectResponse]{
 		Object:  "list",
 		Data:    result,
-		HasMore: hasMore,
-		FirstID: firstId,
-		LastID:  lastId,
+		HasMore: pageCursor.HasMore,
+		FirstID: pageCursor.FirstID,
+		LastID:  pageCursor.LastID,
+		Total:   int64(pageCursor.Total),
 	}
 	reqCtx.JSON(http.StatusOK, response)
 }
@@ -161,6 +168,10 @@ func (api *ProjectsRoute) GetProjects(reqCtx *gin.Context) {
 func (api *ProjectsRoute) CreateProject(reqCtx *gin.Context) {
 	projectService := api.projectService
 	ctx := reqCtx.Request.Context()
+	orgEntity, ok := auth.GetAdminOrganizationFromContext(reqCtx)
+	if !ok {
+		return
+	}
 
 	var requestPayload CreateProjectRequest
 	if err := reqCtx.ShouldBindJSON(&requestPayload); err != nil {
@@ -171,11 +182,10 @@ func (api *ProjectsRoute) CreateProject(reqCtx *gin.Context) {
 		return
 	}
 
-	// TODO: fix this in project/member
 	projectEntity, err := projectService.CreateProjectWithPublicID(ctx, &project.Project{
-		Name: requestPayload.Name,
-		// OrganizationID: *adminKey.OrganizationID,
-		Status: string(project.ProjectStatusActive),
+		Name:           requestPayload.Name,
+		OrganizationID: orgEntity.ID,
+		Status:         string(project.ProjectStatusActive),
 	})
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
@@ -200,37 +210,15 @@ func (api *ProjectsRoute) CreateProject(reqCtx *gin.Context) {
 // @Failure 404 {object} responses.ErrorResponse "Not Found - project with the given ID does not exist or does not belong to the organization"
 // @Router /v1/organization/projects/{project_id} [get]
 func (api *ProjectsRoute) GetProject(reqCtx *gin.Context) {
-	projectService := api.projectService
-	ctx := reqCtx.Request.Context()
-
-	projectID := reqCtx.Param("project_id")
-	if projectID == "" {
-		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  "e8100503-698f-4ee6-8f5c-3274f5476e67",
-			Error: "invalid or missing project ID",
-		})
-		return
-	}
-
-	entity, err := projectService.FindProjectByPublicID(ctx, projectID)
-	if err != nil {
+	projectEntity, ok := auth.GetProjectFromContext(reqCtx)
+	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
 			Code:  "42ad3a04-6c17-40db-a10f-640be569c93f",
 			Error: "project not found",
 		})
 		return
 	}
-
-	// TODO: project/member
-	// if entity.OrganizationID != *adminKey.OrganizationID {
-	// 	reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-	// 		Code:  "752f93d3-21f1-45a3-ba13-0157d069aca2",
-	// 		Error: "project not found in organization",
-	// 	})
-	// 	return
-	// }
-
-	reqCtx.JSON(http.StatusOK, domainToProjectResponse(entity))
+	reqCtx.JSON(http.StatusOK, domainToProjectResponse(projectEntity))
 }
 
 // UpdateProject godoc
@@ -260,19 +248,10 @@ func (api *ProjectsRoute) UpdateProject(reqCtx *gin.Context) {
 		return
 	}
 
-	projectID := reqCtx.Param("project_id")
-	if projectID == "" {
+	entity, ok := auth.GetProjectFromContext(reqCtx)
+	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  "a50a180b-75ab-4292-9397-781f66f1502d",
-			Error: "invalid or missing project ID",
-		})
-		return
-	}
-
-	entity, err := projectService.FindProjectByPublicID(ctx, projectID)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  "4ee156ce-6425-425b-b9fd-d95165456b6c",
+			Code:  "42ad3a04-6c17-40db-a10f-640be569c93f",
 			Error: "project not found",
 		})
 		return
@@ -309,32 +288,14 @@ func (api *ProjectsRoute) ArchiveProject(reqCtx *gin.Context) {
 	projectService := api.projectService
 	ctx := reqCtx.Request.Context()
 
-	projectID := reqCtx.Param("project_id")
-	if projectID == "" {
+	entity, ok := auth.GetProjectFromContext(reqCtx)
+	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  "2ab393c5-708d-42bc-a785-dcbdcf429ad1",
-			Error: "invalid or missing project ID",
-		})
-		return
-	}
-
-	entity, err := projectService.FindProjectByPublicID(ctx, projectID)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  "26b68f41-0eb0-4fca-8365-613742ef9204",
+			Code:  "42ad3a04-6c17-40db-a10f-640be569c93f",
 			Error: "project not found",
 		})
 		return
 	}
-
-	// TODO: project/member
-	// if entity.OrganizationID != *adminKey.OrganizationID {
-	// 	reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-	// 		Code:  "4b656858-4212-451a-9ab6-23bc09dcc357",
-	// 		Error: "project not found in organization",
-	// 	})
-	// 	return
-	// }
 
 	// Set archived status
 	entity.Status = string(project.ProjectStatusArchived)
