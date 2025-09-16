@@ -7,8 +7,10 @@
 package main
 
 import (
+	"context"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
+	"menlo.ai/jan-api-gateway/app/domain/chat"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
@@ -24,11 +26,12 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/responserepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
+	"menlo.ai/jan-api-gateway/app/infrastructure/inference"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	auth2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth/google"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
+	chat2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
@@ -36,6 +39,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects/api_keys"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/responses"
+	"menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
 )
 
 import (
@@ -64,8 +68,13 @@ func CreateApplication() (*Application, error) {
 	projectsRoute := projects.NewProjectsRoute(projectService, apiKeyService, projectApiKeyRoute)
 	authService := auth.NewAuthService(userService, apiKeyService, organizationService)
 	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI, projectsRoute, authService)
-	completionAPI := chat.NewCompletionAPI(apiKeyService)
-	chatRoute := chat.NewChatRoute(completionAPI)
+	context := provideContext()
+	janInferenceClient := janinference.NewJanInferenceClient(context)
+	inferenceProvider := inference.NewJanInferenceProvider(janInferenceClient)
+	chatUseCase := chat.NewChatUseCase(inferenceProvider)
+	streamingService := chat.NewStreamingService(inferenceProvider)
+	completionAPI := chat2.NewCompletionAPI(apiKeyService, chatUseCase, streamingService)
+	chatRoute := chat2.NewChatRoute(completionAPI, authService)
 	conversationRepository := conversationrepo.NewConversationGormRepository(transactionDatabase)
 	itemRepository := itemrepo.NewItemGormRepository(transactionDatabase)
 	conversationService := conversation.NewService(conversationRepository, itemRepository)
@@ -88,4 +97,10 @@ func CreateApplication() (*Application, error) {
 		HttpServer: httpServer,
 	}
 	return application, nil
+}
+
+// wire.go:
+
+func provideContext() context.Context {
+	return context.Background()
 }

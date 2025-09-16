@@ -4,6 +4,7 @@ import (
 	"github.com/google/wire"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
+	"menlo.ai/jan-api-gateway/app/domain/chat"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
@@ -24,4 +25,6 @@ var ServiceProvider = wire.NewSet(
 	response.NewStreamModelService,
 	response.NewNonStreamModelService,
 	serpermcp.NewSerperService,
+	chat.NewChatUseCase,
+	chat.NewStreamingService,
 )

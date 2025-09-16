@@ -1,51 +1,32 @@
 package chat
 
 import (
-	"fmt"
+	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
-	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
+	chatdomain "menlo.ai/jan-api-gateway/app/domain/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
-	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
 )
 
 type CompletionAPI struct {
-	apikeyService *apikey.ApiKeyService
+	apikeyService    *apikey.ApiKeyService
+	chatUseCase      *chatdomain.ChatUseCase
+	streamingService *chatdomain.StreamingService
 }
 
-func NewCompletionAPI(apikeyService *apikey.ApiKeyService) *CompletionAPI {
+func NewCompletionAPI(apikeyService *apikey.ApiKeyService, chatUseCase *chatdomain.ChatUseCase, streamingService *chatdomain.StreamingService) *CompletionAPI {
 	return &CompletionAPI{
-		apikeyService,
+		apikeyService:    apikeyService,
+		chatUseCase:      chatUseCase,
+		streamingService: streamingService,
 	}
 }
 
 func (completionAPI *CompletionAPI) RegisterRouter(router *gin.RouterGroup) {
 	router.POST("/completions", completionAPI.PostCompletion)
-}
-
-// ChatCompletionResponseSwagger is a doc-only version without http.Header
-type ChatCompletionChoice struct {
-	Index        int     `json:"index"`
-	Message      Message `json:"message"`
-	FinishReason string  `json:"finish_reason"`
-}
-
-type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
-}
-
-type ChatCompletionResponseSwagger struct {
-	ID      string                 `json:"id"`
-	Object  string                 `json:"object"`
-	Created int64                  `json:"created"`
-	Model   string                 `json:"model"`
-	Choices []ChatCompletionChoice `json:"choices"`
-	Usage   Usage                  `json:"usage"`
 }
 
 // CreateChatCompletion
@@ -56,7 +37,7 @@ type ChatCompletionResponseSwagger struct {
 // @Accept json
 // @Produce json
 // @Param request body PostChatCompletionRequest true "Chat completion request payload"
-// @Success 200 {object} ChatCompletionResponseSwagger "Successful response"
+// @Success 200 {object} CompletionResponse "Successful response"
 // @Failure 400 {object} responses.ErrorResponse "Invalid request payload"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
@@ -71,6 +52,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		return
 	}
 
+	// TODO: Implement admin API key check
 	key := ""
 	// if environment_variables.EnvironmentVariables.ENABLE_ADMIN_API {
 	// 	key, ok := requests.GetTokenFromBearer(reqCtx)
@@ -106,53 +88,100 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	// 	}
 	// }
 
-	modelRegistry := inferencemodelregistry.GetInstance()
-	mToE := modelRegistry.GetModelToEndpoints()
-	endpoints, ok := mToE[request.Model]
-	if !ok {
-		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "59253517-df33-44bf-9333-c927402e4e2e",
-			Error: fmt.Sprintf("Model: %s does not exist", request.Model),
-		})
+	// Convert to domain request
+	domainRequest := &chatdomain.CompletionRequest{
+		Model:    request.Model,
+		Messages: request.Messages,
+		Stream:   request.Stream,
+	}
+
+	if request.Temperature != 0 {
+		domainRequest.Temperature = &request.Temperature
+	}
+	if request.MaxTokens != 0 {
+		domainRequest.MaxTokens = &request.MaxTokens
+	}
+	if request.TopP != 0 {
+		domainRequest.TopP = &request.TopP
+	}
+	if request.Metadata != nil {
+		// Convert map[string]string to map[string]interface{}
+		metadata := make(map[string]interface{})
+		for k, v := range request.Metadata {
+			metadata[k] = v
+		}
+		domainRequest.Metadata = metadata
+	}
+
+	// Handle streaming vs non-streaming requests
+	if request.Stream {
+		err := api.streamingService.StreamCompletion(reqCtx, key, request)
+		if !err.IsEmpty() {
+			// Check if context was cancelled (timeout)
+			if reqCtx.Request.Context().Err() == context.DeadlineExceeded {
+				reqCtx.AbortWithStatusJSON(
+					http.StatusRequestTimeout,
+					responses.ErrorResponse{
+						Code: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+					})
+			} else if reqCtx.Request.Context().Err() == context.Canceled {
+				reqCtx.AbortWithStatusJSON(
+					http.StatusRequestTimeout,
+					responses.ErrorResponse{
+						Code: "b2c3d4e5-f6g7-8901-bcde-f23456789012",
+					})
+			} else {
+				reqCtx.AbortWithStatusJSON(
+					http.StatusBadRequest,
+					responses.ErrorResponse{
+						Code:  err.Code,
+						Error: err.Message,
+					})
+			}
+			return
+		}
+		return
+	} else {
+		response, err := api.chatUseCase.CreateCompletion(reqCtx.Request.Context(), key, domainRequest)
+		if !err.IsEmpty() {
+			reqCtx.AbortWithStatusJSON(
+				http.StatusBadRequest,
+				responses.ErrorResponse{
+					Code:  err.Code,
+					Error: err.Message,
+				})
+			return
+		}
+		reqCtx.JSON(http.StatusOK, response)
 		return
 	}
+}
 
-	janInferenceClient := janinference.NewJanInferenceClient(reqCtx)
-	for _, endpoint := range endpoints {
-		if endpoint == janInferenceClient.BaseURL {
-			if request.Stream {
-				err := janInferenceClient.CreateChatCompletionStream(reqCtx, key, request)
-				if err != nil {
-					reqCtx.AbortWithStatusJSON(
-						http.StatusBadRequest,
-						responses.ErrorResponse{
-							Code:  "c3af973c-eada-4e8b-96d9-e92546588cd3",
-							Error: err.Error(),
-						})
-					return
-				}
-				return
-			} else {
-				response, err := janInferenceClient.CreateChatCompletion(reqCtx.Request.Context(), key, request)
-				if err != nil {
-					reqCtx.AbortWithStatusJSON(
-						http.StatusBadRequest,
-						responses.ErrorResponse{
-							Code:  "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4",
-							Error: err.Error(),
-						})
-					return
-				}
-				reqCtx.JSON(http.StatusOK, response)
-				return
-			}
-		}
-	}
+// CompletionResponse represents the response from chat completion
+type CompletionResponse struct {
+	ID      string             `json:"id"`
+	Object  string             `json:"object"`
+	Created int64              `json:"created"`
+	Model   string             `json:"model"`
+	Choices []CompletionChoice `json:"choices"`
+	Usage   Usage              `json:"usage"`
+}
 
-	reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-		Code:  "6c6e4ea0-53d2-4c6c-8617-3a645af59f43",
-		Error: "Client does not exist",
-	})
+type CompletionChoice struct {
+	Index        int               `json:"index"`
+	Message      CompletionMessage `json:"message"`
+	FinishReason string            `json:"finish_reason"`
+}
+
+type CompletionMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type Usage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
 }
 
 type Message struct {
