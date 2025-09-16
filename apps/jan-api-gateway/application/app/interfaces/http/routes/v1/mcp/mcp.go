@@ -13,6 +13,10 @@ import (
 
 func MCPMethodGuard(allowedMethods map[string]bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if c.Request.Header.Get("Mcp-Session-Id") == "" {
+			// TODO: server hack
+			c.Request.Header.Add("Mcp-Session-Id", "mcp-session-60cbe9c6-2b87-4a82-bbaa-5a8fad2bb462")
+		}
 		bodyBytes, err := io.ReadAll(c.Request.Body)
 		if err != nil {
 			c.Abort()
