@@ -99,7 +99,12 @@ func (s *CompletionStreamHandler) streamResponseToChannel(reqCtx *gin.Context, r
 
 	// Save input messages to conversation first
 	if conv != nil {
-		s.saveInputMessagesToConversation(reqCtx.Request.Context(), conv, user.ID, request.Messages)
+		// Save messages to conversation and get the assistant message item
+		var latestMessage []openai.ChatCompletionMessage
+		if len(request.Messages) > 0 {
+			latestMessage = []openai.ChatCompletionMessage{request.Messages[len(request.Messages)-1]}
+		}
+		s.saveInputMessagesToConversation(reqCtx.Request.Context(), conv, user.ID, latestMessage)
 	}
 
 	// Get streaming reader from inference provider

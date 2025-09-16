@@ -10,7 +10,6 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/response"
 	"menlo.ai/jan-api-gateway/app/domain/user"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 )
 
 var ServiceProvider = wire.NewSet(
@@ -25,6 +24,4 @@ var ServiceProvider = wire.NewSet(
 	response.NewStreamModelService,
 	response.NewNonStreamModelService,
 	serpermcp.NewSerperService,
-	chat.NewChatUseCase,
-	chat.NewStreamingService,
 )

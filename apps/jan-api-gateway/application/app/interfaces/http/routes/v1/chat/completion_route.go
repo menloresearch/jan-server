@@ -135,7 +135,11 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		}
 
 		// Save messages to conversation and get the assistant message item
-		assistantItem, _ := api.completionNonStreamHandler.SaveMessagesToConversationWithAssistant(reqCtx.Request.Context(), conv, user.ID, request.Messages, response.Choices[0].Message.Content)
+		var latestMessage []openai.ChatCompletionMessage
+		if len(request.Messages) > 0 {
+			latestMessage = []openai.ChatCompletionMessage{request.Messages[len(request.Messages)-1]}
+		}
+		assistantItem, _ := api.completionNonStreamHandler.SaveMessagesToConversationWithAssistant(reqCtx.Request.Context(), conv, user.ID, latestMessage, response.Choices[0].Message.Content)
 
 		// Modify response to include item ID and metadata
 		modifiedResponse := api.completionNonStreamHandler.ModifyCompletionResponse(response, conv, conversationCreated, assistantItem)
