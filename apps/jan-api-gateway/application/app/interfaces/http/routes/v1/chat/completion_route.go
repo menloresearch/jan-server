@@ -18,16 +18,16 @@ import (
 type CompletionAPI struct {
 	completionNonStreamHandler *CompletionNonStreamHandler
 	completionStreamHandler    *CompletionStreamHandler
-	conversationService *conversation.ConversationService
-	authService         *auth.AuthService
+	conversationService        *conversation.ConversationService
+	authService                *auth.AuthService
 }
 
 func NewCompletionAPI(completionNonStreamHandler *CompletionNonStreamHandler, completionStreamHandler *CompletionStreamHandler, conversationService *conversation.ConversationService, authService *auth.AuthService) *CompletionAPI {
 	return &CompletionAPI{
-		completionNonStreamHandler:         completionNonStreamHandler,
+		completionNonStreamHandler: completionNonStreamHandler,
 		completionStreamHandler:    completionStreamHandler,
-		conversationService: conversationService,
-		authService:         authService,
+		conversationService:        conversationService,
+		authService:                authService,
 	}
 }
 
@@ -43,13 +43,15 @@ type ExtendedChatCompletionRequest struct {
 
 // CreateChatCompletion
 // @Summary Create a chat completion
-// @Description Generates a model response for the given chat conversation.
+// @Description Generates a model response for the given chat conversation. If `stream` is true, the response is sent as a stream of events. If `stream` is false or omitted, a single JSON response is returned.
 // @Tags Chat
 // @Security BearerAuth
 // @Accept json
 // @Produce json
+// @Produce text/event-stream
 // @Param request body ExtendedChatCompletionRequest true "Extended chat completion request payload"
-// @Success 200 {object} CompletionResponse "Successful response"
+// @Success 200 {object} CompletionResponse "Successful non-streaming response"
+// @Success 200 {string} string "Successful streaming response (SSE format, event: 'data', data: JSON object per chunk)"
 // @Failure 400 {object} responses.ErrorResponse "Invalid request payload"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
@@ -133,11 +135,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		}
 
 		// Save messages to conversation and get the assistant message item
-		assistantItem, saveErr := api.completionNonStreamHandler.SaveMessagesToConversationWithAssistant(reqCtx.Request.Context(), conv, user.ID, request.Messages, response.Choices[0].Message.Content)
-		if saveErr != nil {
-			// Log error but don't fail the request since completion was successful
-			fmt.Printf("Warning: Failed to save messages to conversation: %s\n", saveErr.GetMessage())
-		}
+		assistantItem, _ := api.completionNonStreamHandler.SaveMessagesToConversationWithAssistant(reqCtx.Request.Context(), conv, user.ID, request.Messages, response.Choices[0].Message.Content)
 
 		// Modify response to include item ID and metadata
 		modifiedResponse := api.completionNonStreamHandler.ModifyCompletionResponse(response, conv, conversationCreated, assistantItem)
@@ -207,6 +205,7 @@ func (api *CompletionAPI) createNewConversation(reqCtx *gin.Context, messages []
 	return conv, true // Created new conversation
 }
 
+// TODO should be generate from models, now we just use the first user message
 // generateTitleFromMessages creates a title from the first user message
 func (api *CompletionAPI) generateTitleFromMessages(messages []openai.ChatCompletionMessage) string {
 	if len(messages) == 0 {
@@ -233,7 +232,7 @@ func (api *CompletionAPI) sendConversationMetadata(reqCtx *gin.Context, conv *co
 		return
 	}
 
-	metadata := map[string]interface{}{
+	metadata := map[string]any{
 		"object":               "chat.completion.metadata",
 		"conversation_id":      conv.PublicID,
 		"conversation_created": conversationCreated,

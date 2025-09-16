@@ -134,7 +134,6 @@ func (s *CompletionStreamHandler) streamResponseToChannel(reqCtx *gin.Context, r
 			// Collect content for conversation saving
 			if contentChunk != "" {
 				fullResponse += contentChunk
-				fmt.Printf("DEBUG: Collected content chunk: '%s', total length: %d\n", contentChunk, len(fullResponse))
 			}
 		}
 	}
@@ -144,15 +143,10 @@ func (s *CompletionStreamHandler) streamResponseToChannel(reqCtx *gin.Context, r
 		return
 	}
 
-	fmt.Printf("DEBUG: Streaming completed. Full response length: %d\n", len(fullResponse))
-
 	// Save the complete assistant message to conversation if we have content
 	if conv != nil && fullResponse != "" {
-		fmt.Printf("DEBUG: Saving assistant message to conversation. Content: '%s'\n", fullResponse)
 		assistantItemID := s.generateAssistantItemID()
 		s.saveAssistantMessageToConversation(reqCtx.Request.Context(), conv, user, assistantItemID, fullResponse)
-	} else {
-		fmt.Printf("DEBUG: Not saving message - conv: %v, fullResponse length: %d\n", conv != nil, len(fullResponse))
 	}
 }
 
@@ -174,45 +168,24 @@ func (s *CompletionStreamHandler) processStreamChunkForChannel(data string) (str
 	}
 
 	if err := json.Unmarshal([]byte(data), &streamData); err != nil {
-		fmt.Printf("DEBUG: JSON parsing failed for data: %s, error: %v\n", data, err)
 		// If JSON parsing fails, still send raw data but with empty content
 		return fmt.Sprintf("data: %s\n\n", data), ""
 	}
 
-	// Debug: Print the actual JSON structure for first few chunks
-	if len(data) < 300 { // Only print for smaller chunks to avoid spam
-		fmt.Printf("DEBUG: Raw JSON data: %s\n", data)
-	}
-
 	// Extract content from all choices
 	var contentChunk string
-	for i, choice := range streamData.Choices {
+	for _, choice := range streamData.Choices {
 		// Check for regular content
 		if choice.Delta.Content != "" {
 			contentChunk += choice.Delta.Content
-			fmt.Printf("DEBUG: Found content in choice %d: '%s'\n", i, choice.Delta.Content)
 		}
 
 		// Check for reasoning content (internal reasoning, don't save to conversation)
-		if choice.Delta.ReasoningContent != "" {
-			fmt.Printf("DEBUG: Found reasoning content in choice %d: '%s' (not saving to conversation)\n", i, choice.Delta.ReasoningContent)
-		}
+		// Note: reasoning_content is not saved to conversation
 
 		// Check for tool calls
-		if len(choice.Delta.ToolCalls) > 0 {
-			fmt.Printf("DEBUG: Found %d tool calls in choice %d\n", len(choice.Delta.ToolCalls), i)
-			for j, toolCall := range choice.Delta.ToolCalls {
-				fmt.Printf("DEBUG: Tool call %d arguments: '%s'\n", j, toolCall.Function.Arguments)
-			}
-		}
+		// Note: tool_calls are logged for debugging but not processed here
 	}
-
-	// Debug: Show if we have choices but no content
-	if len(streamData.Choices) > 0 && contentChunk == "" {
-		fmt.Printf("DEBUG: Has %d choices but no content. First choice delta: %+v\n", len(streamData.Choices), streamData.Choices[0].Delta)
-	}
-
-	fmt.Printf("DEBUG: Processed chunk - raw data length: %d, content chunk: '%s'\n", len(data), contentChunk)
 
 	// Return formatted data and extracted content
 	return fmt.Sprintf("data: %s\n\n", data), contentChunk
@@ -281,11 +254,7 @@ func (s *CompletionStreamHandler) saveInputMessagesToConversation(ctx context.Co
 		}
 
 		// Add item to conversation
-		_, err := s.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeMessage, &role, content)
-		if err != nil {
-			// Log error but don't fail the streaming
-			fmt.Printf("Warning: Failed to save input message to conversation: %s\n", err.GetMessage())
-		}
+		s.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeMessage, &role, content)
 	}
 }
 
@@ -307,9 +276,5 @@ func (s *CompletionStreamHandler) saveAssistantMessageToConversation(ctx context
 
 	// Add the assistant message to conversation
 	assistantRole := conversation.ItemRoleAssistant
-	_, err := s.conversationService.AddItem(ctx, conv, user.ID, conversation.ItemTypeMessage, &assistantRole, conversationContent)
-	if err != nil {
-		// Log error but don't fail the streaming
-		fmt.Printf("Warning: Failed to save assistant message to conversation: %s\n", err.GetMessage())
-	}
+	s.conversationService.AddItem(ctx, conv, user.ID, conversation.ItemTypeMessage, &assistantRole, conversationContent)
 }
