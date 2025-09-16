@@ -39,15 +39,15 @@ func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 		api.authService.RegisteredUserMiddleware(),
 	)
 
-	conversationsRouter.POST("", api.createConversation)
-	conversationsRouter.GET("", api.listConversations)
+	conversationsRouter.POST("", api.createConversationHandler)
+	conversationsRouter.GET("", api.listConversationsHandler)
 
 	conversationMiddleWare := api.conversationService.GetConversationMiddleWare()
-	conversationsRouter.GET(fmt.Sprintf("/:%s", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.getConversation)
-	conversationsRouter.PATCH(fmt.Sprintf("/:%s", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.updateConversation)
-	conversationsRouter.DELETE(fmt.Sprintf("/:%s", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.deleteConversation)
-	conversationsRouter.POST(fmt.Sprintf("/:%s/items", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.createItems)
-	conversationsRouter.GET(fmt.Sprintf("/:%s/items", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.listItems)
+	conversationsRouter.GET(fmt.Sprintf("/:%s", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.getConversationHandler)
+	conversationsRouter.PATCH(fmt.Sprintf("/:%s", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.updateConversationHandler)
+	conversationsRouter.DELETE(fmt.Sprintf("/:%s", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.deleteConversationHandler)
+	conversationsRouter.POST(fmt.Sprintf("/:%s/items", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.createItemsHandler)
+	conversationsRouter.GET(fmt.Sprintf("/:%s/items", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.listItemsHandler)
 
 	conversationItemMiddleWare := api.conversationService.GetConversationItemMiddleWare()
 	conversationsRouter.GET(
@@ -58,7 +58,7 @@ func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 		),
 		conversationMiddleWare,
 		conversationItemMiddleWare,
-		api.getItem,
+		api.getItemHandler,
 	)
 	conversationsRouter.DELETE(
 		fmt.Sprintf(
@@ -68,7 +68,7 @@ func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 		),
 		conversationMiddleWare,
 		conversationItemMiddleWare,
-		api.deleteItem,
+		api.deleteItemHandler,
 	)
 }
 
@@ -85,12 +85,12 @@ func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - invalid or missing API key"
 // @Failure 500 {object} responses.ErrorResponse "Internal Server Error"
 // @Router /v1/conversations [get]
-func (api *ConversationAPI) listConversations(reqCtx *gin.Context) {
+func (api *ConversationAPI) listConversationsHandler(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
 	user, _ := auth.GetUserFromContext(reqCtx)
 	userID := user.ID
 
-	result, err := api.doListConversations(ctx, userID, reqCtx)
+	result, err := api.ListConversations(ctx, userID, reqCtx)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  err.GetCode(),
@@ -103,7 +103,7 @@ func (api *ConversationAPI) listConversations(reqCtx *gin.Context) {
 }
 
 // doListConversations performs the business logic for listing conversations
-func (api *ConversationAPI) doListConversations(ctx context.Context, userID uint, reqCtx *gin.Context) (*ListResponse[*ConversationResponse], *common.Error) {
+func (api *ConversationAPI) ListConversations(ctx context.Context, userID uint, reqCtx *gin.Context) (*ListResponse[*ConversationResponse], *common.Error) {
 	pagination, err := query.GetCursorPaginationFromQuery(reqCtx, func(lastID string) (*uint, error) {
 		convs, convErr := api.conversationService.FindConversationsByFilter(ctx, conversation.ConversationFilter{
 			UserID:   &userID,
@@ -192,7 +192,7 @@ type ConversationResponse struct {
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations [post]
-func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
+func (api *ConversationAPI) createConversationHandler(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
 	user, _ := auth.GetUserFromContext(reqCtx)
 	userId := user.ID
@@ -206,7 +206,7 @@ func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
 		return
 	}
 
-	result, err := api.doCreateConversation(ctx, userId, request)
+	result, err := api.CreateConversation(ctx, userId, request)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  err.GetCode(),
@@ -219,7 +219,7 @@ func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
 }
 
 // doCreateConversation performs the business logic for creating a conversation
-func (api *ConversationAPI) doCreateConversation(ctx context.Context, userId uint, request CreateConversationRequest) (*ConversationResponse, *common.Error) {
+func (api *ConversationAPI) CreateConversation(ctx context.Context, userId uint, request CreateConversationRequest) (*ConversationResponse, *common.Error) {
 	if len(request.Items) > 20 {
 		return nil, common.NewErrorWithMessage("Too many items", "0e5b8426-b1d2-4114-ac81-d3982dc497cf")
 	}
@@ -234,8 +234,8 @@ func (api *ConversationAPI) doCreateConversation(ctx context.Context, userId uin
 		itemsToCreate[i] = item
 	}
 
-	ok, err := api.conversationService.ValidateItems(ctx, itemsToCreate)
-	if !ok {
+	err := api.conversationService.ValidateItems(ctx, itemsToCreate)
+	if err != nil {
 		return nil, err
 	}
 
@@ -275,13 +275,13 @@ func (api *ConversationAPI) doCreateConversation(ctx context.Context, userId uin
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id} [get]
-func (api *ConversationAPI) getConversation(reqCtx *gin.Context) {
+func (api *ConversationAPI) getConversationHandler(reqCtx *gin.Context) {
 	conv, ok := conversation.GetConversationFromContext(reqCtx)
 	if !ok {
 		return
 	}
 
-	result, err := api.doGetConversation(conv)
+	result, err := api.GetConversation(conv)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  err.GetCode(),
@@ -294,7 +294,7 @@ func (api *ConversationAPI) getConversation(reqCtx *gin.Context) {
 }
 
 // doGetConversation performs the business logic for getting a conversation
-func (api *ConversationAPI) doGetConversation(conv *conversation.Conversation) (*ConversationResponse, *common.Error) {
+func (api *ConversationAPI) GetConversation(conv *conversation.Conversation) (*ConversationResponse, *common.Error) {
 	return domainToConversationResponse(conv), nil
 }
 
@@ -319,7 +319,7 @@ type UpdateConversationRequest struct {
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id} [patch]
-func (api *ConversationAPI) updateConversation(reqCtx *gin.Context) {
+func (api *ConversationAPI) updateConversationHandler(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
 	conv, ok := conversation.GetConversationFromContext(reqCtx)
 	if !ok {
@@ -335,7 +335,7 @@ func (api *ConversationAPI) updateConversation(reqCtx *gin.Context) {
 		return
 	}
 
-	result, err := api.doUpdateConversation(ctx, conv, request)
+	result, err := api.UpdateConversation(ctx, conv, request)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  err.GetCode(),
@@ -348,7 +348,7 @@ func (api *ConversationAPI) updateConversation(reqCtx *gin.Context) {
 }
 
 // doUpdateConversation performs the business logic for updating a conversation
-func (api *ConversationAPI) doUpdateConversation(ctx context.Context, conv *conversation.Conversation, request UpdateConversationRequest) (*ConversationResponse, *common.Error) {
+func (api *ConversationAPI) UpdateConversation(ctx context.Context, conv *conversation.Conversation, request UpdateConversationRequest) (*ConversationResponse, *common.Error) {
 	if request.Title != nil {
 		conv.Title = request.Title
 	}
@@ -384,7 +384,7 @@ type DeletedConversationResponse struct {
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id} [delete]
-func (api *ConversationAPI) deleteConversation(reqCtx *gin.Context) {
+func (api *ConversationAPI) deleteConversationHandler(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
 	conv, ok := conversation.GetConversationFromContext(reqCtx)
 	if !ok {
@@ -394,7 +394,7 @@ func (api *ConversationAPI) deleteConversation(reqCtx *gin.Context) {
 		return
 	}
 
-	result, err := api.doDeleteConversation(ctx, conv)
+	result, err := api.DeleteConversation(ctx, conv)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  err.GetCode(),
@@ -407,7 +407,7 @@ func (api *ConversationAPI) deleteConversation(reqCtx *gin.Context) {
 }
 
 // doDeleteConversation performs the business logic for deleting a conversation
-func (api *ConversationAPI) doDeleteConversation(ctx context.Context, conv *conversation.Conversation) (*DeletedConversationResponse, *common.Error) {
+func (api *ConversationAPI) DeleteConversation(ctx context.Context, conv *conversation.Conversation) (*DeletedConversationResponse, *common.Error) {
 	success, err := api.conversationService.DeleteConversation(ctx, conv)
 	if !success {
 		return nil, err
@@ -489,7 +489,7 @@ type AnnotationResponse struct {
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id}/items [post]
-func (api *ConversationAPI) createItems(reqCtx *gin.Context) {
+func (api *ConversationAPI) createItemsHandler(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
 	conv, _ := conversation.GetConversationFromContext(reqCtx)
 
@@ -502,7 +502,7 @@ func (api *ConversationAPI) createItems(reqCtx *gin.Context) {
 		return
 	}
 
-	result, err := api.doCreateItems(ctx, conv, request)
+	result, err := api.CreateItems(ctx, conv, request)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  err.GetCode(),
@@ -515,7 +515,7 @@ func (api *ConversationAPI) createItems(reqCtx *gin.Context) {
 }
 
 // doCreateItems performs the business logic for creating items
-func (api *ConversationAPI) doCreateItems(ctx context.Context, conv *conversation.Conversation, request CreateItemsRequest) (*ListResponse[*ConversationItemResponse], *common.Error) {
+func (api *ConversationAPI) CreateItems(ctx context.Context, conv *conversation.Conversation, request CreateItemsRequest) (*ListResponse[*ConversationItemResponse], *common.Error) {
 	itemsToCreate := make([]*conversation.Item, len(request.Items))
 	for i, itemReq := range request.Items {
 		item, ok := NewItemFromConversationItemRequest(itemReq)
@@ -525,8 +525,8 @@ func (api *ConversationAPI) doCreateItems(ctx context.Context, conv *conversatio
 		itemsToCreate[i] = item
 	}
 
-	ok, err := api.conversationService.ValidateItems(ctx, itemsToCreate)
-	if !ok {
+	err := api.conversationService.ValidateItems(ctx, itemsToCreate)
+	if err != nil {
 		return nil, err
 	}
 
@@ -567,11 +567,11 @@ func (api *ConversationAPI) doCreateItems(ctx context.Context, conv *conversatio
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id}/items [get]
-func (api *ConversationAPI) listItems(reqCtx *gin.Context) {
+func (api *ConversationAPI) listItemsHandler(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
 	conv, _ := conversation.GetConversationFromContext(reqCtx)
 
-	result, err := api.doListItems(ctx, conv, reqCtx)
+	result, err := api.ListItems(ctx, conv, reqCtx)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  err.GetCode(),
@@ -584,7 +584,7 @@ func (api *ConversationAPI) listItems(reqCtx *gin.Context) {
 }
 
 // doListItems performs the business logic for listing items
-func (api *ConversationAPI) doListItems(ctx context.Context, conv *conversation.Conversation, reqCtx *gin.Context) (*ListResponse[*ConversationItemResponse], *common.Error) {
+func (api *ConversationAPI) ListItems(ctx context.Context, conv *conversation.Conversation, reqCtx *gin.Context) (*ListResponse[*ConversationItemResponse], *common.Error) {
 	pagination, err := query.GetCursorPaginationFromQuery(reqCtx, func(lastID string) (*uint, error) {
 		items, err := api.conversationService.FindItemsByFilter(ctx, conversation.ItemFilter{
 			PublicID:       &lastID,
@@ -653,13 +653,13 @@ func (api *ConversationAPI) doListItems(ctx context.Context, conv *conversation.
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id}/items/{item_id} [get]
-func (api *ConversationAPI) getItem(reqCtx *gin.Context) {
+func (api *ConversationAPI) getItemHandler(reqCtx *gin.Context) {
 	item, ok := conversation.GetConversationItemFromContext(reqCtx)
 	if !ok {
 		return
 	}
 
-	result, err := api.doGetItem(item)
+	result, err := api.GetItem(item)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  err.GetCode(),
@@ -672,7 +672,7 @@ func (api *ConversationAPI) getItem(reqCtx *gin.Context) {
 }
 
 // doGetItem performs the business logic for getting an item
-func (api *ConversationAPI) doGetItem(item *conversation.Item) (*ConversationItemResponse, *common.Error) {
+func (api *ConversationAPI) GetItem(item *conversation.Item) (*ConversationItemResponse, *common.Error) {
 	return domainToConversationItemResponse(item), nil
 }
 
@@ -690,7 +690,7 @@ func (api *ConversationAPI) doGetItem(item *conversation.Item) (*ConversationIte
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id}/items/{item_id} [delete]
-func (api *ConversationAPI) deleteItem(reqCtx *gin.Context) {
+func (api *ConversationAPI) deleteItemHandler(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
 	conv, ok := conversation.GetConversationFromContext(reqCtx)
 	if !ok {
@@ -707,7 +707,7 @@ func (api *ConversationAPI) deleteItem(reqCtx *gin.Context) {
 		return
 	}
 
-	result, err := api.doDeleteItem(ctx, conv, item)
+	result, err := api.DeleteItem(ctx, conv, item)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  err.GetCode(),
@@ -720,7 +720,7 @@ func (api *ConversationAPI) deleteItem(reqCtx *gin.Context) {
 }
 
 // doDeleteItem performs the business logic for deleting an item
-func (api *ConversationAPI) doDeleteItem(ctx context.Context, conv *conversation.Conversation, item *conversation.Item) (*ConversationItemResponse, *common.Error) {
+func (api *ConversationAPI) DeleteItem(ctx context.Context, conv *conversation.Conversation, item *conversation.Item) (*ConversationItemResponse, *common.Error) {
 	// Use efficient deletion with item public ID instead of loading all items
 	itemDeleted, err := api.conversationService.DeleteItemWithConversation(ctx, conv, item)
 	if err != nil {

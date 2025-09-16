@@ -52,10 +52,10 @@ func (responseRoute *ResponseRoute) registerRoutes(router *gin.RouterGroup) {
 
 	// Apply response middleware for routes that need response context
 	responseMiddleWare := responseRoute.responseService.GetResponseMiddleWare()
-	responseGroup.GET(fmt.Sprintf("/:%s", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.GetResponse)
-	responseGroup.DELETE(fmt.Sprintf("/:%s", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.DeleteResponse)
-	responseGroup.POST(fmt.Sprintf("/:%s/cancel", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.CancelResponse)
-	responseGroup.GET(fmt.Sprintf("/:%s/input_items", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.ListInputItems)
+	responseGroup.GET(fmt.Sprintf("/:%s", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.responseModelService.GetResponseHandler)
+	responseGroup.DELETE(fmt.Sprintf("/:%s", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.responseModelService.DeleteResponseHandler)
+	responseGroup.POST(fmt.Sprintf("/:%s/cancel", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.responseModelService.CancelResponseHandler)
+	responseGroup.GET(fmt.Sprintf("/:%s/input_items", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.responseModelService.ListInputItemsHandler)
 }
 
 // CreateResponse creates a new response from LLM
@@ -223,7 +223,7 @@ func (responseRoute *ResponseRoute) handleResponseCreation(reqCtx *gin.Context, 
 	if result.IsStreaming {
 		responseRoute.streamModelService.CreateStreamResponse(reqCtx, request, result.APIKey, result.Conversation, result.Response, result.ChatCompletionRequest)
 	} else {
-		responseRoute.nonStreamModelService.CreateNonStreamResponse(reqCtx, request, result.APIKey, result.Conversation, result.Response, result.ChatCompletionRequest)
+		responseRoute.nonStreamModelService.CreateNonStreamResponseHandler(reqCtx, request, result.APIKey, result.Conversation, result.Response, result.ChatCompletionRequest)
 	}
 }
 

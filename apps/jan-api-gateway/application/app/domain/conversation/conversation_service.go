@@ -177,82 +177,11 @@ func (s *ConversationService) AddItem(ctx context.Context, conversation *Convers
 	}
 
 	// Update conversation timestamp
-	conversation.UpdatedAt = now
-	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
-		return nil, common.NewError(err, "r8s9t0u1-v2w3-4567-rstu-890123456789")
+	if err := s.updateConversationTimestamp(ctx, conversation, "r8s9t0u1-v2w3-4567-rstu-890123456789"); err != nil {
+		return nil, err
 	}
 
 	return item, nil
-}
-
-// verifyItemBelongsToConversation efficiently checks if an item belongs to a conversation
-func (s *ConversationService) verifyItemBelongsToConversation(ctx context.Context, itemID uint, conversationID uint) *common.Error {
-	// Use the efficient exists check instead of loading all items
-	exists, err := s.itemRepo.ExistsByIDAndConversation(ctx, itemID, conversationID)
-	if err != nil {
-		return common.NewError(err, "n0o1p2q3-r4s5-6789-nopq-012345678901")
-	}
-
-	if !exists {
-		return common.NewErrorWithMessage("Item not in conversation", "o1p2q3r4-s5t6-7890-opqr-123456789012")
-	}
-
-	return nil
-}
-
-func (s *ConversationService) DeleteItem(ctx context.Context, conversation *Conversation, itemID uint, userID uint) (*Conversation, *common.Error) {
-	// Check access permissions - only owner can delete items
-	if conversation.UserID != userID {
-		return nil, common.NewErrorWithMessage("Access denied", "x4y5z6a7-b8c9-0123-xyza-456789012345")
-	}
-
-	// Get the item to verify it exists and belongs to this conversation
-	item, err := s.itemRepo.FindByID(ctx, itemID)
-	if err != nil {
-		return nil, common.NewError(err, "y5z6a7b8-c9d0-1234-yzab-567890123456")
-	}
-
-	if item == nil {
-		return nil, common.NewErrorWithMessage("Item not found", "z6a7b8c9-d0e1-2345-zabc-678901234567")
-	}
-
-	// Verify the item belongs to the conversation
-	conversationItems, err := s.itemRepo.FindByConversationID(ctx, conversation.ID)
-	if err != nil {
-		return nil, common.NewError(err, "a7b8c9d0-e1f2-3456-abcd-789012345678")
-	}
-
-	// Check if the item belongs to this conversation
-	itemFound := false
-	for _, convItem := range conversationItems {
-		if convItem.ID == itemID {
-			itemFound = true
-			break
-		}
-	}
-
-	if !itemFound {
-		return nil, common.NewErrorWithMessage("Item not in conversation", "b8c9d0e1-f2g3-4567-bcde-890123456789")
-	}
-
-	// Delete the item
-	if err := s.itemRepo.Delete(ctx, itemID); err != nil {
-		return nil, common.NewError(err, "c9d0e1f2-g3h4-5678-cdef-901234567890")
-	}
-
-	// Update conversation timestamp
-	conversation.UpdatedAt = time.Now()
-	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
-		return nil, common.NewError(err, "d0e1f2g3-h4i5-6789-defg-012345678901")
-	}
-
-	// Load the updated conversation with remaining items
-	updatedConversation, convErr := s.GetConversationByPublicIDAndUserID(ctx, conversation.PublicID, userID)
-	if convErr != nil {
-		return nil, convErr
-	}
-
-	return updatedConversation, nil
 }
 
 // DeleteItemWithConversation deletes an item by its ID and updates the conversation accordingly.
@@ -261,9 +190,8 @@ func (s *ConversationService) DeleteItemWithConversation(ctx context.Context, co
 		return nil, common.NewError(err, "e1f2g3h4-i5j6-7890-efgh-123456789012")
 	}
 
-	conversation.UpdatedAt = time.Now()
-	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
-		return nil, common.NewError(err, "f2g3h4i5-j6k7-8901-fghi-234567890123")
+	if err := s.updateConversationTimestamp(ctx, conversation, "f2g3h4i5-j6k7-8901-fghi-234567890123"); err != nil {
+		return nil, err
 	}
 
 	return item, nil
@@ -281,16 +209,25 @@ func (s *ConversationService) generateItemPublicID() (string, error) {
 	return idgen.GenerateSecureID("msg", 42)
 }
 
-func (s *ConversationService) ValidateItems(ctx context.Context, items []*Item) (bool, *common.Error) {
+// updateConversationTimestamp updates the conversation's UpdatedAt timestamp and saves to database
+func (s *ConversationService) updateConversationTimestamp(ctx context.Context, conversation *Conversation, errorCode string) *common.Error {
+	conversation.UpdatedAt = time.Now()
+	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
+		return common.NewError(err, errorCode)
+	}
+	return nil
+}
+
+func (s *ConversationService) ValidateItems(ctx context.Context, items []*Item) (*common.Error) {
 	if len(items) > 100 {
-		return false, common.NewErrorWithMessage("Too many items", "g3h4i5j6-k7l8-9012-ghij-345678901234")
+		return common.NewErrorWithMessage("Too many items", "g3h4i5j6-k7l8-9012-ghij-345678901234")
 	}
 	for _, itemData := range items {
 		if errCode := s.validator.ValidateItemContent(itemData.Content); errCode != nil {
-			return false, common.NewErrorWithMessage("Item validation failed", "h4i5j6k7-l8m9-0123-hijk-456789012345")
+			return common.NewErrorWithMessage("Item validation failed", "h4i5j6k7-l8m9-0123-hijk-456789012345")
 		}
 	}
-	return true, nil
+	return nil
 }
 
 func (s *ConversationService) FindItemsByFilter(ctx context.Context, filter ItemFilter, p *query.Pagination) ([]*Item, *common.Error) {
@@ -340,9 +277,8 @@ func (s *ConversationService) AddMultipleItems(ctx context.Context, conversation
 		createdItems[i] = item
 	}
 
-	conversation.UpdatedAt = now
-	if err := s.conversationRepo.Update(ctx, conversation); err != nil {
-		return nil, common.NewError(err, "m9n0o1p2-q3r4-5678-mnop-901234567890")
+	if err := s.updateConversationTimestamp(ctx, conversation, "m9n0o1p2-q3r4-5678-mnop-901234567890"); err != nil {
+		return nil, err
 	}
 
 	return createdItems, nil

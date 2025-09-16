@@ -33,9 +33,9 @@ func NewNonStreamModelService(responseModelService *ResponseModelService) *NonSt
 }
 
 // CreateNonStreamResponse handles the business logic for creating a non-streaming response
-func (h *NonStreamModelService) CreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *Response, chatCompletionRequest *openai.ChatCompletionRequest) {
+func (h *NonStreamModelService) CreateNonStreamResponseHandler(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *Response, chatCompletionRequest *openai.ChatCompletionRequest) {
 
-	result, err := h.doCreateNonStreamResponse(reqCtx, request, key, conv, responseEntity, chatCompletionRequest)
+	result, err := h.CreateNonStreamResponse(reqCtx, request, key, conv, responseEntity, chatCompletionRequest)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(
 			http.StatusBadRequest,
@@ -50,7 +50,7 @@ func (h *NonStreamModelService) CreateNonStreamResponse(reqCtx *gin.Context, req
 }
 
 // doCreateNonStreamResponse performs the business logic for creating a non-streaming response
-func (h *NonStreamModelService) doCreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *Response, chatCompletionRequest *openai.ChatCompletionRequest) (responsetypes.Response, *common.Error) {
+func (h *NonStreamModelService) CreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *Response, chatCompletionRequest *openai.ChatCompletionRequest) (responsetypes.Response, *common.Error) {
 	// Process with Jan inference client for non-streaming with timeout
 	janInferenceClient := janinference.NewJanInferenceClient(reqCtx)
 	ctx, cancel := context.WithTimeout(reqCtx.Request.Context(), DefaultTimeout)
