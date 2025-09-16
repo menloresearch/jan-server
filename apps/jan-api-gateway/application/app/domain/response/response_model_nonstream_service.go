@@ -83,8 +83,8 @@ func (h *NonStreamModelService) CreateNonStreamResponse(reqCtx *gin.Context, req
 	// Update response with all fields at once (optimized to prevent N+1 queries)
 	updates := &ResponseUpdates{
 		Status: ptr.ToString(string(ResponseStatusCompleted)),
-		Output: responseData.T.Output,
-		Usage:  responseData.T.Usage,
+		Output: responseData.Output,
+		Usage:  responseData.Usage,
 	}
 	success, updateErr := h.responseService.UpdateResponseFields(reqCtx, responseEntity.ID, updates)
 	if !success {
@@ -92,11 +92,11 @@ func (h *NonStreamModelService) CreateNonStreamResponse(reqCtx *gin.Context, req
 		logger.GetLogger().Errorf("Failed to update response fields: %s - %s\n", updateErr.GetCode(), updateErr.Error())
 	}
 
-	return responseData.T, nil
+	return responseData, nil
 }
 
 // convertFromChatCompletionResponse converts a ChatCompletionResponse to a Response
-func (h *NonStreamModelService) convertFromChatCompletionResponse(chatResp *openai.ChatCompletionResponse, req *requesttypes.CreateResponseRequest, conv *conversation.Conversation, responseEntity *Response) responsetypes.OpenAIGeneralResponse[responsetypes.Response] {
+func (h *NonStreamModelService) convertFromChatCompletionResponse(chatResp *openai.ChatCompletionResponse, req *requesttypes.CreateResponseRequest, conv *conversation.Conversation, responseEntity *Response) responsetypes.Response {
 
 	// Extract the content and reasoning from the first choice
 	var outputText string
@@ -209,7 +209,5 @@ func (h *NonStreamModelService) convertFromChatCompletionResponse(chatResp *open
 		Metadata:   req.Metadata,
 	}
 
-	return responsetypes.OpenAIGeneralResponse[responsetypes.Response]{
-		T: response,
-	}
+	return response
 }

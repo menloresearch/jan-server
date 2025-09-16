@@ -393,11 +393,5 @@ func (h *ResponseModelService) sendErrorResponse(reqCtx *gin.Context, statusCode
 
 // sendSuccessResponse sends a standardized success response
 func (h *ResponseModelService) sendSuccessResponse(reqCtx *gin.Context, data any) {
-	status := responsetypes.ResponseCodeOk
-	objectType := responsetypes.ObjectTypeResponse
-	reqCtx.JSON(http.StatusOK, responsetypes.OpenAIGeneralResponse[responsetypes.Response]{
-		JanStatus: &status,
-		Object:    &objectType,
-		T:         data.(responsetypes.Response),
-	})
+	reqCtx.JSON(http.StatusOK, data.(responsetypes.Response))
 }

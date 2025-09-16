@@ -747,7 +747,7 @@ func (h *StreamModelService) streamResponseToChannel(reqCtx *gin.Context, reques
 
 		// Update response with all fields at once (optimized to prevent N+1 queries)
 		updates := &ResponseUpdates{
-			Status: ptr.ToRespoToStringnseStatus(string(ResponseStatusCompleted)),
+			Status: ptr.ToString(string(ResponseStatusCompleted)),
 			Output: outputData,
 		}
 		success, updateErr := h.responseService.UpdateResponseFields(reqCtx, responseEntity.ID, updates)
