@@ -46,21 +46,14 @@ func NewResponseService(responseRepo ResponseRepository, itemRepo conversation.I
 	}
 }
 
-// CreateResponse creates a new response
-func (s *ResponseService) CreateResponse(ctx context.Context, userID uint, conversationID *uint, model string, input interface{}, systemPrompt *string, params *ResponseParams) (*Response, *common.Error) {
-	return s.CreateResponseWithPrevious(ctx, userID, conversationID, nil, model, input, systemPrompt, params)
+// CreateResponse creates a new response using a Response domain object
+func (s *ResponseService) CreateResponse(ctx context.Context, response *Response) (*Response, *common.Error) {
+	return s.CreateResponseWithPrevious(ctx, response, nil)
 }
 
 // CreateResponseWithPrevious creates a new response, optionally linking to a previous response
-func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID uint, conversationID *uint, previousResponseID *string, model string, input interface{}, systemPrompt *string, params *ResponseParams) (*Response, *common.Error) {
-	// Convert input to JSON string
-	inputJSON, err := json.Marshal(input)
-	if err != nil {
-		return nil, common.NewError(err, "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
-	}
-
+func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, response *Response, previousResponseID *string) (*Response, *common.Error) {
 	// Handle previous_response_id logic
-	var finalConversationID *uint = conversationID
 	if previousResponseID != nil {
 		// Load the previous response
 		previousResponse, err := s.responseRepo.FindByPublicID(ctx, *previousResponseID)
@@ -72,135 +65,47 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID
 		}
 
 		// Validate that the previous response belongs to the same user
-		if previousResponse.UserID != userID {
+		if previousResponse.UserID != response.UserID {
 			return nil, common.NewErrorWithMessage("Previous response does not belong to the current user", "d4e5f6g7-h8i9-0123-defg-456789012345")
 		}
 
 		// Use the previous response's conversation ID
-		finalConversationID = previousResponse.ConversationID
-		if finalConversationID == nil {
+		response.ConversationID = previousResponse.ConversationID
+		if response.ConversationID == nil {
 			return nil, common.NewErrorWithMessage("Previous response does not belong to any conversation", "e5f6g7h8-i9j0-1234-efgh-567890123456")
 		}
 	}
 
-	// Generate public ID
-	publicID, err := idgen.GenerateSecureID("resp", 42)
-	if err != nil {
-		return nil, common.NewError(err, "f6g7h8i9-j0k1-2345-fghi-678901234567")
+	// Set the previous response ID
+	response.PreviousResponseID = previousResponseID
+
+	// Generate public ID if not already set
+	if response.PublicID == "" {
+		publicID, err := idgen.GenerateSecureID("resp", 42)
+		if err != nil {
+			return nil, common.NewError(err, "f6g7h8i9-j0k1-2345-fghi-678901234567")
+		}
+		response.PublicID = publicID
 	}
 
-	response := &Response{
-		PublicID:           publicID,
-		UserID:             userID,
-		ConversationID:     finalConversationID,
-		PreviousResponseID: previousResponseID,
-		Model:              model,
-		Status:             ResponseStatusPending,
-		Input:              string(inputJSON),
-		SystemPrompt:       systemPrompt,
-		CreatedAt:          time.Now(),
-		UpdatedAt:          time.Now(),
+	// Set default values
+	if response.Status == "" {
+		response.Status = ResponseStatusPending
 	}
+	if response.CreatedAt.IsZero() {
+		response.CreatedAt = time.Now()
+	}
+	response.UpdatedAt = time.Now()
 
-	// Apply parameters if provided
-	if params != nil {
-		response.MaxTokens = params.MaxTokens
-		response.Temperature = params.Temperature
-		response.TopP = params.TopP
-		response.TopK = params.TopK
-		response.RepetitionPenalty = params.RepetitionPenalty
-		response.Seed = params.Seed
-		response.PresencePenalty = params.PresencePenalty
-		response.FrequencyPenalty = params.FrequencyPenalty
-		response.Stream = params.Stream
-		response.Background = params.Background
-		response.Timeout = params.Timeout
-		response.User = params.User
-
-		// Convert complex fields to JSON strings
-		if params.Stop != nil {
-			stopJSON, err := json.Marshal(params.Stop)
-			if err != nil {
-				return nil, common.NewError(err, "g7h8i9j0-k1l2-3456-ghij-789012345678")
-			}
-			stopStr := string(stopJSON)
-			// For JSON columns, use null for empty arrays/objects
-			if stopStr == "[]" || stopStr == "{}" {
-				response.Stop = nil
-			} else {
-				response.Stop = &stopStr
-			}
-		}
-
-		if params.LogitBias != nil {
-			logitBiasJSON, err := json.Marshal(params.LogitBias)
-			if err != nil {
-				return nil, common.NewError(err, "h8i9j0k1-l2m3-4567-hijk-890123456789")
-			}
-			logitBiasStr := string(logitBiasJSON)
-			// For JSON columns, use null for empty arrays/objects
-			if logitBiasStr == "[]" || logitBiasStr == "{}" {
-				response.LogitBias = nil
-			} else {
-				response.LogitBias = &logitBiasStr
-			}
-		}
-
-		if params.ResponseFormat != nil {
-			responseFormatJSON, err := json.Marshal(params.ResponseFormat)
-			if err != nil {
-				return nil, common.NewError(err, "i9j0k1l2-m3n4-5678-ijkl-901234567890")
-			}
-			responseFormatStr := string(responseFormatJSON)
-			// For JSON columns, use null for empty arrays/objects
-			if responseFormatStr == "[]" || responseFormatStr == "{}" {
-				response.ResponseFormat = nil
-			} else {
-				response.ResponseFormat = &responseFormatStr
-			}
-		}
-
-		if params.Tools != nil {
-			toolsJSON, err := json.Marshal(params.Tools)
-			if err != nil {
-				return nil, common.NewError(err, "j0k1l2m3-n4o5-6789-jklm-012345678901")
-			}
-			toolsStr := string(toolsJSON)
-			// For JSON columns, use null for empty arrays/objects
-			if toolsStr == "[]" || toolsStr == "{}" {
-				response.Tools = nil
-			} else {
-				response.Tools = &toolsStr
-			}
-		}
-
-		if params.ToolChoice != nil {
-			toolChoiceJSON, err := json.Marshal(params.ToolChoice)
-			if err != nil {
-				return nil, common.NewError(err, "k1l2m3n4-o5p6-7890-klmn-123456789012")
-			}
-			toolChoiceStr := string(toolChoiceJSON)
-			// For JSON columns, use null for empty arrays/objects
-			if toolChoiceStr == "[]" || toolChoiceStr == "{}" {
-				response.ToolChoice = nil
-			} else {
-				response.ToolChoice = &toolChoiceStr
-			}
-		}
-
-		if params.Metadata != nil {
-			metadataJSON, err := json.Marshal(params.Metadata)
-			if err != nil {
-				return nil, common.NewError(err, "l2m3n4o5-p6q7-8901-lmno-234567890123")
-			}
-			metadataStr := string(metadataJSON)
-			// For JSON columns, use null for empty arrays/objects
-			if metadataStr == "[]" || metadataStr == "{}" {
-				response.Metadata = nil
-			} else {
-				response.Metadata = &metadataStr
-			}
-		}
+	// Validate required fields
+	if response.UserID == 0 {
+		return nil, common.NewErrorWithMessage("UserID is required", "m3n4o5p6-q7r8-9012-mnop-345678901234")
+	}
+	if response.Model == "" {
+		return nil, common.NewErrorWithMessage("Model is required", "n4o5p6q7-r8s9-0123-nopq-456789012345")
+	}
+	if response.Input == "" {
+		return nil, common.NewErrorWithMessage("Input is required", "o5p6q7r8-s9t0-1234-opqr-567890123456")
 	}
 
 	if err := s.responseRepo.Create(ctx, response); err != nil {
@@ -446,13 +351,28 @@ func (s *ResponseService) GetItemsForResponse(ctx context.Context, responseID ui
 
 // CreateResponseFromRequest creates a response from an API request structure
 func (s *ResponseService) CreateResponseFromRequest(ctx context.Context, userID uint, req *ResponseRequest) (*Response, *common.Error) {
-	// Convert the request to ResponseParams
-	params := &ResponseParams{
-		Stream: req.Stream,
+	// Convert input to JSON string
+	inputJSON, jsonErr := json.Marshal(req.Input)
+	if jsonErr != nil {
+		return nil, common.NewError(jsonErr, "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+	}
+
+	// Build Response object from request
+	response := &Response{
+		UserID:             userID,
+		ConversationID:     nil, // Will be set by CreateResponseWithPrevious if previousResponseID is provided
+		PreviousResponseID: req.PreviousResponseID,
+		Model:              req.Model,
+		Input:              string(inputJSON),
+		SystemPrompt:       nil,
+		Status:             ResponseStatusPending,
+		Stream:             req.Stream,
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
 	}
 
 	// Create the response with previous_response_id handling
-	return s.CreateResponseWithPrevious(ctx, userID, nil, req.PreviousResponseID, req.Model, req.Input, nil, params)
+	return s.CreateResponseWithPrevious(ctx, response, req.PreviousResponseID)
 }
 
 // ResponseRequest represents the API request structure for creating a response

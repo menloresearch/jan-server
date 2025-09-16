@@ -2,6 +2,7 @@ package response
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -144,7 +145,95 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 	if conversation != nil {
 		conversationID = &conversation.ID
 	}
-	responseEntity, err := h.responseService.CreateResponse(ctx, userID, conversationID, request.Model, request.Input, request.SystemPrompt, responseParams)
+
+	// Convert input to JSON string
+	inputJSON, jsonErr := json.Marshal(request.Input)
+	if jsonErr != nil {
+		return nil, common.NewError(jsonErr, "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+	}
+
+	// Build Response object from parameters
+	response := &Response{
+		UserID:         userID,
+		ConversationID: conversationID,
+		Model:          request.Model,
+		Input:          string(inputJSON),
+		SystemPrompt:   request.SystemPrompt,
+		Status:         ResponseStatusPending,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+	}
+
+	// Apply response parameters
+	response.MaxTokens = responseParams.MaxTokens
+	response.Temperature = responseParams.Temperature
+	response.TopP = responseParams.TopP
+	response.TopK = responseParams.TopK
+	response.RepetitionPenalty = responseParams.RepetitionPenalty
+	response.Seed = responseParams.Seed
+	response.PresencePenalty = responseParams.PresencePenalty
+	response.FrequencyPenalty = responseParams.FrequencyPenalty
+	response.Stream = responseParams.Stream
+	response.Background = responseParams.Background
+	response.Timeout = responseParams.Timeout
+	response.User = responseParams.User
+
+	// Convert complex fields to JSON strings
+	if responseParams.Stop != nil {
+		if stopJSON, err := json.Marshal(responseParams.Stop); err == nil {
+			stopStr := string(stopJSON)
+			if stopStr != "[]" && stopStr != "{}" {
+				response.Stop = &stopStr
+			}
+		}
+	}
+
+	if responseParams.LogitBias != nil {
+		if logitBiasJSON, err := json.Marshal(responseParams.LogitBias); err == nil {
+			logitBiasStr := string(logitBiasJSON)
+			if logitBiasStr != "[]" && logitBiasStr != "{}" {
+				response.LogitBias = &logitBiasStr
+			}
+		}
+	}
+
+	if responseParams.ResponseFormat != nil {
+		if responseFormatJSON, err := json.Marshal(responseParams.ResponseFormat); err == nil {
+			responseFormatStr := string(responseFormatJSON)
+			if responseFormatStr != "[]" && responseFormatStr != "{}" {
+				response.ResponseFormat = &responseFormatStr
+			}
+		}
+	}
+
+	if responseParams.Tools != nil {
+		if toolsJSON, err := json.Marshal(responseParams.Tools); err == nil {
+			toolsStr := string(toolsJSON)
+			if toolsStr != "[]" && toolsStr != "{}" {
+				response.Tools = &toolsStr
+			}
+		}
+	}
+
+	if responseParams.ToolChoice != nil {
+		if toolChoiceJSON, err := json.Marshal(responseParams.ToolChoice); err == nil {
+			toolChoiceStr := string(toolChoiceJSON)
+			if toolChoiceStr != "[]" && toolChoiceStr != "{}" {
+				response.ToolChoice = &toolChoiceStr
+			}
+		}
+	}
+
+	if responseParams.Metadata != nil {
+		if metadataJSON, err := json.Marshal(responseParams.Metadata); err == nil {
+			metadataStr := string(metadataJSON)
+			if metadataStr != "[]" && metadataStr != "{}" {
+				response.Metadata = &metadataStr
+			}
+		}
+	}
+
+	responseEntity, err := h.responseService.CreateResponse(ctx, response)
 	if err != nil {
 		return nil, err
 	}
