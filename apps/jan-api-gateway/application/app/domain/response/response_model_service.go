@@ -105,14 +105,14 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 
 	// Handle conversation logic using domain service
 	conversation, err := h.responseService.HandleConversation(ctx, userID, request)
-	if !err.IsEmpty() {
+	if err != nil {
 		return nil, err
 	}
 
 	// If previous_response_id is provided, prepend conversation history to input messages
 	if request.PreviousResponseID != nil && *request.PreviousResponseID != "" {
 		conversationMessages, err := h.responseService.ConvertConversationItemsToMessages(ctx, conversation)
-		if !err.IsEmpty() {
+		if err != nil {
 			return nil, err
 		}
 		// Prepend conversation history to the input messages
@@ -145,7 +145,7 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 		conversationID = &conversation.ID
 	}
 	responseEntity, err := h.responseService.CreateResponse(ctx, userID, conversationID, request.Model, request.Input, request.SystemPrompt, responseParams)
-	if !err.IsEmpty() {
+	if err != nil {
 		return nil, err
 	}
 
@@ -165,7 +165,7 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 		ChatCompletionRequest: chatCompletionRequest,
 		APIKey:                key,
 		IsStreaming:           isStreaming,
-	}, common.EmptyError
+	}, nil
 }
 
 // handleConversation handles conversation creation or loading based on the request
@@ -180,7 +180,7 @@ func (h *ResponseModelService) GetResponse(reqCtx *gin.Context) {
 	}
 
 	result, err := h.doGetResponse(responseEntity)
-	if !err.IsEmpty() {
+	if err != nil {
 		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.Code, err.Message)
 		return
 	}
@@ -192,7 +192,7 @@ func (h *ResponseModelService) GetResponse(reqCtx *gin.Context) {
 func (h *ResponseModelService) doGetResponse(responseEntity *Response) (responsetypes.Response, *common.Error) {
 	// Convert domain response to API response using domain service
 	apiResponse := h.responseService.ConvertDomainResponseToAPIResponse(responseEntity)
-	return apiResponse, common.EmptyError
+	return apiResponse, nil
 }
 
 // DeleteResponse handles the business logic for deleting a response
@@ -205,7 +205,7 @@ func (h *ResponseModelService) DeleteResponse(reqCtx *gin.Context) {
 	}
 
 	result, err := h.doDeleteResponse(reqCtx, responseEntity)
-	if !err.IsEmpty() {
+	if err != nil {
 		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.Code, err.Message)
 		return
 	}
@@ -231,7 +231,7 @@ func (h *ResponseModelService) doDeleteResponse(reqCtx *gin.Context, responseEnt
 		CancelledAt: ptr.ToInt64(time.Now().Unix()),
 	}
 
-	return deletedResponse, common.EmptyError
+	return deletedResponse, nil
 }
 
 // CancelResponse handles the business logic for cancelling a response
@@ -244,7 +244,7 @@ func (h *ResponseModelService) CancelResponse(reqCtx *gin.Context) {
 	}
 
 	result, err := h.doCancelResponse(responseEntity)
-	if !err.IsEmpty() {
+	if err != nil {
 		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.Code, err.Message)
 		return
 	}
@@ -265,7 +265,7 @@ func (h *ResponseModelService) doCancelResponse(responseEntity *Response) (respo
 		CancelledAt: ptr.ToInt64(time.Now().Unix()),
 	}
 
-	return mockResponse, common.EmptyError
+	return mockResponse, nil
 }
 
 // ListInputItems handles the business logic for listing input items
@@ -278,7 +278,7 @@ func (h *ResponseModelService) ListInputItems(reqCtx *gin.Context) {
 	}
 
 	result, err := h.doListInputItems(reqCtx, responseEntity)
-	if !err.IsEmpty() {
+	if err != nil {
 		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.Code, err.Message)
 		return
 	}
@@ -299,7 +299,7 @@ func (h *ResponseModelService) doListInputItems(reqCtx *gin.Context, responseEnt
 	// Get input items for the response (only user role messages)
 	userRole := conversation.ItemRole("user")
 	items, err := h.responseService.GetItemsForResponse(reqCtx, responseEntity.ID, &userRole)
-	if !err.IsEmpty() {
+	if err != nil {
 		return responsetypes.OpenAIListResponse[responsetypes.InputItem]{}, err
 	}
 
@@ -369,7 +369,7 @@ func (h *ResponseModelService) doListInputItems(reqCtx *gin.Context, responseEnt
 		FirstID:   firstID,
 		LastID:    lastID,
 		T:         paginatedItems,
-	}, common.EmptyError
+	}, nil
 }
 
 // sendErrorResponse sends a standardized error response

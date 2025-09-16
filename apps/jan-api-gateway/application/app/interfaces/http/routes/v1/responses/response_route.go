@@ -196,7 +196,7 @@ func (responseRoute *ResponseRoute) CreateResponse(reqCtx *gin.Context) {
 
 	// Call domain service (pure business logic)
 	result, err := responseRoute.responseModelService.CreateResponse(ctx, userID, domainRequest)
-	if !err.IsEmpty() {
+	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  err.Code,
 			Error: err.Message,
@@ -361,7 +361,7 @@ func (responseRoute *ResponseRoute) CancelResponse(reqCtx *gin.Context) {
 
 	// Reload the response to get updated status
 	updatedResp, err := responseRoute.responseService.GetResponseByPublicID(ctx, resp.PublicID)
-	if !err.IsEmpty() {
+	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Code:  err.Code,
 			Error: err.Message,
@@ -432,7 +432,7 @@ func (responseRoute *ResponseRoute) ListInputItems(reqCtx *gin.Context) {
 
 	// Get items for this response using the response service
 	items, err := responseRoute.responseService.GetItemsForResponse(ctx, resp.ID, nil)
-	if !err.IsEmpty() {
+	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Code:  err.Code,
 			Error: err.Message,

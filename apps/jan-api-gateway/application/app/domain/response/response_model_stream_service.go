@@ -54,7 +54,7 @@ func (h *StreamModelService) validateRequest(request *requesttypes.CreateRespons
 	if request.Input == nil {
 		return false, common.NewError("b2c3d4e5-f6g7-8901-bcde-f23456789012", "Input is required")
 	}
-	return true, common.EmptyError
+	return true, nil
 }
 
 // checkContextCancellation checks if context was cancelled and sends error to channel
@@ -657,7 +657,7 @@ func (h *StreamModelService) streamResponseToChannel(reqCtx *gin.Context, reques
 		}
 		// Get response entity to get the internal ID
 		responseEntity, err := h.responseService.GetResponseByPublicID(reqCtx, responseID)
-		if err.IsEmpty() && responseEntity != nil {
+		if err == nil && responseEntity != nil {
 			success, err := h.responseService.AppendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}, &responseEntity.ID)
 			if !success {
 				// Log error but don't fail the response
@@ -736,7 +736,7 @@ func (h *StreamModelService) streamResponseToChannel(reqCtx *gin.Context, reques
 	// Update response status to completed and save output
 	// Get response entity by public ID to update status
 	responseEntity, getErr := h.responseService.GetResponseByPublicID(reqCtx, responseID)
-	if getErr.IsEmpty() && responseEntity != nil {
+	if getErr == nil && responseEntity != nil {
 		// Update status to completed
 		success, updateErr := h.responseService.UpdateResponseStatus(reqCtx, responseEntity.ID, ResponseStatusCompleted)
 		if !success {

@@ -14,11 +14,6 @@ func NewError(code, message string) *Error {
 	}
 }
 
-// IsEmpty checks if the error is empty (no error)
-func (e *Error) IsEmpty() bool {
-	return e == nil || e.Code == ""
-}
-
 // String returns the string representation of the error
 func (e *Error) String() string {
 	if e == nil {
@@ -31,6 +26,3 @@ func (e *Error) String() string {
 func (e *Error) Error() string {
 	return e.String()
 }
-
-// EmptyError represents an empty error (no error occurred)
-var EmptyError = &Error{}

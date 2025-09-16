@@ -36,7 +36,7 @@ func NewNonStreamModelService(responseModelService *ResponseModelService) *NonSt
 func (h *NonStreamModelService) CreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *Response, chatCompletionRequest *openai.ChatCompletionRequest) {
 
 	result, err := h.doCreateNonStreamResponse(reqCtx, request, key, conv, responseEntity, chatCompletionRequest)
-	if !err.IsEmpty() {
+	if err != nil {
 		reqCtx.AbortWithStatusJSON(
 			http.StatusBadRequest,
 			responsetypes.ErrorResponse{
@@ -100,7 +100,7 @@ func (h *NonStreamModelService) doCreateNonStreamResponse(reqCtx *gin.Context, r
 		}
 	}
 
-	return responseData.T, common.EmptyError
+	return responseData.T, nil
 }
 
 // convertFromChatCompletionResponse converts a ChatCompletionResponse to a Response

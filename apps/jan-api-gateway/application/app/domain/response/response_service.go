@@ -207,7 +207,7 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID
 		return nil, common.NewError("m3n4o5p6-q7r8-9012-mnop-345678901234", "Failed to create response")
 	}
 
-	return response, common.EmptyError
+	return response, nil
 }
 
 // UpdateResponseStatus updates the status of a response
@@ -238,7 +238,7 @@ func (s *ResponseService) UpdateResponseStatus(ctx context.Context, responseID u
 		return false, common.NewError("p6q7r8s9-t0u1-2345-pqrs-678901234567", "Failed to update response status")
 	}
 
-	return true, common.EmptyError
+	return true, nil
 }
 
 // UpdateResponseOutput updates the output of a response
@@ -270,7 +270,7 @@ func (s *ResponseService) UpdateResponseOutput(ctx context.Context, responseID u
 		return false, common.NewError("t0u1v2w3-x4y5-6789-tuvw-012345678901", "Failed to update response output")
 	}
 
-	return true, common.EmptyError
+	return true, nil
 }
 
 // UpdateResponseUsage updates the usage statistics of a response
@@ -302,7 +302,7 @@ func (s *ResponseService) UpdateResponseUsage(ctx context.Context, responseID ui
 		return false, common.NewError("x4y5z6a7-b8c9-0123-xyza-456789012345", "Failed to update response usage")
 	}
 
-	return true, common.EmptyError
+	return true, nil
 }
 
 // UpdateResponseError updates the error information of a response
@@ -337,7 +337,7 @@ func (s *ResponseService) UpdateResponseError(ctx context.Context, responseID ui
 		return false, common.NewError("b8c9d0e1-f2g3-4567-bcde-890123456789", "Failed to update response error")
 	}
 
-	return true, common.EmptyError
+	return true, nil
 }
 
 // GetResponseByPublicID gets a response by public ID
@@ -346,7 +346,7 @@ func (s *ResponseService) GetResponseByPublicID(ctx context.Context, publicID st
 	if err != nil {
 		return nil, common.NewError("c9d0e1f2-g3h4-5678-cdef-901234567890", "Failed to get response")
 	}
-	return response, common.EmptyError
+	return response, nil
 }
 
 // GetResponsesByUserID gets responses for a specific user
@@ -355,7 +355,7 @@ func (s *ResponseService) GetResponsesByUserID(ctx context.Context, userID uint,
 	if err != nil {
 		return nil, common.NewError("d0e1f2g3-h4i5-6789-defg-012345678901", "Failed to get responses by user ID")
 	}
-	return responses, common.EmptyError
+	return responses, nil
 }
 
 // GetResponsesByConversationID gets responses for a specific conversation
@@ -364,7 +364,7 @@ func (s *ResponseService) GetResponsesByConversationID(ctx context.Context, conv
 	if err != nil {
 		return nil, common.NewError("e1f2g3h4-i5j6-7890-efgh-123456789012", "Failed to get responses by conversation ID")
 	}
-	return responses, common.EmptyError
+	return responses, nil
 }
 
 // DeleteResponse deletes a response
@@ -372,7 +372,7 @@ func (s *ResponseService) DeleteResponse(ctx context.Context, responseID uint) (
 	if err := s.responseRepo.DeleteByID(ctx, responseID); err != nil {
 		return false, common.NewError("f2g3h4i5-j6k7-8901-fghi-234567890123", "Failed to delete response")
 	}
-	return true, common.EmptyError
+	return true, nil
 }
 
 // CreateItemsForResponse creates items for a specific response
@@ -415,7 +415,7 @@ func (s *ResponseService) CreateItemsForResponse(ctx context.Context, responseID
 		createdItems = append(createdItems, item)
 	}
 
-	return createdItems, common.EmptyError
+	return createdItems, nil
 }
 
 // GetItemsForResponse gets items that belong to a specific response, optionally filtered by role
@@ -441,7 +441,7 @@ func (s *ResponseService) GetItemsForResponse(ctx context.Context, responseID ui
 		return nil, common.NewError("n0o1p2q3-r4s5-6789-nopq-012345678901", "Failed to get items")
 	}
 
-	return items, common.EmptyError
+	return items, nil
 }
 
 // CreateResponseFromRequest creates a response from an API request structure
@@ -548,11 +548,11 @@ func GetResponseFromContext(reqCtx *gin.Context) (*Response, bool) {
 func (s *ResponseService) ProcessResponseRequest(ctx context.Context, userID uint, req *ResponseRequest) (*Response, *common.Error) {
 	// Create response from request
 	responseEntity, err := s.CreateResponseFromRequest(ctx, userID, req)
-	if !err.IsEmpty() {
+	if err != nil {
 		return nil, err
 	}
 
-	return responseEntity, common.EmptyError
+	return responseEntity, nil
 }
 
 // ConvertDomainResponseToAPIResponse converts a domain response to API response format
@@ -639,14 +639,14 @@ func (s *ResponseService) ConvertConversationItemToInputItem(item *conversation.
 func (s *ResponseService) HandleConversation(ctx context.Context, userID uint, request *requesttypes.CreateResponseRequest) (*conversation.Conversation, *common.Error) {
 	// If store is explicitly set to false, don't create or use any conversation
 	if request.Store != nil && !*request.Store {
-		return nil, common.EmptyError
+		return nil, nil
 	}
 
 	// If previous_response_id is provided, load the conversation from the previous response
 	if request.PreviousResponseID != nil && *request.PreviousResponseID != "" {
 		// Load the previous response
 		previousResponse, err := s.GetResponseByPublicID(ctx, *request.PreviousResponseID)
-		if !err.IsEmpty() {
+		if err != nil {
 			return nil, err
 		}
 		if previousResponse == nil {
@@ -664,29 +664,29 @@ func (s *ResponseService) HandleConversation(ctx context.Context, userID uint, r
 		}
 
 		conv, err := s.conversationService.GetConversationByID(ctx, *previousResponse.ConversationID)
-		if !err.IsEmpty() {
+		if err != nil {
 			return nil, err
 		}
-		return conv, common.EmptyError
+		return conv, nil
 	}
 
 	// Check if conversation is specified and not 'client-created-root'
 	if request.Conversation != nil && *request.Conversation != "" && *request.Conversation != ClientCreatedRootConversationID {
 		// Load existing conversation
 		conv, err := s.conversationService.GetConversationByPublicIDAndUserID(ctx, *request.Conversation, userID)
-		if !err.IsEmpty() {
+		if err != nil {
 			return nil, err
 		}
-		return conv, common.EmptyError
+		return conv, nil
 	}
 
 	// Create new conversation
 	conv, err := s.conversationService.CreateConversation(ctx, userID, nil, true, nil)
-	if !err.IsEmpty() {
+	if err != nil {
 		return nil, err
 	}
 
-	return conv, common.EmptyError
+	return conv, nil
 }
 
 // AppendMessagesToConversation appends messages to a conversation
@@ -752,12 +752,12 @@ func (s *ResponseService) AppendMessagesToConversation(ctx context.Context, conv
 	// Add items to conversation
 	if len(items) > 0 {
 		_, err := s.conversationService.AddMultipleItems(ctx, conv, conv.UserID, items)
-		if !err.IsEmpty() {
+		if err != nil {
 			return false, err
 		}
 	}
 
-	return true, common.EmptyError
+	return true, nil
 }
 
 // ConvertToChatCompletionRequest converts a response request to OpenAI chat completion request
@@ -821,7 +821,7 @@ func (s *ResponseService) ConvertToChatCompletionRequest(req *requesttypes.Creat
 func (s *ResponseService) ConvertConversationItemsToMessages(ctx context.Context, conv *conversation.Conversation) ([]openai.ChatCompletionMessage, *common.Error) {
 	// Load conversation with items
 	convWithItems, err := s.conversationService.GetConversationByPublicIDAndUserID(ctx, conv.PublicID, conv.UserID)
-	if !err.IsEmpty() {
+	if err != nil {
 		return nil, err
 	}
 
@@ -863,5 +863,5 @@ func (s *ResponseService) ConvertConversationItemsToMessages(ctx context.Context
 		}
 	}
 
-	return messages, common.EmptyError
+	return messages, nil
 }

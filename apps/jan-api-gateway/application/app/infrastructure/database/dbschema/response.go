@@ -14,8 +14,8 @@ type Response struct {
 	UserID             uint    `gorm:"not null;index"`
 	ConversationID     *uint   `gorm:"index"`
 	PreviousResponseID *string `gorm:"size:255;index"`
-	Model              string  `gorm:"size:255;not null"`
-	Status             string  `gorm:"size:50;not null;default:'pending'"`
+	Model              string  `gorm:"size:255;not null;index"`
+	Status             string  `gorm:"size:50;not null;default:'pending';index"`
 	Input              string  `gorm:"type:text;not null"`
 	Output             *string `gorm:"type:text"`
 	SystemPrompt       *string `gorm:"type:text"`

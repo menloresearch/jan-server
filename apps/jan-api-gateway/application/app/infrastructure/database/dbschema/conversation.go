@@ -19,9 +19,9 @@ type Conversation struct {
 	PublicID  string `gorm:"type:varchar(50);uniqueIndex;not null"`
 	Title     string `gorm:"type:varchar(255)"`
 	UserID    uint   `gorm:"not null;index"`
-	Status    string `gorm:"type:varchar(20);not null;default:'active'"`
+	Status    string `gorm:"type:varchar(20);not null;default:'active';index"`
 	Metadata  string `gorm:"type:text"`
-	IsPrivate bool   `gorm:"not null;default:true"`
+	IsPrivate bool   `gorm:"not null;default:true;index"`
 	Items     []Item `gorm:"foreignKey:ConversationID"`
 	User      User   `gorm:"foreignKey:UserID"`
 }
@@ -31,10 +31,10 @@ type Item struct {
 	PublicID          string       `gorm:"type:varchar(50);uniqueIndex;not null"`
 	ConversationID    uint         `gorm:"not null;index"`
 	ResponseID        *uint        `gorm:"index"`
-	Type              string       `gorm:"type:varchar(50);not null"`
-	Role              string       `gorm:"type:varchar(20)"`
+	Type              string       `gorm:"type:varchar(50);not null;index"`
+	Role              string       `gorm:"type:varchar(20);index"`
 	Content           string       `gorm:"type:text"`
-	Status            string       `gorm:"type:varchar(50)"`
+	Status            string       `gorm:"type:varchar(50);index"`
 	IncompleteAt      *time.Time   `gorm:"type:timestamp"`
 	IncompleteDetails string       `gorm:"type:text"`
 	CompletedAt       *time.Time   `gorm:"type:timestamp"`

@@ -108,7 +108,7 @@ func ValidateCreateResponseRequest(req *requesttypes.CreateResponseRequest) (boo
 		}
 	}
 
-	return true, common.EmptyError
+	return true, nil
 }
 
 // validateInput validates the input field (can be string, array of strings, or structured CreateResponseInput)

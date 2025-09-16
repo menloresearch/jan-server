@@ -2,200 +2,164 @@ package responserepo
 
 import (
 	"context"
-	"fmt"
 
-	"gorm.io/gorm"
 	"menlo.ai/jan-api-gateway/app/domain/query"
 	"menlo.ai/jan-api-gateway/app/domain/response"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/dbschema"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/gormgen"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
+	"menlo.ai/jan-api-gateway/app/utils/functional"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
 )
 
-// ResponseRepository implements the response repository interface
-type ResponseRepository struct {
-	db *gorm.DB
+type ResponseGormRepository struct {
+	db *transaction.Database
 }
 
-// NewResponseRepository creates a new response repository
-func NewResponseRepository(db *gorm.DB) *ResponseRepository {
-	return &ResponseRepository{db: db}
+var _ response.ResponseRepository = (*ResponseGormRepository)(nil)
+
+func NewResponseGormRepository(db *transaction.Database) response.ResponseRepository {
+	return &ResponseGormRepository{
+		db: db,
+	}
 }
 
 // Create creates a new response in the database
-func (r *ResponseRepository) Create(ctx context.Context, resp *response.Response) error {
+func (r *ResponseGormRepository) Create(ctx context.Context, resp *response.Response) error {
 	// Generate public ID if not provided
 	if resp.PublicID == "" {
 		id, err := idgen.GenerateSecureID("resp", 42)
 		if err != nil {
-			return fmt.Errorf("failed to generate response ID: %w", err)
+			return err
 		}
 		resp.PublicID = id
 	}
 
-	dbResponse := r.domainToDB(resp)
-	if err := r.db.WithContext(ctx).Create(dbResponse).Error; err != nil {
-		return fmt.Errorf("failed to create response: %w", err)
+	model := dbschema.NewSchemaResponse(resp)
+	if err := r.db.GetQuery(ctx).Response.WithContext(ctx).Create(model); err != nil {
+		return err
 	}
-
-	// Update the domain model with the generated ID
-	resp.ID = dbResponse.ID
-	resp.CreatedAt = dbResponse.CreatedAt
-	resp.UpdatedAt = dbResponse.UpdatedAt
-
+	resp.ID = model.ID
 	return nil
 }
 
 // Update updates an existing response in the database
-func (r *ResponseRepository) Update(ctx context.Context, resp *response.Response) error {
-	dbResponse := r.domainToDB(resp)
-	if err := r.db.WithContext(ctx).Save(dbResponse).Error; err != nil {
-		return fmt.Errorf("failed to update response: %w", err)
-	}
+func (r *ResponseGormRepository) Update(ctx context.Context, resp *response.Response) error {
+	model := dbschema.NewSchemaResponse(resp)
+	model.ID = resp.ID
 
-	resp.UpdatedAt = dbResponse.UpdatedAt
-	return nil
+	query := r.db.GetQuery(ctx)
+	_, err := query.Response.WithContext(ctx).Where(query.Response.ID.Eq(resp.ID)).Updates(model)
+	return err
 }
 
 // DeleteByID deletes a response by ID
-func (r *ResponseRepository) DeleteByID(ctx context.Context, id uint) error {
-	if err := r.db.WithContext(ctx).Delete(&dbschema.Response{}, id).Error; err != nil {
-		return fmt.Errorf("failed to delete response: %w", err)
-	}
-	return nil
+func (r *ResponseGormRepository) DeleteByID(ctx context.Context, id uint) error {
+	query := r.db.GetQuery(ctx)
+	_, err := query.Response.WithContext(ctx).Where(query.Response.ID.Eq(id)).Delete()
+	return err
 }
 
 // FindByID finds a response by ID
-func (r *ResponseRepository) FindByID(ctx context.Context, id uint) (*response.Response, error) {
-	var dbResponse dbschema.Response
-	if err := r.db.WithContext(ctx).First(&dbResponse, id).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("failed to find response by ID: %w", err)
+func (r *ResponseGormRepository) FindByID(ctx context.Context, id uint) (*response.Response, error) {
+	query := r.db.GetQuery(ctx)
+	model, err := query.Response.WithContext(ctx).Where(query.Response.ID.Eq(id)).First()
+	if err != nil {
+		return nil, err
 	}
 
-	return r.dbToDomain(&dbResponse), nil
+	return model.EtoD(), nil
 }
 
 // FindByPublicID finds a response by public ID
-func (r *ResponseRepository) FindByPublicID(ctx context.Context, publicID string) (*response.Response, error) {
-	var dbResponse dbschema.Response
-	if err := r.db.WithContext(ctx).Where("public_id = ?", publicID).First(&dbResponse).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("failed to find response by public ID: %w", err)
+func (r *ResponseGormRepository) FindByPublicID(ctx context.Context, publicID string) (*response.Response, error) {
+	query := r.db.GetQuery(ctx)
+	model, err := query.Response.WithContext(ctx).Where(query.Response.PublicID.Eq(publicID)).First()
+	if err != nil {
+		return nil, err
 	}
 
-	return r.dbToDomain(&dbResponse), nil
+	return model.EtoD(), nil
 }
 
 // FindByFilter finds responses by filter criteria
-func (r *ResponseRepository) FindByFilter(ctx context.Context, filter response.ResponseFilter, pagination *query.Pagination) ([]*response.Response, error) {
-	var dbResponses []dbschema.Response
-	query := r.db.WithContext(ctx).Model(&dbschema.Response{})
-
-	// Apply filters
-	if filter.PublicID != nil {
-		query = query.Where("public_id = ?", *filter.PublicID)
-	}
-	if filter.UserID != nil {
-		query = query.Where("user_id = ?", *filter.UserID)
-	}
-	if filter.ConversationID != nil {
-		query = query.Where("conversation_id = ?", *filter.ConversationID)
-	}
-	if filter.Model != nil {
-		query = query.Where("model = ?", *filter.Model)
-	}
-	if filter.Status != nil {
-		query = query.Where("status = ?", string(*filter.Status))
-	}
-	if filter.CreatedAfter != nil {
-		query = query.Where("created_at >= ?", *filter.CreatedAfter)
-	}
-	if filter.CreatedBefore != nil {
-		query = query.Where("created_at <= ?", *filter.CreatedBefore)
-	}
-
-	// Apply pagination
-	if pagination != nil {
-		if pagination.Limit != nil && *pagination.Limit > 0 {
-			query = query.Limit(*pagination.Limit)
+func (r *ResponseGormRepository) FindByFilter(ctx context.Context, filter response.ResponseFilter, p *query.Pagination) ([]*response.Response, error) {
+	query := r.db.GetQuery(ctx)
+	sql := query.Response.WithContext(ctx)
+	sql = r.applyFilter(query, sql, filter)
+	if p != nil {
+		if p.Limit != nil && *p.Limit > 0 {
+			sql = sql.Limit(*p.Limit)
 		}
-		if pagination.Offset != nil && *pagination.Offset > 0 {
-			query = query.Offset(*pagination.Offset)
+		if p.After != nil {
+			if p.Order == "desc" {
+				sql = sql.Where(query.Response.ID.Lt(*p.After))
+			} else {
+				sql = sql.Where(query.Response.ID.Gt(*p.After))
+			}
+		}
+		if p.Order == "desc" {
+			sql = sql.Order(query.Response.ID.Desc())
+		} else {
+			sql = sql.Order(query.Response.ID.Asc())
 		}
 	}
-
-	// Order by created_at desc
-	query = query.Order("created_at DESC")
-
-	if err := query.Find(&dbResponses).Error; err != nil {
-		return nil, fmt.Errorf("failed to find responses by filter: %w", err)
+	rows, err := sql.Find()
+	if err != nil {
+		return nil, err
 	}
-
-	responses := make([]*response.Response, len(dbResponses))
-	for i, dbResp := range dbResponses {
-		responses[i] = r.dbToDomain(&dbResp)
-	}
-
-	return responses, nil
+	result := functional.Map(rows, func(item *dbschema.Response) *response.Response {
+		return item.EtoD()
+	})
+	return result, nil
 }
 
 // Count counts responses by filter criteria
-func (r *ResponseRepository) Count(ctx context.Context, filter response.ResponseFilter) (int64, error) {
-	var count int64
-	query := r.db.WithContext(ctx).Model(&dbschema.Response{})
-
-	// Apply filters
-	if filter.PublicID != nil {
-		query = query.Where("public_id = ?", *filter.PublicID)
-	}
-	if filter.UserID != nil {
-		query = query.Where("user_id = ?", *filter.UserID)
-	}
-	if filter.ConversationID != nil {
-		query = query.Where("conversation_id = ?", *filter.ConversationID)
-	}
-	if filter.Model != nil {
-		query = query.Where("model = ?", *filter.Model)
-	}
-	if filter.Status != nil {
-		query = query.Where("status = ?", string(*filter.Status))
-	}
-	if filter.CreatedAfter != nil {
-		query = query.Where("created_at >= ?", *filter.CreatedAfter)
-	}
-	if filter.CreatedBefore != nil {
-		query = query.Where("created_at <= ?", *filter.CreatedBefore)
-	}
-
-	if err := query.Count(&count).Error; err != nil {
-		return 0, fmt.Errorf("failed to count responses: %w", err)
-	}
-
-	return count, nil
+func (r *ResponseGormRepository) Count(ctx context.Context, filter response.ResponseFilter) (int64, error) {
+	query := r.db.GetQuery(ctx)
+	q := query.Response.WithContext(ctx)
+	q = r.applyFilter(query, q, filter)
+	return q.Count()
 }
 
 // FindByUserID finds responses by user ID
-func (r *ResponseRepository) FindByUserID(ctx context.Context, userID uint, pagination *query.Pagination) ([]*response.Response, error) {
+func (r *ResponseGormRepository) FindByUserID(ctx context.Context, userID uint, pagination *query.Pagination) ([]*response.Response, error) {
 	filter := response.ResponseFilter{UserID: &userID}
 	return r.FindByFilter(ctx, filter, pagination)
 }
 
 // FindByConversationID finds responses by conversation ID
-func (r *ResponseRepository) FindByConversationID(ctx context.Context, conversationID uint, pagination *query.Pagination) ([]*response.Response, error) {
+func (r *ResponseGormRepository) FindByConversationID(ctx context.Context, conversationID uint, pagination *query.Pagination) ([]*response.Response, error) {
 	filter := response.ResponseFilter{ConversationID: &conversationID}
 	return r.FindByFilter(ctx, filter, pagination)
 }
 
-// domainToDB converts domain model to database model
-func (r *ResponseRepository) domainToDB(resp *response.Response) *dbschema.Response {
-	return dbschema.NewSchemaResponse(resp)
-}
-
-// dbToDomain converts database model to domain model
-func (r *ResponseRepository) dbToDomain(dbResp *dbschema.Response) *response.Response {
-	return dbResp.EtoD()
+// applyFilter applies conditions dynamically to the query
+func (r *ResponseGormRepository) applyFilter(
+	query *gormgen.Query,
+	sql gormgen.IResponseDo,
+	filter response.ResponseFilter,
+) gormgen.IResponseDo {
+	if filter.PublicID != nil {
+		sql = sql.Where(query.Response.PublicID.Eq(*filter.PublicID))
+	}
+	if filter.UserID != nil {
+		sql = sql.Where(query.Response.UserID.Eq(*filter.UserID))
+	}
+	if filter.ConversationID != nil {
+		sql = sql.Where(query.Response.ConversationID.Eq(*filter.ConversationID))
+	}
+	if filter.Model != nil {
+		sql = sql.Where(query.Response.Model.Eq(*filter.Model))
+	}
+	if filter.Status != nil {
+		sql = sql.Where(query.Response.Status.Eq(string(*filter.Status)))
+	}
+	if filter.CreatedAfter != nil {
+		sql = sql.Where(query.Response.CreatedAt.Gte(*filter.CreatedAfter))
+	}
+	if filter.CreatedBefore != nil {
+		sql = sql.Where(query.Response.CreatedAt.Lte(*filter.CreatedBefore))
+	}
+	return sql
 }

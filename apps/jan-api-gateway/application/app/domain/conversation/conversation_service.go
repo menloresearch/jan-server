@@ -50,7 +50,7 @@ func (s *ConversationService) FindConversationsByFilter(ctx context.Context, fil
 	if err != nil {
 		return nil, common.NewError("a1b2c3d4-e5f6-7890-abcd-ef1234567890", "Failed to find conversations")
 	}
-	return conversations, common.EmptyError
+	return conversations, nil
 }
 
 func (s *ConversationService) CountConversationsByFilter(ctx context.Context, filter ConversationFilter) (int64, *common.Error) {
@@ -58,7 +58,7 @@ func (s *ConversationService) CountConversationsByFilter(ctx context.Context, fi
 	if err != nil {
 		return 0, common.NewError("b2c3d4e5-f6g7-8901-bcde-f23456789012", "Failed to count conversations")
 	}
-	return count, common.EmptyError
+	return count, nil
 }
 
 func (s *ConversationService) CreateConversation(ctx context.Context, userID uint, title *string, isPrivate bool, metadata map[string]string) (*Conversation, *common.Error) {
@@ -87,7 +87,7 @@ func (s *ConversationService) CreateConversation(ctx context.Context, userID uin
 		return nil, common.NewError("e5f6g7h8-i9j0-1234-efgh-567890123456", "Failed to create conversation")
 	}
 
-	return conversation, common.EmptyError
+	return conversation, nil
 }
 
 // GetConversation retrieves a conversation by its public ID with access control and items loaded
@@ -110,7 +110,7 @@ func (s *ConversationService) GetConversationByID(ctx context.Context, conversat
 		return nil, common.NewError("h8i9j0k1-l2m3-4567-hijk-890123456789", "Conversation not found")
 	}
 
-	return conversation, common.EmptyError
+	return conversation, nil
 }
 
 // getConversationWithAccessCheck is the internal method that handles conversation retrieval with optional item loading
@@ -130,21 +130,21 @@ func (s *ConversationService) getConversationWithAccessCheck(ctx context.Context
 	if len(convs) != 1 {
 		return nil, common.NewError("k1l2m3n4-o5p6-7890-klmn-123456789012", "Conversation not found")
 	}
-	return convs[0], common.EmptyError
+	return convs[0], nil
 }
 
 func (s *ConversationService) UpdateConversation(ctx context.Context, entity *Conversation) (*Conversation, *common.Error) {
 	if err := s.conversationRepo.Update(ctx, entity); err != nil {
 		return nil, common.NewError("l2m3n4o5-p6q7-8901-lmno-234567890123", "Failed to update conversation")
 	}
-	return entity, common.EmptyError
+	return entity, nil
 }
 
 func (s *ConversationService) DeleteConversation(ctx context.Context, conv *Conversation) (bool, *common.Error) {
 	if err := s.conversationRepo.Delete(ctx, conv.ID); err != nil {
 		return false, common.NewError("m3n4o5p6-q7r8-9012-mnop-345678901234", "Failed to delete conversation")
 	}
-	return true, common.EmptyError
+	return true, nil
 }
 
 func (s *ConversationService) AddItem(ctx context.Context, conversation *Conversation, userID uint, itemType ItemType, role *ItemRole, content []Content) (*Item, *common.Error) {
@@ -183,7 +183,7 @@ func (s *ConversationService) AddItem(ctx context.Context, conversation *Convers
 		return nil, common.NewError("r8s9t0u1-v2w3-4567-rstu-890123456789", "Failed to update conversation timestamp")
 	}
 
-	return item, common.EmptyError
+	return item, nil
 }
 
 func (s *ConversationService) GetItem(ctx context.Context, conversation *Conversation, itemID uint, userID uint) (*Item, *common.Error) {
@@ -196,7 +196,7 @@ func (s *ConversationService) GetItem(ctx context.Context, conversation *Convers
 	if len(conversation.Items) > 0 {
 		for _, item := range conversation.Items {
 			if item.ID == itemID {
-				return &item, common.EmptyError
+				return &item, nil
 			}
 		}
 		return nil, common.NewError("t0u1v2w3-x4y5-6789-tuvw-012345678901", "Item not found")
@@ -212,11 +212,11 @@ func (s *ConversationService) GetItem(ctx context.Context, conversation *Convers
 		return nil, common.NewError("v2w3x4y5-z6a7-8901-vwxy-234567890123", "Item not found")
 	}
 
-	if err := s.verifyItemBelongsToConversation(ctx, itemID, conversation.ID); !err.IsEmpty() {
+	if err := s.verifyItemBelongsToConversation(ctx, itemID, conversation.ID); err != nil {
 		return nil, err
 	}
 
-	return item, common.EmptyError
+	return item, nil
 }
 
 // verifyItemBelongsToConversation efficiently checks if an item belongs to a conversation
@@ -231,7 +231,7 @@ func (s *ConversationService) verifyItemBelongsToConversation(ctx context.Contex
 		return common.NewError("o1p2q3r4-s5t6-7890-opqr-123456789012", "Item not in conversation")
 	}
 
-	return common.EmptyError
+	return nil
 }
 
 func (s *ConversationService) DeleteItem(ctx context.Context, conversation *Conversation, itemID uint, userID uint) (*Conversation, *common.Error) {
@@ -282,11 +282,11 @@ func (s *ConversationService) DeleteItem(ctx context.Context, conversation *Conv
 
 	// Load the updated conversation with remaining items
 	updatedConversation, convErr := s.GetConversationByPublicIDAndUserID(ctx, conversation.PublicID, userID)
-	if !convErr.IsEmpty() {
+	if convErr != nil {
 		return nil, convErr
 	}
 
-	return updatedConversation, common.EmptyError
+	return updatedConversation, nil
 }
 
 // DeleteItemWithConversation deletes an item by its ID and updates the conversation accordingly.
@@ -300,7 +300,7 @@ func (s *ConversationService) DeleteItemWithConversation(ctx context.Context, co
 		return nil, common.NewError("f2g3h4i5-j6k7-8901-fghi-234567890123", "Failed to update conversation")
 	}
 
-	return item, common.EmptyError
+	return item, nil
 }
 
 // generateConversationPublicID generates a conversation ID with business rules
@@ -324,7 +324,7 @@ func (s *ConversationService) ValidateItems(ctx context.Context, items []*Item) 
 			return false, common.NewError("h4i5j6k7-l8m9-0123-hijk-456789012345", "Item validation failed")
 		}
 	}
-	return true, common.EmptyError
+	return true, nil
 }
 
 func (s *ConversationService) FindItemsByFilter(ctx context.Context, filter ItemFilter, p *query.Pagination) ([]*Item, *common.Error) {
@@ -332,7 +332,7 @@ func (s *ConversationService) FindItemsByFilter(ctx context.Context, filter Item
 	if err != nil {
 		return nil, common.NewError("i5j6k7l8-m9n0-1234-ijkl-567890123456", "Failed to find items")
 	}
-	return items, common.EmptyError
+	return items, nil
 }
 
 func (s *ConversationService) CountItemsByFilter(ctx context.Context, filter ItemFilter) (int64, *common.Error) {
@@ -340,7 +340,7 @@ func (s *ConversationService) CountItemsByFilter(ctx context.Context, filter Ite
 	if err != nil {
 		return 0, common.NewError("j6k7l8m9-n0o1-2345-jklm-678901234567", "Failed to count items")
 	}
-	return count, common.EmptyError
+	return count, nil
 }
 
 // AddMultipleItems adds multiple items to a conversation in a single transaction
@@ -379,7 +379,7 @@ func (s *ConversationService) AddMultipleItems(ctx context.Context, conversation
 		return nil, common.NewError("m9n0o1p2-q3r4-5678-mnop-901234567890", "Failed to update conversation timestamp")
 	}
 
-	return createdItems, common.EmptyError
+	return createdItems, nil
 }
 
 func (s *ConversationService) GetConversationMiddleWare() gin.HandlerFunc {
@@ -406,7 +406,7 @@ func (s *ConversationService) GetConversationMiddleWare() gin.HandlerFunc {
 			UserID:   &user.ID,
 		}, nil)
 
-		if !err.IsEmpty() {
+		if err != nil {
 			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 				Code:  err.Code,
 				Error: err.Message,
@@ -467,7 +467,7 @@ func (s *ConversationService) GetConversationItemMiddleWare() gin.HandlerFunc {
 			ConversationID: &conv.ID,
 		}, nil)
 
-		if !err.IsEmpty() {
+		if err != nil {
 			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
 				Code:  err.Code,
 				Error: err.Message,

@@ -91,7 +91,7 @@ func (api *ConversationAPI) listConversations(reqCtx *gin.Context) {
 	userID := user.ID
 
 	result, err := api.doListConversations(ctx, userID, reqCtx)
-	if !err.IsEmpty() {
+	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  err.Code,
 			Error: err.Message,
@@ -109,7 +109,7 @@ func (api *ConversationAPI) doListConversations(ctx context.Context, userID uint
 			UserID:   &userID,
 			PublicID: &lastID,
 		}, nil)
-		if !convErr.IsEmpty() {
+		if convErr != nil {
 			return nil, convErr
 		}
 		if len(convs) != 1 {
@@ -125,11 +125,11 @@ func (api *ConversationAPI) doListConversations(ctx context.Context, userID uint
 		UserID: &userID,
 	}
 	conversations, convErr := api.conversationService.FindConversationsByFilter(ctx, filter, pagination)
-	if !convErr.IsEmpty() {
+	if convErr != nil {
 		return nil, convErr
 	}
 	count, countErr := api.conversationService.CountConversationsByFilter(ctx, filter)
-	if !countErr.IsEmpty() {
+	if countErr != nil {
 		return nil, countErr
 	}
 	var firstId *string
@@ -143,7 +143,7 @@ func (api *ConversationAPI) doListConversations(ctx context.Context, userID uint
 			Limit: ptr.ToInt(1),
 			After: &conversations[len(conversations)-1].ID,
 		})
-		if !moreErr.IsEmpty() {
+		if moreErr != nil {
 			return nil, moreErr
 		}
 		if len(moreRecords) != 0 {
@@ -158,7 +158,7 @@ func (api *ConversationAPI) doListConversations(ctx context.Context, userID uint
 		Total:   count,
 		HasMore: hasMore,
 		Data:    functional.Map(conversations, domainToConversationResponse),
-	}, common.EmptyError
+	}, nil
 }
 
 // ListResponse represents a paginated list response
@@ -207,7 +207,7 @@ func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
 	}
 
 	result, err := api.doCreateConversation(ctx, userId, request)
-	if !err.IsEmpty() {
+	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  err.Code,
 			Error: err.Message,
@@ -241,25 +241,25 @@ func (api *ConversationAPI) doCreateConversation(ctx context.Context, userId uin
 
 	// Create conversation
 	conv, err := api.conversationService.CreateConversation(ctx, userId, &request.Title, true, request.Metadata)
-	if !err.IsEmpty() {
+	if err != nil {
 		return nil, err
 	}
 
 	// Add items if provided using batch operation
 	if len(request.Items) > 0 {
 		_, err := api.conversationService.AddMultipleItems(ctx, conv, userId, itemsToCreate)
-		if !err.IsEmpty() {
+		if err != nil {
 			return nil, err
 		}
 
 		// Reload conversation with items
 		conv, err = api.conversationService.GetConversationByPublicIDAndUserID(ctx, conv.PublicID, userId)
-		if !err.IsEmpty() {
+		if err != nil {
 			return nil, err
 		}
 	}
 
-	return domainToConversationResponse(conv), common.EmptyError
+	return domainToConversationResponse(conv), nil
 }
 
 // getConversation handles conversation retrieval
@@ -282,7 +282,7 @@ func (api *ConversationAPI) getConversation(reqCtx *gin.Context) {
 	}
 
 	result, err := api.doGetConversation(conv)
-	if !err.IsEmpty() {
+	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  err.Code,
 			Error: err.Message,
@@ -295,7 +295,7 @@ func (api *ConversationAPI) getConversation(reqCtx *gin.Context) {
 
 // doGetConversation performs the business logic for getting a conversation
 func (api *ConversationAPI) doGetConversation(conv *conversation.Conversation) (*ConversationResponse, *common.Error) {
-	return domainToConversationResponse(conv), common.EmptyError
+	return domainToConversationResponse(conv), nil
 }
 
 type UpdateConversationRequest struct {
@@ -336,7 +336,7 @@ func (api *ConversationAPI) updateConversation(reqCtx *gin.Context) {
 	}
 
 	result, err := api.doUpdateConversation(ctx, conv, request)
-	if !err.IsEmpty() {
+	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  err.Code,
 			Error: err.Message,
@@ -357,11 +357,11 @@ func (api *ConversationAPI) doUpdateConversation(ctx context.Context, conv *conv
 	}
 
 	conv, err := api.conversationService.UpdateConversation(ctx, conv)
-	if !err.IsEmpty() {
+	if err != nil {
 		return nil, err
 	}
 
-	return domainToConversationResponse(conv), common.EmptyError
+	return domainToConversationResponse(conv), nil
 }
 
 // DeletedConversationResponse represents the deleted conversation response
@@ -395,7 +395,7 @@ func (api *ConversationAPI) deleteConversation(reqCtx *gin.Context) {
 	}
 
 	result, err := api.doDeleteConversation(ctx, conv)
-	if !err.IsEmpty() {
+	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  err.Code,
 			Error: err.Message,
@@ -412,7 +412,7 @@ func (api *ConversationAPI) doDeleteConversation(ctx context.Context, conv *conv
 	if !success {
 		return nil, err
 	}
-	return domainToDeletedConversationResponse(conv), common.EmptyError
+	return domainToDeletedConversationResponse(conv), nil
 }
 
 // ConversationItemResponse represents an item in the response
@@ -503,7 +503,7 @@ func (api *ConversationAPI) createItems(reqCtx *gin.Context) {
 	}
 
 	result, err := api.doCreateItems(ctx, conv, request)
-	if !err.IsEmpty() {
+	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  err.Code,
 			Error: err.Message,
@@ -531,7 +531,7 @@ func (api *ConversationAPI) doCreateItems(ctx context.Context, conv *conversatio
 	}
 
 	createdItems, err := api.conversationService.AddMultipleItems(ctx, conv, conv.UserID, itemsToCreate)
-	if !err.IsEmpty() {
+	if err != nil {
 		return nil, err
 	}
 	var firstId *string
@@ -548,7 +548,7 @@ func (api *ConversationAPI) doCreateItems(ctx context.Context, conv *conversatio
 		LastID:  lastId,
 		HasMore: false,
 		Total:   int64(len(createdItems)),
-	}, common.EmptyError
+	}, nil
 }
 
 // listItems handles item listing with optional pagination
@@ -572,7 +572,7 @@ func (api *ConversationAPI) listItems(reqCtx *gin.Context) {
 	conv, _ := conversation.GetConversationFromContext(reqCtx)
 
 	result, err := api.doListItems(ctx, conv, reqCtx)
-	if !err.IsEmpty() {
+	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  err.Code,
 			Error: err.Message,
@@ -590,7 +590,7 @@ func (api *ConversationAPI) doListItems(ctx context.Context, conv *conversation.
 			PublicID:       &lastID,
 			ConversationID: &conv.ID,
 		}, nil)
-		if !err.IsEmpty() {
+		if err != nil {
 			return nil, fmt.Errorf("%s: %s", err.Code, err.Message)
 		}
 		if len(items) != 1 {
@@ -606,7 +606,7 @@ func (api *ConversationAPI) doListItems(ctx context.Context, conv *conversation.
 		ConversationID: &conv.ID,
 	}
 	itemEntities, filterErr := api.conversationService.FindItemsByFilter(ctx, filter, pagination)
-	if !filterErr.IsEmpty() {
+	if filterErr != nil {
 		return nil, filterErr
 	}
 
@@ -621,7 +621,7 @@ func (api *ConversationAPI) doListItems(ctx context.Context, conv *conversation.
 			Limit: ptr.ToInt(1),
 			After: &itemEntities[len(itemEntities)-1].ID,
 		})
-		if !moreErr.IsEmpty() {
+		if moreErr != nil {
 			return nil, moreErr
 		}
 		if len(moreRecords) != 0 {
@@ -636,7 +636,7 @@ func (api *ConversationAPI) doListItems(ctx context.Context, conv *conversation.
 		LastID:  lastId,
 		HasMore: hasMore,
 		Total:   int64(len(itemEntities)),
-	}, common.EmptyError
+	}, nil
 }
 
 // getItem handles single item retrieval
@@ -660,7 +660,7 @@ func (api *ConversationAPI) getItem(reqCtx *gin.Context) {
 	}
 
 	result, err := api.doGetItem(item)
-	if !err.IsEmpty() {
+	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  err.Code,
 			Error: err.Message,
@@ -673,7 +673,7 @@ func (api *ConversationAPI) getItem(reqCtx *gin.Context) {
 
 // doGetItem performs the business logic for getting an item
 func (api *ConversationAPI) doGetItem(item *conversation.Item) (*ConversationItemResponse, *common.Error) {
-	return domainToConversationItemResponse(item), common.EmptyError
+	return domainToConversationItemResponse(item), nil
 }
 
 // deleteItem handles item deletion
@@ -708,7 +708,7 @@ func (api *ConversationAPI) deleteItem(reqCtx *gin.Context) {
 	}
 
 	result, err := api.doDeleteItem(ctx, conv, item)
-	if !err.IsEmpty() {
+	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  err.Code,
 			Error: err.Message,
@@ -723,10 +723,10 @@ func (api *ConversationAPI) deleteItem(reqCtx *gin.Context) {
 func (api *ConversationAPI) doDeleteItem(ctx context.Context, conv *conversation.Conversation, item *conversation.Item) (*ConversationItemResponse, *common.Error) {
 	// Use efficient deletion with item public ID instead of loading all items
 	itemDeleted, err := api.conversationService.DeleteItemWithConversation(ctx, conv, item)
-	if !err.IsEmpty() {
+	if err != nil {
 		return nil, err
 	}
-	return domainToConversationItemResponse(itemDeleted), common.EmptyError
+	return domainToConversationItemResponse(itemDeleted), nil
 }
 
 func domainToConversationResponse(entity *conversation.Conversation) *ConversationResponse {
