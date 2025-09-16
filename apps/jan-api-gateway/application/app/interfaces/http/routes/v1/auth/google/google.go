@@ -69,6 +69,8 @@ type AccessTokenResponseObjectType string
 
 const AccessTokenResponseObjectTypeObject = "access.token"
 
+const AccessTokenExpirationDuration = 15 * time.Minute
+
 type AccessTokenResponse struct {
 	Object      AccessTokenResponseObjectType `json:"object"`
 	AccessToken string                        `json:"access_token"`
@@ -88,7 +90,7 @@ func handleGoogleToken(tokenResp TokenResponse) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("invalid expires_in value")
 	}
 	// Set expiration with a 10-second buffer
-	accessTokenExp := time.Now().Add(time.Duration(tokenResp.ExpiresIn)*time.Second - 30*time.Second)
+	accessTokenExp := time.Now().Add(AccessTokenExpirationDuration)
 	return accessTokenExp, nil
 }
 
