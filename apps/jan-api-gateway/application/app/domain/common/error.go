@@ -49,3 +49,8 @@ func (e *Error) GetMessage() string {
 func (e *Error) GetCode() string {
 	return e.Code
 }
+
+// GetCode returns the error code
+func (e *Error) GetError() error {
+	return e.Err
+}
