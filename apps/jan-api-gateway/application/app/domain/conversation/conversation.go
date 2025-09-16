@@ -51,6 +51,40 @@ func ValidateItemRole(input string) bool {
 	}
 }
 
+// @Enum(pending, in_progress, completed, failed, cancelled)
+type ItemStatus string
+
+const (
+	ItemStatusPending    ItemStatus = "pending"
+	ItemStatusInProgress ItemStatus = "in_progress"
+	ItemStatusCompleted  ItemStatus = "completed"
+	ItemStatusFailed     ItemStatus = "failed"
+	ItemStatusCancelled  ItemStatus = "cancelled"
+)
+
+func ValidateItemStatus(input string) bool {
+	switch ItemStatus(input) {
+	case ItemStatusPending, ItemStatusInProgress, ItemStatusCompleted, ItemStatusFailed, ItemStatusCancelled:
+		return true
+	default:
+		return false
+	}
+}
+
+// ToItemStatusPtr returns a pointer to the given ItemStatus
+func ToItemStatusPtr(s ItemStatus) *ItemStatus {
+	return &s
+}
+
+// ItemStatusToStringPtr converts *ItemStatus to *string
+func ItemStatusToStringPtr(s *ItemStatus) *string {
+	if s == nil {
+		return nil
+	}
+	str := string(*s)
+	return &str
+}
+
 type Item struct {
 	ID                uint               `json:"-"`
 	ConversationID    uint               `json:"-"`
@@ -58,7 +92,7 @@ type Item struct {
 	Type              ItemType           `json:"type"`
 	Role              *ItemRole          `json:"role,omitempty"`
 	Content           []Content          `json:"content,omitempty"`
-	Status            *string            `json:"status,omitempty"`
+	Status            *ItemStatus        `json:"status,omitempty"`
 	IncompleteAt      *time.Time         `json:"incomplete_at,omitempty"`
 	IncompleteDetails *IncompleteDetails `json:"incomplete_details,omitempty"`
 	CompletedAt       *time.Time         `json:"completed_at,omitempty"`
@@ -180,4 +214,27 @@ type ItemRepository interface {
 	ExistsByIDAndConversation(ctx context.Context, itemID uint, conversationID uint) (bool, error)
 	FindByFilter(ctx context.Context, filter ItemFilter, pagination *query.Pagination) ([]*Item, error)
 	Count(ctx context.Context, filter ItemFilter) (int64, error)
+}
+
+// NewItem creates a new conversation item with the given parameters
+func NewItem(publicID string, itemType ItemType, role ItemRole, content []Content, conversationID uint, responseID *uint) *Item {
+	return &Item{
+		PublicID:       publicID,
+		Type:           itemType,
+		Role:           &role,
+		Content:        content,
+		ConversationID: conversationID,
+		ResponseID:     responseID,
+		CreatedAt:      time.Now(),
+	}
+}
+
+// NewTextContent creates a new text content item
+func NewTextContent(text string) Content {
+	return Content{
+		Type: "text",
+		Text: &Text{
+			Value: text,
+		},
+	}
 }

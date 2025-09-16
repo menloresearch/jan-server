@@ -19,9 +19,9 @@ type Conversation struct {
 	PublicID  string `gorm:"type:varchar(50);uniqueIndex;not null"`
 	Title     string `gorm:"type:varchar(255)"`
 	UserID    uint   `gorm:"not null;index"`
-	Status    string `gorm:"type:varchar(20);not null;default:'active'"`
+	Status    string `gorm:"type:varchar(20);not null;default:'active';index"`
 	Metadata  string `gorm:"type:text"`
-	IsPrivate bool   `gorm:"not null;default:true"`
+	IsPrivate bool   `gorm:"not null;default:true;index"`
 	Items     []Item `gorm:"foreignKey:ConversationID"`
 	User      User   `gorm:"foreignKey:UserID"`
 }
@@ -31,10 +31,10 @@ type Item struct {
 	PublicID          string       `gorm:"type:varchar(50);uniqueIndex;not null"`
 	ConversationID    uint         `gorm:"not null;index"`
 	ResponseID        *uint        `gorm:"index"`
-	Type              string       `gorm:"type:varchar(50);not null"`
-	Role              string       `gorm:"type:varchar(20)"`
+	Type              string       `gorm:"type:varchar(50);not null;index"`
+	Role              string       `gorm:"type:varchar(20);index"`
 	Content           string       `gorm:"type:text"`
-	Status            string       `gorm:"type:varchar(50)"`
+	Status            string       `gorm:"type:varchar(50);index"`
 	IncompleteAt      *time.Time   `gorm:"type:timestamp"`
 	IncompleteDetails string       `gorm:"type:text"`
 	CompletedAt       *time.Time   `gorm:"type:timestamp"`
@@ -58,7 +58,7 @@ func NewSchemaConversation(c *conversation.Conversation) *Conversation {
 			ID: c.ID,
 		},
 		PublicID:  c.PublicID,
-		Title:     stringPtrToString(c.Title),
+		Title:     ptr.FromString(c.Title),
 		UserID:    c.UserID,
 		Status:    string(c.Status),
 		Metadata:  metadataJSON,
@@ -110,9 +110,9 @@ func NewSchemaItem(i *conversation.Item) *Item {
 		ConversationID:    i.ConversationID,
 		ResponseID:        i.ResponseID,
 		Type:              string(i.Type),
-		Role:              stringPtrToString((*string)(i.Role)),
+		Role:              string(*i.Role),
 		Content:           contentJSON,
-		Status:            stringPtrToString(i.Status),
+		Status:            string(*i.Status),
 		IncompleteAt:      i.IncompleteAt,
 		IncompleteDetails: incompleteDetailsJSON,
 		CompletedAt:       i.CompletedAt,
@@ -139,7 +139,7 @@ func (i *Item) EtoD() *conversation.Item {
 		Type:              conversation.ItemType(i.Type),
 		Role:              (*conversation.ItemRole)(ptr.ToString(i.Role)),
 		Content:           content,
-		Status:            ptr.ToString(i.Status),
+		Status:            (*conversation.ItemStatus)(ptr.ToString(i.Status)),
 		IncompleteAt:      i.IncompleteAt,
 		IncompleteDetails: incompleteDetails,
 		CompletedAt:       i.CompletedAt,
@@ -147,12 +147,4 @@ func (i *Item) EtoD() *conversation.Item {
 		ResponseID:        i.ResponseID,
 		CreatedAt:         i.CreatedAt,
 	}
-}
-
-// Helper functions
-func stringPtrToString(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }

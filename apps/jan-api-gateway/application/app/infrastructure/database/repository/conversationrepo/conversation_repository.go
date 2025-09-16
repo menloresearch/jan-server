@@ -16,6 +16,8 @@ type ConversationGormRepository struct {
 	db *transaction.Database
 }
 
+var _ domain.ConversationRepository = (*ConversationGormRepository)(nil)
+
 func NewConversationGormRepository(db *transaction.Database) domain.ConversationRepository {
 	return &ConversationGormRepository{
 		db: db,

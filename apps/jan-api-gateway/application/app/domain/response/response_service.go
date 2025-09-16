@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
@@ -46,348 +45,232 @@ func NewResponseService(responseRepo ResponseRepository, itemRepo conversation.I
 	}
 }
 
-// CreateResponse creates a new response
-func (s *ResponseService) CreateResponse(ctx context.Context, userID uint, conversationID *uint, model string, input interface{}, systemPrompt *string, params *ResponseParams) (*Response, *common.Error) {
-	return s.CreateResponseWithPrevious(ctx, userID, conversationID, nil, model, input, systemPrompt, params)
+// CreateResponse creates a new response using a Response domain object
+func (s *ResponseService) CreateResponse(ctx context.Context, response *Response) (*Response, *common.Error) {
+	return s.CreateResponseWithPrevious(ctx, response, nil)
 }
 
 // CreateResponseWithPrevious creates a new response, optionally linking to a previous response
-func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID uint, conversationID *uint, previousResponseID *string, model string, input interface{}, systemPrompt *string, params *ResponseParams) (*Response, *common.Error) {
-	// Convert input to JSON string
-	inputJSON, err := json.Marshal(input)
-	if err != nil {
-		return nil, common.NewError("a1b2c3d4-e5f6-7890-abcd-ef1234567890", "Failed to marshal input")
-	}
-
+func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, response *Response, previousResponseID *string) (*Response, *common.Error) {
 	// Handle previous_response_id logic
-	var finalConversationID *uint = conversationID
 	if previousResponseID != nil {
 		// Load the previous response
 		previousResponse, err := s.responseRepo.FindByPublicID(ctx, *previousResponseID)
 		if err != nil {
-			return nil, common.NewError("b2c3d4e5-f6g7-8901-bcde-f23456789012", "Failed to find previous response")
+			return nil, common.NewError(err, "b2c3d4e5-f6g7-8901-bcde-f23456789012")
 		}
 		if previousResponse == nil {
-			return nil, common.NewError("c3d4e5f6-g7h8-9012-cdef-345678901234", "Previous response not found")
+			return nil, common.NewErrorWithMessage("Previous response not found", "c3d4e5f6-g7h8-9012-cdef-345678901234")
 		}
 
 		// Validate that the previous response belongs to the same user
-		if previousResponse.UserID != userID {
-			return nil, common.NewError("d4e5f6g7-h8i9-0123-defg-456789012345", "Previous response does not belong to the current user")
+		if previousResponse.UserID != response.UserID {
+			return nil, common.NewErrorWithMessage("Previous response does not belong to the current user", "d4e5f6g7-h8i9-0123-defg-456789012345")
 		}
 
 		// Use the previous response's conversation ID
-		finalConversationID = previousResponse.ConversationID
-		if finalConversationID == nil {
-			return nil, common.NewError("e5f6g7h8-i9j0-1234-efgh-567890123456", "Previous response does not belong to any conversation")
+		response.ConversationID = previousResponse.ConversationID
+		if response.ConversationID == nil {
+			return nil, common.NewErrorWithMessage("Previous response does not belong to any conversation", "e5f6g7h8-i9j0-1234-efgh-567890123456")
 		}
 	}
 
-	// Generate public ID
-	publicID, err := idgen.GenerateSecureID("resp", 42)
-	if err != nil {
-		return nil, common.NewError("f6g7h8i9-j0k1-2345-fghi-678901234567", "Failed to generate response ID")
+	// Set the previous response ID
+	response.PreviousResponseID = previousResponseID
+
+	// Generate public ID if not already set
+	if response.PublicID == "" {
+		publicID, err := idgen.GenerateSecureID("resp", 42)
+		if err != nil {
+			return nil, common.NewError(err, "f6g7h8i9-j0k1-2345-fghi-678901234567")
+		}
+		response.PublicID = publicID
 	}
 
-	response := &Response{
-		PublicID:           publicID,
-		UserID:             userID,
-		ConversationID:     finalConversationID,
-		PreviousResponseID: previousResponseID,
-		Model:              model,
-		Status:             ResponseStatusPending,
-		Input:              string(inputJSON),
-		SystemPrompt:       systemPrompt,
-		CreatedAt:          time.Now(),
-		UpdatedAt:          time.Now(),
+	// Set default values
+	if response.Status == "" {
+		response.Status = ResponseStatusPending
 	}
 
-	// Apply parameters if provided
-	if params != nil {
-		response.MaxTokens = params.MaxTokens
-		response.Temperature = params.Temperature
-		response.TopP = params.TopP
-		response.TopK = params.TopK
-		response.RepetitionPenalty = params.RepetitionPenalty
-		response.Seed = params.Seed
-		response.PresencePenalty = params.PresencePenalty
-		response.FrequencyPenalty = params.FrequencyPenalty
-		response.Stream = params.Stream
-		response.Background = params.Background
-		response.Timeout = params.Timeout
-		response.User = params.User
-
-		// Convert complex fields to JSON strings
-		if params.Stop != nil {
-			stopJSON, err := json.Marshal(params.Stop)
-			if err != nil {
-				return nil, common.NewError("g7h8i9j0-k1l2-3456-ghij-789012345678", "Failed to marshal stop sequences")
-			}
-			stopStr := string(stopJSON)
-			// For JSON columns, use null for empty arrays/objects
-			if stopStr == "[]" || stopStr == "{}" {
-				response.Stop = nil
-			} else {
-				response.Stop = &stopStr
-			}
-		}
-
-		if params.LogitBias != nil {
-			logitBiasJSON, err := json.Marshal(params.LogitBias)
-			if err != nil {
-				return nil, common.NewError("h8i9j0k1-l2m3-4567-hijk-890123456789", "Failed to marshal logit bias")
-			}
-			logitBiasStr := string(logitBiasJSON)
-			// For JSON columns, use null for empty arrays/objects
-			if logitBiasStr == "[]" || logitBiasStr == "{}" {
-				response.LogitBias = nil
-			} else {
-				response.LogitBias = &logitBiasStr
-			}
-		}
-
-		if params.ResponseFormat != nil {
-			responseFormatJSON, err := json.Marshal(params.ResponseFormat)
-			if err != nil {
-				return nil, common.NewError("i9j0k1l2-m3n4-5678-ijkl-901234567890", "Failed to marshal response format")
-			}
-			responseFormatStr := string(responseFormatJSON)
-			// For JSON columns, use null for empty arrays/objects
-			if responseFormatStr == "[]" || responseFormatStr == "{}" {
-				response.ResponseFormat = nil
-			} else {
-				response.ResponseFormat = &responseFormatStr
-			}
-		}
-
-		if params.Tools != nil {
-			toolsJSON, err := json.Marshal(params.Tools)
-			if err != nil {
-				return nil, common.NewError("j0k1l2m3-n4o5-6789-jklm-012345678901", "Failed to marshal tools")
-			}
-			toolsStr := string(toolsJSON)
-			// For JSON columns, use null for empty arrays/objects
-			if toolsStr == "[]" || toolsStr == "{}" {
-				response.Tools = nil
-			} else {
-				response.Tools = &toolsStr
-			}
-		}
-
-		if params.ToolChoice != nil {
-			toolChoiceJSON, err := json.Marshal(params.ToolChoice)
-			if err != nil {
-				return nil, common.NewError("k1l2m3n4-o5p6-7890-klmn-123456789012", "Failed to marshal tool choice")
-			}
-			toolChoiceStr := string(toolChoiceJSON)
-			// For JSON columns, use null for empty arrays/objects
-			if toolChoiceStr == "[]" || toolChoiceStr == "{}" {
-				response.ToolChoice = nil
-			} else {
-				response.ToolChoice = &toolChoiceStr
-			}
-		}
-
-		if params.Metadata != nil {
-			metadataJSON, err := json.Marshal(params.Metadata)
-			if err != nil {
-				return nil, common.NewError("l2m3n4o5-p6q7-8901-lmno-234567890123", "Failed to marshal metadata")
-			}
-			metadataStr := string(metadataJSON)
-			// For JSON columns, use null for empty arrays/objects
-			if metadataStr == "[]" || metadataStr == "{}" {
-				response.Metadata = nil
-			} else {
-				response.Metadata = &metadataStr
-			}
-		}
+	// Validate required fields
+	if response.UserID == 0 {
+		return nil, common.NewErrorWithMessage("UserID is required", "m3n4o5p6-q7r8-9012-mnop-345678901234")
+	}
+	if response.Model == "" {
+		return nil, common.NewErrorWithMessage("Model is required", "n4o5p6q7-r8s9-0123-nopq-456789012345")
+	}
+	if response.Input == "" {
+		return nil, common.NewErrorWithMessage("Input is required", "o5p6q7r8-s9t0-1234-opqr-567890123456")
 	}
 
 	if err := s.responseRepo.Create(ctx, response); err != nil {
-		return nil, common.NewError("m3n4o5p6-q7r8-9012-mnop-345678901234", "Failed to create response")
+		return nil, common.NewError(err, "m3n4o5p6-q7r8-9012-mnop-345678901234")
 	}
 
-	return response, common.EmptyError
+	return response, nil
 }
 
 // UpdateResponseStatus updates the status of a response
 func (s *ResponseService) UpdateResponseStatus(ctx context.Context, responseID uint, status ResponseStatus) (bool, *common.Error) {
 	response, err := s.responseRepo.FindByID(ctx, responseID)
 	if err != nil {
-		return false, common.NewError("n4o5p6q7-r8s9-0123-nopq-456789012345", "Failed to find response")
+		return false, common.NewError(err, "n4o5p6q7-r8s9-0123-nopq-456789012345")
 	}
 	if response == nil {
-		return false, common.NewError("o5p6q7r8-s9t0-1234-opqr-567890123456", "Response not found")
+		return false, common.NewErrorWithMessage("Response not found", "o5p6q7r8-s9t0-1234-opqr-567890123456")
 	}
 
-	response.Status = status
-	response.UpdatedAt = time.Now()
+	// Update the response object
+	UpdateResponseStatusOnObject(response, status)
 
-	// Set completion timestamps based on status
-	now := time.Now()
-	switch status {
-	case ResponseStatusCompleted:
-		response.CompletedAt = &now
-	case ResponseStatusCancelled:
-		response.CancelledAt = &now
-	case ResponseStatusFailed:
-		response.FailedAt = &now
-	}
-
+	// Save to database
 	if err := s.responseRepo.Update(ctx, response); err != nil {
-		return false, common.NewError("p6q7r8s9-t0u1-2345-pqrs-678901234567", "Failed to update response status")
+		return false, common.NewError(err, "p6q7r8s9-t0u1-2345-pqrs-678901234567")
 	}
 
-	return true, common.EmptyError
+	return true, nil
 }
 
 // UpdateResponseOutput updates the output of a response
-func (s *ResponseService) UpdateResponseOutput(ctx context.Context, responseID uint, output interface{}) (bool, *common.Error) {
+func (s *ResponseService) UpdateResponseOutput(ctx context.Context, responseID uint, output any) (bool, *common.Error) {
 	response, err := s.responseRepo.FindByID(ctx, responseID)
 	if err != nil {
-		return false, common.NewError("q7r8s9t0-u1v2-3456-qrst-789012345678", "Failed to find response")
+		return false, common.NewError(err, "q7r8s9t0-u1v2-3456-qrst-789012345678")
 	}
 	if response == nil {
-		return false, common.NewError("r8s9t0u1-v2w3-4567-rstu-890123456789", "Response not found")
+		return false, common.NewErrorWithMessage("Response not found", "r8s9t0u1-v2w3-4567-rstu-890123456789")
 	}
 
-	// Convert output to JSON string
-	outputJSON, err := json.Marshal(output)
-	if err != nil {
-		return false, common.NewError("s9t0u1v2-w3x4-5678-stuv-901234567890", "Failed to marshal output")
+	// Update the response object
+	if err := UpdateResponseOutputOnObject(response, output); err != nil {
+		return false, err
 	}
 
-	outputStr := string(outputJSON)
-	// For JSON columns, use null for empty arrays/objects
-	if outputStr == "[]" || outputStr == "{}" {
-		response.Output = nil
-	} else {
-		response.Output = &outputStr
-	}
-	response.UpdatedAt = time.Now()
-
+	// Save to database
 	if err := s.responseRepo.Update(ctx, response); err != nil {
-		return false, common.NewError("t0u1v2w3-x4y5-6789-tuvw-012345678901", "Failed to update response output")
+		return false, common.NewError(err, "t0u1v2w3-x4y5-6789-tuvw-012345678901")
 	}
 
-	return true, common.EmptyError
+	return true, nil
 }
 
 // UpdateResponseUsage updates the usage statistics of a response
-func (s *ResponseService) UpdateResponseUsage(ctx context.Context, responseID uint, usage interface{}) (bool, *common.Error) {
+func (s *ResponseService) UpdateResponseUsage(ctx context.Context, responseID uint, usage any) (bool, *common.Error) {
 	response, err := s.responseRepo.FindByID(ctx, responseID)
 	if err != nil {
-		return false, common.NewError("u1v2w3x4-y5z6-7890-uvwx-123456789012", "Failed to find response")
+		return false, common.NewError(err, "u1v2w3x4-y5z6-7890-uvwx-123456789012")
 	}
 	if response == nil {
-		return false, common.NewError("v2w3x4y5-z6a7-8901-vwxy-234567890123", "Response not found")
+		return false, common.NewErrorWithMessage("Response not found", "v2w3x4y5-z6a7-8901-vwxy-234567890123")
 	}
 
-	// Convert usage to JSON string
-	usageJSON, err := json.Marshal(usage)
-	if err != nil {
-		return false, common.NewError("w3x4y5z6-a7b8-9012-wxyz-345678901234", "Failed to marshal usage")
+	// Update the response object
+	if err := UpdateResponseUsageOnObject(response, usage); err != nil {
+		return false, err
 	}
 
-	usageStr := string(usageJSON)
-	// For JSON columns, use null for empty arrays/objects
-	if usageStr == "[]" || usageStr == "{}" {
-		response.Usage = nil
-	} else {
-		response.Usage = &usageStr
-	}
-	response.UpdatedAt = time.Now()
-
+	// Save to database
 	if err := s.responseRepo.Update(ctx, response); err != nil {
-		return false, common.NewError("x4y5z6a7-b8c9-0123-xyza-456789012345", "Failed to update response usage")
+		return false, common.NewError(err, "x4y5z6a7-b8c9-0123-xyza-456789012345")
 	}
 
-	return true, common.EmptyError
+	return true, nil
 }
 
 // UpdateResponseError updates the error information of a response
-func (s *ResponseService) UpdateResponseError(ctx context.Context, responseID uint, error interface{}) (bool, *common.Error) {
+func (s *ResponseService) UpdateResponseError(ctx context.Context, responseID uint, error any) (bool, *common.Error) {
 	response, err := s.responseRepo.FindByID(ctx, responseID)
 	if err != nil {
-		return false, common.NewError("y5z6a7b8-c9d0-1234-yzab-567890123456", "Failed to find response")
+		return false, common.NewError(err, "y5z6a7b8-c9d0-1234-yzab-567890123456")
 	}
 	if response == nil {
-		return false, common.NewError("z6a7b8c9-d0e1-2345-zabc-678901234567", "Response not found")
+		return false, common.NewErrorWithMessage("Response not found", "z6a7b8c9-d0e1-2345-zabc-678901234567")
 	}
 
-	// Convert error to JSON string
-	errorJSON, err := json.Marshal(error)
-	if err != nil {
-		return false, common.NewError("a7b8c9d0-e1f2-3456-abcd-789012345678", "Failed to marshal error")
+	// Update the response object
+	if err := UpdateResponseErrorOnObject(response, error); err != nil {
+		return false, err
 	}
 
-	errorStr := string(errorJSON)
-	// For JSON columns, use null for empty arrays/objects
-	if errorStr == "[]" || errorStr == "{}" {
-		response.Error = nil
-	} else {
-		response.Error = &errorStr
-	}
-	response.Status = ResponseStatusFailed
-	response.UpdatedAt = time.Now()
-	now := time.Now()
-	response.FailedAt = &now
-
+	// Save to database
 	if err := s.responseRepo.Update(ctx, response); err != nil {
-		return false, common.NewError("b8c9d0e1-f2g3-4567-bcde-890123456789", "Failed to update response error")
+		return false, common.NewError(err, "b8c9d0e1-f2g3-4567-bcde-890123456789")
 	}
 
-	return true, common.EmptyError
+	return true, nil
+}
+
+// UpdateResponseFields updates multiple fields on a response object and saves it once (optimized for N+1 prevention)
+func (s *ResponseService) UpdateResponseFields(ctx context.Context, responseID uint, updates *ResponseUpdates) (bool, *common.Error) {
+	response, err := s.responseRepo.FindByID(ctx, responseID)
+	if err != nil {
+		return false, common.NewError(err, "c9d0e1f2-g3h4-5678-cdef-901234567890")
+	}
+	if response == nil {
+		return false, common.NewErrorWithMessage("Response not found", "d0e1f2g3-h4i5-6789-defg-012345678901")
+	}
+
+	// Apply all updates to the response object
+	if err := ApplyResponseUpdates(response, updates); err != nil {
+		return false, err
+	}
+
+	// Save to database once
+	if err := s.responseRepo.Update(ctx, response); err != nil {
+		return false, common.NewError(err, "e1f2g3h4-i5j6-7890-efgh-123456789012")
+	}
+
+	return true, nil
 }
 
 // GetResponseByPublicID gets a response by public ID
 func (s *ResponseService) GetResponseByPublicID(ctx context.Context, publicID string) (*Response, *common.Error) {
 	response, err := s.responseRepo.FindByPublicID(ctx, publicID)
 	if err != nil {
-		return nil, common.NewError("c9d0e1f2-g3h4-5678-cdef-901234567890", "Failed to get response")
+		return nil, common.NewError(err, "c9d0e1f2-g3h4-5678-cdef-901234567890")
 	}
-	return response, common.EmptyError
+	return response, nil
 }
 
 // GetResponsesByUserID gets responses for a specific user
 func (s *ResponseService) GetResponsesByUserID(ctx context.Context, userID uint, pagination *query.Pagination) ([]*Response, *common.Error) {
 	responses, err := s.responseRepo.FindByUserID(ctx, userID, pagination)
 	if err != nil {
-		return nil, common.NewError("d0e1f2g3-h4i5-6789-defg-012345678901", "Failed to get responses by user ID")
+		return nil, common.NewError(err, "d0e1f2g3-h4i5-6789-defg-012345678901")
 	}
-	return responses, common.EmptyError
+	return responses, nil
 }
 
 // GetResponsesByConversationID gets responses for a specific conversation
 func (s *ResponseService) GetResponsesByConversationID(ctx context.Context, conversationID uint, pagination *query.Pagination) ([]*Response, *common.Error) {
 	responses, err := s.responseRepo.FindByConversationID(ctx, conversationID, pagination)
 	if err != nil {
-		return nil, common.NewError("e1f2g3h4-i5j6-7890-efgh-123456789012", "Failed to get responses by conversation ID")
+		return nil, common.NewError(err, "e1f2g3h4-i5j6-7890-efgh-123456789012")
 	}
-	return responses, common.EmptyError
+	return responses, nil
 }
 
 // DeleteResponse deletes a response
 func (s *ResponseService) DeleteResponse(ctx context.Context, responseID uint) (bool, *common.Error) {
 	if err := s.responseRepo.DeleteByID(ctx, responseID); err != nil {
-		return false, common.NewError("f2g3h4i5-j6k7-8901-fghi-234567890123", "Failed to delete response")
+		return false, common.NewError(err, "f2g3h4i5-j6k7-8901-fghi-234567890123")
 	}
-	return true, common.EmptyError
+	return true, nil
 }
 
 // CreateItemsForResponse creates items for a specific response
 func (s *ResponseService) CreateItemsForResponse(ctx context.Context, responseID uint, conversationID uint, items []*conversation.Item) ([]*conversation.Item, *common.Error) {
 	response, err := s.responseRepo.FindByID(ctx, responseID)
 	if err != nil {
-		return nil, common.NewError("g3h4i5j6-k7l8-9012-ghij-345678901234", "Failed to find response")
+		return nil, common.NewError(err, "g3h4i5j6-k7l8-9012-ghij-345678901234")
 	}
 	if response == nil {
-		return nil, common.NewError("h4i5j6k7-l8m9-0123-hijk-456789012345", "Response not found")
+		return nil, common.NewErrorWithMessage("Response not found", "h4i5j6k7-l8m9-0123-hijk-456789012345")
 	}
 
 	// Validate that the response belongs to the specified conversation
 	if response.ConversationID == nil || *response.ConversationID != conversationID {
-		return nil, common.NewError("i5j6k7l8-m9n0-1234-ijkl-567890123456", "Response does not belong to the specified conversation")
+		return nil, common.NewErrorWithMessage("Response does not belong to the specified conversation", "i5j6k7l8-m9n0-1234-ijkl-567890123456")
 	}
 
 	var createdItems []*conversation.Item
@@ -395,37 +278,36 @@ func (s *ResponseService) CreateItemsForResponse(ctx context.Context, responseID
 		// Generate public ID for the item
 		publicID, err := idgen.GenerateSecureID("msg", 42)
 		if err != nil {
-			return nil, common.NewError("j6k7l8m9-n0o1-2345-jklm-678901234567", "Failed to generate item ID")
+			return nil, common.NewError(err, "j6k7l8m9-n0o1-2345-jklm-678901234567")
 		}
 
-		item := &conversation.Item{
-			PublicID:       publicID,
-			Type:           itemData.Type,
-			Role:           itemData.Role,
-			Content:        itemData.Content,
-			ConversationID: conversationID,
-			ResponseID:     &responseID,
-			CreatedAt:      time.Now(),
-		}
+		item := conversation.NewItem(
+			publicID,
+			itemData.Type,
+			*itemData.Role,
+			itemData.Content,
+			conversationID,
+			&responseID,
+		)
 
 		if err := s.itemRepo.Create(ctx, item); err != nil {
-			return nil, common.NewError("k7l8m9n0-o1p2-3456-klmn-789012345678", "Failed to create item")
+			return nil, common.NewError(err, "k7l8m9n0-o1p2-3456-klmn-789012345678")
 		}
 
 		createdItems = append(createdItems, item)
 	}
 
-	return createdItems, common.EmptyError
+	return createdItems, nil
 }
 
 // GetItemsForResponse gets items that belong to a specific response, optionally filtered by role
 func (s *ResponseService) GetItemsForResponse(ctx context.Context, responseID uint, itemRole *conversation.ItemRole) ([]*conversation.Item, *common.Error) {
 	response, err := s.responseRepo.FindByID(ctx, responseID)
 	if err != nil {
-		return nil, common.NewError("l8m9n0o1-p2q3-4567-lmno-890123456789", "Failed to find response")
+		return nil, common.NewError(err, "l8m9n0o1-p2q3-4567-lmno-890123456789")
 	}
 	if response == nil {
-		return nil, common.NewError("m9n0o1p2-q3r4-5678-mnop-901234567890", "Response not found")
+		return nil, common.NewErrorWithMessage("Response not found", "m9n0o1p2-q3r4-5678-mnop-901234567890")
 	}
 
 	// Create filter for database query
@@ -438,51 +320,42 @@ func (s *ResponseService) GetItemsForResponse(ctx context.Context, responseID ui
 	// Get items using database filter (more efficient than in-memory filtering)
 	items, err := s.itemRepo.FindByFilter(ctx, filter, nil)
 	if err != nil {
-		return nil, common.NewError("n0o1p2q3-r4s5-6789-nopq-012345678901", "Failed to get items")
+		return nil, common.NewError(err, "n0o1p2q3-r4s5-6789-nopq-012345678901")
 	}
 
-	return items, common.EmptyError
+	return items, nil
 }
 
 // CreateResponseFromRequest creates a response from an API request structure
 func (s *ResponseService) CreateResponseFromRequest(ctx context.Context, userID uint, req *ResponseRequest) (*Response, *common.Error) {
-	// Convert the request to ResponseParams
-	params := &ResponseParams{
-		Stream: req.Stream,
+	// Convert input to JSON string
+	inputJSON, jsonErr := json.Marshal(req.Input)
+	if jsonErr != nil {
+		return nil, common.NewError(jsonErr, "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+	}
+
+	// Build Response object from request
+	response := &Response{
+		UserID:             userID,
+		ConversationID:     nil, // Will be set by CreateResponseWithPrevious if previousResponseID is provided
+		PreviousResponseID: req.PreviousResponseID,
+		Model:              req.Model,
+		Input:              string(inputJSON),
+		SystemPrompt:       nil,
+		Status:             ResponseStatusPending,
+		Stream:             req.Stream,
 	}
 
 	// Create the response with previous_response_id handling
-	return s.CreateResponseWithPrevious(ctx, userID, nil, req.PreviousResponseID, req.Model, req.Input, nil, params)
+	return s.CreateResponseWithPrevious(ctx, response, req.PreviousResponseID)
 }
 
 // ResponseRequest represents the API request structure for creating a response
 type ResponseRequest struct {
-	Model              string      `json:"model"`
-	PreviousResponseID *string     `json:"previous_response_id,omitempty"`
-	Input              interface{} `json:"input"`
-	Stream             *bool       `json:"stream,omitempty"`
-}
-
-// ResponseParams represents parameters for creating a response
-type ResponseParams struct {
-	MaxTokens         *int
-	Temperature       *float64
-	TopP              *float64
-	TopK              *int
-	RepetitionPenalty *float64
-	Seed              *int
-	Stop              []string
-	PresencePenalty   *float64
-	FrequencyPenalty  *float64
-	LogitBias         map[string]float64
-	ResponseFormat    interface{}
-	Tools             interface{}
-	ToolChoice        interface{}
-	Metadata          map[string]interface{}
-	Stream            *bool
-	Background        *bool
-	Timeout           *int
-	User              *string
+	Model              string  `json:"model"`
+	PreviousResponseID *string `json:"previous_response_id,omitempty"`
+	Input              any     `json:"input"`
+	Stream             *bool   `json:"stream,omitempty"`
 }
 
 // GetResponseMiddleWare creates middleware to load response by public ID and set it in context
@@ -548,11 +421,11 @@ func GetResponseFromContext(reqCtx *gin.Context) (*Response, bool) {
 func (s *ResponseService) ProcessResponseRequest(ctx context.Context, userID uint, req *ResponseRequest) (*Response, *common.Error) {
 	// Create response from request
 	responseEntity, err := s.CreateResponseFromRequest(ctx, userID, req)
-	if !err.IsEmpty() {
+	if err != nil {
 		return nil, err
 	}
 
-	return responseEntity, common.EmptyError
+	return responseEntity, nil
 }
 
 // ConvertDomainResponseToAPIResponse converts a domain response to API response format
@@ -586,7 +459,7 @@ func (s *ResponseService) ConvertDomainResponseToAPIResponse(responseEntity *Res
 
 	// Parse output if exists
 	if responseEntity.Output != nil {
-		var output interface{}
+		var output any
 		if err := json.Unmarshal([]byte(*responseEntity.Output), &output); err == nil {
 			apiResponse.Output = output
 		}
@@ -639,54 +512,54 @@ func (s *ResponseService) ConvertConversationItemToInputItem(item *conversation.
 func (s *ResponseService) HandleConversation(ctx context.Context, userID uint, request *requesttypes.CreateResponseRequest) (*conversation.Conversation, *common.Error) {
 	// If store is explicitly set to false, don't create or use any conversation
 	if request.Store != nil && !*request.Store {
-		return nil, common.EmptyError
+		return nil, nil
 	}
 
 	// If previous_response_id is provided, load the conversation from the previous response
 	if request.PreviousResponseID != nil && *request.PreviousResponseID != "" {
 		// Load the previous response
 		previousResponse, err := s.GetResponseByPublicID(ctx, *request.PreviousResponseID)
-		if !err.IsEmpty() {
+		if err != nil {
 			return nil, err
 		}
 		if previousResponse == nil {
-			return nil, common.NewError("o1p2q3r4-s5t6-7890-opqr-123456789012", "Previous response not found")
+			return nil, common.NewErrorWithMessage("Previous response not found", "o1p2q3r4-s5t6-7890-opqr-123456789012")
 		}
 
 		// Validate that the previous response belongs to the same user
 		if previousResponse.UserID != userID {
-			return nil, common.NewError("p2q3r4s5-t6u7-8901-pqrs-234567890123", "Previous response does not belong to the current user")
+			return nil, common.NewErrorWithMessage("Previous response does not belong to the current user", "p2q3r4s5-t6u7-8901-pqrs-234567890123")
 		}
 
 		// Load the conversation from the previous response
 		if previousResponse.ConversationID == nil {
-			return nil, common.NewError("q3r4s5t6-u7v8-9012-qrst-345678901234", "Previous response does not belong to any conversation")
+			return nil, common.NewErrorWithMessage("Previous response does not belong to any conversation", "q3r4s5t6-u7v8-9012-qrst-345678901234")
 		}
 
 		conv, err := s.conversationService.GetConversationByID(ctx, *previousResponse.ConversationID)
-		if !err.IsEmpty() {
+		if err != nil {
 			return nil, err
 		}
-		return conv, common.EmptyError
+		return conv, nil
 	}
 
 	// Check if conversation is specified and not 'client-created-root'
 	if request.Conversation != nil && *request.Conversation != "" && *request.Conversation != ClientCreatedRootConversationID {
 		// Load existing conversation
 		conv, err := s.conversationService.GetConversationByPublicIDAndUserID(ctx, *request.Conversation, userID)
-		if !err.IsEmpty() {
+		if err != nil {
 			return nil, err
 		}
-		return conv, common.EmptyError
+		return conv, nil
 	}
 
 	// Create new conversation
 	conv, err := s.conversationService.CreateConversation(ctx, userID, nil, true, nil)
-	if !err.IsEmpty() {
+	if err != nil {
 		return nil, err
 	}
 
-	return conv, common.EmptyError
+	return conv, nil
 }
 
 // AppendMessagesToConversation appends messages to a conversation
@@ -697,7 +570,7 @@ func (s *ResponseService) AppendMessagesToConversation(ctx context.Context, conv
 		// Generate public ID for the item
 		publicID, err := idgen.GenerateSecureID("msg", 42)
 		if err != nil {
-			return false, common.NewError("u7v8w9x0-y1z2-3456-uvwx-789012345678", "Failed to generate item ID")
+			return false, common.NewErrorWithMessage("Failed to generate item ID", "u7v8w9x0-y1z2-3456-uvwx-789012345678")
 		}
 
 		// Convert role
@@ -717,34 +590,23 @@ func (s *ResponseService) AppendMessagesToConversation(ctx context.Context, conv
 		content := make([]conversation.Content, 0, len(msg.MultiContent))
 		for _, contentPart := range msg.MultiContent {
 			if contentPart.Type == openai.ChatMessagePartTypeText {
-				content = append(content, conversation.Content{
-					Type: "text",
-					Text: &conversation.Text{
-						Value: contentPart.Text,
-					},
-				})
+				content = append(content, conversation.NewTextContent(contentPart.Text))
 			}
 		}
 
 		// If no multi-content, use simple text content
 		if len(content) == 0 && msg.Content != "" {
-			content = append(content, conversation.Content{
-				Type: "text",
-				Text: &conversation.Text{
-					Value: msg.Content,
-				},
-			})
+			content = append(content, conversation.NewTextContent(msg.Content))
 		}
 
-		item := &conversation.Item{
-			PublicID:       publicID,
-			Type:           conversation.ItemType("message"),
-			Role:           &role,
-			Content:        content,
-			ConversationID: conv.ID,
-			ResponseID:     responseID,
-			CreatedAt:      time.Now(),
-		}
+		item := conversation.NewItem(
+			publicID,
+			conversation.ItemTypeMessage,
+			role,
+			content,
+			conv.ID,
+			responseID,
+		)
 
 		items = append(items, item)
 	}
@@ -752,12 +614,12 @@ func (s *ResponseService) AppendMessagesToConversation(ctx context.Context, conv
 	// Add items to conversation
 	if len(items) > 0 {
 		_, err := s.conversationService.AddMultipleItems(ctx, conv, conv.UserID, items)
-		if !err.IsEmpty() {
+		if err != nil {
 			return false, err
 		}
 	}
 
-	return true, common.EmptyError
+	return true, nil
 }
 
 // ConvertToChatCompletionRequest converts a response request to OpenAI chat completion request
@@ -821,7 +683,7 @@ func (s *ResponseService) ConvertToChatCompletionRequest(req *requesttypes.Creat
 func (s *ResponseService) ConvertConversationItemsToMessages(ctx context.Context, conv *conversation.Conversation) ([]openai.ChatCompletionMessage, *common.Error) {
 	// Load conversation with items
 	convWithItems, err := s.conversationService.GetConversationByPublicIDAndUserID(ctx, conv.PublicID, conv.UserID)
-	if !err.IsEmpty() {
+	if err != nil {
 		return nil, err
 	}
 
@@ -863,5 +725,5 @@ func (s *ResponseService) ConvertConversationItemsToMessages(ctx context.Context
 		}
 	}
 
-	return messages, common.EmptyError
+	return messages, nil
 }

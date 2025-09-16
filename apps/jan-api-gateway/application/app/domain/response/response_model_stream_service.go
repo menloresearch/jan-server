@@ -49,12 +49,12 @@ const (
 // validateRequest validates the incoming request
 func (h *StreamModelService) validateRequest(request *requesttypes.CreateResponseRequest) (bool, *common.Error) {
 	if request.Model == "" {
-		return false, common.NewError("a1b2c3d4-e5f6-7890-abcd-ef1234567890", "Model is required")
+		return false, common.NewErrorWithMessage("Model is required", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	}
 	if request.Input == nil {
-		return false, common.NewError("b2c3d4e5-f6g7-8901-bcde-f23456789012", "Input is required")
+		return false, common.NewErrorWithMessage("Input is required", "b2c3d4e5-f6g7-8901-bcde-f23456789012")
 	}
-	return true, common.EmptyError
+	return true, nil
 }
 
 // checkContextCancellation checks if context was cancelled and sends error to channel
@@ -107,8 +107,8 @@ func (h *StreamModelService) CreateStreamResponse(reqCtx *gin.Context, request *
 	success, err := h.validateRequest(request)
 	if !success {
 		reqCtx.JSON(http.StatusBadRequest, responsetypes.ErrorResponse{
-			Code:  err.Code,
-			Error: err.Message,
+			Code:  err.GetCode(),
+			Error: err.GetMessage(),
 		})
 		return
 	}
@@ -407,7 +407,7 @@ func (h *StreamModelService) streamResponseToChannel(reqCtx *gin.Context, reques
 		Item: responsetypes.ResponseOutputItem{
 			ID:      itemID,
 			Type:    "message",
-			Status:  "in_progress",
+			Status:  string(conversation.ItemStatusInProgress),
 			Content: []responsetypes.ResponseContentPart{},
 			Role:    "assistant",
 		},
@@ -519,7 +519,7 @@ func (h *StreamModelService) streamResponseToChannel(reqCtx *gin.Context, reques
 						Item: responsetypes.ResponseOutputItem{
 							ID:      reasoningItemID,
 							Type:    "reasoning",
-							Status:  "in_progress",
+							Status:  string(conversation.ItemStatusInProgress),
 							Content: []responsetypes.ResponseContentPart{},
 							Role:    "assistant",
 						},
@@ -657,11 +657,11 @@ func (h *StreamModelService) streamResponseToChannel(reqCtx *gin.Context, reques
 		}
 		// Get response entity to get the internal ID
 		responseEntity, err := h.responseService.GetResponseByPublicID(reqCtx, responseID)
-		if err.IsEmpty() && responseEntity != nil {
+		if err == nil && responseEntity != nil {
 			success, err := h.responseService.AppendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}, &responseEntity.ID)
 			if !success {
 				// Log error but don't fail the response
-				logger.GetLogger().Errorf("Failed to append assistant response to conversation: %s - %s", err.Code, err.Message)
+				logger.GetLogger().Errorf("Failed to append assistant response to conversation: %s - %s", err.GetCode(), err.Error())
 			}
 		}
 	}
@@ -713,7 +713,7 @@ func (h *StreamModelService) streamResponseToChannel(reqCtx *gin.Context, reques
 			Item: responsetypes.ResponseOutputItem{
 				ID:     itemID,
 				Type:   "message",
-				Status: "completed",
+				Status: string(conversation.ItemStatusCompleted),
 				Content: []responsetypes.ResponseContentPart{
 					{
 						Type:        "output_text",
@@ -736,27 +736,27 @@ func (h *StreamModelService) streamResponseToChannel(reqCtx *gin.Context, reques
 	// Update response status to completed and save output
 	// Get response entity by public ID to update status
 	responseEntity, getErr := h.responseService.GetResponseByPublicID(reqCtx, responseID)
-	if getErr.IsEmpty() && responseEntity != nil {
-		// Update status to completed
-		success, updateErr := h.responseService.UpdateResponseStatus(reqCtx, responseEntity.ID, ResponseStatusCompleted)
-		if !success {
-			// Log error but don't fail the request since streaming is already complete
-			fmt.Printf("Failed to update response status to completed: %s - %s\n", updateErr.Code, updateErr.Message)
-		}
-
-		// Save the output to database
-		outputData := map[string]interface{}{
+	if getErr == nil && responseEntity != nil {
+		// Prepare output data
+		outputData := map[string]any{
 			"type": "text",
-			"text": map[string]interface{}{
+			"text": map[string]any{
 				"value": fullResponse.String(),
 			},
 		}
-		success, outputErr := h.responseService.UpdateResponseOutput(reqCtx, responseEntity.ID, outputData)
+
+		// Update response with all fields at once (optimized to prevent N+1 queries)
+		updates := &ResponseUpdates{
+			Status: ptr.ToString(string(ResponseStatusCompleted)),
+			Output: outputData,
+		}
+		success, updateErr := h.responseService.UpdateResponseFields(reqCtx, responseEntity.ID, updates)
 		if !success {
-			fmt.Printf("Failed to update response output: %s - %s\n", outputErr.Code, outputErr.Message)
+			// Log error but don't fail the request since streaming is already complete
+			fmt.Printf("Failed to update response fields: %s - %s\n", updateErr.GetCode(), updateErr.Error())
 		}
 	} else {
-		fmt.Printf("Failed to get response entity for status update: %s - %s\n", getErr.Code, getErr.Message)
+		fmt.Printf("Failed to get response entity for status update: %s - %s\n", getErr.GetCode(), getErr.Error())
 	}
 
 	// Log streaming metrics

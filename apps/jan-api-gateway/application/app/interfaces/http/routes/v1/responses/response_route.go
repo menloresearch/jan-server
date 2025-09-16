@@ -52,10 +52,10 @@ func (responseRoute *ResponseRoute) registerRoutes(router *gin.RouterGroup) {
 
 	// Apply response middleware for routes that need response context
 	responseMiddleWare := responseRoute.responseService.GetResponseMiddleWare()
-	responseGroup.GET(fmt.Sprintf("/:%s", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.GetResponse)
-	responseGroup.DELETE(fmt.Sprintf("/:%s", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.DeleteResponse)
-	responseGroup.POST(fmt.Sprintf("/:%s/cancel", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.CancelResponse)
-	responseGroup.GET(fmt.Sprintf("/:%s/input_items", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.ListInputItems)
+	responseGroup.GET(fmt.Sprintf("/:%s", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.responseModelService.GetResponseHandler)
+	responseGroup.DELETE(fmt.Sprintf("/:%s", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.responseModelService.DeleteResponseHandler)
+	responseGroup.POST(fmt.Sprintf("/:%s/cancel", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.responseModelService.CancelResponseHandler)
+	responseGroup.GET(fmt.Sprintf("/:%s/input_items", string(response.ResponseContextKeyPublicID)), responseMiddleWare, responseRoute.responseModelService.ListInputItemsHandler)
 }
 
 // CreateResponse creates a new response from LLM
@@ -196,10 +196,10 @@ func (responseRoute *ResponseRoute) CreateResponse(reqCtx *gin.Context) {
 
 	// Call domain service (pure business logic)
 	result, err := responseRoute.responseModelService.CreateResponse(ctx, userID, domainRequest)
-	if !err.IsEmpty() {
+	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  err.Code,
-			Error: err.Message,
+			Code:  err.GetCode(),
+			Error: err.Error(),
 		})
 		return
 	}
@@ -223,7 +223,7 @@ func (responseRoute *ResponseRoute) handleResponseCreation(reqCtx *gin.Context, 
 	if result.IsStreaming {
 		responseRoute.streamModelService.CreateStreamResponse(reqCtx, request, result.APIKey, result.Conversation, result.Response, result.ChatCompletionRequest)
 	} else {
-		responseRoute.nonStreamModelService.CreateNonStreamResponse(reqCtx, request, result.APIKey, result.Conversation, result.Response, result.ChatCompletionRequest)
+		responseRoute.nonStreamModelService.CreateNonStreamResponseHandler(reqCtx, request, result.APIKey, result.Conversation, result.Response, result.ChatCompletionRequest)
 	}
 }
 
@@ -302,8 +302,8 @@ func (responseRoute *ResponseRoute) DeleteResponse(reqCtx *gin.Context) {
 	success, err := responseRoute.responseService.DeleteResponse(ctx, resp.ID)
 	if !success {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  err.Code,
-			Error: err.Message,
+			Code:  err.GetCode(),
+			Error: err.Error(),
 		})
 		return
 	}
@@ -353,18 +353,18 @@ func (responseRoute *ResponseRoute) CancelResponse(reqCtx *gin.Context) {
 	success, err := responseRoute.responseService.UpdateResponseStatus(ctx, resp.ID, response.ResponseStatusCancelled)
 	if !success {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  err.Code,
-			Error: err.Message,
+			Code:  err.GetCode(),
+			Error: err.Error(),
 		})
 		return
 	}
 
 	// Reload the response to get updated status
 	updatedResp, err := responseRoute.responseService.GetResponseByPublicID(ctx, resp.PublicID)
-	if !err.IsEmpty() {
+	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  err.Code,
-			Error: err.Message,
+			Code:  err.GetCode(),
+			Error: err.Error(),
 		})
 		return
 	}
@@ -432,10 +432,10 @@ func (responseRoute *ResponseRoute) ListInputItems(reqCtx *gin.Context) {
 
 	// Get items for this response using the response service
 	items, err := responseRoute.responseService.GetItemsForResponse(ctx, resp.ID, nil)
-	if !err.IsEmpty() {
+	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  err.Code,
-			Error: err.Message,
+			Code:  err.GetCode(),
+			Error: err.Error(),
 		})
 		return
 	}

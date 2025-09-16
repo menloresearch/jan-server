@@ -2,6 +2,7 @@ package response
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -80,13 +81,13 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 	mToE := modelRegistry.GetModelToEndpoints()
 	endpoints, ok := mToE[request.Model]
 	if !ok {
-		return nil, common.NewError("h8i9j0k1-l2m3-4567-hijk-890123456789", "Model validation error")
+		return nil, common.NewErrorWithMessage("Model validation error", "h8i9j0k1-l2m3-4567-hijk-890123456789")
 	}
 
 	// Convert response request to chat completion request using domain service
 	chatCompletionRequest := h.responseService.ConvertToChatCompletionRequest(request)
 	if chatCompletionRequest == nil {
-		return nil, common.NewError("i9j0k1l2-m3n4-5678-ijkl-901234567890", "Input validation error")
+		return nil, common.NewErrorWithMessage("Input validation error", "i9j0k1l2-m3n4-5678-ijkl-901234567890")
 	}
 
 	// Check if model endpoint exists
@@ -100,19 +101,19 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 	}
 
 	if !endpointExists {
-		return nil, common.NewError("h8i9j0k1-l2m3-4567-hijk-890123456789", "Model validation error")
+		return nil, common.NewErrorWithMessage("Model validation error", "h8i9j0k1-l2m3-4567-hijk-890123456789")
 	}
 
 	// Handle conversation logic using domain service
 	conversation, err := h.responseService.HandleConversation(ctx, userID, request)
-	if !err.IsEmpty() {
+	if err != nil {
 		return nil, err
 	}
 
 	// If previous_response_id is provided, prepend conversation history to input messages
 	if request.PreviousResponseID != nil && *request.PreviousResponseID != "" {
 		conversationMessages, err := h.responseService.ConvertConversationItemsToMessages(ctx, conversation)
-		if !err.IsEmpty() {
+		if err != nil {
 			return nil, err
 		}
 		// Prepend conversation history to the input messages
@@ -144,8 +145,18 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 	if conversation != nil {
 		conversationID = &conversation.ID
 	}
-	responseEntity, err := h.responseService.CreateResponse(ctx, userID, conversationID, request.Model, request.Input, request.SystemPrompt, responseParams)
-	if !err.IsEmpty() {
+
+	// Convert input to JSON string
+	inputJSON, jsonErr := json.Marshal(request.Input)
+	if jsonErr != nil {
+		return nil, common.NewError(jsonErr, "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+	}
+
+	// Build Response object from parameters
+	response := NewResponse(userID, conversationID, request.Model, string(inputJSON), request.SystemPrompt, responseParams)
+
+	responseEntity, err := h.responseService.CreateResponse(ctx, response)
+	if err != nil {
 		return nil, err
 	}
 
@@ -165,13 +176,13 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 		ChatCompletionRequest: chatCompletionRequest,
 		APIKey:                key,
 		IsStreaming:           isStreaming,
-	}, common.EmptyError
+	}, nil
 }
 
 // handleConversation handles conversation creation or loading based on the request
 
 // GetResponse handles the business logic for getting a response
-func (h *ResponseModelService) GetResponse(reqCtx *gin.Context) {
+func (h *ResponseModelService) GetResponseHandler(reqCtx *gin.Context) {
 	// Get response from middleware context
 	responseEntity, ok := GetResponseFromContext(reqCtx)
 	if !ok {
@@ -179,9 +190,9 @@ func (h *ResponseModelService) GetResponse(reqCtx *gin.Context) {
 		return
 	}
 
-	result, err := h.doGetResponse(responseEntity)
-	if !err.IsEmpty() {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.Code, err.Message)
+	result, err := h.GetResponse(responseEntity)
+	if err != nil {
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.GetCode(), err.Error())
 		return
 	}
 
@@ -189,14 +200,14 @@ func (h *ResponseModelService) GetResponse(reqCtx *gin.Context) {
 }
 
 // doGetResponse performs the business logic for getting a response
-func (h *ResponseModelService) doGetResponse(responseEntity *Response) (responsetypes.Response, *common.Error) {
+func (h *ResponseModelService) GetResponse(responseEntity *Response) (responsetypes.Response, *common.Error) {
 	// Convert domain response to API response using domain service
 	apiResponse := h.responseService.ConvertDomainResponseToAPIResponse(responseEntity)
-	return apiResponse, common.EmptyError
+	return apiResponse, nil
 }
 
 // DeleteResponse handles the business logic for deleting a response
-func (h *ResponseModelService) DeleteResponse(reqCtx *gin.Context) {
+func (h *ResponseModelService) DeleteResponseHandler(reqCtx *gin.Context) {
 	// Get response from middleware context
 	responseEntity, ok := GetResponseFromContext(reqCtx)
 	if !ok {
@@ -204,9 +215,9 @@ func (h *ResponseModelService) DeleteResponse(reqCtx *gin.Context) {
 		return
 	}
 
-	result, err := h.doDeleteResponse(reqCtx, responseEntity)
-	if !err.IsEmpty() {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.Code, err.Message)
+	result, err := h.DeleteResponse(reqCtx, responseEntity)
+	if err != nil {
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.GetCode(), err.Error())
 		return
 	}
 
@@ -214,7 +225,7 @@ func (h *ResponseModelService) DeleteResponse(reqCtx *gin.Context) {
 }
 
 // doDeleteResponse performs the business logic for deleting a response
-func (h *ResponseModelService) doDeleteResponse(reqCtx *gin.Context, responseEntity *Response) (responsetypes.Response, *common.Error) {
+func (h *ResponseModelService) DeleteResponse(reqCtx *gin.Context, responseEntity *Response) (responsetypes.Response, *common.Error) {
 	// Delete the response from database
 	success, err := h.responseService.DeleteResponse(reqCtx, responseEntity.ID)
 	if !success {
@@ -231,11 +242,11 @@ func (h *ResponseModelService) doDeleteResponse(reqCtx *gin.Context, responseEnt
 		CancelledAt: ptr.ToInt64(time.Now().Unix()),
 	}
 
-	return deletedResponse, common.EmptyError
+	return deletedResponse, nil
 }
 
 // CancelResponse handles the business logic for cancelling a response
-func (h *ResponseModelService) CancelResponse(reqCtx *gin.Context) {
+func (h *ResponseModelService) CancelResponseHandler(reqCtx *gin.Context) {
 	// Get response from middleware context
 	responseEntity, ok := GetResponseFromContext(reqCtx)
 	if !ok {
@@ -243,9 +254,9 @@ func (h *ResponseModelService) CancelResponse(reqCtx *gin.Context) {
 		return
 	}
 
-	result, err := h.doCancelResponse(responseEntity)
-	if !err.IsEmpty() {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.Code, err.Message)
+	result, err := h.CancelResponse(responseEntity)
+	if err != nil {
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.GetCode(), err.Error())
 		return
 	}
 
@@ -253,7 +264,7 @@ func (h *ResponseModelService) CancelResponse(reqCtx *gin.Context) {
 }
 
 // doCancelResponse performs the business logic for cancelling a response
-func (h *ResponseModelService) doCancelResponse(responseEntity *Response) (responsetypes.Response, *common.Error) {
+func (h *ResponseModelService) CancelResponse(responseEntity *Response) (responsetypes.Response, *common.Error) {
 	// TODO: Implement actual cancellation logic
 	// For now, return the response with cancelled status
 	mockResponse := responsetypes.Response{
@@ -265,11 +276,11 @@ func (h *ResponseModelService) doCancelResponse(responseEntity *Response) (respo
 		CancelledAt: ptr.ToInt64(time.Now().Unix()),
 	}
 
-	return mockResponse, common.EmptyError
+	return mockResponse, nil
 }
 
 // ListInputItems handles the business logic for listing input items
-func (h *ResponseModelService) ListInputItems(reqCtx *gin.Context) {
+func (h *ResponseModelService) ListInputItemsHandler(reqCtx *gin.Context) {
 	// Get response from middleware context
 	responseEntity, ok := GetResponseFromContext(reqCtx)
 	if !ok {
@@ -277,9 +288,9 @@ func (h *ResponseModelService) ListInputItems(reqCtx *gin.Context) {
 		return
 	}
 
-	result, err := h.doListInputItems(reqCtx, responseEntity)
-	if !err.IsEmpty() {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.Code, err.Message)
+	result, err := h.ListInputItems(reqCtx, responseEntity)
+	if err != nil {
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.GetCode(), err.Error())
 		return
 	}
 
@@ -287,7 +298,7 @@ func (h *ResponseModelService) ListInputItems(reqCtx *gin.Context) {
 }
 
 // doListInputItems performs the business logic for listing input items
-func (h *ResponseModelService) doListInputItems(reqCtx *gin.Context, responseEntity *Response) (responsetypes.OpenAIListResponse[responsetypes.InputItem], *common.Error) {
+func (h *ResponseModelService) ListInputItems(reqCtx *gin.Context, responseEntity *Response) (responsetypes.OpenAIListResponse[responsetypes.InputItem], *common.Error) {
 	// Parse pagination parameters
 	limit := 20 // default limit
 	if limitStr := reqCtx.Query("limit"); limitStr != "" {
@@ -299,7 +310,7 @@ func (h *ResponseModelService) doListInputItems(reqCtx *gin.Context, responseEnt
 	// Get input items for the response (only user role messages)
 	userRole := conversation.ItemRole("user")
 	items, err := h.responseService.GetItemsForResponse(reqCtx, responseEntity.ID, &userRole)
-	if !err.IsEmpty() {
+	if err != nil {
 		return responsetypes.OpenAIListResponse[responsetypes.InputItem]{}, err
 	}
 
@@ -369,7 +380,7 @@ func (h *ResponseModelService) doListInputItems(reqCtx *gin.Context, responseEnt
 		FirstID:   firstID,
 		LastID:    lastID,
 		T:         paginatedItems,
-	}, common.EmptyError
+	}, nil
 }
 
 // sendErrorResponse sends a standardized error response
@@ -381,12 +392,6 @@ func (h *ResponseModelService) sendErrorResponse(reqCtx *gin.Context, statusCode
 }
 
 // sendSuccessResponse sends a standardized success response
-func (h *ResponseModelService) sendSuccessResponse(reqCtx *gin.Context, data interface{}) {
-	status := responsetypes.ResponseCodeOk
-	objectType := responsetypes.ObjectTypeResponse
-	reqCtx.JSON(http.StatusOK, responsetypes.OpenAIGeneralResponse[responsetypes.Response]{
-		JanStatus: &status,
-		Object:    &objectType,
-		T:         data.(responsetypes.Response),
-	})
+func (h *ResponseModelService) sendSuccessResponse(reqCtx *gin.Context, data any) {
+	reqCtx.JSON(http.StatusOK, data.(responsetypes.Response))
 }

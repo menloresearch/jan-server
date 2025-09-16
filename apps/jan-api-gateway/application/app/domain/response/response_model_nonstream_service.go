@@ -13,6 +13,7 @@ import (
 	responsetypes "menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
 	"menlo.ai/jan-api-gateway/app/utils/logger"
+	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
 const (
@@ -33,15 +34,15 @@ func NewNonStreamModelService(responseModelService *ResponseModelService) *NonSt
 }
 
 // CreateNonStreamResponse handles the business logic for creating a non-streaming response
-func (h *NonStreamModelService) CreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *Response, chatCompletionRequest *openai.ChatCompletionRequest) {
+func (h *NonStreamModelService) CreateNonStreamResponseHandler(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *Response, chatCompletionRequest *openai.ChatCompletionRequest) {
 
-	result, err := h.doCreateNonStreamResponse(reqCtx, request, key, conv, responseEntity, chatCompletionRequest)
-	if !err.IsEmpty() {
+	result, err := h.CreateNonStreamResponse(reqCtx, request, key, conv, responseEntity, chatCompletionRequest)
+	if err != nil {
 		reqCtx.AbortWithStatusJSON(
 			http.StatusBadRequest,
 			responsetypes.ErrorResponse{
-				Code:  err.Code,
-				Error: err.Message,
+				Code:  err.GetCode(),
+				Error: err.Error(),
 			})
 		return
 	}
@@ -50,14 +51,14 @@ func (h *NonStreamModelService) CreateNonStreamResponse(reqCtx *gin.Context, req
 }
 
 // doCreateNonStreamResponse performs the business logic for creating a non-streaming response
-func (h *NonStreamModelService) doCreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *Response, chatCompletionRequest *openai.ChatCompletionRequest) (responsetypes.Response, *common.Error) {
+func (h *NonStreamModelService) CreateNonStreamResponse(reqCtx *gin.Context, request *requesttypes.CreateResponseRequest, key string, conv *conversation.Conversation, responseEntity *Response, chatCompletionRequest *openai.ChatCompletionRequest) (responsetypes.Response, *common.Error) {
 	// Process with Jan inference client for non-streaming with timeout
 	janInferenceClient := janinference.NewJanInferenceClient(reqCtx)
 	ctx, cancel := context.WithTimeout(reqCtx.Request.Context(), DefaultTimeout)
 	defer cancel()
 	chatResponse, err := janInferenceClient.CreateChatCompletion(ctx, key, *chatCompletionRequest)
 	if err != nil {
-		return responsetypes.Response{}, common.NewError("bc82d69c-685b-4556-9d1f-2a4a80ae8ca4", "Failed to create chat completion")
+		return responsetypes.Response{}, common.NewError(err, "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
 	}
 
 	// Process reasoning content
@@ -72,39 +73,30 @@ func (h *NonStreamModelService) doCreateNonStreamResponse(reqCtx *gin.Context, r
 		success, err := h.responseService.AppendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}, &responseEntity.ID)
 		if !success {
 			// Log error but don't fail the response
-			logger.GetLogger().Errorf("Failed to append assistant response to conversation: %s - %s", err.Code, err.Message)
+			logger.GetLogger().Errorf("Failed to append assistant response to conversation: %s - %s", err.GetCode(), err.Error())
 		}
-	}
-
-	// Update response status to completed
-	success, updateErr := h.responseService.UpdateResponseStatus(reqCtx, responseEntity.ID, ResponseStatusCompleted)
-	if !success {
-		// Log error but don't fail the request since response is already generated
-		logger.GetLogger().Errorf("Failed to update response status to completed: %s - %s\n", updateErr.Code, updateErr.Message)
 	}
 
 	// Convert chat completion response to response format
 	responseData := h.convertFromChatCompletionResponse(processedResponse, request, conv, responseEntity)
 
-	// Save output and usage to database
-	if responseData.T.Output != nil {
-		success, outputErr := h.responseService.UpdateResponseOutput(reqCtx, responseEntity.ID, responseData.T.Output)
-		if !success {
-			logger.GetLogger().Errorf("Failed to update response output: %s - %s\n", outputErr.Code, outputErr.Message)
-		}
+	// Update response with all fields at once (optimized to prevent N+1 queries)
+	updates := &ResponseUpdates{
+		Status: ptr.ToString(string(ResponseStatusCompleted)),
+		Output: responseData.Output,
+		Usage:  responseData.Usage,
 	}
-	if responseData.T.Usage != nil {
-		success, usageErr := h.responseService.UpdateResponseUsage(reqCtx, responseEntity.ID, responseData.T.Usage)
-		if !success {
-			logger.GetLogger().Errorf("Failed to update response usage: %s - %s\n", usageErr.Code, usageErr.Message)
-		}
+	success, updateErr := h.responseService.UpdateResponseFields(reqCtx, responseEntity.ID, updates)
+	if !success {
+		// Log error but don't fail the request since response is already generated
+		logger.GetLogger().Errorf("Failed to update response fields: %s - %s\n", updateErr.GetCode(), updateErr.Error())
 	}
 
-	return responseData.T, common.EmptyError
+	return responseData, nil
 }
 
 // convertFromChatCompletionResponse converts a ChatCompletionResponse to a Response
-func (h *NonStreamModelService) convertFromChatCompletionResponse(chatResp *openai.ChatCompletionResponse, req *requesttypes.CreateResponseRequest, conv *conversation.Conversation, responseEntity *Response) responsetypes.OpenAIGeneralResponse[responsetypes.Response] {
+func (h *NonStreamModelService) convertFromChatCompletionResponse(chatResp *openai.ChatCompletionResponse, req *requesttypes.CreateResponseRequest, conv *conversation.Conversation, responseEntity *Response) responsetypes.Response {
 
 	// Extract the content and reasoning from the first choice
 	var outputText string
@@ -121,11 +113,11 @@ func (h *NonStreamModelService) convertFromChatCompletionResponse(chatResp *open
 	}
 
 	// Convert input back to the original format for response
-	var responseInput interface{}
+	var responseInput any
 	switch v := req.Input.(type) {
 	case string:
 		responseInput = v
-	case []interface{}:
+	case []any:
 		responseInput = v
 	default:
 		responseInput = req.Input
@@ -217,7 +209,5 @@ func (h *NonStreamModelService) convertFromChatCompletionResponse(chatResp *open
 		Metadata:   req.Metadata,
 	}
 
-	return responsetypes.OpenAIGeneralResponse[responsetypes.Response]{
-		T: response,
-	}
+	return response
 }

@@ -7,7 +7,7 @@ type CreateResponseRequest struct {
 	Model string `json:"model" binding:"required"`
 
 	// The input to the model. Can be a string or array of strings.
-	Input interface{} `json:"input" binding:"required"`
+	Input any `json:"input" binding:"required"`
 
 	// The system prompt to use for this response.
 	SystemPrompt *string `json:"system_prompt,omitempty"`
@@ -52,7 +52,7 @@ type CreateResponseRequest struct {
 	ToolChoice *ToolChoice `json:"tool_choice,omitempty"`
 
 	// The metadata to use for this response.
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	Metadata map[string]any `json:"metadata,omitempty"`
 
 	// Whether to stream the response.
 	Stream *bool `json:"stream,omitempty"`
@@ -189,7 +189,7 @@ type FunctionCall struct {
 	Name string `json:"name" binding:"required"`
 
 	// The arguments to pass to the function.
-	Arguments map[string]interface{} `json:"arguments,omitempty"`
+	Arguments map[string]any `json:"arguments,omitempty"`
 }
 
 // ReasoningInput represents a reasoning input
@@ -225,7 +225,7 @@ type FunctionDefinition struct {
 	Description *string `json:"description,omitempty"`
 
 	// The parameters of the function.
-	Parameters map[string]interface{} `json:"parameters,omitempty"`
+	Parameters map[string]any `json:"parameters,omitempty"`
 }
 
 // ToolChoice represents the tool choice for the model

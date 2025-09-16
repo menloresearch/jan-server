@@ -85,7 +85,7 @@ func CreateApplication() (*Application, error) {
 	mcpapi := mcp.NewMCPAPI(serperMCP, authService)
 	googleAuthAPI := google.NewGoogleAuthAPI(userService, authService)
 	authRoute := auth2.NewAuthRoute(googleAuthAPI, userService, authService)
-	responseRepository := responserepo.NewResponseRepository(db)
+	responseRepository := responserepo.NewResponseGormRepository(transactionDatabase)
 	responseService := response.NewResponseService(responseRepository, itemRepository, conversationService)
 	responseModelService := response.NewResponseModelService(userService, authService, apiKeyService, conversationService, responseService)
 	streamModelService := response.NewStreamModelService(responseModelService)
