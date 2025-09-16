@@ -175,6 +175,7 @@ type ListResponse[T any] struct {
 type ConversationResponse struct {
 	ID        string            `json:"id"`
 	Object    string            `json:"object"`
+	Title     *string           `json:"title,omitempty"`
 	CreatedAt int64             `json:"created_at"`
 	Metadata  map[string]string `json:"metadata"`
 }
@@ -737,6 +738,7 @@ func domainToConversationResponse(entity *conversation.Conversation) *Conversati
 	return &ConversationResponse{
 		ID:        entity.PublicID,
 		Object:    "conversation",
+		Title:     entity.Title,
 		CreatedAt: entity.CreatedAt.Unix(),
 		Metadata:  metadata,
 	}
