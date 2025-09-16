@@ -737,23 +737,23 @@ func (h *StreamModelService) streamResponseToChannel(reqCtx *gin.Context, reques
 	// Get response entity by public ID to update status
 	responseEntity, getErr := h.responseService.GetResponseByPublicID(reqCtx, responseID)
 	if getErr == nil && responseEntity != nil {
-		// Update status to completed
-		success, updateErr := h.responseService.UpdateResponseStatus(reqCtx, responseEntity.ID, ResponseStatusCompleted)
-		if !success {
-			// Log error but don't fail the request since streaming is already complete
-			fmt.Printf("Failed to update response status to completed: %s - %s\n", updateErr.GetCode(), updateErr.Error())
-		}
-
-		// Save the output to database
-		outputData := map[string]interface{}{
+		// Prepare output data
+		outputData := map[string]any{
 			"type": "text",
-			"text": map[string]interface{}{
+			"text": map[string]any{
 				"value": fullResponse.String(),
 			},
 		}
-		success, outputErr := h.responseService.UpdateResponseOutput(reqCtx, responseEntity.ID, outputData)
+
+		// Update response with all fields at once (optimized to prevent N+1 queries)
+		updates := &ResponseUpdates{
+			Status: ptr.ToRespoToStringnseStatus(string(ResponseStatusCompleted)),
+			Output: outputData,
+		}
+		success, updateErr := h.responseService.UpdateResponseFields(reqCtx, responseEntity.ID, updates)
 		if !success {
-			fmt.Printf("Failed to update response output: %s - %s\n", outputErr.GetCode(), outputErr.Error())
+			// Log error but don't fail the request since streaming is already complete
+			fmt.Printf("Failed to update response fields: %s - %s\n", updateErr.GetCode(), updateErr.Error())
 		}
 	} else {
 		fmt.Printf("Failed to get response entity for status update: %s - %s\n", getErr.GetCode(), getErr.Error())

@@ -58,7 +58,7 @@ func NewSchemaConversation(c *conversation.Conversation) *Conversation {
 			ID: c.ID,
 		},
 		PublicID:  c.PublicID,
-		Title:     stringPtrToString(c.Title),
+		Title:     ptr.FromString(c.Title),
 		UserID:    c.UserID,
 		Status:    string(c.Status),
 		Metadata:  metadataJSON,
@@ -110,9 +110,9 @@ func NewSchemaItem(i *conversation.Item) *Item {
 		ConversationID:    i.ConversationID,
 		ResponseID:        i.ResponseID,
 		Type:              string(i.Type),
-		Role:              stringPtrToString((*string)(i.Role)),
+		Role:              string(*i.Role),
 		Content:           contentJSON,
-		Status:            stringPtrToString((*string)(i.Status)),
+		Status:            string(*i.Status),
 		IncompleteAt:      i.IncompleteAt,
 		IncompleteDetails: incompleteDetailsJSON,
 		CompletedAt:       i.CompletedAt,
@@ -147,12 +147,4 @@ func (i *Item) EtoD() *conversation.Item {
 		ResponseID:        i.ResponseID,
 		CreatedAt:         i.CreatedAt,
 	}
-}
-
-// Helper functions
-func stringPtrToString(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }

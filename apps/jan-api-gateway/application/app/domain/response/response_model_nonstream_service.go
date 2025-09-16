@@ -13,6 +13,7 @@ import (
 	responsetypes "menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
 	"menlo.ai/jan-api-gateway/app/utils/logger"
+	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
 const (
@@ -76,28 +77,19 @@ func (h *NonStreamModelService) CreateNonStreamResponse(reqCtx *gin.Context, req
 		}
 	}
 
-	// Update response status to completed
-	success, updateErr := h.responseService.UpdateResponseStatus(reqCtx, responseEntity.ID, ResponseStatusCompleted)
-	if !success {
-		// Log error but don't fail the request since response is already generated
-		logger.GetLogger().Errorf("Failed to update response status to completed: %s - %s\n", updateErr.GetCode(), updateErr.Error())
-	}
-
 	// Convert chat completion response to response format
 	responseData := h.convertFromChatCompletionResponse(processedResponse, request, conv, responseEntity)
 
-	// Save output and usage to database
-	if responseData.T.Output != nil {
-		success, outputErr := h.responseService.UpdateResponseOutput(reqCtx, responseEntity.ID, responseData.T.Output)
-		if !success {
-			logger.GetLogger().Errorf("Failed to update response output: %s - %s\n", outputErr.GetCode(), outputErr.Error())
-		}
+	// Update response with all fields at once (optimized to prevent N+1 queries)
+	updates := &ResponseUpdates{
+		Status: ptr.ToString(string(ResponseStatusCompleted)),
+		Output: responseData.T.Output,
+		Usage:  responseData.T.Usage,
 	}
-	if responseData.T.Usage != nil {
-		success, usageErr := h.responseService.UpdateResponseUsage(reqCtx, responseEntity.ID, responseData.T.Usage)
-		if !success {
-			logger.GetLogger().Errorf("Failed to update response usage: %s - %s\n", usageErr.GetCode(), usageErr.Error())
-		}
+	success, updateErr := h.responseService.UpdateResponseFields(reqCtx, responseEntity.ID, updates)
+	if !success {
+		// Log error but don't fail the request since response is already generated
+		logger.GetLogger().Errorf("Failed to update response fields: %s - %s\n", updateErr.GetCode(), updateErr.Error())
 	}
 
 	return responseData.T, nil
@@ -121,11 +113,11 @@ func (h *NonStreamModelService) convertFromChatCompletionResponse(chatResp *open
 	}
 
 	// Convert input back to the original format for response
-	var responseInput interface{}
+	var responseInput any
 	switch v := req.Input.(type) {
 	case string:
 		responseInput = v
-	case []interface{}:
+	case []any:
 		responseInput = v
 	default:
 		responseInput = req.Input

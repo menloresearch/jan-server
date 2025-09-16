@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
@@ -121,20 +120,10 @@ func (s *ResponseService) UpdateResponseStatus(ctx context.Context, responseID u
 		return false, common.NewErrorWithMessage("Response not found", "o5p6q7r8-s9t0-1234-opqr-567890123456")
 	}
 
-	response.Status = status
-	response.UpdatedAt = time.Now()
+	// Update the response object
+	UpdateResponseStatusOnObject(response, status)
 
-	// Set completion timestamps based on status
-	now := time.Now()
-	switch status {
-	case ResponseStatusCompleted:
-		response.CompletedAt = &now
-	case ResponseStatusCancelled:
-		response.CancelledAt = &now
-	case ResponseStatusFailed:
-		response.FailedAt = &now
-	}
-
+	// Save to database
 	if err := s.responseRepo.Update(ctx, response); err != nil {
 		return false, common.NewError(err, "p6q7r8s9-t0u1-2345-pqrs-678901234567")
 	}
@@ -143,7 +132,7 @@ func (s *ResponseService) UpdateResponseStatus(ctx context.Context, responseID u
 }
 
 // UpdateResponseOutput updates the output of a response
-func (s *ResponseService) UpdateResponseOutput(ctx context.Context, responseID uint, output interface{}) (bool, *common.Error) {
+func (s *ResponseService) UpdateResponseOutput(ctx context.Context, responseID uint, output any) (bool, *common.Error) {
 	response, err := s.responseRepo.FindByID(ctx, responseID)
 	if err != nil {
 		return false, common.NewError(err, "q7r8s9t0-u1v2-3456-qrst-789012345678")
@@ -152,21 +141,12 @@ func (s *ResponseService) UpdateResponseOutput(ctx context.Context, responseID u
 		return false, common.NewErrorWithMessage("Response not found", "r8s9t0u1-v2w3-4567-rstu-890123456789")
 	}
 
-	// Convert output to JSON string
-	outputJSON, err := json.Marshal(output)
-	if err != nil {
-		return false, common.NewError(err, "s9t0u1v2-w3x4-5678-stuv-901234567890")
+	// Update the response object
+	if err := UpdateResponseOutputOnObject(response, output); err != nil {
+		return false, err
 	}
 
-	outputStr := string(outputJSON)
-	// For JSON columns, use null for empty arrays/objects
-	if outputStr == "[]" || outputStr == "{}" {
-		response.Output = nil
-	} else {
-		response.Output = &outputStr
-	}
-	response.UpdatedAt = time.Now()
-
+	// Save to database
 	if err := s.responseRepo.Update(ctx, response); err != nil {
 		return false, common.NewError(err, "t0u1v2w3-x4y5-6789-tuvw-012345678901")
 	}
@@ -175,7 +155,7 @@ func (s *ResponseService) UpdateResponseOutput(ctx context.Context, responseID u
 }
 
 // UpdateResponseUsage updates the usage statistics of a response
-func (s *ResponseService) UpdateResponseUsage(ctx context.Context, responseID uint, usage interface{}) (bool, *common.Error) {
+func (s *ResponseService) UpdateResponseUsage(ctx context.Context, responseID uint, usage any) (bool, *common.Error) {
 	response, err := s.responseRepo.FindByID(ctx, responseID)
 	if err != nil {
 		return false, common.NewError(err, "u1v2w3x4-y5z6-7890-uvwx-123456789012")
@@ -184,21 +164,12 @@ func (s *ResponseService) UpdateResponseUsage(ctx context.Context, responseID ui
 		return false, common.NewErrorWithMessage("Response not found", "v2w3x4y5-z6a7-8901-vwxy-234567890123")
 	}
 
-	// Convert usage to JSON string
-	usageJSON, err := json.Marshal(usage)
-	if err != nil {
-		return false, common.NewError(err, "w3x4y5z6-a7b8-9012-wxyz-345678901234")
+	// Update the response object
+	if err := UpdateResponseUsageOnObject(response, usage); err != nil {
+		return false, err
 	}
 
-	usageStr := string(usageJSON)
-	// For JSON columns, use null for empty arrays/objects
-	if usageStr == "[]" || usageStr == "{}" {
-		response.Usage = nil
-	} else {
-		response.Usage = &usageStr
-	}
-	response.UpdatedAt = time.Now()
-
+	// Save to database
 	if err := s.responseRepo.Update(ctx, response); err != nil {
 		return false, common.NewError(err, "x4y5z6a7-b8c9-0123-xyza-456789012345")
 	}
@@ -207,7 +178,7 @@ func (s *ResponseService) UpdateResponseUsage(ctx context.Context, responseID ui
 }
 
 // UpdateResponseError updates the error information of a response
-func (s *ResponseService) UpdateResponseError(ctx context.Context, responseID uint, error interface{}) (bool, *common.Error) {
+func (s *ResponseService) UpdateResponseError(ctx context.Context, responseID uint, error any) (bool, *common.Error) {
 	response, err := s.responseRepo.FindByID(ctx, responseID)
 	if err != nil {
 		return false, common.NewError(err, "y5z6a7b8-c9d0-1234-yzab-567890123456")
@@ -216,26 +187,37 @@ func (s *ResponseService) UpdateResponseError(ctx context.Context, responseID ui
 		return false, common.NewErrorWithMessage("Response not found", "z6a7b8c9-d0e1-2345-zabc-678901234567")
 	}
 
-	// Convert error to JSON string
-	errorJSON, err := json.Marshal(error)
-	if err != nil {
-		return false, common.NewError(err, "a7b8c9d0-e1f2-3456-abcd-789012345678")
+	// Update the response object
+	if err := UpdateResponseErrorOnObject(response, error); err != nil {
+		return false, err
 	}
 
-	errorStr := string(errorJSON)
-	// For JSON columns, use null for empty arrays/objects
-	if errorStr == "[]" || errorStr == "{}" {
-		response.Error = nil
-	} else {
-		response.Error = &errorStr
-	}
-	response.Status = ResponseStatusFailed
-	response.UpdatedAt = time.Now()
-	now := time.Now()
-	response.FailedAt = &now
-
+	// Save to database
 	if err := s.responseRepo.Update(ctx, response); err != nil {
 		return false, common.NewError(err, "b8c9d0e1-f2g3-4567-bcde-890123456789")
+	}
+
+	return true, nil
+}
+
+// UpdateResponseFields updates multiple fields on a response object and saves it once (optimized for N+1 prevention)
+func (s *ResponseService) UpdateResponseFields(ctx context.Context, responseID uint, updates *ResponseUpdates) (bool, *common.Error) {
+	response, err := s.responseRepo.FindByID(ctx, responseID)
+	if err != nil {
+		return false, common.NewError(err, "c9d0e1f2-g3h4-5678-cdef-901234567890")
+	}
+	if response == nil {
+		return false, common.NewErrorWithMessage("Response not found", "d0e1f2g3-h4i5-6789-defg-012345678901")
+	}
+
+	// Apply all updates to the response object
+	if err := ApplyResponseUpdates(response, updates); err != nil {
+		return false, err
+	}
+
+	// Save to database once
+	if err := s.responseRepo.Update(ctx, response); err != nil {
+		return false, common.NewError(err, "e1f2g3h4-i5j6-7890-efgh-123456789012")
 	}
 
 	return true, nil
@@ -299,14 +281,14 @@ func (s *ResponseService) CreateItemsForResponse(ctx context.Context, responseID
 			return nil, common.NewError(err, "j6k7l8m9-n0o1-2345-jklm-678901234567")
 		}
 
-		item := &conversation.Item{
-			PublicID:       publicID,
-			Type:           itemData.Type,
-			Role:           itemData.Role,
-			Content:        itemData.Content,
-			ConversationID: conversationID,
-			ResponseID:     &responseID,
-		}
+		item := conversation.NewItem(
+			publicID,
+			itemData.Type,
+			*itemData.Role,
+			itemData.Content,
+			conversationID,
+			&responseID,
+		)
 
 		if err := s.itemRepo.Create(ctx, item); err != nil {
 			return nil, common.NewError(err, "k7l8m9n0-o1p2-3456-klmn-789012345678")
@@ -370,10 +352,10 @@ func (s *ResponseService) CreateResponseFromRequest(ctx context.Context, userID 
 
 // ResponseRequest represents the API request structure for creating a response
 type ResponseRequest struct {
-	Model              string      `json:"model"`
-	PreviousResponseID *string     `json:"previous_response_id,omitempty"`
-	Input              interface{} `json:"input"`
-	Stream             *bool       `json:"stream,omitempty"`
+	Model              string  `json:"model"`
+	PreviousResponseID *string `json:"previous_response_id,omitempty"`
+	Input              any     `json:"input"`
+	Stream             *bool   `json:"stream,omitempty"`
 }
 
 // GetResponseMiddleWare creates middleware to load response by public ID and set it in context
@@ -477,7 +459,7 @@ func (s *ResponseService) ConvertDomainResponseToAPIResponse(responseEntity *Res
 
 	// Parse output if exists
 	if responseEntity.Output != nil {
-		var output interface{}
+		var output any
 		if err := json.Unmarshal([]byte(*responseEntity.Output), &output); err == nil {
 			apiResponse.Output = output
 		}
@@ -608,34 +590,23 @@ func (s *ResponseService) AppendMessagesToConversation(ctx context.Context, conv
 		content := make([]conversation.Content, 0, len(msg.MultiContent))
 		for _, contentPart := range msg.MultiContent {
 			if contentPart.Type == openai.ChatMessagePartTypeText {
-				content = append(content, conversation.Content{
-					Type: "text",
-					Text: &conversation.Text{
-						Value: contentPart.Text,
-					},
-				})
+				content = append(content, conversation.NewTextContent(contentPart.Text))
 			}
 		}
 
 		// If no multi-content, use simple text content
 		if len(content) == 0 && msg.Content != "" {
-			content = append(content, conversation.Content{
-				Type: "text",
-				Text: &conversation.Text{
-					Value: msg.Content,
-				},
-			})
+			content = append(content, conversation.NewTextContent(msg.Content))
 		}
 
-		item := &conversation.Item{
-			PublicID:       publicID,
-			Type:           conversation.ItemType("message"),
-			Role:           &role,
-			Content:        content,
-			ConversationID: conv.ID,
-			ResponseID:     responseID,
-			CreatedAt:      time.Now(),
-		}
+		item := conversation.NewItem(
+			publicID,
+			conversation.ItemTypeMessage,
+			role,
+			content,
+			conv.ID,
+			responseID,
+		)
 
 		items = append(items, item)
 	}

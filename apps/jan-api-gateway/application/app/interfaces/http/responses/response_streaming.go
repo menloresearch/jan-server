@@ -18,7 +18,7 @@ type ResponseCreatedEvent struct {
 // ResponseInProgressEvent represents a response.in_progress event
 type ResponseInProgressEvent struct {
 	BaseStreamingEvent
-	Response map[string]interface{} `json:"response"`
+	Response map[string]any `json:"response"`
 }
 
 // ResponseOutputItemAddedEvent represents a response.output_item.added event
@@ -353,7 +353,7 @@ type ResponseOutputFunctionCallsDeltaEvent struct {
 // FunctionCallDelta represents a delta for function call
 type FunctionCallDelta struct {
 	Name      string                 `json:"name"`
-	Arguments map[string]interface{} `json:"arguments"`
+	Arguments map[string]any `json:"arguments"`
 }
 
 // FunctionCallsDelta represents a delta for function calls output

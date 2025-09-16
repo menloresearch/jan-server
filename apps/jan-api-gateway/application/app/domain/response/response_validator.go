@@ -112,7 +112,7 @@ func ValidateCreateResponseRequest(req *requesttypes.CreateResponseRequest) (boo
 }
 
 // validateInput validates the input field (can be string, array of strings, or structured CreateResponseInput)
-func validateInput(input interface{}) *[]ValidationError {
+func validateInput(input any) *[]ValidationError {
 	var errors []ValidationError
 
 	if input == nil {
@@ -131,7 +131,7 @@ func validateInput(input interface{}) *[]ValidationError {
 				Message: "input string cannot be empty",
 			})
 		}
-	case []interface{}:
+	case []any:
 		if len(v) == 0 {
 			errors = append(errors, ValidationError{
 				Field:   "input",
@@ -147,7 +147,7 @@ func validateInput(input interface{}) *[]ValidationError {
 						Message: "input array string items cannot be empty",
 					})
 				}
-			case map[string]interface{}:
+			case map[string]any:
 				// Validate message object format
 				if err := validateMessageObject(itemVal, i); err != nil {
 					errors = append(errors, *err...)
@@ -159,7 +159,7 @@ func validateInput(input interface{}) *[]ValidationError {
 				})
 			}
 		}
-	case map[string]interface{}:
+	case map[string]any:
 		// Check if this is a structured CreateResponseInput object
 		if structuredInput := convertToCreateResponseInput(v); structuredInput != nil {
 			// Delegate to structured input validation
@@ -188,7 +188,7 @@ func validateInput(input interface{}) *[]ValidationError {
 
 // convertToCreateResponseInput attempts to convert a map to CreateResponseInput
 // Returns nil if the map doesn't represent a structured input
-func convertToCreateResponseInput(inputMap map[string]interface{}) *requesttypes.CreateResponseInput {
+func convertToCreateResponseInput(inputMap map[string]any) *requesttypes.CreateResponseInput {
 	// Check if this looks like a structured input by looking for a 'type' field
 	typeField, hasType := inputMap["type"]
 	if !hasType {
@@ -222,7 +222,7 @@ func convertToCreateResponseInput(inputMap map[string]interface{}) *requesttypes
 				structuredInput.Text = &text
 			}
 		case requesttypes.InputTypeImage:
-			if imageData, ok := inputMap["image"].(map[string]interface{}); ok {
+			if imageData, ok := inputMap["image"].(map[string]any); ok {
 				imageInput := &requesttypes.ImageInput{}
 				if url, ok := imageData["url"].(string); ok {
 					imageInput.URL = &url
@@ -236,7 +236,7 @@ func convertToCreateResponseInput(inputMap map[string]interface{}) *requesttypes
 				structuredInput.Image = imageInput
 			}
 		case requesttypes.InputTypeFile:
-			if fileData, ok := inputMap["file"].(map[string]interface{}); ok {
+			if fileData, ok := inputMap["file"].(map[string]any); ok {
 				if fileID, ok := fileData["file_id"].(string); ok {
 					structuredInput.File = &requesttypes.FileInput{
 						FileID: fileID,
@@ -244,7 +244,7 @@ func convertToCreateResponseInput(inputMap map[string]interface{}) *requesttypes
 				}
 			}
 		case requesttypes.InputTypeWebSearch:
-			if webSearchData, ok := inputMap["web_search"].(map[string]interface{}); ok {
+			if webSearchData, ok := inputMap["web_search"].(map[string]any); ok {
 				if query, ok := webSearchData["query"].(string); ok {
 					webSearchInput := &requesttypes.WebSearchInput{
 						Query: query,
@@ -260,12 +260,12 @@ func convertToCreateResponseInput(inputMap map[string]interface{}) *requesttypes
 				}
 			}
 		case requesttypes.InputTypeFileSearch:
-			if fileSearchData, ok := inputMap["file_search"].(map[string]interface{}); ok {
+			if fileSearchData, ok := inputMap["file_search"].(map[string]any); ok {
 				if query, ok := fileSearchData["query"].(string); ok {
 					fileSearchInput := &requesttypes.FileSearchInput{
 						Query: query,
 					}
-					if fileIDs, ok := fileSearchData["file_ids"].([]interface{}); ok {
+					if fileIDs, ok := fileSearchData["file_ids"].([]any); ok {
 						fileSearchInput.FileIDs = make([]string, len(fileIDs))
 						for i, id := range fileIDs {
 							if idStr, ok := id.(string); ok {
@@ -281,7 +281,7 @@ func convertToCreateResponseInput(inputMap map[string]interface{}) *requesttypes
 				}
 			}
 		case requesttypes.InputTypeStreaming:
-			if streamingData, ok := inputMap["streaming"].(map[string]interface{}); ok {
+			if streamingData, ok := inputMap["streaming"].(map[string]any); ok {
 				if url, ok := streamingData["url"].(string); ok {
 					streamingInput := &requesttypes.StreamingInput{
 						URL: url,
@@ -292,7 +292,7 @@ func convertToCreateResponseInput(inputMap map[string]interface{}) *requesttypes
 					if body, ok := streamingData["body"].(string); ok {
 						streamingInput.Body = &body
 					}
-					if headers, ok := streamingData["headers"].(map[string]interface{}); ok {
+					if headers, ok := streamingData["headers"].(map[string]any); ok {
 						streamingInput.Headers = make(map[string]string)
 						for k, v := range headers {
 							if vStr, ok := v.(string); ok {
@@ -304,18 +304,18 @@ func convertToCreateResponseInput(inputMap map[string]interface{}) *requesttypes
 				}
 			}
 		case requesttypes.InputTypeFunctionCalls:
-			if functionCallsData, ok := inputMap["function_calls"].(map[string]interface{}); ok {
-				if calls, ok := functionCallsData["calls"].([]interface{}); ok {
+			if functionCallsData, ok := inputMap["function_calls"].(map[string]any); ok {
+				if calls, ok := functionCallsData["calls"].([]any); ok {
 					functionCallsInput := &requesttypes.FunctionCallsInput{
 						Calls: make([]requesttypes.FunctionCall, len(calls)),
 					}
 					for i, call := range calls {
-						if callData, ok := call.(map[string]interface{}); ok {
+						if callData, ok := call.(map[string]any); ok {
 							if name, ok := callData["name"].(string); ok {
 								functionCallsInput.Calls[i] = requesttypes.FunctionCall{
 									Name: name,
 								}
-								if args, ok := callData["arguments"].(map[string]interface{}); ok {
+								if args, ok := callData["arguments"].(map[string]any); ok {
 									functionCallsInput.Calls[i].Arguments = args
 								}
 							}
@@ -325,7 +325,7 @@ func convertToCreateResponseInput(inputMap map[string]interface{}) *requesttypes
 				}
 			}
 		case requesttypes.InputTypeReasoning:
-			if reasoningData, ok := inputMap["reasoning"].(map[string]interface{}); ok {
+			if reasoningData, ok := inputMap["reasoning"].(map[string]any); ok {
 				if task, ok := reasoningData["task"].(string); ok {
 					reasoningInput := &requesttypes.ReasoningInput{
 						Task: task,
@@ -345,7 +345,7 @@ func convertToCreateResponseInput(inputMap map[string]interface{}) *requesttypes
 }
 
 // validateMessageObject validates a message object in the input array
-func validateMessageObject(msg map[string]interface{}, index int) *[]ValidationError {
+func validateMessageObject(msg map[string]any, index int) *[]ValidationError {
 	var errors []ValidationError
 
 	// Check for required role field

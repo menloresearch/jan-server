@@ -215,3 +215,26 @@ type ItemRepository interface {
 	FindByFilter(ctx context.Context, filter ItemFilter, pagination *query.Pagination) ([]*Item, error)
 	Count(ctx context.Context, filter ItemFilter) (int64, error)
 }
+
+// NewItem creates a new conversation item with the given parameters
+func NewItem(publicID string, itemType ItemType, role ItemRole, content []Content, conversationID uint, responseID *uint) *Item {
+	return &Item{
+		PublicID:       publicID,
+		Type:           itemType,
+		Role:           &role,
+		Content:        content,
+		ConversationID: conversationID,
+		ResponseID:     responseID,
+		CreatedAt:      time.Now(),
+	}
+}
+
+// NewTextContent creates a new text content item
+func NewTextContent(text string) Content {
+	return Content{
+		Type: "text",
+		Text: &Text{
+			Value: text,
+		},
+	}
+}
