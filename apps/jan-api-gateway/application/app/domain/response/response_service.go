@@ -92,10 +92,6 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, respon
 	if response.Status == "" {
 		response.Status = ResponseStatusPending
 	}
-	if response.CreatedAt.IsZero() {
-		response.CreatedAt = time.Now()
-	}
-	response.UpdatedAt = time.Now()
 
 	// Validate required fields
 	if response.UserID == 0 {
@@ -310,7 +306,6 @@ func (s *ResponseService) CreateItemsForResponse(ctx context.Context, responseID
 			Content:        itemData.Content,
 			ConversationID: conversationID,
 			ResponseID:     &responseID,
-			CreatedAt:      time.Now(),
 		}
 
 		if err := s.itemRepo.Create(ctx, item); err != nil {
@@ -367,8 +362,6 @@ func (s *ResponseService) CreateResponseFromRequest(ctx context.Context, userID 
 		SystemPrompt:       nil,
 		Status:             ResponseStatusPending,
 		Stream:             req.Stream,
-		CreatedAt:          time.Now(),
-		UpdatedAt:          time.Now(),
 	}
 
 	// Create the response with previous_response_id handling
@@ -381,28 +374,6 @@ type ResponseRequest struct {
 	PreviousResponseID *string     `json:"previous_response_id,omitempty"`
 	Input              interface{} `json:"input"`
 	Stream             *bool       `json:"stream,omitempty"`
-}
-
-// ResponseParams represents parameters for creating a response
-type ResponseParams struct {
-	MaxTokens         *int
-	Temperature       *float64
-	TopP              *float64
-	TopK              *int
-	RepetitionPenalty *float64
-	Seed              *int
-	Stop              []string
-	PresencePenalty   *float64
-	FrequencyPenalty  *float64
-	LogitBias         map[string]float64
-	ResponseFormat    interface{}
-	Tools             interface{}
-	ToolChoice        interface{}
-	Metadata          map[string]interface{}
-	Stream            *bool
-	Background        *bool
-	Timeout           *int
-	User              *string
 }
 
 // GetResponseMiddleWare creates middleware to load response by public ID and set it in context

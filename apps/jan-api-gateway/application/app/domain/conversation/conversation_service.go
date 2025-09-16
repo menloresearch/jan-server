@@ -70,7 +70,6 @@ func (s *ConversationService) CreateConversation(ctx context.Context, userID uin
 		return nil, common.NewError(err, "d4e5f6g7-h8i9-0123-defg-456789012345")
 	}
 
-	now := time.Now()
 	conversation := &Conversation{
 		PublicID:  publicID,
 		Title:     title,
@@ -78,8 +77,6 @@ func (s *ConversationService) CreateConversation(ctx context.Context, userID uin
 		Status:    ConversationStatusActive,
 		IsPrivate: isPrivate,
 		Metadata:  metadata,
-		CreatedAt: now,
-		UpdatedAt: now,
 	}
 
 	if err := s.conversationRepo.Create(ctx, conversation); err != nil {
@@ -161,15 +158,12 @@ func (s *ConversationService) AddItem(ctx context.Context, conversation *Convers
 		return nil, common.NewError(err, "p6q7r8s9-t0u1-2345-pqrs-678901234567")
 	}
 
-	now := time.Now()
 	item := &Item{
 		PublicID:    itemPublicID,
 		Type:        itemType,
 		Role:        role,
 		Content:     content,
-		Status:      ToItemStatusPtr(ItemStatusCompleted), // Default status
-		CreatedAt:   now,
-		CompletedAt: &now,
+		Status:      ToItemStatusPtr(ItemStatusCompleted), 
 	}
 
 	if err := s.conversationRepo.AddItem(ctx, conversation.ID, item); err != nil {
@@ -265,7 +259,6 @@ func (s *ConversationService) AddMultipleItems(ctx context.Context, conversation
 			Role:        itemData.Role,
 			Content:     itemData.Content,
 			Status:      ToItemStatusPtr(ItemStatusCompleted),
-			CreatedAt:   now,
 			CompletedAt: &now,
 			ResponseID:  itemData.ResponseID,
 		}
