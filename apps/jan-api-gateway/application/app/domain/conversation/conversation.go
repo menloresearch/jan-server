@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"context"
+	"time"
 
 	"menlo.ai/jan-api-gateway/app/domain/query"
 )
@@ -50,18 +51,53 @@ func ValidateItemRole(input string) bool {
 	}
 }
 
+// @Enum(pending, in_progress, completed, failed, cancelled)
+type ItemStatus string
+
+const (
+	ItemStatusPending    ItemStatus = "pending"
+	ItemStatusInProgress ItemStatus = "in_progress"
+	ItemStatusCompleted  ItemStatus = "completed"
+	ItemStatusFailed     ItemStatus = "failed"
+	ItemStatusCancelled  ItemStatus = "cancelled"
+)
+
+func ValidateItemStatus(input string) bool {
+	switch ItemStatus(input) {
+	case ItemStatusPending, ItemStatusInProgress, ItemStatusCompleted, ItemStatusFailed, ItemStatusCancelled:
+		return true
+	default:
+		return false
+	}
+}
+
+// ToItemStatusPtr returns a pointer to the given ItemStatus
+func ToItemStatusPtr(s ItemStatus) *ItemStatus {
+	return &s
+}
+
+// ItemStatusToStringPtr converts *ItemStatus to *string
+func ItemStatusToStringPtr(s *ItemStatus) *string {
+	if s == nil {
+		return nil
+	}
+	str := string(*s)
+	return &str
+}
+
 type Item struct {
-	ID                uint               `json:"-"` // Internal DB ID (hidden from JSON)
+	ID                uint               `json:"-"`
 	ConversationID    uint               `json:"-"`
-	PublicID          string             `json:"id"` // OpenAI-compatible string ID like "msg_abc123"
+	PublicID          string             `json:"id"`
 	Type              ItemType           `json:"type"`
 	Role              *ItemRole          `json:"role,omitempty"`
 	Content           []Content          `json:"content,omitempty"`
-	Status            *string            `json:"status,omitempty"`
-	IncompleteAt      *int64             `json:"incomplete_at,omitempty"`
+	Status            *ItemStatus        `json:"status,omitempty"`
+	IncompleteAt      *time.Time         `json:"incomplete_at,omitempty"`
 	IncompleteDetails *IncompleteDetails `json:"incomplete_details,omitempty"`
-	CompletedAt       *int64             `json:"completed_at,omitempty"`
-	CreatedAt         int64              `json:"created_at"` // Unix timestamp for OpenAI compatibility
+	CompletedAt       *time.Time         `json:"completed_at,omitempty"`
+	ResponseID        *uint              `json:"-"`
+	CreatedAt         time.Time          `json:"created_at"`
 }
 
 type Content struct {
@@ -129,16 +165,16 @@ type IncompleteDetails struct {
 }
 
 type Conversation struct {
-	ID        uint               `json:"-"`  // Internal DB ID (hidden from JSON)
+	ID        uint               `json:"-"`
 	PublicID  string             `json:"id"` // OpenAI-compatible string ID like "conv_abc123"
 	Title     *string            `json:"title,omitempty"`
-	UserID    uint               `json:"-"` // Internal user ID (hidden from JSON)
+	UserID    uint               `json:"-"`
 	Status    ConversationStatus `json:"status"`
 	Items     []Item             `json:"items,omitempty"`
 	Metadata  map[string]string  `json:"metadata,omitempty"`
 	IsPrivate bool               `json:"is_private"`
-	CreatedAt int64              `json:"created_at"` // Unix timestamp for OpenAI compatibility
-	UpdatedAt int64              `json:"updated_at"` // Unix timestamp for OpenAI compatibility
+	CreatedAt time.Time          `json:"created_at"` // Unix timestamp for OpenAI compatibility
+	UpdatedAt time.Time          `json:"updated_at"` // Unix timestamp for OpenAI compatibility
 }
 
 type ConversationFilter struct {
@@ -149,6 +185,8 @@ type ConversationFilter struct {
 type ItemFilter struct {
 	PublicID       *string
 	ConversationID *uint
+	Role           *ItemRole
+	ResponseID     *uint
 }
 
 type ConversationRepository interface {
@@ -176,4 +214,27 @@ type ItemRepository interface {
 	ExistsByIDAndConversation(ctx context.Context, itemID uint, conversationID uint) (bool, error)
 	FindByFilter(ctx context.Context, filter ItemFilter, pagination *query.Pagination) ([]*Item, error)
 	Count(ctx context.Context, filter ItemFilter) (int64, error)
+}
+
+// NewItem creates a new conversation item with the given parameters
+func NewItem(publicID string, itemType ItemType, role ItemRole, content []Content, conversationID uint, responseID *uint) *Item {
+	return &Item{
+		PublicID:       publicID,
+		Type:           itemType,
+		Role:           &role,
+		Content:        content,
+		ConversationID: conversationID,
+		ResponseID:     responseID,
+		CreatedAt:      time.Now(),
+	}
+}
+
+// NewTextContent creates a new text content item
+func NewTextContent(text string) Content {
+	return Content{
+		Type: "text",
+		Text: &Text{
+			Value: text,
+		},
+	}
 }

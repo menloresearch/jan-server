@@ -25,6 +25,7 @@ var (
 	OrganizationMember *organizationMember
 	Project            *project
 	ProjectMember      *projectMember
+	Response           *response
 	User               *user
 )
 
@@ -38,6 +39,7 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	OrganizationMember = &Q.OrganizationMember
 	Project = &Q.Project
 	ProjectMember = &Q.ProjectMember
+	Response = &Q.Response
 	User = &Q.User
 }
 
@@ -52,6 +54,7 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		OrganizationMember: newOrganizationMember(db, opts...),
 		Project:            newProject(db, opts...),
 		ProjectMember:      newProjectMember(db, opts...),
+		Response:           newResponse(db, opts...),
 		User:               newUser(db, opts...),
 	}
 }
@@ -67,6 +70,7 @@ type Query struct {
 	OrganizationMember organizationMember
 	Project            project
 	ProjectMember      projectMember
+	Response           response
 	User               user
 }
 
@@ -83,6 +87,7 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		OrganizationMember: q.OrganizationMember.clone(db),
 		Project:            q.Project.clone(db),
 		ProjectMember:      q.ProjectMember.clone(db),
+		Response:           q.Response.clone(db),
 		User:               q.User.clone(db),
 	}
 }
@@ -106,6 +111,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		OrganizationMember: q.OrganizationMember.replaceDB(db),
 		Project:            q.Project.replaceDB(db),
 		ProjectMember:      q.ProjectMember.replaceDB(db),
+		Response:           q.Response.replaceDB(db),
 		User:               q.User.replaceDB(db),
 	}
 }
@@ -119,6 +125,7 @@ type queryCtx struct {
 	OrganizationMember IOrganizationMemberDo
 	Project            IProjectDo
 	ProjectMember      IProjectMemberDo
+	Response           IResponseDo
 	User               IUserDo
 }
 
@@ -132,6 +139,7 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		OrganizationMember: q.OrganizationMember.WithContext(ctx),
 		Project:            q.Project.WithContext(ctx),
 		ProjectMember:      q.ProjectMember.WithContext(ctx),
+		Response:           q.Response.WithContext(ctx),
 		User:               q.User.WithContext(ctx),
 	}
 }

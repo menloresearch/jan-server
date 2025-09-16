@@ -7,12 +7,15 @@
 package main
 
 import (
+	"context"
+
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/project"
+	"menlo.ai/jan-api-gateway/app/domain/response"
 	"menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/apikeyrepo"
@@ -20,23 +23,27 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/itemrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/organizationrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/projectrepo"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/responserepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
+	"menlo.ai/jan-api-gateway/app/infrastructure/inference"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
+	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	auth2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth/google"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
+	chat2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
+	mcpimpl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	organization2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects/api_keys"
-)
+	apikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects/api_keys"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/responses"
+	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
 
-import (
 	_ "github.com/grafana/pyroscope-go/godeltaprof/http/pprof"
+
 	_ "net/http/pprof"
 )
 
@@ -61,11 +68,16 @@ func CreateApplication() (*Application, error) {
 	projectsRoute := projects.NewProjectsRoute(projectService, apiKeyService, projectApiKeyRoute)
 	authService := auth.NewAuthService(userService, apiKeyService, organizationService)
 	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI, projectsRoute, authService)
-	completionAPI := chat.NewCompletionAPI(apiKeyService)
-	chatRoute := chat.NewChatRoute(completionAPI)
+	context := provideContext()
+	janInferenceClient := janinference.NewJanInferenceClient(context)
+	inferenceProvider := inference.NewJanInferenceProvider(janInferenceClient)
 	conversationRepository := conversationrepo.NewConversationGormRepository(transactionDatabase)
 	itemRepository := itemrepo.NewItemGormRepository(transactionDatabase)
 	conversationService := conversation.NewService(conversationRepository, itemRepository)
+	completionNonStreamHandler := chat.NewCompletionNonStreamHandler(inferenceProvider, conversationService)
+	completionStreamHandler := chat.NewCompletionStreamHandler(inferenceProvider, conversationService)
+	completionAPI := chat2.NewCompletionAPI(completionNonStreamHandler, completionStreamHandler, conversationService, authService)
+	chatRoute := chat2.NewChatRoute(completionAPI, authService)
 	conversationAPI := conversations.NewConversationAPI(conversationService, authService)
 	modelAPI := v1.NewModelAPI()
 	serperService := serpermcp.NewSerperService()
@@ -73,10 +85,22 @@ func CreateApplication() (*Application, error) {
 	mcpapi := mcp.NewMCPAPI(serperMCP, authService)
 	googleAuthAPI := google.NewGoogleAuthAPI(userService, authService)
 	authRoute := auth2.NewAuthRoute(googleAuthAPI, userService, authService)
-	v1Route := v1.NewV1Route(organizationRoute, chatRoute, conversationAPI, modelAPI, mcpapi, authRoute)
+	responseRepository := responserepo.NewResponseGormRepository(transactionDatabase)
+	responseService := response.NewResponseService(responseRepository, itemRepository, conversationService)
+	responseModelService := response.NewResponseModelService(userService, authService, apiKeyService, conversationService, responseService)
+	streamModelService := response.NewStreamModelService(responseModelService)
+	nonStreamModelService := response.NewNonStreamModelService(responseModelService)
+	responseRoute := responses.NewResponseRoute(responseModelService, authService, responseService, streamModelService, nonStreamModelService)
+	v1Route := v1.NewV1Route(organizationRoute, chatRoute, conversationAPI, modelAPI, mcpapi, authRoute, responseRoute)
 	httpServer := http.NewHttpServer(v1Route)
 	application := &Application{
 		HttpServer: httpServer,
 	}
 	return application, nil
+}
+
+// wire.go:
+
+func provideContext() context.Context {
+	return context.Background()
 }

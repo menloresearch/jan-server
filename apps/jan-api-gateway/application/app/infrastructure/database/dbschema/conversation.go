@@ -2,6 +2,7 @@ package dbschema
 
 import (
 	"encoding/json"
+	"time"
 
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database"
@@ -18,25 +19,27 @@ type Conversation struct {
 	PublicID  string `gorm:"type:varchar(50);uniqueIndex;not null"`
 	Title     string `gorm:"type:varchar(255)"`
 	UserID    uint   `gorm:"not null;index"`
-	Status    string `gorm:"type:varchar(20);not null;default:'active'"`
+	Status    string `gorm:"type:varchar(20);not null;default:'active';index"`
 	Metadata  string `gorm:"type:text"`
-	IsPrivate bool   `gorm:"not null;default:true"`
+	IsPrivate bool   `gorm:"not null;default:true;index"`
 	Items     []Item `gorm:"foreignKey:ConversationID"`
 	User      User   `gorm:"foreignKey:UserID"`
 }
 
 type Item struct {
 	BaseModel
-	PublicID          string       `gorm:"type:varchar(50);uniqueIndex;not null"` // OpenAI-compatible string ID
+	PublicID          string       `gorm:"type:varchar(50);uniqueIndex;not null"`
 	ConversationID    uint         `gorm:"not null;index"`
-	Type              string       `gorm:"type:varchar(50);not null"`
-	Role              string       `gorm:"type:varchar(20)"`
+	ResponseID        *uint        `gorm:"index"`
+	Type              string       `gorm:"type:varchar(50);not null;index"`
+	Role              string       `gorm:"type:varchar(20);index"`
 	Content           string       `gorm:"type:text"`
-	Status            string       `gorm:"type:varchar(50)"`
-	IncompleteAt      *int64       `gorm:"type:bigint"`
+	Status            string       `gorm:"type:varchar(50);index"`
+	IncompleteAt      *time.Time   `gorm:"type:timestamp"`
 	IncompleteDetails string       `gorm:"type:text"`
-	CompletedAt       *int64       `gorm:"type:bigint"`
+	CompletedAt       *time.Time   `gorm:"type:timestamp"`
 	Conversation      Conversation `gorm:"foreignKey:ConversationID"`
+	Response          *Response    `gorm:"foreignKey:ResponseID"`
 }
 
 func NewSchemaConversation(c *conversation.Conversation) *Conversation {
@@ -55,7 +58,7 @@ func NewSchemaConversation(c *conversation.Conversation) *Conversation {
 			ID: c.ID,
 		},
 		PublicID:  c.PublicID,
-		Title:     stringPtrToString(c.Title),
+		Title:     ptr.FromString(c.Title),
 		UserID:    c.UserID,
 		Status:    string(c.Status),
 		Metadata:  metadataJSON,
@@ -79,8 +82,8 @@ func (c *Conversation) EtoD() *conversation.Conversation {
 		Status:    conversation.ConversationStatus(c.Status),
 		Metadata:  metadata,
 		IsPrivate: c.IsPrivate,
-		CreatedAt: c.CreatedAt.Unix(),
-		UpdatedAt: c.UpdatedAt.Unix(),
+		CreatedAt: c.CreatedAt,
+		UpdatedAt: c.UpdatedAt,
 	}
 }
 
@@ -103,11 +106,13 @@ func NewSchemaItem(i *conversation.Item) *Item {
 		BaseModel: BaseModel{
 			ID: i.ID,
 		},
-		PublicID:          i.PublicID, // Add PublicID field
+		PublicID:          i.PublicID,
+		ConversationID:    i.ConversationID,
+		ResponseID:        i.ResponseID,
 		Type:              string(i.Type),
-		Role:              stringPtrToString((*string)(i.Role)),
+		Role:              string(*i.Role),
 		Content:           contentJSON,
-		Status:            stringPtrToString(i.Status),
+		Status:            string(*i.Status),
 		IncompleteAt:      i.IncompleteAt,
 		IncompleteDetails: incompleteDetailsJSON,
 		CompletedAt:       i.CompletedAt,
@@ -134,19 +139,12 @@ func (i *Item) EtoD() *conversation.Item {
 		Type:              conversation.ItemType(i.Type),
 		Role:              (*conversation.ItemRole)(ptr.ToString(i.Role)),
 		Content:           content,
-		Status:            ptr.ToString(i.Status),
+		Status:            (*conversation.ItemStatus)(ptr.ToString(i.Status)),
 		IncompleteAt:      i.IncompleteAt,
 		IncompleteDetails: incompleteDetails,
 		CompletedAt:       i.CompletedAt,
-		CreatedAt:         i.CreatedAt.Unix(), // Convert time.Time to Unix timestamp
 		ConversationID:    i.ConversationID,
+		ResponseID:        i.ResponseID,
+		CreatedAt:         i.CreatedAt,
 	}
-}
-
-// Helper functions
-func stringPtrToString(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }
