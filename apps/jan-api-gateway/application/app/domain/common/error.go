@@ -26,15 +26,11 @@ func NewErrorWithMessage(message string, code string) *Error {
 
 // Error implements the error interface
 func (e *Error) Error() string {
-	if e == nil {
-		return ""
-	}
 	if e.Err != nil {
 		return e.Err.Error()
 	}
 	return ""
 }
-
 
 // String returns the string representation of the error
 func (e *Error) String() string {
