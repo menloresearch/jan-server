@@ -6,33 +6,37 @@ import (
 
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/common"
+	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/inference"
 	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
 )
 
 // ChatUseCase handles chat completion business logic
 type ChatUseCase struct {
-	inferenceProvider inference.InferenceProvider
-	modelRegistry     *inferencemodelregistry.InferenceModelRegistry
+	inferenceProvider   inference.InferenceProvider
+	modelRegistry       *inferencemodelregistry.InferenceModelRegistry
+	conversationService *conversation.ConversationService
 }
 
 // NewChatUseCase creates a new ChatUseCase instance
-func NewChatUseCase(inferenceProvider inference.InferenceProvider) *ChatUseCase {
+func NewChatUseCase(inferenceProvider inference.InferenceProvider, conversationService *conversation.ConversationService) *ChatUseCase {
 	return &ChatUseCase{
-		inferenceProvider: inferenceProvider,
-		modelRegistry:     inferencemodelregistry.GetInstance(),
+		inferenceProvider:   inferenceProvider,
+		modelRegistry:       inferencemodelregistry.GetInstance(),
+		conversationService: conversationService,
 	}
 }
 
 // CompletionRequest represents a chat completion request
 type CompletionRequest struct {
-	Model       string                         `json:"model"`
-	Messages    []openai.ChatCompletionMessage `json:"messages"`
-	Temperature *float32                       `json:"temperature,omitempty"`
-	MaxTokens   *int                           `json:"max_tokens,omitempty"`
-	Stream      bool                           `json:"stream"`
-	TopP        *float32                       `json:"top_p,omitempty"`
-	Metadata    map[string]interface{}         `json:"metadata,omitempty"`
+	Model          string                         `json:"model"`
+	Messages       []openai.ChatCompletionMessage `json:"messages"`
+	Temperature    *float32                       `json:"temperature,omitempty"`
+	MaxTokens      *int                           `json:"max_tokens,omitempty"`
+	Stream         bool                           `json:"stream"`
+	TopP           *float32                       `json:"top_p,omitempty"`
+	Metadata       map[string]interface{}         `json:"metadata,omitempty"`
+	ConversationID *string                        `json:"conversation_id,omitempty"`
 }
 
 // CompletionResponse represents a chat completion response
@@ -159,4 +163,95 @@ func (uc *ChatUseCase) convertResponse(response *openai.ChatCompletionResponse) 
 			TotalTokens:      response.Usage.TotalTokens,
 		},
 	}
+}
+
+// SaveMessagesToConversation saves all messages from the completion request to the conversation
+func (c *ChatUseCase) SaveMessagesToConversation(ctx context.Context, conv *conversation.Conversation, userID uint, messages []openai.ChatCompletionMessage) *common.Error {
+	_, err := c.saveMessagesToConversationWithAssistant(ctx, conv, userID, messages, "")
+	return err
+}
+
+// SaveMessagesToConversationWithAssistant saves all messages including the assistant response and returns the assistant item
+func (c *ChatUseCase) SaveMessagesToConversationWithAssistant(ctx context.Context, conv *conversation.Conversation, userID uint, messages []openai.ChatCompletionMessage, assistantContent string) (*conversation.Item, *common.Error) {
+	return c.saveMessagesToConversationWithAssistant(ctx, conv, userID, messages, assistantContent)
+}
+
+// saveMessagesToConversationWithAssistant internal method that saves messages and optionally the assistant response
+func (c *ChatUseCase) saveMessagesToConversationWithAssistant(ctx context.Context, conv *conversation.Conversation, userID uint, messages []openai.ChatCompletionMessage, assistantContent string) (*conversation.Item, *common.Error) {
+	if conv == nil {
+		return nil, common.EmptyError // No conversation to save to
+	}
+
+	var assistantItem *conversation.Item
+
+	// Convert OpenAI messages to conversation items
+	for _, msg := range messages {
+		// Convert role
+		var role conversation.ItemRole
+		switch msg.Role {
+		case openai.ChatMessageRoleSystem:
+			role = conversation.ItemRoleSystem
+		case openai.ChatMessageRoleUser:
+			role = conversation.ItemRoleUser
+		case openai.ChatMessageRoleAssistant:
+			role = conversation.ItemRoleAssistant
+		default:
+			role = conversation.ItemRoleUser
+		}
+
+		// Convert content
+		content := make([]conversation.Content, 0, len(msg.MultiContent))
+		for _, contentPart := range msg.MultiContent {
+			if contentPart.Type == openai.ChatMessagePartTypeText {
+				content = append(content, conversation.Content{
+					Type: "text",
+					Text: &conversation.Text{
+						Value: contentPart.Text,
+					},
+				})
+			}
+		}
+
+		// If no multi-content, use simple text content
+		if len(content) == 0 && msg.Content != "" {
+			content = append(content, conversation.Content{
+				Type: "text",
+				Text: &conversation.Text{
+					Value: msg.Content,
+				},
+			})
+		}
+
+		// Add item to conversation
+		item, err := c.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeMessage, &role, content)
+		if !err.IsEmpty() {
+			return nil, common.NewError("b2c3d4e5-f6g7-8901-bcde-f23456789012", fmt.Sprintf("Failed to save message: %s", err.Message))
+		}
+
+		// If this is an assistant message, store it for return
+		if msg.Role == openai.ChatMessageRoleAssistant {
+			assistantItem = item
+		}
+	}
+
+	// If assistant content is provided and no assistant message was found in the input, create one
+	if assistantContent != "" && assistantItem == nil {
+		content := []conversation.Content{
+			{
+				Type: "text",
+				Text: &conversation.Text{
+					Value: assistantContent,
+				},
+			},
+		}
+
+		assistantRole := conversation.ItemRoleAssistant
+		item, err := c.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeMessage, &assistantRole, content)
+		if !err.IsEmpty() {
+			return nil, common.NewError("c3d4e5f6-g7h8-9012-cdef-345678901234", fmt.Sprintf("Failed to save assistant message: %s", err.Message))
+		}
+		assistantItem = item
+	}
+
+	return assistantItem, common.EmptyError
 }
