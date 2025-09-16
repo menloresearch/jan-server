@@ -35,13 +35,6 @@ func (e *Error) Error() string {
 	return ""
 }
 
-// Unwrap returns the underlying error for error unwrapping
-func (e *Error) Unwrap() error {
-	if e == nil {
-		return nil
-	}
-	return e.Err
-}
 
 // String returns the string representation of the error
 func (e *Error) String() string {
@@ -50,9 +43,6 @@ func (e *Error) String() string {
 
 // GetMessage returns the error message from the underlying error
 func (e *Error) GetMessage() string {
-	if e == nil {
-		return ""
-	}
 	if e.Err != nil {
 		return e.Err.Error()
 	}
@@ -61,8 +51,5 @@ func (e *Error) GetMessage() string {
 
 // GetCode returns the error code
 func (e *Error) GetCode() string {
-	if e == nil {
-		return ""
-	}
 	return e.Code
 }
