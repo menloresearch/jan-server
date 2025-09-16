@@ -56,7 +56,7 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID
 	// Convert input to JSON string
 	inputJSON, err := json.Marshal(input)
 	if err != nil {
-		return nil, common.NewError("a1b2c3d4-e5f6-7890-abcd-ef1234567890", "Failed to marshal input")
+		return nil, common.NewError(err, "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	}
 
 	// Handle previous_response_id logic
@@ -65,28 +65,28 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID
 		// Load the previous response
 		previousResponse, err := s.responseRepo.FindByPublicID(ctx, *previousResponseID)
 		if err != nil {
-			return nil, common.NewError("b2c3d4e5-f6g7-8901-bcde-f23456789012", "Failed to find previous response")
+			return nil, common.NewError(err, "b2c3d4e5-f6g7-8901-bcde-f23456789012")
 		}
 		if previousResponse == nil {
-			return nil, common.NewError("c3d4e5f6-g7h8-9012-cdef-345678901234", "Previous response not found")
+			return nil, common.NewErrorWithMessage("Previous response not found", "c3d4e5f6-g7h8-9012-cdef-345678901234")
 		}
 
 		// Validate that the previous response belongs to the same user
 		if previousResponse.UserID != userID {
-			return nil, common.NewError("d4e5f6g7-h8i9-0123-defg-456789012345", "Previous response does not belong to the current user")
+			return nil, common.NewErrorWithMessage("Previous response does not belong to the current user", "d4e5f6g7-h8i9-0123-defg-456789012345")
 		}
 
 		// Use the previous response's conversation ID
 		finalConversationID = previousResponse.ConversationID
 		if finalConversationID == nil {
-			return nil, common.NewError("e5f6g7h8-i9j0-1234-efgh-567890123456", "Previous response does not belong to any conversation")
+			return nil, common.NewErrorWithMessage("Previous response does not belong to any conversation", "e5f6g7h8-i9j0-1234-efgh-567890123456")
 		}
 	}
 
 	// Generate public ID
 	publicID, err := idgen.GenerateSecureID("resp", 42)
 	if err != nil {
-		return nil, common.NewError("f6g7h8i9-j0k1-2345-fghi-678901234567", "Failed to generate response ID")
+		return nil, common.NewError(err, "f6g7h8i9-j0k1-2345-fghi-678901234567")
 	}
 
 	response := &Response{
@@ -121,7 +121,7 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID
 		if params.Stop != nil {
 			stopJSON, err := json.Marshal(params.Stop)
 			if err != nil {
-				return nil, common.NewError("g7h8i9j0-k1l2-3456-ghij-789012345678", "Failed to marshal stop sequences")
+				return nil, common.NewError(err, "g7h8i9j0-k1l2-3456-ghij-789012345678")
 			}
 			stopStr := string(stopJSON)
 			// For JSON columns, use null for empty arrays/objects
@@ -135,7 +135,7 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID
 		if params.LogitBias != nil {
 			logitBiasJSON, err := json.Marshal(params.LogitBias)
 			if err != nil {
-				return nil, common.NewError("h8i9j0k1-l2m3-4567-hijk-890123456789", "Failed to marshal logit bias")
+				return nil, common.NewError(err, "h8i9j0k1-l2m3-4567-hijk-890123456789")
 			}
 			logitBiasStr := string(logitBiasJSON)
 			// For JSON columns, use null for empty arrays/objects
@@ -149,7 +149,7 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID
 		if params.ResponseFormat != nil {
 			responseFormatJSON, err := json.Marshal(params.ResponseFormat)
 			if err != nil {
-				return nil, common.NewError("i9j0k1l2-m3n4-5678-ijkl-901234567890", "Failed to marshal response format")
+				return nil, common.NewError(err, "i9j0k1l2-m3n4-5678-ijkl-901234567890")
 			}
 			responseFormatStr := string(responseFormatJSON)
 			// For JSON columns, use null for empty arrays/objects
@@ -163,7 +163,7 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID
 		if params.Tools != nil {
 			toolsJSON, err := json.Marshal(params.Tools)
 			if err != nil {
-				return nil, common.NewError("j0k1l2m3-n4o5-6789-jklm-012345678901", "Failed to marshal tools")
+				return nil, common.NewError(err, "j0k1l2m3-n4o5-6789-jklm-012345678901")
 			}
 			toolsStr := string(toolsJSON)
 			// For JSON columns, use null for empty arrays/objects
@@ -177,7 +177,7 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID
 		if params.ToolChoice != nil {
 			toolChoiceJSON, err := json.Marshal(params.ToolChoice)
 			if err != nil {
-				return nil, common.NewError("k1l2m3n4-o5p6-7890-klmn-123456789012", "Failed to marshal tool choice")
+				return nil, common.NewError(err, "k1l2m3n4-o5p6-7890-klmn-123456789012")
 			}
 			toolChoiceStr := string(toolChoiceJSON)
 			// For JSON columns, use null for empty arrays/objects
@@ -191,7 +191,7 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID
 		if params.Metadata != nil {
 			metadataJSON, err := json.Marshal(params.Metadata)
 			if err != nil {
-				return nil, common.NewError("l2m3n4o5-p6q7-8901-lmno-234567890123", "Failed to marshal metadata")
+				return nil, common.NewError(err, "l2m3n4o5-p6q7-8901-lmno-234567890123")
 			}
 			metadataStr := string(metadataJSON)
 			// For JSON columns, use null for empty arrays/objects
@@ -204,7 +204,7 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID
 	}
 
 	if err := s.responseRepo.Create(ctx, response); err != nil {
-		return nil, common.NewError("m3n4o5p6-q7r8-9012-mnop-345678901234", "Failed to create response")
+		return nil, common.NewError(err, "m3n4o5p6-q7r8-9012-mnop-345678901234")
 	}
 
 	return response, nil
@@ -214,10 +214,10 @@ func (s *ResponseService) CreateResponseWithPrevious(ctx context.Context, userID
 func (s *ResponseService) UpdateResponseStatus(ctx context.Context, responseID uint, status ResponseStatus) (bool, *common.Error) {
 	response, err := s.responseRepo.FindByID(ctx, responseID)
 	if err != nil {
-		return false, common.NewError("n4o5p6q7-r8s9-0123-nopq-456789012345", "Failed to find response")
+		return false, common.NewError(err, "n4o5p6q7-r8s9-0123-nopq-456789012345")
 	}
 	if response == nil {
-		return false, common.NewError("o5p6q7r8-s9t0-1234-opqr-567890123456", "Response not found")
+		return false, common.NewErrorWithMessage("Response not found", "o5p6q7r8-s9t0-1234-opqr-567890123456")
 	}
 
 	response.Status = status
@@ -235,7 +235,7 @@ func (s *ResponseService) UpdateResponseStatus(ctx context.Context, responseID u
 	}
 
 	if err := s.responseRepo.Update(ctx, response); err != nil {
-		return false, common.NewError("p6q7r8s9-t0u1-2345-pqrs-678901234567", "Failed to update response status")
+		return false, common.NewError(err, "p6q7r8s9-t0u1-2345-pqrs-678901234567")
 	}
 
 	return true, nil
@@ -245,16 +245,16 @@ func (s *ResponseService) UpdateResponseStatus(ctx context.Context, responseID u
 func (s *ResponseService) UpdateResponseOutput(ctx context.Context, responseID uint, output interface{}) (bool, *common.Error) {
 	response, err := s.responseRepo.FindByID(ctx, responseID)
 	if err != nil {
-		return false, common.NewError("q7r8s9t0-u1v2-3456-qrst-789012345678", "Failed to find response")
+		return false, common.NewError(err, "q7r8s9t0-u1v2-3456-qrst-789012345678")
 	}
 	if response == nil {
-		return false, common.NewError("r8s9t0u1-v2w3-4567-rstu-890123456789", "Response not found")
+		return false, common.NewErrorWithMessage("Response not found", "r8s9t0u1-v2w3-4567-rstu-890123456789")
 	}
 
 	// Convert output to JSON string
 	outputJSON, err := json.Marshal(output)
 	if err != nil {
-		return false, common.NewError("s9t0u1v2-w3x4-5678-stuv-901234567890", "Failed to marshal output")
+		return false, common.NewError(err, "s9t0u1v2-w3x4-5678-stuv-901234567890")
 	}
 
 	outputStr := string(outputJSON)
@@ -267,7 +267,7 @@ func (s *ResponseService) UpdateResponseOutput(ctx context.Context, responseID u
 	response.UpdatedAt = time.Now()
 
 	if err := s.responseRepo.Update(ctx, response); err != nil {
-		return false, common.NewError("t0u1v2w3-x4y5-6789-tuvw-012345678901", "Failed to update response output")
+		return false, common.NewError(err, "t0u1v2w3-x4y5-6789-tuvw-012345678901")
 	}
 
 	return true, nil
@@ -277,16 +277,16 @@ func (s *ResponseService) UpdateResponseOutput(ctx context.Context, responseID u
 func (s *ResponseService) UpdateResponseUsage(ctx context.Context, responseID uint, usage interface{}) (bool, *common.Error) {
 	response, err := s.responseRepo.FindByID(ctx, responseID)
 	if err != nil {
-		return false, common.NewError("u1v2w3x4-y5z6-7890-uvwx-123456789012", "Failed to find response")
+		return false, common.NewError(err, "u1v2w3x4-y5z6-7890-uvwx-123456789012")
 	}
 	if response == nil {
-		return false, common.NewError("v2w3x4y5-z6a7-8901-vwxy-234567890123", "Response not found")
+		return false, common.NewErrorWithMessage("Response not found", "v2w3x4y5-z6a7-8901-vwxy-234567890123")
 	}
 
 	// Convert usage to JSON string
 	usageJSON, err := json.Marshal(usage)
 	if err != nil {
-		return false, common.NewError("w3x4y5z6-a7b8-9012-wxyz-345678901234", "Failed to marshal usage")
+		return false, common.NewError(err, "w3x4y5z6-a7b8-9012-wxyz-345678901234")
 	}
 
 	usageStr := string(usageJSON)
@@ -299,7 +299,7 @@ func (s *ResponseService) UpdateResponseUsage(ctx context.Context, responseID ui
 	response.UpdatedAt = time.Now()
 
 	if err := s.responseRepo.Update(ctx, response); err != nil {
-		return false, common.NewError("x4y5z6a7-b8c9-0123-xyza-456789012345", "Failed to update response usage")
+		return false, common.NewError(err, "x4y5z6a7-b8c9-0123-xyza-456789012345")
 	}
 
 	return true, nil
@@ -309,16 +309,16 @@ func (s *ResponseService) UpdateResponseUsage(ctx context.Context, responseID ui
 func (s *ResponseService) UpdateResponseError(ctx context.Context, responseID uint, error interface{}) (bool, *common.Error) {
 	response, err := s.responseRepo.FindByID(ctx, responseID)
 	if err != nil {
-		return false, common.NewError("y5z6a7b8-c9d0-1234-yzab-567890123456", "Failed to find response")
+		return false, common.NewError(err, "y5z6a7b8-c9d0-1234-yzab-567890123456")
 	}
 	if response == nil {
-		return false, common.NewError("z6a7b8c9-d0e1-2345-zabc-678901234567", "Response not found")
+		return false, common.NewErrorWithMessage("Response not found", "z6a7b8c9-d0e1-2345-zabc-678901234567")
 	}
 
 	// Convert error to JSON string
 	errorJSON, err := json.Marshal(error)
 	if err != nil {
-		return false, common.NewError("a7b8c9d0-e1f2-3456-abcd-789012345678", "Failed to marshal error")
+		return false, common.NewError(err, "a7b8c9d0-e1f2-3456-abcd-789012345678")
 	}
 
 	errorStr := string(errorJSON)
@@ -334,7 +334,7 @@ func (s *ResponseService) UpdateResponseError(ctx context.Context, responseID ui
 	response.FailedAt = &now
 
 	if err := s.responseRepo.Update(ctx, response); err != nil {
-		return false, common.NewError("b8c9d0e1-f2g3-4567-bcde-890123456789", "Failed to update response error")
+		return false, common.NewError(err, "b8c9d0e1-f2g3-4567-bcde-890123456789")
 	}
 
 	return true, nil
@@ -344,7 +344,7 @@ func (s *ResponseService) UpdateResponseError(ctx context.Context, responseID ui
 func (s *ResponseService) GetResponseByPublicID(ctx context.Context, publicID string) (*Response, *common.Error) {
 	response, err := s.responseRepo.FindByPublicID(ctx, publicID)
 	if err != nil {
-		return nil, common.NewError("c9d0e1f2-g3h4-5678-cdef-901234567890", "Failed to get response")
+		return nil, common.NewError(err, "c9d0e1f2-g3h4-5678-cdef-901234567890")
 	}
 	return response, nil
 }
@@ -353,7 +353,7 @@ func (s *ResponseService) GetResponseByPublicID(ctx context.Context, publicID st
 func (s *ResponseService) GetResponsesByUserID(ctx context.Context, userID uint, pagination *query.Pagination) ([]*Response, *common.Error) {
 	responses, err := s.responseRepo.FindByUserID(ctx, userID, pagination)
 	if err != nil {
-		return nil, common.NewError("d0e1f2g3-h4i5-6789-defg-012345678901", "Failed to get responses by user ID")
+		return nil, common.NewError(err, "d0e1f2g3-h4i5-6789-defg-012345678901")
 	}
 	return responses, nil
 }
@@ -362,7 +362,7 @@ func (s *ResponseService) GetResponsesByUserID(ctx context.Context, userID uint,
 func (s *ResponseService) GetResponsesByConversationID(ctx context.Context, conversationID uint, pagination *query.Pagination) ([]*Response, *common.Error) {
 	responses, err := s.responseRepo.FindByConversationID(ctx, conversationID, pagination)
 	if err != nil {
-		return nil, common.NewError("e1f2g3h4-i5j6-7890-efgh-123456789012", "Failed to get responses by conversation ID")
+		return nil, common.NewError(err, "e1f2g3h4-i5j6-7890-efgh-123456789012")
 	}
 	return responses, nil
 }
@@ -370,7 +370,7 @@ func (s *ResponseService) GetResponsesByConversationID(ctx context.Context, conv
 // DeleteResponse deletes a response
 func (s *ResponseService) DeleteResponse(ctx context.Context, responseID uint) (bool, *common.Error) {
 	if err := s.responseRepo.DeleteByID(ctx, responseID); err != nil {
-		return false, common.NewError("f2g3h4i5-j6k7-8901-fghi-234567890123", "Failed to delete response")
+		return false, common.NewError(err, "f2g3h4i5-j6k7-8901-fghi-234567890123")
 	}
 	return true, nil
 }
@@ -379,15 +379,15 @@ func (s *ResponseService) DeleteResponse(ctx context.Context, responseID uint) (
 func (s *ResponseService) CreateItemsForResponse(ctx context.Context, responseID uint, conversationID uint, items []*conversation.Item) ([]*conversation.Item, *common.Error) {
 	response, err := s.responseRepo.FindByID(ctx, responseID)
 	if err != nil {
-		return nil, common.NewError("g3h4i5j6-k7l8-9012-ghij-345678901234", "Failed to find response")
+		return nil, common.NewError(err, "g3h4i5j6-k7l8-9012-ghij-345678901234")
 	}
 	if response == nil {
-		return nil, common.NewError("h4i5j6k7-l8m9-0123-hijk-456789012345", "Response not found")
+		return nil, common.NewErrorWithMessage("Response not found", "h4i5j6k7-l8m9-0123-hijk-456789012345")
 	}
 
 	// Validate that the response belongs to the specified conversation
 	if response.ConversationID == nil || *response.ConversationID != conversationID {
-		return nil, common.NewError("i5j6k7l8-m9n0-1234-ijkl-567890123456", "Response does not belong to the specified conversation")
+		return nil, common.NewErrorWithMessage("Response does not belong to the specified conversation", "i5j6k7l8-m9n0-1234-ijkl-567890123456")
 	}
 
 	var createdItems []*conversation.Item
@@ -395,7 +395,7 @@ func (s *ResponseService) CreateItemsForResponse(ctx context.Context, responseID
 		// Generate public ID for the item
 		publicID, err := idgen.GenerateSecureID("msg", 42)
 		if err != nil {
-			return nil, common.NewError("j6k7l8m9-n0o1-2345-jklm-678901234567", "Failed to generate item ID")
+			return nil, common.NewError(err, "j6k7l8m9-n0o1-2345-jklm-678901234567")
 		}
 
 		item := &conversation.Item{
@@ -409,7 +409,7 @@ func (s *ResponseService) CreateItemsForResponse(ctx context.Context, responseID
 		}
 
 		if err := s.itemRepo.Create(ctx, item); err != nil {
-			return nil, common.NewError("k7l8m9n0-o1p2-3456-klmn-789012345678", "Failed to create item")
+			return nil, common.NewError(err, "k7l8m9n0-o1p2-3456-klmn-789012345678")
 		}
 
 		createdItems = append(createdItems, item)
@@ -422,10 +422,10 @@ func (s *ResponseService) CreateItemsForResponse(ctx context.Context, responseID
 func (s *ResponseService) GetItemsForResponse(ctx context.Context, responseID uint, itemRole *conversation.ItemRole) ([]*conversation.Item, *common.Error) {
 	response, err := s.responseRepo.FindByID(ctx, responseID)
 	if err != nil {
-		return nil, common.NewError("l8m9n0o1-p2q3-4567-lmno-890123456789", "Failed to find response")
+		return nil, common.NewError(err, "l8m9n0o1-p2q3-4567-lmno-890123456789")
 	}
 	if response == nil {
-		return nil, common.NewError("m9n0o1p2-q3r4-5678-mnop-901234567890", "Response not found")
+		return nil, common.NewErrorWithMessage("Response not found", "m9n0o1p2-q3r4-5678-mnop-901234567890")
 	}
 
 	// Create filter for database query
@@ -438,7 +438,7 @@ func (s *ResponseService) GetItemsForResponse(ctx context.Context, responseID ui
 	// Get items using database filter (more efficient than in-memory filtering)
 	items, err := s.itemRepo.FindByFilter(ctx, filter, nil)
 	if err != nil {
-		return nil, common.NewError("n0o1p2q3-r4s5-6789-nopq-012345678901", "Failed to get items")
+		return nil, common.NewError(err, "n0o1p2q3-r4s5-6789-nopq-012345678901")
 	}
 
 	return items, nil
@@ -650,17 +650,17 @@ func (s *ResponseService) HandleConversation(ctx context.Context, userID uint, r
 			return nil, err
 		}
 		if previousResponse == nil {
-			return nil, common.NewError("o1p2q3r4-s5t6-7890-opqr-123456789012", "Previous response not found")
+			return nil, common.NewErrorWithMessage("Previous response not found", "o1p2q3r4-s5t6-7890-opqr-123456789012")
 		}
 
 		// Validate that the previous response belongs to the same user
 		if previousResponse.UserID != userID {
-			return nil, common.NewError("p2q3r4s5-t6u7-8901-pqrs-234567890123", "Previous response does not belong to the current user")
+			return nil, common.NewErrorWithMessage("Previous response does not belong to the current user", "p2q3r4s5-t6u7-8901-pqrs-234567890123")
 		}
 
 		// Load the conversation from the previous response
 		if previousResponse.ConversationID == nil {
-			return nil, common.NewError("q3r4s5t6-u7v8-9012-qrst-345678901234", "Previous response does not belong to any conversation")
+			return nil, common.NewErrorWithMessage("Previous response does not belong to any conversation", "q3r4s5t6-u7v8-9012-qrst-345678901234")
 		}
 
 		conv, err := s.conversationService.GetConversationByID(ctx, *previousResponse.ConversationID)
@@ -697,7 +697,7 @@ func (s *ResponseService) AppendMessagesToConversation(ctx context.Context, conv
 		// Generate public ID for the item
 		publicID, err := idgen.GenerateSecureID("msg", 42)
 		if err != nil {
-			return false, common.NewError("u7v8w9x0-y1z2-3456-uvwx-789012345678", "Failed to generate item ID")
+			return false, common.NewErrorWithMessage("Failed to generate item ID", "u7v8w9x0-y1z2-3456-uvwx-789012345678")
 		}
 
 		// Convert role

@@ -80,13 +80,13 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 	mToE := modelRegistry.GetModelToEndpoints()
 	endpoints, ok := mToE[request.Model]
 	if !ok {
-		return nil, common.NewError("h8i9j0k1-l2m3-4567-hijk-890123456789", "Model validation error")
+		return nil, common.NewErrorWithMessage("Model validation error", "h8i9j0k1-l2m3-4567-hijk-890123456789")
 	}
 
 	// Convert response request to chat completion request using domain service
 	chatCompletionRequest := h.responseService.ConvertToChatCompletionRequest(request)
 	if chatCompletionRequest == nil {
-		return nil, common.NewError("i9j0k1l2-m3n4-5678-ijkl-901234567890", "Input validation error")
+		return nil, common.NewErrorWithMessage("Input validation error", "i9j0k1l2-m3n4-5678-ijkl-901234567890")
 	}
 
 	// Check if model endpoint exists
@@ -100,7 +100,7 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 	}
 
 	if !endpointExists {
-		return nil, common.NewError("h8i9j0k1-l2m3-4567-hijk-890123456789", "Model validation error")
+		return nil, common.NewErrorWithMessage("Model validation error", "h8i9j0k1-l2m3-4567-hijk-890123456789")
 	}
 
 	// Handle conversation logic using domain service
@@ -181,7 +181,7 @@ func (h *ResponseModelService) GetResponse(reqCtx *gin.Context) {
 
 	result, err := h.doGetResponse(responseEntity)
 	if err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.Code, err.Message)
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.GetCode(), err.Error())
 		return
 	}
 
@@ -206,7 +206,7 @@ func (h *ResponseModelService) DeleteResponse(reqCtx *gin.Context) {
 
 	result, err := h.doDeleteResponse(reqCtx, responseEntity)
 	if err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.Code, err.Message)
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.GetCode(), err.Error())
 		return
 	}
 
@@ -245,7 +245,7 @@ func (h *ResponseModelService) CancelResponse(reqCtx *gin.Context) {
 
 	result, err := h.doCancelResponse(responseEntity)
 	if err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.Code, err.Message)
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.GetCode(), err.Error())
 		return
 	}
 
@@ -279,7 +279,7 @@ func (h *ResponseModelService) ListInputItems(reqCtx *gin.Context) {
 
 	result, err := h.doListInputItems(reqCtx, responseEntity)
 	if err != nil {
-		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.Code, err.Message)
+		h.sendErrorResponse(reqCtx, http.StatusBadRequest, err.GetCode(), err.Error())
 		return
 	}
 

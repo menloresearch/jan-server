@@ -198,8 +198,8 @@ func (responseRoute *ResponseRoute) CreateResponse(reqCtx *gin.Context) {
 	result, err := responseRoute.responseModelService.CreateResponse(ctx, userID, domainRequest)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  err.Code,
-			Error: err.Message,
+			Code:  err.GetCode(),
+			Error: err.Error(),
 		})
 		return
 	}
@@ -302,8 +302,8 @@ func (responseRoute *ResponseRoute) DeleteResponse(reqCtx *gin.Context) {
 	success, err := responseRoute.responseService.DeleteResponse(ctx, resp.ID)
 	if !success {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  err.Code,
-			Error: err.Message,
+			Code:  err.GetCode(),
+			Error: err.Error(),
 		})
 		return
 	}
@@ -353,8 +353,8 @@ func (responseRoute *ResponseRoute) CancelResponse(reqCtx *gin.Context) {
 	success, err := responseRoute.responseService.UpdateResponseStatus(ctx, resp.ID, response.ResponseStatusCancelled)
 	if !success {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  err.Code,
-			Error: err.Message,
+			Code:  err.GetCode(),
+			Error: err.Error(),
 		})
 		return
 	}
@@ -363,8 +363,8 @@ func (responseRoute *ResponseRoute) CancelResponse(reqCtx *gin.Context) {
 	updatedResp, err := responseRoute.responseService.GetResponseByPublicID(ctx, resp.PublicID)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  err.Code,
-			Error: err.Message,
+			Code:  err.GetCode(),
+			Error: err.Error(),
 		})
 		return
 	}
@@ -434,8 +434,8 @@ func (responseRoute *ResponseRoute) ListInputItems(reqCtx *gin.Context) {
 	items, err := responseRoute.responseService.GetItemsForResponse(ctx, resp.ID, nil)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  err.Code,
-			Error: err.Message,
+			Code:  err.GetCode(),
+			Error: err.Error(),
 		})
 		return
 	}

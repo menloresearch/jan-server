@@ -49,10 +49,10 @@ const (
 // validateRequest validates the incoming request
 func (h *StreamModelService) validateRequest(request *requesttypes.CreateResponseRequest) (bool, *common.Error) {
 	if request.Model == "" {
-		return false, common.NewError("a1b2c3d4-e5f6-7890-abcd-ef1234567890", "Model is required")
+		return false, common.NewErrorWithMessage("Model is required", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	}
 	if request.Input == nil {
-		return false, common.NewError("b2c3d4e5-f6g7-8901-bcde-f23456789012", "Input is required")
+		return false, common.NewErrorWithMessage("Input is required", "b2c3d4e5-f6g7-8901-bcde-f23456789012")
 	}
 	return true, nil
 }
@@ -107,8 +107,8 @@ func (h *StreamModelService) CreateStreamResponse(reqCtx *gin.Context, request *
 	success, err := h.validateRequest(request)
 	if !success {
 		reqCtx.JSON(http.StatusBadRequest, responsetypes.ErrorResponse{
-			Code:  err.Code,
-			Error: err.Message,
+			Code:  err.GetCode(),
+			Error: err.GetMessage(),
 		})
 		return
 	}
@@ -407,7 +407,7 @@ func (h *StreamModelService) streamResponseToChannel(reqCtx *gin.Context, reques
 		Item: responsetypes.ResponseOutputItem{
 			ID:      itemID,
 			Type:    "message",
-			Status:  "in_progress",
+			Status:  string(conversation.ItemStatusInProgress),
 			Content: []responsetypes.ResponseContentPart{},
 			Role:    "assistant",
 		},
@@ -519,7 +519,7 @@ func (h *StreamModelService) streamResponseToChannel(reqCtx *gin.Context, reques
 						Item: responsetypes.ResponseOutputItem{
 							ID:      reasoningItemID,
 							Type:    "reasoning",
-							Status:  "in_progress",
+							Status:  string(conversation.ItemStatusInProgress),
 							Content: []responsetypes.ResponseContentPart{},
 							Role:    "assistant",
 						},
@@ -661,7 +661,7 @@ func (h *StreamModelService) streamResponseToChannel(reqCtx *gin.Context, reques
 			success, err := h.responseService.AppendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}, &responseEntity.ID)
 			if !success {
 				// Log error but don't fail the response
-				logger.GetLogger().Errorf("Failed to append assistant response to conversation: %s - %s", err.Code, err.Message)
+				logger.GetLogger().Errorf("Failed to append assistant response to conversation: %s - %s", err.GetCode(), err.Error())
 			}
 		}
 	}
@@ -713,7 +713,7 @@ func (h *StreamModelService) streamResponseToChannel(reqCtx *gin.Context, reques
 			Item: responsetypes.ResponseOutputItem{
 				ID:     itemID,
 				Type:   "message",
-				Status: "completed",
+				Status: string(conversation.ItemStatusCompleted),
 				Content: []responsetypes.ResponseContentPart{
 					{
 						Type:        "output_text",
@@ -741,7 +741,7 @@ func (h *StreamModelService) streamResponseToChannel(reqCtx *gin.Context, reques
 		success, updateErr := h.responseService.UpdateResponseStatus(reqCtx, responseEntity.ID, ResponseStatusCompleted)
 		if !success {
 			// Log error but don't fail the request since streaming is already complete
-			fmt.Printf("Failed to update response status to completed: %s - %s\n", updateErr.Code, updateErr.Message)
+			fmt.Printf("Failed to update response status to completed: %s - %s\n", updateErr.GetCode(), updateErr.Error())
 		}
 
 		// Save the output to database
@@ -753,10 +753,10 @@ func (h *StreamModelService) streamResponseToChannel(reqCtx *gin.Context, reques
 		}
 		success, outputErr := h.responseService.UpdateResponseOutput(reqCtx, responseEntity.ID, outputData)
 		if !success {
-			fmt.Printf("Failed to update response output: %s - %s\n", outputErr.Code, outputErr.Message)
+			fmt.Printf("Failed to update response output: %s - %s\n", outputErr.GetCode(), outputErr.Error())
 		}
 	} else {
-		fmt.Printf("Failed to get response entity for status update: %s - %s\n", getErr.Code, getErr.Message)
+		fmt.Printf("Failed to get response entity for status update: %s - %s\n", getErr.GetCode(), getErr.Error())
 	}
 
 	// Log streaming metrics

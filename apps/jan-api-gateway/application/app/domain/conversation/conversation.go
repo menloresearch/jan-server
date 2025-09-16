@@ -51,6 +51,40 @@ func ValidateItemRole(input string) bool {
 	}
 }
 
+// @Enum(pending, in_progress, completed, failed, cancelled)
+type ItemStatus string
+
+const (
+	ItemStatusPending    ItemStatus = "pending"
+	ItemStatusInProgress ItemStatus = "in_progress"
+	ItemStatusCompleted  ItemStatus = "completed"
+	ItemStatusFailed     ItemStatus = "failed"
+	ItemStatusCancelled  ItemStatus = "cancelled"
+)
+
+func ValidateItemStatus(input string) bool {
+	switch ItemStatus(input) {
+	case ItemStatusPending, ItemStatusInProgress, ItemStatusCompleted, ItemStatusFailed, ItemStatusCancelled:
+		return true
+	default:
+		return false
+	}
+}
+
+// ToItemStatusPtr returns a pointer to the given ItemStatus
+func ToItemStatusPtr(s ItemStatus) *ItemStatus {
+	return &s
+}
+
+// ItemStatusToStringPtr converts *ItemStatus to *string
+func ItemStatusToStringPtr(s *ItemStatus) *string {
+	if s == nil {
+		return nil
+	}
+	str := string(*s)
+	return &str
+}
+
 type Item struct {
 	ID                uint               `json:"-"`
 	ConversationID    uint               `json:"-"`
@@ -58,7 +92,7 @@ type Item struct {
 	Type              ItemType           `json:"type"`
 	Role              *ItemRole          `json:"role,omitempty"`
 	Content           []Content          `json:"content,omitempty"`
-	Status            *string            `json:"status,omitempty"`
+	Status            *ItemStatus        `json:"status,omitempty"`
 	IncompleteAt      *time.Time         `json:"incomplete_at,omitempty"`
 	IncompleteDetails *IncompleteDetails `json:"incomplete_details,omitempty"`
 	CompletedAt       *time.Time         `json:"completed_at,omitempty"`

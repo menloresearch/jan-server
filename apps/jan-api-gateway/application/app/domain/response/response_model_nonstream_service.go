@@ -40,8 +40,8 @@ func (h *NonStreamModelService) CreateNonStreamResponse(reqCtx *gin.Context, req
 		reqCtx.AbortWithStatusJSON(
 			http.StatusBadRequest,
 			responsetypes.ErrorResponse{
-				Code:  err.Code,
-				Error: err.Message,
+				Code:  err.GetCode(),
+				Error: err.Error(),
 			})
 		return
 	}
@@ -57,7 +57,7 @@ func (h *NonStreamModelService) doCreateNonStreamResponse(reqCtx *gin.Context, r
 	defer cancel()
 	chatResponse, err := janInferenceClient.CreateChatCompletion(ctx, key, *chatCompletionRequest)
 	if err != nil {
-		return responsetypes.Response{}, common.NewError("bc82d69c-685b-4556-9d1f-2a4a80ae8ca4", "Failed to create chat completion")
+		return responsetypes.Response{}, common.NewError(err, "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
 	}
 
 	// Process reasoning content
@@ -72,7 +72,7 @@ func (h *NonStreamModelService) doCreateNonStreamResponse(reqCtx *gin.Context, r
 		success, err := h.responseService.AppendMessagesToConversation(reqCtx, conv, []openai.ChatCompletionMessage{assistantMessage}, &responseEntity.ID)
 		if !success {
 			// Log error but don't fail the response
-			logger.GetLogger().Errorf("Failed to append assistant response to conversation: %s - %s", err.Code, err.Message)
+			logger.GetLogger().Errorf("Failed to append assistant response to conversation: %s - %s", err.GetCode(), err.Error())
 		}
 	}
 
@@ -80,7 +80,7 @@ func (h *NonStreamModelService) doCreateNonStreamResponse(reqCtx *gin.Context, r
 	success, updateErr := h.responseService.UpdateResponseStatus(reqCtx, responseEntity.ID, ResponseStatusCompleted)
 	if !success {
 		// Log error but don't fail the request since response is already generated
-		logger.GetLogger().Errorf("Failed to update response status to completed: %s - %s\n", updateErr.Code, updateErr.Message)
+		logger.GetLogger().Errorf("Failed to update response status to completed: %s - %s\n", updateErr.GetCode(), updateErr.Error())
 	}
 
 	// Convert chat completion response to response format
@@ -90,13 +90,13 @@ func (h *NonStreamModelService) doCreateNonStreamResponse(reqCtx *gin.Context, r
 	if responseData.T.Output != nil {
 		success, outputErr := h.responseService.UpdateResponseOutput(reqCtx, responseEntity.ID, responseData.T.Output)
 		if !success {
-			logger.GetLogger().Errorf("Failed to update response output: %s - %s\n", outputErr.Code, outputErr.Message)
+			logger.GetLogger().Errorf("Failed to update response output: %s - %s\n", outputErr.GetCode(), outputErr.Error())
 		}
 	}
 	if responseData.T.Usage != nil {
 		success, usageErr := h.responseService.UpdateResponseUsage(reqCtx, responseEntity.ID, responseData.T.Usage)
 		if !success {
-			logger.GetLogger().Errorf("Failed to update response usage: %s - %s\n", usageErr.Code, usageErr.Message)
+			logger.GetLogger().Errorf("Failed to update response usage: %s - %s\n", usageErr.GetCode(), usageErr.Error())
 		}
 	}
 
