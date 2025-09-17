@@ -102,3 +102,9 @@ func (repo *UserGormRepository) applyFilter(query *gormgen.Query, sql gormgen.IU
 	}
 	return sql
 }
+
+func (r *UserGormRepository) Update(ctx context.Context, u *domain.User) error {
+	user := dbschema.NewSchemaUser(u)
+	query := r.db.GetQuery(ctx)
+	return query.User.WithContext(ctx).Save(user)
+}

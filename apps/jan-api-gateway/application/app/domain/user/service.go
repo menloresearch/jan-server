@@ -29,6 +29,13 @@ func (s *UserService) RegisterUser(ctx context.Context, user *User) (*User, erro
 	return user, nil
 }
 
+func (s *UserService) UpdateUser(ctx context.Context, user *User) (*User, error) {
+	if err := s.userrepo.Update(ctx, user); err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
 func (s *UserService) FindByEmail(ctx context.Context, email string) (*User, error) {
 	users, err := s.userrepo.FindByFilter(ctx, UserFilter{
 		Email: &email,

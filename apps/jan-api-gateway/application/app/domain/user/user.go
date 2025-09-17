@@ -16,6 +16,7 @@ type User struct {
 	Enabled   bool
 	PublicID  string
 	CreatedAt time.Time
+	IsGuest   bool
 }
 
 type UserFilter struct {
@@ -27,6 +28,7 @@ type UserFilter struct {
 
 type UserRepository interface {
 	Create(ctx context.Context, u *User) error
+	Update(ctx context.Context, u *User) error
 	FindFirst(ctx context.Context, filter UserFilter) (*User, error)
 	FindByFilter(ctx context.Context, filter UserFilter, p *query.Pagination) ([]*User, error)
 	FindByID(ctx context.Context, id uint) (*User, error)
