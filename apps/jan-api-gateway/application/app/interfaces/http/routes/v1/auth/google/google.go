@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/user"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/middleware"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
@@ -51,7 +49,7 @@ func NewGoogleAuthAPI(userService *user.UserService, authService *auth.AuthServi
 
 func (googleAuthAPI *GoogleAuthAPI) RegisterRouter(router *gin.RouterGroup) {
 	googleRouter := router.Group("/google")
-	googleRouter.POST("/callback", middleware.TransactionMiddleware(), googleAuthAPI.HandleGoogleCallback)
+	googleRouter.POST("/callback", googleAuthAPI.HandleGoogleCallback)
 	googleRouter.GET("/login", googleAuthAPI.GetGoogleLoginUrl)
 }
 
@@ -60,16 +58,10 @@ type GoogleCallbackRequest struct {
 	State string `json:"state"`
 }
 
-type TokenResponse struct {
-	ExpiresIn int `json:"expires_in"`
-}
-
 // @Enum(access.token)
 type AccessTokenResponseObjectType string
 
 const AccessTokenResponseObjectTypeObject = "access.token"
-
-const AccessTokenExpirationDuration = 15 * time.Minute
 
 type AccessTokenResponse struct {
 	Object      AccessTokenResponseObjectType `json:"object"`
@@ -83,15 +75,6 @@ func generateState() (string, error) {
 		return "", err
 	}
 	return base64.URLEncoding.EncodeToString(b), nil
-}
-
-func handleGoogleToken(tokenResp TokenResponse) (time.Time, error) {
-	if tokenResp.ExpiresIn <= 0 {
-		return time.Time{}, fmt.Errorf("invalid expires_in value")
-	}
-	// Set expiration with a 10-second buffer
-	accessTokenExp := time.Now().Add(AccessTokenExpirationDuration)
-	return accessTokenExp, nil
 }
 
 // @Summary Google OAuth2 Callback
@@ -135,11 +118,6 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 			Code: "f9e2d2b5-45b5-4697-bb04-548b4290fdde",
 		})
 		return
-	}
-
-	// Extract expires_in from token response
-	tokenResp := TokenResponse{
-		ExpiresIn: int(time.Until(token.Expiry).Seconds()),
 	}
 
 	rawIDToken, ok := token.Extra("id_token").(string)
@@ -196,17 +174,7 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 		}
 	}
 
-	// Use handleGoogleToken to calculate expiration with buffer
-	// Instead of hardcoded 15 minutes, the access token now uses the actual expiration time from Google's token response
-	accessTokenExp, err := handleGoogleToken(tokenResp)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  "c6d6bafd-b9f3-4ebb-9c90-a21b07308ebc",
-			Error: err.Error(),
-		})
-		return
-	}
-
+	accessTokenExp := time.Now().Add(auth.AccessTokenExpirationDuration)
 	accessTokenString, err := auth.CreateJwtSignedString(auth.UserClaim{
 		Email: exists.Email,
 		Name:  exists.Name,
@@ -224,7 +192,8 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 		})
 		return
 	}
-	refreshTokenExp := time.Now().Add(7 * 24 * time.Hour)
+
+	refreshTokenExp := time.Now().Add(auth.AccessTokenExpirationDuration)
 	refreshTokenString, err := auth.CreateJwtSignedString(auth.UserClaim{
 		Email: exists.Email,
 		Name:  exists.Name,
