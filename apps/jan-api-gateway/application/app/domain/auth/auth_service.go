@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -34,6 +35,9 @@ func NewAuthService(
 	}
 }
 
+const AccessTokenExpirationDuration = 15 * time.Minute
+const RefreshTokenExpirationDuration = 7 * 24 * time.Hour
+
 type UserContextKey string
 
 const (
@@ -57,7 +61,6 @@ func (s *AuthService) JWTAuthMiddleware() gin.HandlerFunc {
 		if !ok {
 			return
 		}
-
 		SetUserIDToContext(reqCtx, userId)
 		reqCtx.Next()
 	}
