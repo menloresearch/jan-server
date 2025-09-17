@@ -67,5 +67,6 @@ type ApiKeyRepository interface {
 	FindByID(ctx context.Context, id uint) (*ApiKey, error)
 	FindByKeyHash(ctx context.Context, keyHash string) (*ApiKey, error)
 	FindByFilter(ctx context.Context, filter ApiKeyFilter, pagination *query.Pagination) ([]*ApiKey, error)
+	FindOneByFilter(ctx context.Context, filter ApiKeyFilter) (*ApiKey, error)
 	Count(ctx context.Context, filter ApiKeyFilter) (int64, error)
 }

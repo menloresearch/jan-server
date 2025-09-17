@@ -2,6 +2,7 @@ package apikeyrepo
 
 import (
 	"context"
+	"fmt"
 
 	domain "menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/query"
@@ -65,6 +66,18 @@ func (repo *ApiKeyGormRepository) Update(ctx context.Context, u *domain.ApiKey) 
 	query := repo.db.GetQuery(ctx)
 	apiKey := dbschema.NewSchemaApiKey(u)
 	return query.ApiKey.WithContext(ctx).Save(apiKey)
+}
+
+// FindOneFilter implements apikey.ApiKeyRepository.
+func (repo *ApiKeyGormRepository) FindOneByFilter(ctx context.Context, filter domain.ApiKeyFilter) (*domain.ApiKey, error) {
+	entities, err := repo.FindByFilter(ctx, filter, nil)
+	if err != nil {
+		return nil, err
+	}
+	if len(entities) != 1 {
+		return nil, fmt.Errorf("no records")
+	}
+	return entities[0], err
 }
 
 func (repo *ApiKeyGormRepository) FindByFilter(ctx context.Context, filter domain.ApiKeyFilter, p *query.Pagination) ([]*domain.ApiKey, error) {

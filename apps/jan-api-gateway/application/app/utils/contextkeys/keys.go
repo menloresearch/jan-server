@@ -4,3 +4,5 @@ type RequestId struct{}
 type HttpClientStartsAt struct{}
 type HttpClientRequestBody struct{}
 type TransactionContextKey struct{}
+
+const SkipMiddleware = "SkipMiddleware"

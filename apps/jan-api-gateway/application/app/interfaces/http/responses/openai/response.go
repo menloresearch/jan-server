@@ -38,3 +38,9 @@ type ListResponse[T any] struct {
 	HasMore bool           `json:"has_more"`
 	Total   int64          `json:"total"`
 }
+
+type DeleteResponse struct {
+	Object  string `json:"object"`
+	ID      string `json:"id"`
+	Deleted bool   `json:"deleted"`
+}

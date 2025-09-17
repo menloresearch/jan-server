@@ -95,5 +95,10 @@ func (repo *UserGormRepository) applyFilter(query *gormgen.Query, sql gormgen.IU
 	if filter.Enabled != nil {
 		sql = sql.Where(query.User.Enabled.Is(*filter.Enabled))
 	}
+	if filter.OrganizationId != nil {
+		sql = sql.
+			Join(query.OrganizationMember, query.OrganizationMember.UserID.EqCol(query.User.ID)).
+			Where(query.OrganizationMember.OrganizationID.Eq(*filter.OrganizationId))
+	}
 	return sql
 }

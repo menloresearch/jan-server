@@ -35,7 +35,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/google.GoogleCallbackRequest"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_auth_google.GoogleCallbackRequest"
                         }
                     }
                 ],
@@ -43,25 +43,25 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully authenticated and returned tokens",
                         "schema": {
-                            "$ref": "#/definitions/google.AccessTokenResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_auth_google.AccessTokenResponse"
                         }
                     },
                     "400": {
                         "description": "Bad request (e.g., invalid state, missing code, or invalid claims)",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized (e.g., a user claim is not found or is invalid in the context)",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -75,13 +75,16 @@ const docTemplate = `{
                 ],
                 "summary": "Google OAuth2 Login",
                 "responses": {
-                    "307": {
-                        "description": "Redirects to Google's login page"
+                    "200": {
+                        "description": "redirect url",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_auth_google.GoogleLoginUrl"
+                        }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -101,19 +104,19 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully refreshed the access token",
                         "schema": {
-                            "$ref": "#/definitions/auth.AccessTokenResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_auth.AccessTokenResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request (e.g., invalid refresh token)",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized (e.g., expired or missing refresh token)",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -139,13 +142,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request (e.g., invalid refresh token)",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized (e.g., expired or missing refresh token)",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -170,13 +173,13 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully retrieved user profile",
                         "schema": {
-                            "$ref": "#/definitions/auth.GetMeResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_auth.GetMeResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized (e.g., missing or invalid JWT)",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -199,19 +202,19 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully refreshed the access token",
                         "schema": {
-                            "$ref": "#/definitions/auth.AccessTokenResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_auth.AccessTokenResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request (e.g., invalid refresh token)",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized (e.g., expired or missing refresh token)",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -224,12 +227,13 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Generates a model response for the given chat conversation.",
+                "description": "Generates a model response for the given chat conversation. If ` + "`" + `stream` + "`" + ` is true, the response is sent as a stream of events. If ` + "`" + `stream` + "`" + ` is false or omitted, a single JSON response is returned.",
                 "consumes": [
                     "application/json"
                 ],
                 "produces": [
-                    "application/json"
+                    "application/json",
+                    "text/event-stream"
                 ],
                 "tags": [
                     "Chat"
@@ -237,38 +241,38 @@ const docTemplate = `{
                 "summary": "Create a chat completion",
                 "parameters": [
                     {
-                        "description": "Chat completion request payload",
+                        "description": "Extended chat completion request payload",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/chat.PostChatCompletionRequest"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_chat.ExtendedChatCompletionRequest"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful response",
+                        "description": "Successful streaming response (SSE format, event: 'data', data: JSON object per chunk)",
                         "schema": {
-                            "$ref": "#/definitions/chat.ChatCompletionResponseSwagger"
+                            "type": "string"
                         }
                     },
                     "400": {
                         "description": "Invalid request payload",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -281,7 +285,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Retrieves a paginated list of conversations for the authenticated user.",
+                "description": "Retrieves a paginated list of conversations for the authenticated user with OpenAI-compatible response format.",
                 "tags": [
                     "Conversations"
                 ],
@@ -311,25 +315,25 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully retrieved the list of conversations",
                         "schema": {
-                            "$ref": "#/definitions/conversations.ListResponse-conversations_ConversationResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ExtendedConversationResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request - Invalid pagination parameters",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -340,7 +344,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a new conversation for the authenticated user",
+                "description": "Creates a new conversation for the authenticated user with optional items",
                 "consumes": [
                     "application/json"
                 ],
@@ -358,7 +362,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/conversations.CreateConversationRequest"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.CreateConversationRequest"
                         }
                     }
                 ],
@@ -366,25 +370,25 @@ const docTemplate = `{
                     "200": {
                         "description": "Created conversation",
                         "schema": {
-                            "$ref": "#/definitions/conversations.ConversationResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ExtendedConversationResponse"
                         }
                     },
                     "400": {
-                        "description": "Invalid request",
+                        "description": "Invalid request - Bad payload, too many items, or invalid item format",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -397,7 +401,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Retrieves a conversation by its ID",
+                "description": "Retrieves a conversation by its ID with full metadata and title",
                 "produces": [
                     "application/json"
                 ],
@@ -418,31 +422,31 @@ const docTemplate = `{
                     "200": {
                         "description": "Conversation details",
                         "schema": {
-                            "$ref": "#/definitions/conversations.ConversationResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ExtendedConversationResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Access denied",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Conversation not found",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -453,7 +457,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Deletes a conversation and all its items",
+                "description": "Deletes a conversation and all its items permanently",
                 "produces": [
                     "application/json"
                 ],
@@ -474,31 +478,31 @@ const docTemplate = `{
                     "200": {
                         "description": "Deleted conversation",
                         "schema": {
-                            "$ref": "#/definitions/conversations.DeletedConversationResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.DeletedConversationResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Access denied",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Conversation not found",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -509,7 +513,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates conversation metadata",
+                "description": "Updates conversation title and/or metadata",
                 "consumes": [
                     "application/json"
                 ],
@@ -534,7 +538,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/conversations.UpdateConversationRequest"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.UpdateConversationRequest"
                         }
                     }
                 ],
@@ -542,37 +546,37 @@ const docTemplate = `{
                     "200": {
                         "description": "Updated conversation",
                         "schema": {
-                            "$ref": "#/definitions/conversations.ConversationResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ExtendedConversationResponse"
                         }
                     },
                     "400": {
-                        "description": "Invalid request",
+                        "description": "Invalid request payload or update failed",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Access denied",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Conversation not found",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -585,7 +589,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Lists all items in a conversation",
+                "description": "Lists all items in a conversation with OpenAI-compatible pagination",
                 "produces": [
                     "application/json"
                 ],
@@ -609,8 +613,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Cursor for pagination",
-                        "name": "cursor",
+                        "description": "Cursor for pagination - ID of the last item from previous page",
+                        "name": "after",
                         "in": "query"
                     },
                     {
@@ -624,31 +628,37 @@ const docTemplate = `{
                     "200": {
                         "description": "List of items",
                         "schema": {
-                            "$ref": "#/definitions/conversations.ConversationItemListResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ConversationItemResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request - Invalid pagination parameters",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Access denied",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Conversation not found",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -659,7 +669,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Adds multiple items to a conversation",
+                "description": "Adds multiple items to a conversation with OpenAI-compatible format",
                 "consumes": [
                     "application/json"
                 ],
@@ -684,7 +694,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/conversations.CreateItemsRequest"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.CreateItemsRequest"
                         }
                     }
                 ],
@@ -692,37 +702,37 @@ const docTemplate = `{
                     "200": {
                         "description": "Created items",
                         "schema": {
-                            "$ref": "#/definitions/conversations.ListResponse-conversations_ConversationItemResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ConversationItemResponse"
                         }
                     },
                     "400": {
-                        "description": "Invalid request",
+                        "description": "Invalid request payload or invalid item format",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Access denied",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Conversation not found",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -735,7 +745,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Retrieves a specific item from a conversation",
+                "description": "Retrieves a specific item from a conversation with full content details",
                 "produces": [
                     "application/json"
                 ],
@@ -763,31 +773,31 @@ const docTemplate = `{
                     "200": {
                         "description": "Item details",
                         "schema": {
-                            "$ref": "#/definitions/conversations.ConversationItemResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ConversationItemResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Access denied",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Conversation not found",
+                        "description": "Conversation or item not found",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -798,7 +808,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Deletes a specific item from a conversation",
+                "description": "Deletes a specific item from a conversation and returns the deleted item details",
                 "produces": [
                     "application/json"
                 ],
@@ -824,33 +834,39 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Updated conversation",
+                        "description": "Deleted item details",
                         "schema": {
-                            "$ref": "#/definitions/conversations.ConversationResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ConversationItemResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request - Deletion failed",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Access denied",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Conversation not found",
+                        "description": "Conversation or item not found",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -915,7 +931,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Successful response",
                         "schema": {
-                            "$ref": "#/definitions/v1.ModelsResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1.ModelsResponse"
                         }
                     }
                 }
@@ -952,19 +968,19 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully retrieved the list of admin API keys",
                         "schema": {
-                            "$ref": "#/definitions/organization.AdminApiKeyListResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization.AdminApiKeyListResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -993,7 +1009,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/organization.CreateOrganizationAdminAPIKeyRequest"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization.CreateOrganizationAdminAPIKeyRequest"
                         }
                     }
                 ],
@@ -1001,19 +1017,19 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully created admin API key",
                         "schema": {
-                            "$ref": "#/definitions/organization.OrganizationAdminAPIKeyResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization.OrganizationAdminAPIKeyResponse"
                         }
                     },
                     "400": {
                         "description": "Bad request - invalid payload",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -1044,19 +1060,19 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully retrieved the admin API key",
                         "schema": {
-                            "$ref": "#/definitions/organization.OrganizationAdminAPIKeyResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization.OrganizationAdminAPIKeyResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found - API key with the given ID does not exist or does not belong to the organization",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -1085,19 +1101,218 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully deleted the admin API key",
                         "schema": {
-                            "$ref": "#/definitions/organization.AdminAPIKeyDeletedResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization.AdminAPIKeyDeletedResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found - API key with the given ID does not exist or does not belong to the organization",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/organization/invites": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves a paginated list of invites for the current organization.",
+                "tags": [
+                    "Organizations"
+                ],
+                "summary": "List Organization Invites",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Cursor pointing to a record after which to fetch results",
+                        "name": "after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of results to return",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully retrieved list of invites",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_organization_invites_InviteResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid or missing query parameter",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - invalid or missing API key",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a new invite for a user to join the organization.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Organizations"
+                ],
+                "summary": "Create Invite",
+                "parameters": [
+                    {
+                        "description": "Invite request payload",
+                        "name": "invite",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_invites.CreateInviteUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully created invite",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_invites.InviteResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request payload or user already exists",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - invalid or missing API key",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/organization/invites/{invite_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves a specific invite by its ID.",
+                "tags": [
+                    "Organizations"
+                ],
+                "summary": "Retrieve Invite",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Public ID of the invite",
+                        "name": "invite_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully retrieved invite",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_invites.InviteResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - invalid or missing API key",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Invite not found",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes a specific invite by its ID. Only organization owners can delete invites.",
+                "tags": [
+                    "Organizations"
+                ],
+                "summary": "Delete Invite",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Public ID of the invite",
+                        "name": "invite_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully deleted invite",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.DeleteResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - invalid or missing API key",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - only owners can delete invites",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Invite not found",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -1140,19 +1355,19 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully retrieved the list of projects",
                         "schema": {
-                            "$ref": "#/definitions/projects.ProjectListResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_projects.ProjectListResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -1181,7 +1396,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/projects.CreateProjectRequest"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_projects.CreateProjectRequest"
                         }
                     }
                 ],
@@ -1189,25 +1404,25 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully created project",
                         "schema": {
-                            "$ref": "#/definitions/projects.ProjectResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_projects.ProjectResponse"
                         }
                     },
                     "400": {
                         "description": "Bad request - invalid payload",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -1238,19 +1453,19 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully retrieved the project",
                         "schema": {
-                            "$ref": "#/definitions/projects.ProjectResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_projects.ProjectResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found - project with the given ID does not exist or does not belong to the organization",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -1286,7 +1501,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/projects.UpdateProjectRequest"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_projects.UpdateProjectRequest"
                         }
                     }
                 ],
@@ -1294,25 +1509,25 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully updated the project",
                         "schema": {
-                            "$ref": "#/definitions/projects.ProjectResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_projects.ProjectResponse"
                         }
                     },
                     "400": {
                         "description": "Bad request - invalid payload",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found - project with the given ID does not exist",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -1343,19 +1558,19 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully archived the project",
                         "schema": {
-                            "$ref": "#/definitions/projects.ProjectResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_projects.ProjectResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found - project with the given ID does not exist",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -1392,31 +1607,31 @@ const docTemplate = `{
                     "200": {
                         "description": "API key created successfully",
                         "schema": {
-                            "$ref": "#/definitions/apikeys.ApiKeyCreateResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_v1_organization_projects_api_keys_ApiKeyResponse"
                         }
                     },
                     "400": {
                         "description": "Bad request, e.g., invalid payload or missing IDs",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized, e.g., invalid or missing token",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found, e.g., project or organization not found",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -1452,7 +1667,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/apikeys.CreateApiKeyRequest"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_projects_api_keys.CreateApiKeyRequest"
                         }
                     }
                 ],
@@ -1460,31 +1675,31 @@ const docTemplate = `{
                     "200": {
                         "description": "API key created successfully",
                         "schema": {
-                            "$ref": "#/definitions/apikeys.ApiKeyCreateResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_v1_organization_projects_api_keys_ApiKeyResponse"
                         }
                     },
                     "400": {
                         "description": "Bad request, e.g., invalid payload or missing IDs",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized, e.g., invalid or missing token",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found, e.g., project or organization not found",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     }
                 }
@@ -1516,31 +1731,52 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/responses.CreateResponseRequest"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.CreateResponseRequest"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful response with embedded fields"
+                        "description": "Created response",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.Response"
+                        }
                     },
                     "202": {
-                        "description": "Response accepted for background processing with embedded fields"
+                        "description": "Response accepted for background processing",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.Response"
+                        }
                     },
                     "400": {
-                        "description": "Invalid request payload"
+                        "description": "Invalid request payload",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     },
                     "401": {
-                        "description": "Unauthorized"
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     },
                     "422": {
-                        "description": "Validation error"
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     },
                     "429": {
-                        "description": "Rate limit exceeded"
+                        "description": "Rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     },
                     "500": {
-                        "description": "Internal server error"
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -1575,19 +1811,40 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful response with embedded fields"
+                        "description": "Response details",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.Response"
+                        }
                     },
                     "400": {
-                        "description": "Invalid request"
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     },
                     "401": {
-                        "description": "Unauthorized"
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Access denied",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     },
                     "404": {
-                        "description": "Response not found"
+                        "description": "Response not found",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     },
                     "500": {
-                        "description": "Internal server error"
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     }
                 }
             },
@@ -1620,19 +1877,40 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful response with embedded fields"
+                        "description": "Deleted response",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.Response"
+                        }
                     },
                     "400": {
-                        "description": "Invalid request"
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     },
                     "401": {
-                        "description": "Unauthorized"
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Access denied",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     },
                     "404": {
-                        "description": "Response not found"
+                        "description": "Response not found",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     },
                     "500": {
-                        "description": "Internal server error"
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -1667,19 +1945,40 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Response cancelled successfully with embedded fields"
+                        "description": "Response cancelled successfully",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.Response"
+                        }
                     },
                     "400": {
-                        "description": "Invalid request or response cannot be cancelled"
+                        "description": "Invalid request or response cannot be cancelled",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     },
                     "401": {
-                        "description": "Unauthorized"
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Access denied",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     },
                     "404": {
-                        "description": "Response not found"
+                        "description": "Response not found",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     },
                     "500": {
-                        "description": "Internal server error"
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -1732,19 +2031,40 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful response with paginated input items and embedded fields"
+                        "description": "List of input items",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListInputItemsResponse"
+                        }
                     },
                     "400": {
-                        "description": "Invalid request or pagination parameters"
+                        "description": "Invalid request or pagination parameters",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     },
                     "401": {
-                        "description": "Unauthorized"
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Access denied",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     },
                     "404": {
-                        "description": "Response not found"
+                        "description": "Response not found",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     },
                     "500": {
-                        "description": "Internal server error"
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -1774,18 +2094,829 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "apikeys.ApiKeyCreateResponse": {
+        "app_interfaces_http_routes_v1.Model": {
             "type": "object",
             "properties": {
-                "result": {
-                    "$ref": "#/definitions/apikeys.ApiKeyResponse"
+                "created": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "object": {
+                    "type": "string"
+                },
+                "owned_by": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1.ModelsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app_interfaces_http_routes_v1.Model"
+                    }
+                },
+                "object": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_auth.AccessTokenResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "expires_in": {
+                    "type": "integer"
+                },
+                "object": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_auth.GetMeResponse": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "object": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_auth_google.AccessTokenResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "expires_in": {
+                    "type": "integer"
+                },
+                "object": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_auth_google.GoogleCallbackRequest": {
+            "type": "object",
+            "required": [
+                "code"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_auth_google.GoogleLoginUrl": {
+            "type": "object",
+            "properties": {
+                "object": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_chat.CompletionChoice": {
+            "type": "object",
+            "properties": {
+                "finish_reason": {
+                    "type": "string"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "message": {
+                    "$ref": "#/definitions/app_interfaces_http_routes_v1_chat.CompletionMessage"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_chat.CompletionMessage": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_chat.CompletionResponse": {
+            "type": "object",
+            "properties": {
+                "choices": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app_interfaces_http_routes_v1_chat.CompletionChoice"
+                    }
+                },
+                "created": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "model": {
+                    "type": "string"
+                },
+                "object": {
+                    "type": "string"
+                },
+                "usage": {
+                    "$ref": "#/definitions/app_interfaces_http_routes_v1_chat.Usage"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_chat.ExtendedChatCompletionRequest": {
+            "type": "object",
+            "properties": {
+                "chat_template_kwargs": {
+                    "description": "ChatTemplateKwargs provides a way to add non-standard parameters to the request body.\nAdditional kwargs to pass to the template renderer. Will be accessible by the chat template.\nSuch as think mode for qwen3. \"chat_template_kwargs\": {\"enable_thinking\": false}\nhttps://qwen.readthedocs.io/en/latest/deployment/vllm.html#thinking-non-thinking-modes",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "conversation": {
+                    "type": "string"
+                },
+                "frequency_penalty": {
+                    "type": "number"
+                },
+                "function_call": {
+                    "description": "Deprecated: use ToolChoice instead."
+                },
+                "functions": {
+                    "description": "Deprecated: use Tools instead.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.FunctionDefinition"
+                    }
+                },
+                "guided_choice": {
+                    "description": "GuidedChoice is a vLLM-specific extension that restricts the model's output\nto one of the predefined string choices provided in this field. This feature\nis used to constrain the model's responses to a controlled set of options,\nensuring predictable and consistent outputs in scenarios where specific\nchoices are required.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "logit_bias": {
+                    "description": "LogitBias is must be a token id string (specified by their token ID in the tokenizer), not a word string.\nincorrect: ` + "`" + `\"logit_bias\":{\"You\": 6}` + "`" + `, correct: ` + "`" + `\"logit_bias\":{\"1639\": 6}` + "`" + `\nrefs: https://platform.openai.com/docs/api-reference/chat/create#chat/create-logit_bias",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "logprobs": {
+                    "description": "LogProbs indicates whether to return log probabilities of the output tokens or not.\nIf true, returns the log probabilities of each output token returned in the content of message.\nThis option is currently not available on the gpt-4-vision-preview model.",
+                    "type": "boolean"
+                },
+                "max_completion_tokens": {
+                    "description": "MaxCompletionTokens An upper bound for the number of tokens that can be generated for a completion,\nincluding visible output tokens and reasoning tokens https://platform.openai.com/docs/guides/reasoning",
+                    "type": "integer"
+                },
+                "max_tokens": {
+                    "description": "MaxTokens The maximum number of tokens that can be generated in the chat completion.\nThis value can be used to control costs for text generated via API.\nDeprecated: use MaxCompletionTokens. Not compatible with o1-series models.\nrefs: https://platform.openai.com/docs/api-reference/chat/create#chat-create-max_tokens",
+                    "type": "integer"
+                },
+                "messages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatCompletionMessage"
+                    }
+                },
+                "metadata": {
+                    "description": "Metadata to store with the completion.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "model": {
+                    "type": "string"
+                },
+                "n": {
+                    "type": "integer"
+                },
+                "parallel_tool_calls": {
+                    "description": "Disable the default behavior of parallel tool calls by setting it: false."
+                },
+                "prediction": {
+                    "description": "Configuration for a predicted output.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.Prediction"
+                        }
+                    ]
+                },
+                "presence_penalty": {
+                    "type": "number"
+                },
+                "reasoning_effort": {
+                    "description": "Controls effort on reasoning for reasoning models. It can be set to \"low\", \"medium\", or \"high\".",
+                    "type": "string"
+                },
+                "response_format": {
+                    "$ref": "#/definitions/openai.ChatCompletionResponseFormat"
+                },
+                "safety_identifier": {
+                    "description": "A stable identifier used to help detect users of your application that may be violating OpenAI's usage policies.\nThe IDs should be a string that uniquely identifies each user.\nWe recommend hashing their username or email address, in order to avoid sending us any identifying information.\nhttps://platform.openai.com/docs/api-reference/chat/create#chat_create-safety_identifier",
+                    "type": "string"
+                },
+                "seed": {
+                    "type": "integer"
+                },
+                "service_tier": {
+                    "description": "Specifies the latency tier to use for processing the request.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ServiceTier"
+                        }
+                    ]
+                },
+                "stop": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "store": {
+                    "description": "Store can be set to true to store the output of this completion request for use in distillations and evals.\nhttps://platform.openai.com/docs/api-reference/chat/create#chat-create-store",
+                    "type": "boolean"
+                },
+                "stream": {
+                    "type": "boolean"
+                },
+                "stream_options": {
+                    "description": "Options for streaming response. Only set this when you set stream: true.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.StreamOptions"
+                        }
+                    ]
+                },
+                "temperature": {
+                    "type": "number"
+                },
+                "tool_choice": {
+                    "description": "This can be either a string or an ToolChoice object."
+                },
+                "tools": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.Tool"
+                    }
+                },
+                "top_logprobs": {
+                    "description": "TopLogProbs is an integer between 0 and 5 specifying the number of most likely tokens to return at each\ntoken position, each with an associated log probability.\nlogprobs must be set to true if this parameter is used.",
+                    "type": "integer"
+                },
+                "top_p": {
+                    "type": "number"
+                },
+                "user": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_chat.Usage": {
+            "type": "object",
+            "properties": {
+                "completion_tokens": {
+                    "type": "integer"
+                },
+                "prompt_tokens": {
+                    "type": "integer"
+                },
+                "total_tokens": {
+                    "type": "integer"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_conversations.AnnotationResponse": {
+            "type": "object",
+            "properties": {
+                "end_index": {
+                    "type": "integer"
+                },
+                "file_id": {
+                    "type": "string"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "start_index": {
+                    "type": "integer"
+                },
+                "text": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_conversations.ContentResponse": {
+            "type": "object",
+            "properties": {
+                "file": {
+                    "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.FileContentResponse"
+                },
+                "image": {
+                    "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ImageContentResponse"
+                },
+                "input_text": {
+                    "type": "string"
+                },
+                "output_text": {
+                    "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.OutputTextResponse"
+                },
+                "text": {
+                    "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.TextResponse"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_conversations.ConversationContentRequest": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "text": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_conversations.ConversationItemRequest": {
+            "type": "object",
+            "required": [
+                "content",
+                "type"
+            ],
+            "properties": {
+                "content": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ConversationContentRequest"
+                    }
+                },
+                "role": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.ItemRole"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_conversations.ConversationItemResponse": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ContentResponse"
+                    }
+                },
+                "created_at": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "object": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_conversations.CreateConversationRequest": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ConversationItemRequest"
+                    }
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_conversations.CreateItemsRequest": {
+            "type": "object",
+            "required": [
+                "items"
+            ],
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ConversationItemRequest"
+                    }
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_conversations.DeletedConversationResponse": {
+            "type": "object",
+            "properties": {
+                "deleted": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "object": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_conversations.ExtendedConversationResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "object": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_conversations.FileContentResponse": {
+            "type": "object",
+            "properties": {
+                "file_id": {
+                    "type": "string"
+                },
+                "mime_type": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_conversations.ImageContentResponse": {
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "type": "string"
+                },
+                "file_id": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_conversations.OutputTextResponse": {
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.AnnotationResponse"
+                    }
+                },
+                "text": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_conversations.TextResponse": {
+            "type": "object",
+            "properties": {
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_conversations.UpdateConversationRequest": {
+            "type": "object",
+            "properties": {
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization.AdminAPIKeyDeletedResponse": {
+            "type": "object",
+            "properties": {
+                "deleted": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "object": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization.AdminApiKeyListResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app_interfaces_http_routes_v1_organization.OrganizationAdminAPIKeyResponse"
+                    }
+                },
+                "first_id": {
+                    "type": "string"
+                },
+                "has_more": {
+                    "type": "boolean"
+                },
+                "last_id": {
+                    "type": "string"
+                },
+                "object": {
+                    "type": "string",
+                    "example": "list"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization.CreateOrganizationAdminAPIKeyRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "My Admin API Key"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization.OrganizationAdminAPIKeyResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "integer",
+                    "example": 1698765432
+                },
+                "id": {
+                    "type": "string",
+                    "example": "key_1234567890"
+                },
+                "last_used_at": {
+                    "type": "integer",
+                    "example": 1698765432
+                },
+                "name": {
+                    "type": "string",
+                    "example": "My Admin API Key"
+                },
+                "object": {
+                    "type": "string",
+                    "example": "api_key"
+                },
+                "owner": {
+                    "$ref": "#/definitions/app_interfaces_http_routes_v1_organization.Owner"
+                },
+                "redacted_value": {
+                    "type": "string",
+                    "example": "sk-...abcd"
+                },
+                "value": {
+                    "type": "string",
+                    "example": "sk-abcdef1234567890"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization.Owner": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "integer",
+                    "example": 1698765432
+                },
+                "id": {
+                    "type": "string",
+                    "example": "user_1234567890"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "John Doe"
+                },
+                "object": {
+                    "type": "string",
+                    "example": "user"
+                },
+                "role": {
+                    "type": "string",
+                    "example": "admin"
+                },
+                "type": {
+                    "type": "string",
+                    "example": "user"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization_invites.CreateInviteUserRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "projects": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_invites.InviteProject"
+                    }
+                },
+                "role": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization_invites.InviteProject": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization_invites.InviteResponse": {
+            "type": "object",
+            "properties": {
+                "accepted_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "invited_at": {
+                    "type": "string"
+                },
+                "object": {
+                    "type": "string"
+                },
+                "projects": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_invites.InviteProject"
+                    }
+                },
+                "role": {
+                    "type": "string"
                 },
                 "status": {
                     "type": "string"
                 }
             }
         },
-        "apikeys.ApiKeyResponse": {
+        "app_interfaces_http_routes_v1_organization_projects.CreateProjectRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "New AI Project"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization_projects.ProjectListResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_projects.ProjectResponse"
+                    }
+                },
+                "first_id": {
+                    "type": "string"
+                },
+                "has_more": {
+                    "type": "boolean"
+                },
+                "last_id": {
+                    "type": "string"
+                },
+                "object": {
+                    "type": "string",
+                    "example": "list"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization_projects.ProjectResponse": {
+            "type": "object",
+            "properties": {
+                "archived_at": {
+                    "type": "integer",
+                    "example": 1698765432
+                },
+                "created_at": {
+                    "type": "integer",
+                    "example": 1698765432
+                },
+                "id": {
+                    "type": "string",
+                    "example": "proj_1234567890"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "My First Project"
+                },
+                "object": {
+                    "type": "string",
+                    "example": "project"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization_projects.UpdateProjectRequest": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "Updated AI Project"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization_projects_api_keys.ApiKeyResponse": {
             "type": "object",
             "properties": {
                 "apikeyType": {
@@ -1817,7 +2948,7 @@ const docTemplate = `{
                 }
             }
         },
-        "apikeys.CreateApiKeyRequest": {
+        "app_interfaces_http_routes_v1_organization_projects_api_keys.CreateApiKeyRequest": {
             "type": "object",
             "properties": {
                 "description": {
@@ -1828,123 +2959,7 @@ const docTemplate = `{
                 }
             }
         },
-        "auth.AccessTokenResponse": {
-            "type": "object",
-            "properties": {
-                "access_token": {
-                    "type": "string"
-                },
-                "expires_in": {
-                    "type": "integer"
-                },
-                "object": {
-                    "type": "string"
-                }
-            }
-        },
-        "auth.GetMeResponse": {
-            "type": "object",
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "object": {
-                    "type": "string"
-                }
-            }
-        },
-        "chat.ChatCompletionChoice": {
-            "type": "object",
-            "properties": {
-                "finish_reason": {
-                    "type": "string"
-                },
-                "index": {
-                    "type": "integer"
-                },
-                "message": {
-                    "$ref": "#/definitions/chat.Message"
-                }
-            }
-        },
-        "chat.ChatCompletionResponseSwagger": {
-            "type": "object",
-            "properties": {
-                "choices": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/chat.ChatCompletionChoice"
-                    }
-                },
-                "created": {
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "model": {
-                    "type": "string"
-                },
-                "object": {
-                    "type": "string"
-                },
-                "usage": {
-                    "$ref": "#/definitions/chat.Usage"
-                }
-            }
-        },
-        "chat.Message": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "type": "string"
-                },
-                "role": {
-                    "type": "string"
-                }
-            }
-        },
-        "chat.PostChatCompletionRequest": {
-            "type": "object",
-            "properties": {
-                "max_tokens": {
-                    "type": "integer"
-                },
-                "messages": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/chat.Message"
-                    }
-                },
-                "model": {
-                    "type": "string"
-                },
-                "temperature": {
-                    "type": "number"
-                }
-            }
-        },
-        "chat.Usage": {
-            "type": "object",
-            "properties": {
-                "completion_tokens": {
-                    "type": "integer"
-                },
-                "prompt_tokens": {
-                    "type": "integer"
-                },
-                "total_tokens": {
-                    "type": "integer"
-                }
-            }
-        },
-        "conversation.ItemRole": {
+        "menlo_ai_jan-api-gateway_app_domain_conversation.ItemRole": {
             "type": "string",
             "enum": [
                 "system",
@@ -1957,579 +2972,428 @@ const docTemplate = `{
                 "ItemRoleAssistant"
             ]
         },
-        "conversations.AnnotationResponse": {
-            "type": "object",
-            "properties": {
-                "end_index": {
-                    "type": "integer"
-                },
-                "file_id": {
-                    "type": "string"
-                },
-                "index": {
-                    "type": "integer"
-                },
-                "start_index": {
-                    "type": "integer"
-                },
-                "text": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string"
-                },
-                "url": {
-                    "type": "string"
-                }
-            }
-        },
-        "conversations.ContentResponse": {
-            "type": "object",
-            "properties": {
-                "file": {
-                    "$ref": "#/definitions/conversations.FileContentResponse"
-                },
-                "image": {
-                    "$ref": "#/definitions/conversations.ImageContentResponse"
-                },
-                "input_text": {
-                    "type": "string"
-                },
-                "output_text": {
-                    "$ref": "#/definitions/conversations.OutputTextResponse"
-                },
-                "text": {
-                    "$ref": "#/definitions/conversations.TextResponse"
-                },
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "conversations.ConversationContentRequest": {
-            "type": "object",
-            "required": [
-                "type"
-            ],
-            "properties": {
-                "text": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "conversations.ConversationItemListResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/conversations.ConversationItemResponse"
-                    }
-                },
-                "first_id": {
-                    "type": "string"
-                },
-                "has_more": {
-                    "type": "boolean"
-                },
-                "last_id": {
-                    "type": "string"
-                },
-                "object": {
-                    "type": "string"
-                }
-            }
-        },
-        "conversations.ConversationItemRequest": {
-            "type": "object",
-            "required": [
-                "content",
-                "type"
-            ],
-            "properties": {
-                "content": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/conversations.ConversationContentRequest"
-                    }
-                },
-                "role": {
-                    "$ref": "#/definitions/conversation.ItemRole"
-                },
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "conversations.ConversationItemResponse": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/conversations.ContentResponse"
-                    }
-                },
-                "created_at": {
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "object": {
-                    "type": "string"
-                },
-                "role": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "conversations.ConversationResponse": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "metadata": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "object": {
-                    "type": "string"
-                }
-            }
-        },
-        "conversations.CreateConversationRequest": {
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/conversations.ConversationItemRequest"
-                    }
-                },
-                "metadata": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
-        "conversations.CreateItemsRequest": {
-            "type": "object",
-            "required": [
-                "items"
-            ],
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/conversations.ConversationItemRequest"
-                    }
-                }
-            }
-        },
-        "conversations.DeletedConversationResponse": {
-            "type": "object",
-            "properties": {
-                "deleted": {
-                    "type": "boolean"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "object": {
-                    "type": "string"
-                }
-            }
-        },
-        "conversations.FileContentResponse": {
-            "type": "object",
-            "properties": {
-                "file_id": {
-                    "type": "string"
-                },
-                "mime_type": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "size": {
-                    "type": "integer"
-                }
-            }
-        },
-        "conversations.ImageContentResponse": {
-            "type": "object",
-            "properties": {
-                "detail": {
-                    "type": "string"
-                },
-                "file_id": {
-                    "type": "string"
-                },
-                "url": {
-                    "type": "string"
-                }
-            }
-        },
-        "conversations.ListResponse-conversations_ConversationItemResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/conversations.ConversationItemResponse"
-                    }
-                },
-                "first_id": {
-                    "type": "string"
-                },
-                "has_more": {
-                    "type": "boolean"
-                },
-                "last_id": {
-                    "type": "string"
-                },
-                "object": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "conversations.ListResponse-conversations_ConversationResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/conversations.ConversationResponse"
-                    }
-                },
-                "first_id": {
-                    "type": "string"
-                },
-                "has_more": {
-                    "type": "boolean"
-                },
-                "last_id": {
-                    "type": "string"
-                },
-                "object": {
-                    "type": "string"
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "conversations.OutputTextResponse": {
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/conversations.AnnotationResponse"
-                    }
-                },
-                "text": {
-                    "type": "string"
-                }
-            }
-        },
-        "conversations.TextResponse": {
-            "type": "object",
-            "properties": {
-                "value": {
-                    "type": "string"
-                }
-            }
-        },
-        "conversations.UpdateConversationRequest": {
-            "type": "object",
-            "properties": {
-                "metadata": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
-        "google.AccessTokenResponse": {
-            "type": "object",
-            "properties": {
-                "access_token": {
-                    "type": "string"
-                },
-                "expires_in": {
-                    "type": "integer"
-                },
-                "object": {
-                    "type": "string"
-                }
-            }
-        },
-        "google.GoogleCallbackRequest": {
-            "type": "object",
-            "required": [
-                "code"
-            ],
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "state": {
-                    "type": "string"
-                }
-            }
-        },
-        "organization.AdminAPIKeyDeletedResponse": {
-            "type": "object",
-            "properties": {
-                "deleted": {
-                    "type": "boolean"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "object": {
-                    "type": "string"
-                }
-            }
-        },
-        "organization.AdminApiKeyListResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/organization.OrganizationAdminAPIKeyResponse"
-                    }
-                },
-                "first_id": {
-                    "type": "string"
-                },
-                "has_more": {
-                    "type": "boolean"
-                },
-                "last_id": {
-                    "type": "string"
-                },
-                "object": {
-                    "type": "string",
-                    "example": "list"
-                }
-            }
-        },
-        "organization.CreateOrganizationAdminAPIKeyRequest": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "example": "My Admin API Key"
-                }
-            }
-        },
-        "organization.OrganizationAdminAPIKeyResponse": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "integer",
-                    "example": 1698765432
-                },
-                "id": {
-                    "type": "string",
-                    "example": "key_1234567890"
-                },
-                "last_used_at": {
-                    "type": "integer",
-                    "example": 1698765432
-                },
-                "name": {
-                    "type": "string",
-                    "example": "My Admin API Key"
-                },
-                "object": {
-                    "type": "string",
-                    "example": "api_key"
-                },
-                "owner": {
-                    "$ref": "#/definitions/organization.Owner"
-                },
-                "redacted_value": {
-                    "type": "string",
-                    "example": "sk-...abcd"
-                },
-                "value": {
-                    "type": "string",
-                    "example": "sk-abcdef1234567890"
-                }
-            }
-        },
-        "organization.Owner": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "integer",
-                    "example": 1698765432
-                },
-                "id": {
-                    "type": "string",
-                    "example": "user_1234567890"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "John Doe"
-                },
-                "object": {
-                    "type": "string",
-                    "example": "user"
-                },
-                "role": {
-                    "type": "string",
-                    "example": "admin"
-                },
-                "type": {
-                    "type": "string",
-                    "example": "user"
-                }
-            }
-        },
-        "projects.CreateProjectRequest": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "example": "New AI Project"
-                }
-            }
-        },
-        "projects.ProjectListResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/projects.ProjectResponse"
-                    }
-                },
-                "first_id": {
-                    "type": "string"
-                },
-                "has_more": {
-                    "type": "boolean"
-                },
-                "last_id": {
-                    "type": "string"
-                },
-                "object": {
-                    "type": "string",
-                    "example": "list"
-                }
-            }
-        },
-        "projects.ProjectResponse": {
-            "type": "object",
-            "properties": {
-                "archived_at": {
-                    "type": "integer",
-                    "example": 1698765432
-                },
-                "created_at": {
-                    "type": "integer",
-                    "example": 1698765432
-                },
-                "id": {
-                    "type": "string",
-                    "example": "proj_1234567890"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "My First Project"
-                },
-                "object": {
-                    "type": "string",
-                    "example": "project"
-                },
-                "status": {
-                    "type": "string"
-                }
-            }
-        },
-        "projects.UpdateProjectRequest": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "example": "Updated AI Project"
-                }
-            }
-        },
-        "responses.CreateResponseRequest": {
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.CreateResponseRequest": {
             "type": "object",
             "required": [
                 "input",
                 "model"
             ],
             "properties": {
-                "generation": {
-                    "type": "object",
-                    "additionalProperties": true
+                "background": {
+                    "description": "Whether to run the response in the background.",
+                    "type": "boolean"
+                },
+                "conversation": {
+                    "description": "The conversation ID to append items to. If not set or set to ClientCreatedRootConversationID, a new conversation will be created.",
+                    "type": "string"
+                },
+                "frequency_penalty": {
+                    "description": "The frequency penalty to use for this response.",
+                    "type": "number"
                 },
                 "input": {
+                    "description": "The input to the model. Can be a string or array of strings."
+                },
+                "logit_bias": {
+                    "description": "The logit bias to use for this response.",
                     "type": "object",
-                    "additionalProperties": true
+                    "additionalProperties": {
+                        "type": "number",
+                        "format": "float64"
+                    }
                 },
                 "max_tokens": {
-                    "type": "integer",
-                    "example": 1000
+                    "description": "The maximum number of tokens to generate.",
+                    "type": "integer"
+                },
+                "metadata": {
+                    "description": "The metadata to use for this response.",
+                    "type": "object",
+                    "additionalProperties": {}
                 },
                 "model": {
-                    "type": "string",
-                    "example": "gpt-4"
+                    "description": "The ID of the model to use for this response.",
+                    "type": "string"
+                },
+                "presence_penalty": {
+                    "description": "The presence penalty to use for this response.",
+                    "type": "number"
+                },
+                "previous_response_id": {
+                    "description": "The ID of the previous response to continue from. If set, the conversation will be loaded from the previous response.",
+                    "type": "string"
+                },
+                "repetition_penalty": {
+                    "description": "The repetition penalty to use for this response.",
+                    "type": "number"
+                },
+                "response_format": {
+                    "description": "The response format to use for this response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.ResponseFormat"
+                        }
+                    ]
+                },
+                "seed": {
+                    "description": "The seed to use for this response.",
+                    "type": "integer"
+                },
+                "stop": {
+                    "description": "The stop sequences to use for this response.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "store": {
+                    "description": "Whether to store the conversation. If false, no conversation will be created or used.",
+                    "type": "boolean"
                 },
                 "stream": {
-                    "type": "boolean",
-                    "example": false
+                    "description": "Whether to stream the response.",
+                    "type": "boolean"
+                },
+                "system_prompt": {
+                    "description": "The system prompt to use for this response.",
+                    "type": "string"
                 },
                 "temperature": {
-                    "type": "number",
-                    "example": 0.7
+                    "description": "The temperature to use for this response.",
+                    "type": "number"
+                },
+                "timeout": {
+                    "description": "The timeout in seconds for this response.",
+                    "type": "integer"
+                },
+                "tool_choice": {
+                    "description": "The tool choice to use for this response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.ToolChoice"
+                        }
+                    ]
+                },
+                "tools": {
+                    "description": "The tools to use for this response.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.Tool"
+                    }
+                },
+                "top_k": {
+                    "description": "The top_k to use for this response.",
+                    "type": "integer"
+                },
+                "top_p": {
+                    "description": "The top_p to use for this response.",
+                    "type": "number"
+                },
+                "user": {
+                    "description": "The user to use for this response.",
+                    "type": "string"
                 }
             }
         },
-        "responses.ErrorResponse": {
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.FileInput": {
+            "type": "object",
+            "required": [
+                "file_id"
+            ],
+            "properties": {
+                "file_id": {
+                    "description": "The ID of the file.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.FileSearchInput": {
+            "type": "object",
+            "required": [
+                "file_ids",
+                "query"
+            ],
+            "properties": {
+                "file_ids": {
+                    "description": "The IDs of the files to search in.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "max_results": {
+                    "description": "The number of results to return.",
+                    "type": "integer"
+                },
+                "query": {
+                    "description": "The query to search for.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionCall": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "arguments": {
+                    "description": "The arguments to pass to the function.",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "description": "The name of the function to call.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionCallsInput": {
+            "type": "object",
+            "required": [
+                "calls"
+            ],
+            "properties": {
+                "calls": {
+                    "description": "The function calls to make.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionCall"
+                    }
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionChoice": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "description": "The name of the function.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionDefinition": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "description": "The description of the function.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "The name of the function.",
+                    "type": "string"
+                },
+                "parameters": {
+                    "description": "The parameters of the function.",
+                    "type": "object",
+                    "additionalProperties": {}
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.ImageInput": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "description": "The base64 encoded image data.",
+                    "type": "string"
+                },
+                "detail": {
+                    "description": "The detail level for the image.",
+                    "type": "string"
+                },
+                "url": {
+                    "description": "The URL of the image.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.InputType": {
+            "type": "string",
+            "enum": [
+                "text",
+                "image",
+                "file",
+                "web_search",
+                "file_search",
+                "streaming",
+                "function_calls",
+                "reasoning"
+            ],
+            "x-enum-varnames": [
+                "InputTypeText",
+                "InputTypeImage",
+                "InputTypeFile",
+                "InputTypeWebSearch",
+                "InputTypeFileSearch",
+                "InputTypeStreaming",
+                "InputTypeFunctionCalls",
+                "InputTypeReasoning"
+            ]
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.ReasoningInput": {
+            "type": "object",
+            "required": [
+                "task"
+            ],
+            "properties": {
+                "context": {
+                    "description": "The context for the reasoning task.",
+                    "type": "string"
+                },
+                "task": {
+                    "description": "The reasoning task to perform.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.ResponseFormat": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "type": {
+                    "description": "The type of response format.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.StreamingInput": {
+            "type": "object",
+            "required": [
+                "url"
+            ],
+            "properties": {
+                "body": {
+                    "description": "The body to send with the request.",
+                    "type": "string"
+                },
+                "headers": {
+                    "description": "The headers to send with the request.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "method": {
+                    "description": "The method to use for the request.",
+                    "type": "string"
+                },
+                "url": {
+                    "description": "The URL to stream from.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.Tool": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "function": {
+                    "description": "The function definition for function tools.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionDefinition"
+                        }
+                    ]
+                },
+                "type": {
+                    "description": "The type of tool.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.ToolChoice": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "function": {
+                    "description": "The function to use for function tool choice.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionChoice"
+                        }
+                    ]
+                },
+                "type": {
+                    "description": "The type of tool choice.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.WebSearchInput": {
+            "type": "object",
+            "required": [
+                "query"
+            ],
+            "properties": {
+                "max_results": {
+                    "description": "The number of results to return.",
+                    "type": "integer"
+                },
+                "query": {
+                    "description": "The query to search for.",
+                    "type": "string"
+                },
+                "search_engine": {
+                    "description": "The search engine to use.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.ConversationInfo": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "The unique ID of the conversation.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.DetailedUsage": {
+            "type": "object",
+            "properties": {
+                "input_tokens": {
+                    "description": "The number of tokens in the prompt.",
+                    "type": "integer"
+                },
+                "input_tokens_details": {
+                    "description": "Details about input tokens.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.TokenDetails"
+                        }
+                    ]
+                },
+                "output_tokens": {
+                    "description": "The number of tokens in the completion.",
+                    "type": "integer"
+                },
+                "output_tokens_details": {
+                    "description": "Details about output tokens.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.TokenDetails"
+                        }
+                    ]
+                },
+                "total_tokens": {
+                    "description": "The total number of tokens used.",
+                    "type": "integer"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse": {
             "type": "object",
             "properties": {
                 "code": {
@@ -2540,36 +3404,736 @@ const docTemplate = `{
                 }
             }
         },
-        "v1.Model": {
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.FormatType": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "description": "The type of format.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_v1_organization_projects_api_keys_ApiKeyResponse": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_projects_api_keys.ApiKeyResponse"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.InputItem": {
             "type": "object",
             "properties": {
                 "created": {
+                    "description": "The Unix timestamp (in seconds) when the input item was created.",
                     "type": "integer"
+                },
+                "file": {
+                    "description": "The file content (for file type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.FileInput"
+                        }
+                    ]
+                },
+                "file_search": {
+                    "description": "The file search content (for file_search type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.FileSearchInput"
+                        }
+                    ]
+                },
+                "function_calls": {
+                    "description": "The function calls content (for function_calls type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionCallsInput"
+                        }
+                    ]
+                },
+                "id": {
+                    "description": "The unique identifier for the input item.",
+                    "type": "string"
+                },
+                "image": {
+                    "description": "The image content (for image type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.ImageInput"
+                        }
+                    ]
+                },
+                "object": {
+                    "description": "The object type, which is always \"input_item\".",
+                    "type": "string"
+                },
+                "reasoning": {
+                    "description": "The reasoning content (for reasoning type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.ReasoningInput"
+                        }
+                    ]
+                },
+                "streaming": {
+                    "description": "The streaming content (for streaming type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.StreamingInput"
+                        }
+                    ]
+                },
+                "text": {
+                    "description": "The text content (for text type).",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "The type of input item.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.InputType"
+                        }
+                    ]
+                },
+                "web_search": {
+                    "description": "The web search content (for web_search type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.WebSearchInput"
+                        }
+                    ]
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListInputItemsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "description": "The list of input items.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.InputItem"
+                    }
+                },
+                "first_id": {
+                    "description": "The first ID in the list.",
+                    "type": "string"
+                },
+                "has_more": {
+                    "description": "Whether there are more items available.",
+                    "type": "boolean"
+                },
+                "last_id": {
+                    "description": "The last ID in the list.",
+                    "type": "string"
+                },
+                "object": {
+                    "description": "The object type, which is always \"list\".",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.Reasoning": {
+            "type": "object",
+            "properties": {
+                "effort": {
+                    "description": "The effort level for reasoning.",
+                    "type": "string"
+                },
+                "summary": {
+                    "description": "The summary of reasoning.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.Response": {
+            "type": "object",
+            "properties": {
+                "background": {
+                    "description": "Whether the response was run in the background.",
+                    "type": "boolean"
+                },
+                "cancelled_at": {
+                    "description": "The Unix timestamp (in seconds) when the response was cancelled.",
+                    "type": "integer"
+                },
+                "completed_at": {
+                    "description": "The Unix timestamp (in seconds) when the response was completed.",
+                    "type": "integer"
+                },
+                "conversation": {
+                    "description": "The conversation that this response belongs to.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ConversationInfo"
+                        }
+                    ]
+                },
+                "created": {
+                    "description": "The Unix timestamp (in seconds) when the response was created.",
+                    "type": "integer"
+                },
+                "error": {
+                    "description": "The error that occurred during processing, if any.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ResponseError"
+                        }
+                    ]
+                },
+                "failed_at": {
+                    "description": "The Unix timestamp (in seconds) when the response was failed.",
+                    "type": "integer"
+                },
+                "frequency_penalty": {
+                    "description": "The frequency penalty that was used for this response.",
+                    "type": "number"
+                },
+                "id": {
+                    "description": "The unique identifier for the response.",
+                    "type": "string"
+                },
+                "incomplete_details": {
+                    "description": "OpenAI API response fields"
+                },
+                "input": {
+                    "description": "The input that was provided to the model. Can be a string or array of strings."
+                },
+                "instructions": {},
+                "logit_bias": {
+                    "description": "The logit bias that was used for this response.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number",
+                        "format": "float64"
+                    }
+                },
+                "max_output_tokens": {
+                    "type": "integer"
+                },
+                "max_tokens": {
+                    "description": "The maximum number of tokens that were generated.",
+                    "type": "integer"
+                },
+                "metadata": {
+                    "description": "The metadata that was provided for this response.",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "model": {
+                    "description": "The ID of the model used for this response.",
+                    "type": "string"
+                },
+                "object": {
+                    "description": "The object type, which is always \"response\".",
+                    "type": "string"
+                },
+                "output": {
+                    "description": "The output generated by the model."
+                },
+                "parallel_tool_calls": {
+                    "type": "boolean"
+                },
+                "presence_penalty": {
+                    "description": "The presence penalty that was used for this response.",
+                    "type": "number"
+                },
+                "previous_response_id": {
+                    "type": "string"
+                },
+                "reasoning": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.Reasoning"
+                },
+                "repetition_penalty": {
+                    "description": "The repetition penalty that was used for this response.",
+                    "type": "number"
+                },
+                "response_format": {
+                    "description": "The response format that was used for this response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.ResponseFormat"
+                        }
+                    ]
+                },
+                "seed": {
+                    "description": "The seed that was used for this response.",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "The status of the response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ResponseStatus"
+                        }
+                    ]
+                },
+                "stop": {
+                    "description": "The stop sequences that were used for this response.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "store": {
+                    "type": "boolean"
+                },
+                "stream": {
+                    "description": "Whether the response was streamed.",
+                    "type": "boolean"
+                },
+                "system_prompt": {
+                    "description": "The system prompt that was used for this response.",
+                    "type": "string"
+                },
+                "temperature": {
+                    "description": "The temperature that was used for this response.",
+                    "type": "number"
+                },
+                "text": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.TextFormat"
+                },
+                "timeout": {
+                    "description": "The timeout in seconds that was used for this response.",
+                    "type": "integer"
+                },
+                "tool_choice": {
+                    "description": "The tool choice that was used for this response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.ToolChoice"
+                        }
+                    ]
+                },
+                "tools": {
+                    "description": "The tools that were used for this response.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.Tool"
+                    }
+                },
+                "top_k": {
+                    "description": "The top_k that was used for this response.",
+                    "type": "integer"
+                },
+                "top_p": {
+                    "description": "The top_p that was used for this response.",
+                    "type": "number"
+                },
+                "truncation": {
+                    "type": "string"
+                },
+                "usage": {
+                    "description": "The usage statistics for this response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.DetailedUsage"
+                        }
+                    ]
+                },
+                "user": {
+                    "description": "The user that was provided for this response.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.ResponseError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "The error code.",
+                    "type": "string"
+                },
+                "details": {
+                    "description": "The error details.",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "message": {
+                    "description": "The error message.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.ResponseStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "running",
+                "completed",
+                "cancelled",
+                "failed"
+            ],
+            "x-enum-varnames": [
+                "ResponseStatusPending",
+                "ResponseStatusRunning",
+                "ResponseStatusCompleted",
+                "ResponseStatusCancelled",
+                "ResponseStatusFailed"
+            ]
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.TextFormat": {
+            "type": "object",
+            "properties": {
+                "format": {
+                    "description": "The format type.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.FormatType"
+                        }
+                    ]
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.TokenDetails": {
+            "type": "object",
+            "properties": {
+                "cached_tokens": {
+                    "description": "The number of cached tokens.",
+                    "type": "integer"
+                },
+                "reasoning_tokens": {
+                    "description": "The number of reasoning tokens.",
+                    "type": "integer"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.DeleteResponse": {
+            "type": "object",
+            "properties": {
+                "deleted": {
+                    "type": "boolean"
                 },
                 "id": {
                     "type": "string"
                 },
                 "object": {
                     "type": "string"
-                },
-                "owned_by": {
-                    "type": "string"
                 }
             }
         },
-        "v1.ModelsResponse": {
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ConversationItemResponse": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/v1.Model"
+                        "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ConversationItemResponse"
                     }
                 },
+                "first_id": {
+                    "type": "string"
+                },
+                "has_more": {
+                    "type": "boolean"
+                },
+                "last_id": {
+                    "type": "string"
+                },
                 "object": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ObjectTypeList"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ExtendedConversationResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ExtendedConversationResponse"
+                    }
+                },
+                "first_id": {
+                    "type": "string"
+                },
+                "has_more": {
+                    "type": "boolean"
+                },
+                "last_id": {
+                    "type": "string"
+                },
+                "object": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ObjectTypeList"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_organization_invites_InviteResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_invites.InviteResponse"
+                    }
+                },
+                "first_id": {
+                    "type": "string"
+                },
+                "has_more": {
+                    "type": "boolean"
+                },
+                "last_id": {
+                    "type": "string"
+                },
+                "object": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ObjectTypeList"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ObjectTypeList": {
+            "type": "string",
+            "enum": [
+                "list"
+            ],
+            "x-enum-varnames": [
+                "ObjectTypeListList"
+            ]
+        },
+        "openai.ChatCompletionMessage": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "function_call": {
+                    "$ref": "#/definitions/openai.FunctionCall"
+                },
+                "multiContent": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatMessagePart"
+                    }
+                },
+                "name": {
+                    "description": "This property isn't in the official documentation, but it's in\nthe documentation for the official library for python:\n- https://github.com/openai/openai-python/blob/main/chatml.md\n- https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb",
+                    "type": "string"
+                },
+                "reasoning_content": {
+                    "description": "This property is used for the \"reasoning\" feature supported by deepseek-reasoner\nwhich is not in the official documentation.\nthe doc from deepseek:\n- https://api-docs.deepseek.com/api/create-chat-completion#responses",
+                    "type": "string"
+                },
+                "refusal": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "tool_call_id": {
+                    "description": "For Role=tool prompts this should be set to the ID given in the assistant's prior request to call a tool.",
+                    "type": "string"
+                },
+                "tool_calls": {
+                    "description": "For Role=assistant prompts this may be set to the tool calls generated by the model, such as function calls.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ToolCall"
+                    }
+                }
+            }
+        },
+        "openai.ChatCompletionResponseFormat": {
+            "type": "object",
+            "properties": {
+                "json_schema": {
+                    "$ref": "#/definitions/openai.ChatCompletionResponseFormatJSONSchema"
+                },
+                "type": {
+                    "$ref": "#/definitions/openai.ChatCompletionResponseFormatType"
+                }
+            }
+        },
+        "openai.ChatCompletionResponseFormatJSONSchema": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "schema": {},
+                "strict": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "openai.ChatCompletionResponseFormatType": {
+            "type": "string",
+            "enum": [
+                "json_object",
+                "json_schema",
+                "text"
+            ],
+            "x-enum-varnames": [
+                "ChatCompletionResponseFormatTypeJSONObject",
+                "ChatCompletionResponseFormatTypeJSONSchema",
+                "ChatCompletionResponseFormatTypeText"
+            ]
+        },
+        "openai.ChatMessageImageURL": {
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "$ref": "#/definitions/openai.ImageURLDetail"
+                },
+                "url": {
                     "type": "string"
                 }
             }
+        },
+        "openai.ChatMessagePart": {
+            "type": "object",
+            "properties": {
+                "image_url": {
+                    "$ref": "#/definitions/openai.ChatMessageImageURL"
+                },
+                "text": {
+                    "type": "string"
+                },
+                "type": {
+                    "$ref": "#/definitions/openai.ChatMessagePartType"
+                }
+            }
+        },
+        "openai.ChatMessagePartType": {
+            "type": "string",
+            "enum": [
+                "text",
+                "image_url"
+            ],
+            "x-enum-varnames": [
+                "ChatMessagePartTypeText",
+                "ChatMessagePartTypeImageURL"
+            ]
+        },
+        "openai.FunctionCall": {
+            "type": "object",
+            "properties": {
+                "arguments": {
+                    "description": "call function with arguments in JSON format",
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "openai.FunctionDefinition": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "parameters": {
+                    "description": "Parameters is an object describing the function.\nYou can pass json.RawMessage to describe the schema,\nor you can pass in a struct which serializes to the proper JSON schema.\nThe jsonschema package is provided for convenience, but you should\nconsider another specialized library if you require more complex schemas."
+                },
+                "strict": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "openai.ImageURLDetail": {
+            "type": "string",
+            "enum": [
+                "high",
+                "low",
+                "auto"
+            ],
+            "x-enum-varnames": [
+                "ImageURLDetailHigh",
+                "ImageURLDetailLow",
+                "ImageURLDetailAuto"
+            ]
+        },
+        "openai.Prediction": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "openai.ServiceTier": {
+            "type": "string",
+            "enum": [
+                "auto",
+                "default",
+                "flex",
+                "priority"
+            ],
+            "x-enum-varnames": [
+                "ServiceTierAuto",
+                "ServiceTierDefault",
+                "ServiceTierFlex",
+                "ServiceTierPriority"
+            ]
+        },
+        "openai.StreamOptions": {
+            "type": "object",
+            "properties": {
+                "include_usage": {
+                    "description": "If set, an additional chunk will be streamed before the data: [DONE] message.\nThe usage field on this chunk shows the token usage statistics for the entire request,\nand the choices field will always be an empty array.\nAll other chunks will also include a usage field, but with a null value.",
+                    "type": "boolean"
+                }
+            }
+        },
+        "openai.Tool": {
+            "type": "object",
+            "properties": {
+                "function": {
+                    "$ref": "#/definitions/openai.FunctionDefinition"
+                },
+                "type": {
+                    "$ref": "#/definitions/openai.ToolType"
+                }
+            }
+        },
+        "openai.ToolCall": {
+            "type": "object",
+            "properties": {
+                "function": {
+                    "$ref": "#/definitions/openai.FunctionCall"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "index": {
+                    "description": "Index is not nil only in chat completion chunk object",
+                    "type": "integer"
+                },
+                "type": {
+                    "$ref": "#/definitions/openai.ToolType"
+                }
+            }
+        },
+        "openai.ToolType": {
+            "type": "string",
+            "enum": [
+                "function"
+            ],
+            "x-enum-varnames": [
+                "ToolTypeFunction"
+            ]
         }
     },
     "securityDefinitions": {

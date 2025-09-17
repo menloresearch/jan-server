@@ -11,6 +11,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
+	"menlo.ai/jan-api-gateway/app/domain/invite"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/project"
@@ -19,6 +20,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/apikeyrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/conversationrepo"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/inviterepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/itemrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/organizationrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/projectrepo"
@@ -35,6 +37,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	organization2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/invites"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects/api_keys"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/responses"
@@ -55,18 +58,21 @@ func CreateApplication() (*Application, error) {
 	}
 	transactionDatabase := transaction.NewDatabase(db)
 	organizationRepository := organizationrepo.NewOrganizationGormRepository(transactionDatabase)
-	projectRepository := projectrepo.NewProjectGormRepository(transactionDatabase)
-	projectService := project.NewService(projectRepository)
-	organizationService := organization.NewService(organizationRepository, projectService)
-	apiKeyRepository := apikeyrepo.NewApiKeyGormRepository(transactionDatabase)
-	apiKeyService := apikey.NewService(apiKeyRepository)
+	organizationService := organization.NewService(organizationRepository)
 	userRepository := userrepo.NewUserGormRepository(transactionDatabase)
 	userService := user.NewService(userRepository)
-	adminApiKeyAPI := organization2.NewAdminApiKeyAPI(organizationService, apiKeyService, userService)
+	apiKeyRepository := apikeyrepo.NewApiKeyGormRepository(transactionDatabase)
+	apiKeyService := apikey.NewService(apiKeyRepository, organizationService)
+	projectRepository := projectrepo.NewProjectGormRepository(transactionDatabase)
+	projectService := project.NewService(projectRepository)
+	inviteRepository := inviterepo.NewInviteGormRepository(transactionDatabase)
+	inviteService := invite.NewInviteService(inviteRepository)
+	authService := auth.NewAuthService(userService, apiKeyService, organizationService, projectService, inviteService)
+	adminApiKeyAPI := organization2.NewAdminApiKeyAPI(organizationService, authService, apiKeyService, userService)
 	projectApiKeyRoute := apikeys.NewProjectApiKeyRoute(organizationService, projectService, apiKeyService, userService)
-	projectsRoute := projects.NewProjectsRoute(projectService, apiKeyService, projectApiKeyRoute)
-	authService := auth.NewAuthService(userService, apiKeyService, organizationService)
-	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI, projectsRoute, authService)
+	projectsRoute := projects.NewProjectsRoute(projectService, apiKeyService, authService, projectApiKeyRoute)
+	invitesRoute := invites.NewInvitesRoute(inviteService, projectService, authService)
+	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI, projectsRoute, invitesRoute, authService)
 	context := provideContext()
 	janInferenceClient := janinference.NewJanInferenceClient(context)
 	inferenceProvider := inference.NewJanInferenceProvider(janInferenceClient)

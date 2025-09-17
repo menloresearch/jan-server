@@ -7,33 +7,39 @@ import (
 	"fmt"
 
 	"golang.org/x/net/context"
+	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/query"
+
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
 type ApiKeyService struct {
-	repo ApiKeyRepository
+	repo                ApiKeyRepository
+	organizationService *organization.OrganizationService
 }
 
-func NewService(repo ApiKeyRepository) *ApiKeyService {
+func NewService(
+	repo ApiKeyRepository,
+	organizationService *organization.OrganizationService,
+) *ApiKeyService {
 	return &ApiKeyService{
-		repo: repo,
+		repo,
+		organizationService,
 	}
 }
 
 const ApikeyPrefix = "sk"
 
 func (s *ApiKeyService) GenerateKeyAndHash(ctx context.Context, ownerType ApikeyType) (string, string, error) {
-	baseKey, err := idgen.GenerateSecureID(ApikeyPrefix, 24)
+	prefix := fmt.Sprintf("%s-%s", ApikeyPrefix, ownerType)
+	baseKey, err := idgen.GenerateSecureID(prefix, 24)
 	if err != nil {
 		return "", "", err
 	}
 
-	// Business rule: Format as sk_<ownerType>-<random> for identification
-	apikey := fmt.Sprintf("%s-%s", ownerType, baseKey)
-	hash := s.HashKey(ctx, apikey)
-	return apikey, hash, nil
+	hash := s.HashKey(ctx, baseKey)
+	return baseKey, hash, nil
 }
 
 func (s *ApiKeyService) generatePublicID() (string, error) {
@@ -101,4 +107,8 @@ func (s *ApiKeyService) Count(ctx context.Context, filter ApiKeyFilter) (int64, 
 
 func (s *ApiKeyService) Save(ctx context.Context, entity *ApiKey) error {
 	return s.repo.Update(ctx, entity)
+}
+
+func (s *ApiKeyService) FindOneByFilter(ctx context.Context, filter ApiKeyFilter) (*ApiKey, error) {
+	return s.repo.FindOneByFilter(ctx, filter)
 }

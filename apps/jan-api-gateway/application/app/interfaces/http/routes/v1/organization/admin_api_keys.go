@@ -6,11 +6,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
+	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/query"
 
 	"menlo.ai/jan-api-gateway/app/domain/user"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses/openai"
 	"menlo.ai/jan-api-gateway/app/utils/functional"
@@ -19,13 +19,19 @@ import (
 
 type AdminApiKeyAPI struct {
 	organizationService *organization.OrganizationService
+	authService         *auth.AuthService
 	apiKeyService       *apikey.ApiKeyService
 	userService         *user.UserService
 }
 
-func NewAdminApiKeyAPI(organizationService *organization.OrganizationService, apiKeyService *apikey.ApiKeyService, userService *user.UserService) *AdminApiKeyAPI {
+func NewAdminApiKeyAPI(
+	organizationService *organization.OrganizationService,
+	authService *auth.AuthService,
+	apiKeyService *apikey.ApiKeyService,
+	userService *user.UserService) *AdminApiKeyAPI {
 	return &AdminApiKeyAPI{
 		organizationService,
+		authService,
 		apiKeyService,
 		userService,
 	}
@@ -34,9 +40,12 @@ func NewAdminApiKeyAPI(organizationService *organization.OrganizationService, ap
 func (adminApiKeyAPI *AdminApiKeyAPI) RegisterRouter(router *gin.RouterGroup) {
 	adminApiKeyRouter := router.Group("/admin_api_keys")
 	adminApiKeyRouter.GET("", adminApiKeyAPI.GetAdminApiKeys)
-	adminApiKeyRouter.GET("/:id", adminApiKeyAPI.GetAdminApiKey)
 	adminApiKeyRouter.POST("", adminApiKeyAPI.CreateAdminApiKey)
-	adminApiKeyRouter.DELETE("/:id", adminApiKeyAPI.DeleteAdminApiKey)
+
+	adminKeyPath := fmt.Sprintf("/:%s", auth.ApikeyContextKeyPublicID)
+	adminApiKeyIdRoute := adminApiKeyRouter.Group(adminKeyPath, adminApiKeyAPI.authService.GetAdminApiKeyFromQuery())
+	adminApiKeyIdRoute.GET("", adminApiKeyAPI.GetAdminApiKey)
+	adminApiKeyIdRoute.DELETE("", adminApiKeyAPI.DeleteAdminApiKey)
 }
 
 // GetAdminApiKey godoc
@@ -50,33 +59,8 @@ func (adminApiKeyAPI *AdminApiKeyAPI) RegisterRouter(router *gin.RouterGroup) {
 // @Failure 404 {object} responses.ErrorResponse "Not Found - API key with the given ID does not exist or does not belong to the organization"
 // @Router /v1/organization/admin_api_keys/{id} [get]
 func (api *AdminApiKeyAPI) GetAdminApiKey(reqCtx *gin.Context) {
-	apikeyService := api.apiKeyService
-	ctx := reqCtx.Request.Context()
-	adminKeyEntity, err := api.validateAdminKey(reqCtx)
-	if err != nil {
-		return
-	}
-	publicID := reqCtx.Param("id")
-	if publicID == "" {
-		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  "2ab393c5-708d-42bc-a785-dcbdcf429ad1",
-			Error: "invalid or missing API key",
-		})
-		return
-	}
-	entity, err := apikeyService.FindByPublicID(ctx, publicID)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  "26b68f41-0eb0-4fca-8365-613742ef9204",
-			Error: "invalid or missing API key",
-		})
-		return
-	}
-	if entity.OrganizationID != adminKeyEntity.OrganizationID {
-		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  "4b656858-4212-451a-9ab6-23bc09dcc357",
-			Error: "invalid or missing API key",
-		})
+	entity, ok := auth.GetAdminKeyFromContext(reqCtx)
+	if !ok {
 		return
 	}
 	reqCtx.JSON(http.StatusOK, domainToOrganizationAdminAPIKeyResponse(entity))
@@ -96,52 +80,44 @@ func (api *AdminApiKeyAPI) GetAdminApiKey(reqCtx *gin.Context) {
 func (api *AdminApiKeyAPI) GetAdminApiKeys(reqCtx *gin.Context) {
 	apikeyService := api.apiKeyService
 	ctx := reqCtx.Request.Context()
-	adminKeyEntity, err := api.validateAdminKey(reqCtx)
-	if err != nil {
+	orgEntity, ok := auth.GetAdminOrganizationFromContext(reqCtx)
+	if !ok {
 		return
 	}
 
-	pagination, err := query.GetPaginationFromQuery(reqCtx)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "5a5931c8-2d34-453a-9cc1-f31a69c97bc8",
-			Error: "invalid or missing query parameter",
-		})
-		return
-	}
-	afterStr := reqCtx.Query("after")
-	if afterStr != "" {
-		entity, err := apikeyService.Find(ctx, apikey.ApiKeyFilter{
-			PublicID: &afterStr,
-		}, &query.Pagination{
-			Limit: ptr.ToInt(1),
+	pagination, err := query.GetCursorPaginationFromQuery(reqCtx, func(lastID string) (*uint, error) {
+		apiKey, err := api.apiKeyService.FindOneByFilter(ctx, apikey.ApiKeyFilter{
+			PublicID: &lastID,
 		})
 		if err != nil {
-			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:  "f6bce0e5-8534-41f5-9f44-701894ddfd47",
-				Error: err.Error(),
-			})
-			return
+			return nil, err
 		}
-		if len(entity) == 0 {
-			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-				Code:  "f6bce0e5-8534-41f5-9f44-701894ddfd47",
-				Error: "invalid or missing API key",
-			})
-			return
-		}
-		pagination.After = &entity[0].ID
+		return &apiKey.ID, nil
+	})
+	if err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:          "5f89e23d-d4a0-45ce-ba43-ae2a9be0ca64",
+			ErrorInstance: err,
+		})
+		return
 	}
 
 	// Fetch all API keys for the organization
 	filter := apikey.ApiKeyFilter{
-		OrganizationID: adminKeyEntity.OrganizationID,
+		OrganizationID: &orgEntity.ID,
 	}
 	apiKeys, err := apikeyService.Find(ctx, filter, pagination)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Code:  "32d59d1a-2eff-4b6f-a198-30a4fa9ff871",
 			Error: "failed to retrieve API keys",
+		})
+		return
+	}
+	total, err := apikeyService.Count(ctx, filter)
+	if err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code: "6d067ca3-c891-4343-b2e3-eb430278dd28",
 		})
 		return
 	}
@@ -168,18 +144,18 @@ func (api *AdminApiKeyAPI) GetAdminApiKeys(reqCtx *gin.Context) {
 			hasMore = true
 		}
 	}
-
-	// TODO: Join/Select With Owner
-	result := functional.Map(apiKeys, func(apikey *apikey.ApiKey) OrganizationAdminAPIKeyResponse {
+	// TODO; owner
+	result := functional.Map(apiKeys, func(apikey *apikey.ApiKey) *OrganizationAdminAPIKeyResponse {
 		return domainToOrganizationAdminAPIKeyResponse(apikey)
 	})
 
-	response := AdminApiKeyListResponse{
+	response := openai.ListResponse[*OrganizationAdminAPIKeyResponse]{
 		Object:  "list",
 		Data:    result,
 		FirstID: firstId,
 		LastID:  lastId,
 		HasMore: hasMore,
+		Total:   total,
 	}
 	reqCtx.JSON(http.StatusOK, response)
 }
@@ -195,55 +171,20 @@ func (api *AdminApiKeyAPI) GetAdminApiKeys(reqCtx *gin.Context) {
 // @Failure 404 {object} responses.ErrorResponse "Not Found - API key with the given ID does not exist or does not belong to the organization"
 // @Router /v1/organization/admin_api_keys/{id} [delete]
 func (api *AdminApiKeyAPI) DeleteAdminApiKey(reqCtx *gin.Context) {
-	apikeyService := api.apiKeyService
 	ctx := reqCtx.Request.Context()
+	entity, ok := auth.GetAdminKeyFromContext(reqCtx)
+	if !ok {
+		return
+	}
 
-	adminKeyEntity, err := api.validateAdminKey(reqCtx)
+	err := api.apiKeyService.Delete(ctx, entity)
 	if err != nil {
-		return
-	}
-
-	publicID := reqCtx.Param("id")
-	if publicID == "" {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "2ab393c5-708d-42bc-a785-dcbdcf429ad1",
-			Error: "invalid or missing API key",
-		})
-		return
-	}
-	entity, err := apikeyService.FindByPublicID(ctx, publicID)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "26b68f41-0eb0-4fca-8365-613742ef9204",
-			Error: "invalid or missing API key",
-		})
-		return
-	}
-	if entity.ApikeyType != string(apikey.ApikeyTypeAdmin) {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "f5a31a69-10b0-416c-8fa2-8183dca24eb9",
-			Error: "invalid or missing API key",
-		})
-		return
-	}
-
-	if entity.OrganizationID != adminKeyEntity.OrganizationID {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "13e172b1-7eec-4b1a-af81-3107ca5a6b0e",
-			Error: "invalid or missing API key",
-		})
-		return
-	}
-
-	err = apikeyService.Delete(ctx, entity)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Code:  "c9a103b2-985c-44b7-9ccd-38e914a2c82b",
 			Error: "invalid or missing API key",
 		})
 		return
 	}
-
 	reqCtx.JSON(http.StatusOK, AdminAPIKeyDeletedResponse{
 		ID:      entity.PublicID,
 		Object:  "organization.admin_api_key.deleted",
@@ -265,28 +206,21 @@ func (api *AdminApiKeyAPI) DeleteAdminApiKey(reqCtx *gin.Context) {
 // @Router /v1/organization/admin_api_keys [post]
 func (api *AdminApiKeyAPI) CreateAdminApiKey(reqCtx *gin.Context) {
 	apikeyService := api.apiKeyService
-	userService := api.userService
 	ctx := reqCtx.Request.Context()
+	user, ok := auth.GetUserFromContext(reqCtx)
+	if !ok {
+		return
+	}
+	organizationEntity, ok := auth.GetAdminOrganizationFromContext(reqCtx)
+	if !ok {
+		return
+	}
 
 	var requestPayload CreateOrganizationAdminAPIKeyRequest
 	if err := reqCtx.ShouldBindJSON(&requestPayload); err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  "b6cb35be-8a53-478d-95d1-5e1f64f35c09",
 			Error: err.Error(),
-		})
-		return
-	}
-
-	adminKeyEntity, err := api.validateAdminKey(reqCtx)
-	if err != nil {
-		return
-	}
-
-	userEntity, err := userService.FindByPublicID(ctx, adminKeyEntity.OwnerPublicID)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "f773c7a0-618a-42e1-ab14-3792e6311fe7",
-			Error: "invalid or missing API key",
 		})
 		return
 	}
@@ -305,11 +239,10 @@ func (api *AdminApiKeyAPI) CreateAdminApiKey(reqCtx *gin.Context) {
 		Description:    requestPayload.Name,
 		Enabled:        true,
 		ApikeyType:     string(apikey.ApikeyTypeAdmin),
-		OwnerPublicID:  adminKeyEntity.OwnerPublicID,
-		OrganizationID: adminKeyEntity.OrganizationID,
+		OwnerPublicID:  user.PublicID,
+		OrganizationID: &organizationEntity.ID,
 		Permissions:    "{}",
 	})
-
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 			Code:  "32d59d1a-2eff-4b6f-a198-30a4fa9ff871",
@@ -318,50 +251,17 @@ func (api *AdminApiKeyAPI) CreateAdminApiKey(reqCtx *gin.Context) {
 		return
 	}
 	response := domainToOrganizationAdminAPIKeyResponse(apikeyEntity)
-	response.Owner = domainToOwnerResponse(userEntity)
+	response.Owner = userToOwnerResponse(user)
 	response.Value = key
 	reqCtx.JSON(http.StatusOK, response)
 }
 
-func (api *AdminApiKeyAPI) validateAdminKey(reqCtx *gin.Context) (*apikey.ApiKey, error) {
-	apikeyService := api.apiKeyService
-	ctx := reqCtx.Request.Context()
-	// Extract and validate the admin API key from the Authorization header
-	adminKey, ok := requests.GetTokenFromBearer(reqCtx)
-	if !ok {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "7ce7c4e8-4fd3-4f60-ac7e-aee87e2e8d4d",
-			Error: "invalid or missing API key",
-		})
-		return nil, fmt.Errorf("invalid token")
-	}
-
-	// Verify the provided admin API key
-	adminKeyEntity, err := apikeyService.FindByKey(ctx, adminKey)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "21882dd7-4945-4d7b-9582-07cec0f450ce",
-			Error: "invalid or missing API key",
-		})
-		return nil, err
-	}
-
-	if adminKeyEntity.ApikeyType != string(apikey.ApikeyTypeAdmin) {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "27828731-bcb8-450b-81c0-3f9e2ff5ef12",
-			Error: "invalid or missing API key",
-		})
-		return nil, fmt.Errorf("invalid or missing API key")
-	}
-	return adminKeyEntity, nil
-}
-
-func domainToOrganizationAdminAPIKeyResponse(entity *apikey.ApiKey) OrganizationAdminAPIKeyResponse {
+func domainToOrganizationAdminAPIKeyResponse(entity *apikey.ApiKey) *OrganizationAdminAPIKeyResponse {
 	var lastUsedAt *int64
 	if entity.LastUsedAt != nil {
 		lastUsedAt = ptr.ToInt64(entity.LastUsedAt.Unix())
 	}
-	return OrganizationAdminAPIKeyResponse{
+	return &OrganizationAdminAPIKeyResponse{
 		Object:        string(openai.ObjectKeyAdminApiKey),
 		ID:            entity.PublicID,
 		Name:          entity.Description,
@@ -371,7 +271,7 @@ func domainToOrganizationAdminAPIKeyResponse(entity *apikey.ApiKey) Organization
 	}
 }
 
-func domainToOwnerResponse(user *user.User) Owner {
+func userToOwnerResponse(user *user.User) Owner {
 	return Owner{
 		Type:      string(openai.ApikeyTypeUser),
 		Object:    string(openai.OwnerObjectOrganizationUser),

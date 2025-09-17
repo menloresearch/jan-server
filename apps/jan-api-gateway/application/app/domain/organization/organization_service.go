@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/query"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
@@ -15,16 +14,14 @@ import (
 // OrganizationService provides business logic for managing organizations.
 type OrganizationService struct {
 	// The service has a dependency on the repository interface.
-	repo           OrganizationRepository
-	projectService *project.ProjectService
+	repo OrganizationRepository
 }
 
 // NewService is the constructor for OrganizationService.
 // It injects the repository dependency.
-func NewService(repo OrganizationRepository, projectService *project.ProjectService) *OrganizationService {
+func NewService(repo OrganizationRepository) *OrganizationService {
 	return &OrganizationService{
-		repo:           repo,
-		projectService: projectService,
+		repo: repo,
 	}
 }
 
@@ -41,21 +38,6 @@ func (s *OrganizationService) CreateOrganizationWithPublicID(ctx context.Context
 	}
 	o.PublicID = publicID
 	if err := s.repo.Create(ctx, o); err != nil {
-		return nil, err
-	}
-
-	projectEntity, err := s.projectService.CreateProjectWithPublicID(ctx, &project.Project{
-		Name:           "Default Project",
-		Status:         string(project.ProjectStatusActive),
-		OrganizationID: o.ID,
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.projectService.AddMember(ctx, projectEntity.ID, o.OwnerID, string(project.ProjectMemberRoleOwner))
-	if err != nil {
 		return nil, err
 	}
 	return o, nil
@@ -96,9 +78,43 @@ func (s *OrganizationService) FindOrganizations(ctx context.Context, filter Orga
 	return s.repo.FindByFilter(ctx, filter, pagination)
 }
 
+func (s *OrganizationService) FindOneByFilter(ctx context.Context, filter OrganizationFilter) (*Organization, error) {
+	orgEntities, err := s.repo.FindByFilter(ctx, filter, nil)
+	if err != nil {
+		return nil, err
+	}
+	if len(orgEntities) == 0 {
+		return nil, nil
+	}
+	if len(orgEntities) != 1 {
+		return nil, fmt.Errorf("no records found")
+	}
+	return orgEntities[0], nil
+}
+
 // CountOrganizations counts the number of organizations matching a given filter.
 func (s *OrganizationService) CountOrganizations(ctx context.Context, filter OrganizationFilter) (int64, error) {
 	return s.repo.Count(ctx, filter)
+}
+
+// CountOrganizations counts the number of organizations matching a given filter.
+func (s *OrganizationService) AddMember(ctx context.Context, m *OrganizationMember) error {
+	return s.repo.AddMember(ctx, m)
+}
+
+func (s *OrganizationService) FindMembersByFilter(ctx context.Context, f OrganizationMemberFilter, p *query.Pagination) ([]*OrganizationMember, error) {
+	return s.repo.FindMemberByFilter(ctx, f, p)
+}
+
+func (s *OrganizationService) FindOneMemberByFilter(ctx context.Context, f OrganizationMemberFilter) (*OrganizationMember, error) {
+	entities, err := s.repo.FindMemberByFilter(ctx, f, nil)
+	if err != nil {
+		return nil, err
+	}
+	if len(entities) != 1 {
+		return nil, fmt.Errorf("no records")
+	}
+	return entities[0], err
 }
 
 type OrganizationContextKey string

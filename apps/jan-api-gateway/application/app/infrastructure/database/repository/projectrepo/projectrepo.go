@@ -16,6 +16,8 @@ type ProjectGormRepository struct {
 	db *transaction.Database
 }
 
+var _ domain.ProjectRepository = (*ProjectGormRepository)(nil)
+
 // AddMember implements project.ProjectRepository.
 func (repo *ProjectGormRepository) AddMember(ctx context.Context, m *domain.ProjectMember) error {
 	model := dbschema.NewSchemaProjectMember(m)
@@ -56,6 +58,9 @@ func (repo *ProjectGormRepository) applyFilter(query *gormgen.Query, sql gormgen
 	}
 	if filter.Archived == ptr.ToBool(true) {
 		sql = sql.Where(query.Project.ArchivedAt.IsNotNull())
+	}
+	if filter.PublicIDs != nil {
+		sql = sql.Where(query.Project.PublicID.In(*filter.PublicIDs...))
 	}
 	return sql
 }

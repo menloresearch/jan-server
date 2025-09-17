@@ -12,7 +12,7 @@ func init() {
 
 type Organization struct {
 	BaseModel
-	Name     string               `gorm:"size:128;not null;uniqueIndex"`
+	Name     string               `gorm:"size:128;not null"`
 	PublicID string               `gorm:"size:64;not null;uniqueIndex"`
 	Enabled  bool                 `gorm:"default:true;index"`
 	Members  []OrganizationMember `gorm:"foreignKey:OrganizationID"`
@@ -25,6 +25,7 @@ type OrganizationMember struct {
 	UserID         uint   `gorm:"primaryKey"`
 	OrganizationID uint   `gorm:"primaryKey"`
 	Role           string `gorm:"type:varchar(20);not null"`
+	IsPrimary      bool   `gorm:"default:false"`
 }
 
 func NewSchemaOrganization(o *organization.Organization) *Organization {
@@ -39,6 +40,18 @@ func NewSchemaOrganization(o *organization.Organization) *Organization {
 	}
 }
 
+func NewSchemaOrganizationMember(o *organization.OrganizationMember) *OrganizationMember {
+	return &OrganizationMember{
+		BaseModel: BaseModel{
+			ID: o.ID,
+		},
+		UserID:         o.UserID,
+		OrganizationID: o.OrganizationID,
+		Role:           string(o.Role),
+		IsPrimary:      o.IsPrimary,
+	}
+}
+
 func (o *Organization) EtoD() *organization.Organization {
 	return &organization.Organization{
 		ID:        o.ID,
@@ -48,5 +61,16 @@ func (o *Organization) EtoD() *organization.Organization {
 		CreatedAt: o.CreatedAt,
 		UpdatedAt: o.UpdatedAt,
 		OwnerID:   o.OwnerID,
+	}
+}
+
+func (o *OrganizationMember) EtoD() *organization.OrganizationMember {
+	return &organization.OrganizationMember{
+		ID:             o.ID,
+		UserID:         o.UserID,
+		OrganizationID: o.OrganizationID,
+		Role:           organization.OrganizationMemberRole(o.Role),
+		IsPrimary:      o.IsPrimary,
+		CreatedAt:      o.CreatedAt,
 	}
 }
