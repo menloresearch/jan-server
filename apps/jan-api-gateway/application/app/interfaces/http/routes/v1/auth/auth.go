@@ -52,6 +52,8 @@ type AccessTokenResponseObjectType string
 
 const AccessTokenResponseObjectTypeObject = "access.token"
 
+const AccessTokenExpirationDuration = 15 * time.Minute
+
 type AccessTokenResponse struct {
 	Object      AccessTokenResponseObjectType `json:"object"`
 	AccessToken string                        `json:"access_token"`
@@ -162,7 +164,7 @@ func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 		userClaim.ID = user.PublicID
 	}
 
-	accessTokenExp := time.Now().Add(15 * time.Minute)
+	accessTokenExp := time.Now().Add(AccessTokenExpirationDuration)
 	accessTokenString, err := auth.CreateJwtSignedString(auth.UserClaim{
 		Email: userClaim.Email,
 		Name:  userClaim.Name,
@@ -251,7 +253,7 @@ func (authRoute *AuthRoute) GuestLogin(reqCtx *gin.Context) {
 		id = userClaim.ID
 	}
 
-	accessTokenExp := time.Now().Add(15 * time.Minute)
+	accessTokenExp := time.Now().Add(AccessTokenExpirationDuration)
 	accessTokenString, err := auth.CreateJwtSignedString(auth.UserClaim{
 		Email: email,
 		Name:  name,

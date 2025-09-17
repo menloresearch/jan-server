@@ -8,6 +8,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/itemrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/organizationrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/projectrepo"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/responserepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 )
@@ -20,5 +21,6 @@ var RepositoryProvider = wire.NewSet(
 	userrepo.NewUserGormRepository,
 	conversationrepo.NewConversationGormRepository,
 	itemrepo.NewItemGormRepository,
+	responserepo.NewResponseGormRepository,
 	transaction.NewDatabase,
 )

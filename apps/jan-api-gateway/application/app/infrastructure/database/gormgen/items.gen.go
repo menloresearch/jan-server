@@ -34,13 +34,14 @@ func newItem(db *gorm.DB, opts ...gen.DOOption) item {
 	_item.DeletedAt = field.NewField(tableName, "deleted_at")
 	_item.PublicID = field.NewString(tableName, "public_id")
 	_item.ConversationID = field.NewUint(tableName, "conversation_id")
+	_item.ResponseID = field.NewUint(tableName, "response_id")
 	_item.Type = field.NewString(tableName, "type")
 	_item.Role = field.NewString(tableName, "role")
 	_item.Content = field.NewString(tableName, "content")
 	_item.Status = field.NewString(tableName, "status")
-	_item.IncompleteAt = field.NewInt64(tableName, "incomplete_at")
+	_item.IncompleteAt = field.NewTime(tableName, "incomplete_at")
 	_item.IncompleteDetails = field.NewString(tableName, "incomplete_details")
-	_item.CompletedAt = field.NewInt64(tableName, "completed_at")
+	_item.CompletedAt = field.NewTime(tableName, "completed_at")
 	_item.Conversation = itemBelongsToConversation{
 		db: db.Session(&gorm.Session{}),
 
@@ -71,6 +72,18 @@ func newItem(db *gorm.DB, opts ...gen.DOOption) item {
 			Conversation struct {
 				field.RelationField
 			}
+			Response struct {
+				field.RelationField
+				UserEntity struct {
+					field.RelationField
+				}
+				Conversation struct {
+					field.RelationField
+				}
+				Items struct {
+					field.RelationField
+				}
+			}
 		}{
 			RelationField: field.NewRelation("Conversation.Items", "dbschema.Item"),
 			Conversation: struct {
@@ -78,7 +91,42 @@ func newItem(db *gorm.DB, opts ...gen.DOOption) item {
 			}{
 				RelationField: field.NewRelation("Conversation.Items.Conversation", "dbschema.Conversation"),
 			},
+			Response: struct {
+				field.RelationField
+				UserEntity struct {
+					field.RelationField
+				}
+				Conversation struct {
+					field.RelationField
+				}
+				Items struct {
+					field.RelationField
+				}
+			}{
+				RelationField: field.NewRelation("Conversation.Items.Response", "dbschema.Response"),
+				UserEntity: struct {
+					field.RelationField
+				}{
+					RelationField: field.NewRelation("Conversation.Items.Response.UserEntity", "dbschema.User"),
+				},
+				Conversation: struct {
+					field.RelationField
+				}{
+					RelationField: field.NewRelation("Conversation.Items.Response.Conversation", "dbschema.Conversation"),
+				},
+				Items: struct {
+					field.RelationField
+				}{
+					RelationField: field.NewRelation("Conversation.Items.Response.Items", "dbschema.Item"),
+				},
+			},
 		},
+	}
+
+	_item.Response = itemBelongsToResponse{
+		db: db.Session(&gorm.Session{}),
+
+		RelationField: field.NewRelation("Response", "dbschema.Response"),
 	}
 
 	_item.fillFieldMap()
@@ -96,14 +144,17 @@ type item struct {
 	DeletedAt         field.Field
 	PublicID          field.String
 	ConversationID    field.Uint
+	ResponseID        field.Uint
 	Type              field.String
 	Role              field.String
 	Content           field.String
 	Status            field.String
-	IncompleteAt      field.Int64
+	IncompleteAt      field.Time
 	IncompleteDetails field.String
-	CompletedAt       field.Int64
+	CompletedAt       field.Time
 	Conversation      itemBelongsToConversation
+
+	Response itemBelongsToResponse
 
 	fieldMap map[string]field.Expr
 }
@@ -126,13 +177,14 @@ func (i *item) updateTableName(table string) *item {
 	i.DeletedAt = field.NewField(table, "deleted_at")
 	i.PublicID = field.NewString(table, "public_id")
 	i.ConversationID = field.NewUint(table, "conversation_id")
+	i.ResponseID = field.NewUint(table, "response_id")
 	i.Type = field.NewString(table, "type")
 	i.Role = field.NewString(table, "role")
 	i.Content = field.NewString(table, "content")
 	i.Status = field.NewString(table, "status")
-	i.IncompleteAt = field.NewInt64(table, "incomplete_at")
+	i.IncompleteAt = field.NewTime(table, "incomplete_at")
 	i.IncompleteDetails = field.NewString(table, "incomplete_details")
-	i.CompletedAt = field.NewInt64(table, "completed_at")
+	i.CompletedAt = field.NewTime(table, "completed_at")
 
 	i.fillFieldMap()
 
@@ -149,13 +201,14 @@ func (i *item) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (i *item) fillFieldMap() {
-	i.fieldMap = make(map[string]field.Expr, 14)
+	i.fieldMap = make(map[string]field.Expr, 16)
 	i.fieldMap["id"] = i.ID
 	i.fieldMap["created_at"] = i.CreatedAt
 	i.fieldMap["updated_at"] = i.UpdatedAt
 	i.fieldMap["deleted_at"] = i.DeletedAt
 	i.fieldMap["public_id"] = i.PublicID
 	i.fieldMap["conversation_id"] = i.ConversationID
+	i.fieldMap["response_id"] = i.ResponseID
 	i.fieldMap["type"] = i.Type
 	i.fieldMap["role"] = i.Role
 	i.fieldMap["content"] = i.Content
@@ -170,12 +223,15 @@ func (i item) clone(db *gorm.DB) item {
 	i.itemDo.ReplaceConnPool(db.Statement.ConnPool)
 	i.Conversation.db = db.Session(&gorm.Session{Initialized: true})
 	i.Conversation.db.Statement.ConnPool = db.Statement.ConnPool
+	i.Response.db = db.Session(&gorm.Session{Initialized: true})
+	i.Response.db.Statement.ConnPool = db.Statement.ConnPool
 	return i
 }
 
 func (i item) replaceDB(db *gorm.DB) item {
 	i.itemDo.ReplaceDB(db)
 	i.Conversation.db = db.Session(&gorm.Session{})
+	i.Response.db = db.Session(&gorm.Session{})
 	return i
 }
 
@@ -197,6 +253,18 @@ type itemBelongsToConversation struct {
 		field.RelationField
 		Conversation struct {
 			field.RelationField
+		}
+		Response struct {
+			field.RelationField
+			UserEntity struct {
+				field.RelationField
+			}
+			Conversation struct {
+				field.RelationField
+			}
+			Items struct {
+				field.RelationField
+			}
 		}
 	}
 }
@@ -272,6 +340,87 @@ func (a itemBelongsToConversationTx) Count() int64 {
 }
 
 func (a itemBelongsToConversationTx) Unscoped() *itemBelongsToConversationTx {
+	a.tx = a.tx.Unscoped()
+	return &a
+}
+
+type itemBelongsToResponse struct {
+	db *gorm.DB
+
+	field.RelationField
+}
+
+func (a itemBelongsToResponse) Where(conds ...field.Expr) *itemBelongsToResponse {
+	if len(conds) == 0 {
+		return &a
+	}
+
+	exprs := make([]clause.Expression, 0, len(conds))
+	for _, cond := range conds {
+		exprs = append(exprs, cond.BeCond().(clause.Expression))
+	}
+	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
+	return &a
+}
+
+func (a itemBelongsToResponse) WithContext(ctx context.Context) *itemBelongsToResponse {
+	a.db = a.db.WithContext(ctx)
+	return &a
+}
+
+func (a itemBelongsToResponse) Session(session *gorm.Session) *itemBelongsToResponse {
+	a.db = a.db.Session(session)
+	return &a
+}
+
+func (a itemBelongsToResponse) Model(m *dbschema.Item) *itemBelongsToResponseTx {
+	return &itemBelongsToResponseTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a itemBelongsToResponse) Unscoped() *itemBelongsToResponse {
+	a.db = a.db.Unscoped()
+	return &a
+}
+
+type itemBelongsToResponseTx struct{ tx *gorm.Association }
+
+func (a itemBelongsToResponseTx) Find() (result *dbschema.Response, err error) {
+	return result, a.tx.Find(&result)
+}
+
+func (a itemBelongsToResponseTx) Append(values ...*dbschema.Response) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Append(targetValues...)
+}
+
+func (a itemBelongsToResponseTx) Replace(values ...*dbschema.Response) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Replace(targetValues...)
+}
+
+func (a itemBelongsToResponseTx) Delete(values ...*dbschema.Response) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Delete(targetValues...)
+}
+
+func (a itemBelongsToResponseTx) Clear() error {
+	return a.tx.Clear()
+}
+
+func (a itemBelongsToResponseTx) Count() int64 {
+	return a.tx.Count()
+}
+
+func (a itemBelongsToResponseTx) Unscoped() *itemBelongsToResponseTx {
 	a.tx = a.tx.Unscoped()
 	return &a
 }

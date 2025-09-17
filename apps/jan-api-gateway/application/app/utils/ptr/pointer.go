@@ -25,3 +25,11 @@ func ToBool(b bool) *bool {
 func ToTime(b time.Time) *time.Time {
 	return &b
 }
+
+// FromString safely dereferences a string pointer, returning empty string if nil
+func FromString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}

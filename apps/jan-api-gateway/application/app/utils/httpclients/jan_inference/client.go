@@ -58,6 +58,33 @@ func (client *JanInferenceClient) CreateChatCompletionStream(ctx context.Context
 	return nil
 }
 
+// CreateChatCompletionStreamChunks returns chunks instead of writing to response
+func (client *JanInferenceClient) CreateChatCompletionStreamChunks(ctx context.Context, apiKey string, request openai.ChatCompletionRequest) (<-chan string, error) {
+	chunkChan := make(chan string, 100)
+
+	go func() {
+		defer close(chunkChan)
+
+		req := JanInferenceRestyClient.R().SetBody(request)
+		resp, err := req.
+			SetDoNotParseResponse(true).
+			Post("/v1/chat/completions")
+		if err != nil {
+			chunkChan <- fmt.Sprintf("error: %v", err)
+			return
+		}
+		defer resp.RawResponse.Body.Close()
+
+		scanner := bufio.NewScanner(resp.RawResponse.Body)
+		for scanner.Scan() {
+			line := scanner.Text()
+			chunkChan <- line
+		}
+	}()
+
+	return chunkChan, nil
+}
+
 // TODO: add timeout
 func (client *JanInferenceClient) CreateChatCompletion(ctx context.Context, apiKey string, request openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
 	var chatCompletionResponse openai.ChatCompletionResponse

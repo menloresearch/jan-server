@@ -135,7 +135,7 @@ func (s *AuthService) AppUserAuthMiddleware() gin.HandlerFunc {
 		}
 
 		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code: "38ac131c-90f4-4b36-bc19-5ad0b63b002f",
+			Code: "019947f0-eca1-7474-8ed2-09d6e5389b54",
 		})
 	}
 }

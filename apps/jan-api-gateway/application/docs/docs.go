@@ -224,12 +224,13 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Generates a model response for the given chat conversation.",
+                "description": "Generates a model response for the given chat conversation. If ` + "`" + `stream` + "`" + ` is true, the response is sent as a stream of events. If ` + "`" + `stream` + "`" + ` is false or omitted, a single JSON response is returned.",
                 "consumes": [
                     "application/json"
                 ],
                 "produces": [
-                    "application/json"
+                    "application/json",
+                    "text/event-stream"
                 ],
                 "tags": [
                     "Chat"
@@ -237,20 +238,20 @@ const docTemplate = `{
                 "summary": "Create a chat completion",
                 "parameters": [
                     {
-                        "description": "Chat completion request payload",
+                        "description": "Extended chat completion request payload",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/openai.ChatCompletionRequest"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_chat.ExtendedChatCompletionRequest"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful response",
+                        "description": "Successful streaming response (SSE format, event: 'data', data: JSON object per chunk)",
                         "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_chat.ChatCompletionResponseSwagger"
+                            "type": "string"
                         }
                     },
                     "400": {
@@ -281,7 +282,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Retrieves a paginated list of conversations for the authenticated user.",
+                "description": "Retrieves a paginated list of conversations for the authenticated user with OpenAI-compatible response format.",
                 "tags": [
                     "Conversations"
                 ],
@@ -311,7 +312,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully retrieved the list of conversations",
                         "schema": {
-                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ConversationResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ExtendedConversationResponse"
                         }
                     },
                     "400": {
@@ -340,7 +341,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a new conversation for the authenticated user",
+                "description": "Creates a new conversation for the authenticated user with optional items",
                 "consumes": [
                     "application/json"
                 ],
@@ -366,11 +367,11 @@ const docTemplate = `{
                     "200": {
                         "description": "Created conversation",
                         "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ConversationResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ExtendedConversationResponse"
                         }
                     },
                     "400": {
-                        "description": "Invalid request",
+                        "description": "Invalid request - Bad payload, too many items, or invalid item format",
                         "schema": {
                             "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
@@ -397,7 +398,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Retrieves a conversation by its ID",
+                "description": "Retrieves a conversation by its ID with full metadata and title",
                 "produces": [
                     "application/json"
                 ],
@@ -418,7 +419,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Conversation details",
                         "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ConversationResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ExtendedConversationResponse"
                         }
                     },
                     "401": {
@@ -453,7 +454,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Deletes a conversation and all its items",
+                "description": "Deletes a conversation and all its items permanently",
                 "produces": [
                     "application/json"
                 ],
@@ -509,7 +510,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates conversation metadata",
+                "description": "Updates conversation title and/or metadata",
                 "consumes": [
                     "application/json"
                 ],
@@ -542,11 +543,11 @@ const docTemplate = `{
                     "200": {
                         "description": "Updated conversation",
                         "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ConversationResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ExtendedConversationResponse"
                         }
                     },
                     "400": {
-                        "description": "Invalid request",
+                        "description": "Invalid request payload or update failed",
                         "schema": {
                             "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
@@ -585,7 +586,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Lists all items in a conversation",
+                "description": "Lists all items in a conversation with OpenAI-compatible pagination",
                 "produces": [
                     "application/json"
                 ],
@@ -609,8 +610,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Cursor for pagination",
-                        "name": "cursor",
+                        "description": "Cursor for pagination - ID of the last item from previous page",
+                        "name": "after",
                         "in": "query"
                     },
                     {
@@ -624,7 +625,13 @@ const docTemplate = `{
                     "200": {
                         "description": "List of items",
                         "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ConversationItemListResponse"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ConversationItemResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request - Invalid pagination parameters",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "401": {
@@ -659,7 +666,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Adds multiple items to a conversation",
+                "description": "Adds multiple items to a conversation with OpenAI-compatible format",
                 "consumes": [
                     "application/json"
                 ],
@@ -696,7 +703,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid request",
+                        "description": "Invalid request payload or invalid item format",
                         "schema": {
                             "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
@@ -735,7 +742,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Retrieves a specific item from a conversation",
+                "description": "Retrieves a specific item from a conversation with full content details",
                 "produces": [
                     "application/json"
                 ],
@@ -779,7 +786,7 @@ const docTemplate = `{
                         }
                     },
                     "404": {
-                        "description": "Conversation not found",
+                        "description": "Conversation or item not found",
                         "schema": {
                             "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
@@ -798,7 +805,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Deletes a specific item from a conversation",
+                "description": "Deletes a specific item from a conversation and returns the deleted item details",
                 "produces": [
                     "application/json"
                 ],
@@ -824,9 +831,15 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Updated conversation",
+                        "description": "Deleted item details",
                         "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ConversationResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ConversationItemResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request - Deletion failed",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
                     },
                     "401": {
@@ -842,7 +855,7 @@ const docTemplate = `{
                         }
                     },
                     "404": {
-                        "description": "Conversation not found",
+                        "description": "Conversation or item not found",
                         "schema": {
                             "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
@@ -1689,6 +1702,370 @@ const docTemplate = `{
                 }
             }
         },
+        "/v1/responses": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a new LLM response for the given input. Supports multiple input types including text, images, files, web search, and more.\n\n**Supported Input Types:**\n- ` + "`" + `text` + "`" + `: Plain text input\n- ` + "`" + `image` + "`" + `: Image input (URL or base64)\n- ` + "`" + `file` + "`" + `: File input by file ID\n- ` + "`" + `web_search` + "`" + `: Web search input\n- ` + "`" + `file_search` + "`" + `: File search input\n- ` + "`" + `streaming` + "`" + `: Streaming input\n- ` + "`" + `function_calls` + "`" + `: Function calls input\n- ` + "`" + `reasoning` + "`" + `: Reasoning input\n\n**Example Request:**\n` + "`" + `` + "`" + `` + "`" + `json\n{\n\"model\": \"gpt-4\",\n\"input\": {\n\"type\": \"text\",\n\"text\": \"Hello, how are you?\"\n},\n\"max_tokens\": 100,\n\"temperature\": 0.7,\n\"stream\": false,\n\"background\": false\n}\n` + "`" + `` + "`" + `` + "`" + `\n\n**Response Format:**\nThe response uses embedded structure where all fields are at the top level:\n- ` + "`" + `jan_status` + "`" + `: Jan API status code (optional)\n- ` + "`" + `id` + "`" + `: Response identifier\n- ` + "`" + `object` + "`" + `: Object type (\"response\")\n- ` + "`" + `created` + "`" + `: Unix timestamp\n- ` + "`" + `model` + "`" + `: Model used\n- ` + "`" + `status` + "`" + `: Response status\n- ` + "`" + `input` + "`" + `: Input data\n- ` + "`" + `output` + "`" + `: Generated output\n\n**Example Response:**\n` + "`" + `` + "`" + `` + "`" + `json\n{\n\"jan_status\": \"000000\",\n\"id\": \"resp_1234567890\",\n\"object\": \"response\",\n\"created\": 1234567890,\n\"model\": \"gpt-4\",\n\"status\": \"completed\",\n\"input\": {\n\"type\": \"text\",\n\"text\": \"Hello, how are you?\"\n},\n\"output\": {\n\"type\": \"text\",\n\"text\": {\n\"value\": \"I'm doing well, thank you!\"\n}\n}\n}\n` + "`" + `` + "`" + `` + "`" + `\n\n**Response Status:**\n- ` + "`" + `completed` + "`" + `: Response generation finished successfully\n- ` + "`" + `processing` + "`" + `: Response is being generated\n- ` + "`" + `failed` + "`" + `: Response generation failed\n- ` + "`" + `cancelled` + "`" + `: Response was cancelled",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jan",
+                    "Jan-Responses"
+                ],
+                "summary": "Create a response",
+                "parameters": [
+                    {
+                        "description": "Request payload containing model, input, and generation parameters",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.CreateResponseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Created response",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.Response"
+                        }
+                    },
+                    "202": {
+                        "description": "Response accepted for background processing",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request payload",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/responses/{response_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves an LLM response by its ID. Returns the complete response object with embedded structure where all fields are at the top level.\n\n**Response Format:**\nThe response uses embedded structure where all fields are at the top level:\n- ` + "`" + `jan_status` + "`" + `: Jan API status code (optional)\n- ` + "`" + `id` + "`" + `: Response identifier\n- ` + "`" + `object` + "`" + `: Object type (\"response\")\n- ` + "`" + `created` + "`" + `: Unix timestamp\n- ` + "`" + `model` + "`" + `: Model used\n- ` + "`" + `status` + "`" + `: Response status\n- ` + "`" + `input` + "`" + `: Input data\n- ` + "`" + `output` + "`" + `: Generated output",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jan",
+                    "Jan-Responses"
+                ],
+                "summary": "Get a response",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique identifier of the response",
+                        "name": "response_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Response details",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Access denied",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Response not found",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes an LLM response by its ID. Returns the deleted response object with embedded structure where all fields are at the top level.\n\n**Response Format:**\nThe response uses embedded structure where all fields are at the top level:\n- ` + "`" + `jan_status` + "`" + `: Jan API status code (optional)\n- ` + "`" + `id` + "`" + `: Response identifier\n- ` + "`" + `object` + "`" + `: Object type (\"response\")\n- ` + "`" + `created` + "`" + `: Unix timestamp\n- ` + "`" + `model` + "`" + `: Model used\n- ` + "`" + `status` + "`" + `: Response status (will be \"cancelled\")\n- ` + "`" + `input` + "`" + `: Input data\n- ` + "`" + `cancelled_at` + "`" + `: Cancellation timestamp",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jan",
+                    "Jan-Responses"
+                ],
+                "summary": "Delete a response",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique identifier of the response",
+                        "name": "response_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Deleted response",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Access denied",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Response not found",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/responses/{response_id}/cancel": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Cancels a running LLM response that was created with background=true. Only responses that are currently processing can be cancelled.\n\n**Response Format:**\nThe response uses embedded structure where all fields are at the top level:\n- ` + "`" + `jan_status` + "`" + `: Jan API status code (optional)\n- ` + "`" + `id` + "`" + `: Response identifier\n- ` + "`" + `object` + "`" + `: Object type (\"response\")\n- ` + "`" + `created` + "`" + `: Unix timestamp\n- ` + "`" + `model` + "`" + `: Model used\n- ` + "`" + `status` + "`" + `: Response status (will be \"cancelled\")\n- ` + "`" + `input` + "`" + `: Input data\n- ` + "`" + `cancelled_at` + "`" + `: Cancellation timestamp",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jan",
+                    "Jan-Responses"
+                ],
+                "summary": "Cancel a response",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique identifier of the response to cancel",
+                        "name": "response_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Response cancelled successfully",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or response cannot be cancelled",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Access denied",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Response not found",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/responses/{response_id}/input_items": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves a paginated list of input items for a response. Supports cursor-based pagination for efficient retrieval of large datasets.\n\n**Response Format:**\nThe response uses embedded structure where all fields are at the top level:\n- ` + "`" + `jan_status` + "`" + `: Jan API status code (optional)\n- ` + "`" + `first_id` + "`" + `: First item ID for pagination (optional)\n- ` + "`" + `last_id` + "`" + `: Last item ID for pagination (optional)\n- ` + "`" + `has_more` + "`" + `: Whether more items are available (optional)\n- ` + "`" + `id` + "`" + `: Input item identifier\n- ` + "`" + `object` + "`" + `: Object type (\"input_item\")\n- ` + "`" + `created` + "`" + `: Unix timestamp\n- ` + "`" + `type` + "`" + `: Input type\n- ` + "`" + `text` + "`" + `: Text content (for text type)\n- ` + "`" + `image` + "`" + `: Image content (for image type)\n- ` + "`" + `file` + "`" + `: File content (for file type)\n\n**Example Response:**\n` + "`" + `` + "`" + `` + "`" + `json\n{\n\"jan_status\": \"000000\",\n\"first_id\": \"input_123\",\n\"last_id\": \"input_456\",\n\"has_more\": false,\n\"id\": \"input_1234567890\",\n\"object\": \"input_item\",\n\"created\": 1234567890,\n\"type\": \"text\",\n\"text\": \"Hello, world!\"\n}\n` + "`" + `` + "`" + `` + "`" + `",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jan",
+                    "Jan-Responses"
+                ],
+                "summary": "List input items",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Unique identifier of the response",
+                        "name": "response_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of items to return (default: 20, max: 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Cursor for pagination - return items after this ID",
+                        "name": "after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Cursor for pagination - return items before this ID",
+                        "name": "before",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of input items",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListInputItemsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or pagination parameters",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Access denied",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Response not found",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/version": {
             "get": {
                 "description": "Returns the current build version of the API server.",
@@ -1804,13 +2181,38 @@ const docTemplate = `{
                 }
             }
         },
-        "app_interfaces_http_routes_v1_chat.ChatCompletionResponseSwagger": {
+        "app_interfaces_http_routes_v1_chat.CompletionChoice": {
+            "type": "object",
+            "properties": {
+                "finish_reason": {
+                    "type": "string"
+                },
+                "index": {
+                    "type": "integer"
+                },
+                "message": {
+                    "$ref": "#/definitions/app_interfaces_http_routes_v1_chat.CompletionMessage"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_chat.CompletionMessage": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_chat.CompletionResponse": {
             "type": "object",
             "properties": {
                 "choices": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/openai.ChatCompletionChoice"
+                        "$ref": "#/definitions/app_interfaces_http_routes_v1_chat.CompletionChoice"
                     }
                 },
                 "created": {
@@ -1819,6 +2221,10 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
                 "model": {
                     "type": "string"
                 },
@@ -1826,7 +2232,171 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "usage": {
-                    "$ref": "#/definitions/openai.Usage"
+                    "$ref": "#/definitions/app_interfaces_http_routes_v1_chat.Usage"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_chat.ExtendedChatCompletionRequest": {
+            "type": "object",
+            "properties": {
+                "chat_template_kwargs": {
+                    "description": "ChatTemplateKwargs provides a way to add non-standard parameters to the request body.\nAdditional kwargs to pass to the template renderer. Will be accessible by the chat template.\nSuch as think mode for qwen3. \"chat_template_kwargs\": {\"enable_thinking\": false}\nhttps://qwen.readthedocs.io/en/latest/deployment/vllm.html#thinking-non-thinking-modes",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "conversation": {
+                    "type": "string"
+                },
+                "frequency_penalty": {
+                    "type": "number"
+                },
+                "function_call": {
+                    "description": "Deprecated: use ToolChoice instead."
+                },
+                "functions": {
+                    "description": "Deprecated: use Tools instead.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.FunctionDefinition"
+                    }
+                },
+                "guided_choice": {
+                    "description": "GuidedChoice is a vLLM-specific extension that restricts the model's output\nto one of the predefined string choices provided in this field. This feature\nis used to constrain the model's responses to a controlled set of options,\nensuring predictable and consistent outputs in scenarios where specific\nchoices are required.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "logit_bias": {
+                    "description": "LogitBias is must be a token id string (specified by their token ID in the tokenizer), not a word string.\nincorrect: ` + "`" + `\"logit_bias\":{\"You\": 6}` + "`" + `, correct: ` + "`" + `\"logit_bias\":{\"1639\": 6}` + "`" + `\nrefs: https://platform.openai.com/docs/api-reference/chat/create#chat/create-logit_bias",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "logprobs": {
+                    "description": "LogProbs indicates whether to return log probabilities of the output tokens or not.\nIf true, returns the log probabilities of each output token returned in the content of message.\nThis option is currently not available on the gpt-4-vision-preview model.",
+                    "type": "boolean"
+                },
+                "max_completion_tokens": {
+                    "description": "MaxCompletionTokens An upper bound for the number of tokens that can be generated for a completion,\nincluding visible output tokens and reasoning tokens https://platform.openai.com/docs/guides/reasoning",
+                    "type": "integer"
+                },
+                "max_tokens": {
+                    "description": "MaxTokens The maximum number of tokens that can be generated in the chat completion.\nThis value can be used to control costs for text generated via API.\nDeprecated: use MaxCompletionTokens. Not compatible with o1-series models.\nrefs: https://platform.openai.com/docs/api-reference/chat/create#chat-create-max_tokens",
+                    "type": "integer"
+                },
+                "messages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.ChatCompletionMessage"
+                    }
+                },
+                "metadata": {
+                    "description": "Metadata to store with the completion.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "model": {
+                    "type": "string"
+                },
+                "n": {
+                    "type": "integer"
+                },
+                "parallel_tool_calls": {
+                    "description": "Disable the default behavior of parallel tool calls by setting it: false."
+                },
+                "prediction": {
+                    "description": "Configuration for a predicted output.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.Prediction"
+                        }
+                    ]
+                },
+                "presence_penalty": {
+                    "type": "number"
+                },
+                "reasoning_effort": {
+                    "description": "Controls effort on reasoning for reasoning models. It can be set to \"low\", \"medium\", or \"high\".",
+                    "type": "string"
+                },
+                "response_format": {
+                    "$ref": "#/definitions/openai.ChatCompletionResponseFormat"
+                },
+                "safety_identifier": {
+                    "description": "A stable identifier used to help detect users of your application that may be violating OpenAI's usage policies.\nThe IDs should be a string that uniquely identifies each user.\nWe recommend hashing their username or email address, in order to avoid sending us any identifying information.\nhttps://platform.openai.com/docs/api-reference/chat/create#chat_create-safety_identifier",
+                    "type": "string"
+                },
+                "seed": {
+                    "type": "integer"
+                },
+                "service_tier": {
+                    "description": "Specifies the latency tier to use for processing the request.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.ServiceTier"
+                        }
+                    ]
+                },
+                "stop": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "store": {
+                    "description": "Store can be set to true to store the output of this completion request for use in distillations and evals.\nhttps://platform.openai.com/docs/api-reference/chat/create#chat-create-store",
+                    "type": "boolean"
+                },
+                "stream": {
+                    "type": "boolean"
+                },
+                "stream_options": {
+                    "description": "Options for streaming response. Only set this when you set stream: true.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openai.StreamOptions"
+                        }
+                    ]
+                },
+                "temperature": {
+                    "type": "number"
+                },
+                "tool_choice": {
+                    "description": "This can be either a string or an ToolChoice object."
+                },
+                "tools": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openai.Tool"
+                    }
+                },
+                "top_logprobs": {
+                    "description": "TopLogProbs is an integer between 0 and 5 specifying the number of most likely tokens to return at each\ntoken position, each with an associated log probability.\nlogprobs must be set to true if this parameter is used.",
+                    "type": "integer"
+                },
+                "top_p": {
+                    "type": "number"
+                },
+                "user": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_chat.Usage": {
+            "type": "object",
+            "properties": {
+                "completion_tokens": {
+                    "type": "integer"
+                },
+                "prompt_tokens": {
+                    "type": "integer"
+                },
+                "total_tokens": {
+                    "type": "integer"
                 }
             }
         },
@@ -1893,29 +2463,6 @@ const docTemplate = `{
                 }
             }
         },
-        "app_interfaces_http_routes_v1_conversations.ConversationItemListResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ConversationItemResponse"
-                    }
-                },
-                "first_id": {
-                    "type": "string"
-                },
-                "has_more": {
-                    "type": "boolean"
-                },
-                "last_id": {
-                    "type": "string"
-                },
-                "object": {
-                    "type": "string"
-                }
-            }
-        },
         "app_interfaces_http_routes_v1_conversations.ConversationItemRequest": {
             "type": "object",
             "required": [
@@ -1966,26 +2513,6 @@ const docTemplate = `{
                 }
             }
         },
-        "app_interfaces_http_routes_v1_conversations.ConversationResponse": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "integer"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "metadata": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "object": {
-                    "type": "string"
-                }
-            }
-        },
         "app_interfaces_http_routes_v1_conversations.CreateConversationRequest": {
             "type": "object",
             "properties": {
@@ -2030,6 +2557,29 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "object": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_conversations.ExtendedConversationResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "object": {
+                    "type": "string"
+                },
+                "title": {
                     "type": "string"
                 }
             }
@@ -2408,6 +2958,427 @@ const docTemplate = `{
                 "ItemRoleAssistant"
             ]
         },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.CreateResponseRequest": {
+            "type": "object",
+            "required": [
+                "input",
+                "model"
+            ],
+            "properties": {
+                "background": {
+                    "description": "Whether to run the response in the background.",
+                    "type": "boolean"
+                },
+                "conversation": {
+                    "description": "The conversation ID to append items to. If not set or set to ClientCreatedRootConversationID, a new conversation will be created.",
+                    "type": "string"
+                },
+                "frequency_penalty": {
+                    "description": "The frequency penalty to use for this response.",
+                    "type": "number"
+                },
+                "input": {
+                    "description": "The input to the model. Can be a string or array of strings."
+                },
+                "logit_bias": {
+                    "description": "The logit bias to use for this response.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number",
+                        "format": "float64"
+                    }
+                },
+                "max_tokens": {
+                    "description": "The maximum number of tokens to generate.",
+                    "type": "integer"
+                },
+                "metadata": {
+                    "description": "The metadata to use for this response.",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "model": {
+                    "description": "The ID of the model to use for this response.",
+                    "type": "string"
+                },
+                "presence_penalty": {
+                    "description": "The presence penalty to use for this response.",
+                    "type": "number"
+                },
+                "previous_response_id": {
+                    "description": "The ID of the previous response to continue from. If set, the conversation will be loaded from the previous response.",
+                    "type": "string"
+                },
+                "repetition_penalty": {
+                    "description": "The repetition penalty to use for this response.",
+                    "type": "number"
+                },
+                "response_format": {
+                    "description": "The response format to use for this response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.ResponseFormat"
+                        }
+                    ]
+                },
+                "seed": {
+                    "description": "The seed to use for this response.",
+                    "type": "integer"
+                },
+                "stop": {
+                    "description": "The stop sequences to use for this response.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "store": {
+                    "description": "Whether to store the conversation. If false, no conversation will be created or used.",
+                    "type": "boolean"
+                },
+                "stream": {
+                    "description": "Whether to stream the response.",
+                    "type": "boolean"
+                },
+                "system_prompt": {
+                    "description": "The system prompt to use for this response.",
+                    "type": "string"
+                },
+                "temperature": {
+                    "description": "The temperature to use for this response.",
+                    "type": "number"
+                },
+                "timeout": {
+                    "description": "The timeout in seconds for this response.",
+                    "type": "integer"
+                },
+                "tool_choice": {
+                    "description": "The tool choice to use for this response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.ToolChoice"
+                        }
+                    ]
+                },
+                "tools": {
+                    "description": "The tools to use for this response.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.Tool"
+                    }
+                },
+                "top_k": {
+                    "description": "The top_k to use for this response.",
+                    "type": "integer"
+                },
+                "top_p": {
+                    "description": "The top_p to use for this response.",
+                    "type": "number"
+                },
+                "user": {
+                    "description": "The user to use for this response.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.FileInput": {
+            "type": "object",
+            "required": [
+                "file_id"
+            ],
+            "properties": {
+                "file_id": {
+                    "description": "The ID of the file.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.FileSearchInput": {
+            "type": "object",
+            "required": [
+                "file_ids",
+                "query"
+            ],
+            "properties": {
+                "file_ids": {
+                    "description": "The IDs of the files to search in.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "max_results": {
+                    "description": "The number of results to return.",
+                    "type": "integer"
+                },
+                "query": {
+                    "description": "The query to search for.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionCall": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "arguments": {
+                    "description": "The arguments to pass to the function.",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "name": {
+                    "description": "The name of the function to call.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionCallsInput": {
+            "type": "object",
+            "required": [
+                "calls"
+            ],
+            "properties": {
+                "calls": {
+                    "description": "The function calls to make.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionCall"
+                    }
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionChoice": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "description": "The name of the function.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionDefinition": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "description": "The description of the function.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "The name of the function.",
+                    "type": "string"
+                },
+                "parameters": {
+                    "description": "The parameters of the function.",
+                    "type": "object",
+                    "additionalProperties": {}
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.ImageInput": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "description": "The base64 encoded image data.",
+                    "type": "string"
+                },
+                "detail": {
+                    "description": "The detail level for the image.",
+                    "type": "string"
+                },
+                "url": {
+                    "description": "The URL of the image.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.InputType": {
+            "type": "string",
+            "enum": [
+                "text",
+                "image",
+                "file",
+                "web_search",
+                "file_search",
+                "streaming",
+                "function_calls",
+                "reasoning"
+            ],
+            "x-enum-varnames": [
+                "InputTypeText",
+                "InputTypeImage",
+                "InputTypeFile",
+                "InputTypeWebSearch",
+                "InputTypeFileSearch",
+                "InputTypeStreaming",
+                "InputTypeFunctionCalls",
+                "InputTypeReasoning"
+            ]
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.ReasoningInput": {
+            "type": "object",
+            "required": [
+                "task"
+            ],
+            "properties": {
+                "context": {
+                    "description": "The context for the reasoning task.",
+                    "type": "string"
+                },
+                "task": {
+                    "description": "The reasoning task to perform.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.ResponseFormat": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "type": {
+                    "description": "The type of response format.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.StreamingInput": {
+            "type": "object",
+            "required": [
+                "url"
+            ],
+            "properties": {
+                "body": {
+                    "description": "The body to send with the request.",
+                    "type": "string"
+                },
+                "headers": {
+                    "description": "The headers to send with the request.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "method": {
+                    "description": "The method to use for the request.",
+                    "type": "string"
+                },
+                "url": {
+                    "description": "The URL to stream from.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.Tool": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "function": {
+                    "description": "The function definition for function tools.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionDefinition"
+                        }
+                    ]
+                },
+                "type": {
+                    "description": "The type of tool.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.ToolChoice": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "function": {
+                    "description": "The function to use for function tool choice.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionChoice"
+                        }
+                    ]
+                },
+                "type": {
+                    "description": "The type of tool choice.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_requests.WebSearchInput": {
+            "type": "object",
+            "required": [
+                "query"
+            ],
+            "properties": {
+                "max_results": {
+                    "description": "The number of results to return.",
+                    "type": "integer"
+                },
+                "query": {
+                    "description": "The query to search for.",
+                    "type": "string"
+                },
+                "search_engine": {
+                    "description": "The search engine to use.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.ConversationInfo": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "The unique ID of the conversation.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.DetailedUsage": {
+            "type": "object",
+            "properties": {
+                "input_tokens": {
+                    "description": "The number of tokens in the prompt.",
+                    "type": "integer"
+                },
+                "input_tokens_details": {
+                    "description": "Details about input tokens.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.TokenDetails"
+                        }
+                    ]
+                },
+                "output_tokens": {
+                    "description": "The number of tokens in the completion.",
+                    "type": "integer"
+                },
+                "output_tokens_details": {
+                    "description": "Details about output tokens.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.TokenDetails"
+                        }
+                    ]
+                },
+                "total_tokens": {
+                    "description": "The total number of tokens used.",
+                    "type": "integer"
+                }
+            }
+        },
         "menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -2415,6 +3386,15 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.FormatType": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "description": "The type of format.",
                     "type": "string"
                 }
             }
@@ -2427,6 +3407,384 @@ const docTemplate = `{
                 },
                 "status": {
                     "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.InputItem": {
+            "type": "object",
+            "properties": {
+                "created": {
+                    "description": "The Unix timestamp (in seconds) when the input item was created.",
+                    "type": "integer"
+                },
+                "file": {
+                    "description": "The file content (for file type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.FileInput"
+                        }
+                    ]
+                },
+                "file_search": {
+                    "description": "The file search content (for file_search type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.FileSearchInput"
+                        }
+                    ]
+                },
+                "function_calls": {
+                    "description": "The function calls content (for function_calls type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionCallsInput"
+                        }
+                    ]
+                },
+                "id": {
+                    "description": "The unique identifier for the input item.",
+                    "type": "string"
+                },
+                "image": {
+                    "description": "The image content (for image type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.ImageInput"
+                        }
+                    ]
+                },
+                "object": {
+                    "description": "The object type, which is always \"input_item\".",
+                    "type": "string"
+                },
+                "reasoning": {
+                    "description": "The reasoning content (for reasoning type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.ReasoningInput"
+                        }
+                    ]
+                },
+                "streaming": {
+                    "description": "The streaming content (for streaming type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.StreamingInput"
+                        }
+                    ]
+                },
+                "text": {
+                    "description": "The text content (for text type).",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "The type of input item.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.InputType"
+                        }
+                    ]
+                },
+                "web_search": {
+                    "description": "The web search content (for web_search type).",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.WebSearchInput"
+                        }
+                    ]
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListInputItemsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "description": "The list of input items.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.InputItem"
+                    }
+                },
+                "first_id": {
+                    "description": "The first ID in the list.",
+                    "type": "string"
+                },
+                "has_more": {
+                    "description": "Whether there are more items available.",
+                    "type": "boolean"
+                },
+                "last_id": {
+                    "description": "The last ID in the list.",
+                    "type": "string"
+                },
+                "object": {
+                    "description": "The object type, which is always \"list\".",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.Reasoning": {
+            "type": "object",
+            "properties": {
+                "effort": {
+                    "description": "The effort level for reasoning.",
+                    "type": "string"
+                },
+                "summary": {
+                    "description": "The summary of reasoning.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.Response": {
+            "type": "object",
+            "properties": {
+                "background": {
+                    "description": "Whether the response was run in the background.",
+                    "type": "boolean"
+                },
+                "cancelled_at": {
+                    "description": "The Unix timestamp (in seconds) when the response was cancelled.",
+                    "type": "integer"
+                },
+                "completed_at": {
+                    "description": "The Unix timestamp (in seconds) when the response was completed.",
+                    "type": "integer"
+                },
+                "conversation": {
+                    "description": "The conversation that this response belongs to.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ConversationInfo"
+                        }
+                    ]
+                },
+                "created": {
+                    "description": "The Unix timestamp (in seconds) when the response was created.",
+                    "type": "integer"
+                },
+                "error": {
+                    "description": "The error that occurred during processing, if any.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ResponseError"
+                        }
+                    ]
+                },
+                "failed_at": {
+                    "description": "The Unix timestamp (in seconds) when the response was failed.",
+                    "type": "integer"
+                },
+                "frequency_penalty": {
+                    "description": "The frequency penalty that was used for this response.",
+                    "type": "number"
+                },
+                "id": {
+                    "description": "The unique identifier for the response.",
+                    "type": "string"
+                },
+                "incomplete_details": {
+                    "description": "OpenAI API response fields"
+                },
+                "input": {
+                    "description": "The input that was provided to the model. Can be a string or array of strings."
+                },
+                "instructions": {},
+                "logit_bias": {
+                    "description": "The logit bias that was used for this response.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number",
+                        "format": "float64"
+                    }
+                },
+                "max_output_tokens": {
+                    "type": "integer"
+                },
+                "max_tokens": {
+                    "description": "The maximum number of tokens that were generated.",
+                    "type": "integer"
+                },
+                "metadata": {
+                    "description": "The metadata that was provided for this response.",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "model": {
+                    "description": "The ID of the model used for this response.",
+                    "type": "string"
+                },
+                "object": {
+                    "description": "The object type, which is always \"response\".",
+                    "type": "string"
+                },
+                "output": {
+                    "description": "The output generated by the model."
+                },
+                "parallel_tool_calls": {
+                    "type": "boolean"
+                },
+                "presence_penalty": {
+                    "description": "The presence penalty that was used for this response.",
+                    "type": "number"
+                },
+                "previous_response_id": {
+                    "type": "string"
+                },
+                "reasoning": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.Reasoning"
+                },
+                "repetition_penalty": {
+                    "description": "The repetition penalty that was used for this response.",
+                    "type": "number"
+                },
+                "response_format": {
+                    "description": "The response format that was used for this response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.ResponseFormat"
+                        }
+                    ]
+                },
+                "seed": {
+                    "description": "The seed that was used for this response.",
+                    "type": "integer"
+                },
+                "status": {
+                    "description": "The status of the response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ResponseStatus"
+                        }
+                    ]
+                },
+                "stop": {
+                    "description": "The stop sequences that were used for this response.",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "store": {
+                    "type": "boolean"
+                },
+                "stream": {
+                    "description": "Whether the response was streamed.",
+                    "type": "boolean"
+                },
+                "system_prompt": {
+                    "description": "The system prompt that was used for this response.",
+                    "type": "string"
+                },
+                "temperature": {
+                    "description": "The temperature that was used for this response.",
+                    "type": "number"
+                },
+                "text": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.TextFormat"
+                },
+                "timeout": {
+                    "description": "The timeout in seconds that was used for this response.",
+                    "type": "integer"
+                },
+                "tool_choice": {
+                    "description": "The tool choice that was used for this response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.ToolChoice"
+                        }
+                    ]
+                },
+                "tools": {
+                    "description": "The tools that were used for this response.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.Tool"
+                    }
+                },
+                "top_k": {
+                    "description": "The top_k that was used for this response.",
+                    "type": "integer"
+                },
+                "top_p": {
+                    "description": "The top_p that was used for this response.",
+                    "type": "number"
+                },
+                "truncation": {
+                    "type": "string"
+                },
+                "usage": {
+                    "description": "The usage statistics for this response.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.DetailedUsage"
+                        }
+                    ]
+                },
+                "user": {
+                    "description": "The user that was provided for this response.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.ResponseError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "The error code.",
+                    "type": "string"
+                },
+                "details": {
+                    "description": "The error details.",
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "message": {
+                    "description": "The error message.",
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.ResponseStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "running",
+                "completed",
+                "cancelled",
+                "failed"
+            ],
+            "x-enum-varnames": [
+                "ResponseStatusPending",
+                "ResponseStatusRunning",
+                "ResponseStatusCompleted",
+                "ResponseStatusCancelled",
+                "ResponseStatusFailed"
+            ]
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.TextFormat": {
+            "type": "object",
+            "properties": {
+                "format": {
+                    "description": "The format type.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.FormatType"
+                        }
+                    ]
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses.TokenDetails": {
+            "type": "object",
+            "properties": {
+                "cached_tokens": {
+                    "description": "The number of cached tokens.",
+                    "type": "integer"
+                },
+                "reasoning_tokens": {
+                    "description": "The number of reasoning tokens.",
+                    "type": "integer"
                 }
             }
         },
@@ -2470,13 +3828,13 @@ const docTemplate = `{
                 }
             }
         },
-        "menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ConversationResponse": {
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ExtendedConversationResponse": {
             "type": "object",
             "properties": {
                 "data": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ConversationResponse"
+                        "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ExtendedConversationResponse"
                     }
                 },
                 "first_id": {
@@ -2531,31 +3889,6 @@ const docTemplate = `{
                 "ObjectTypeListList"
             ]
         },
-        "openai.ChatCompletionChoice": {
-            "type": "object",
-            "properties": {
-                "content_filter_results": {
-                    "$ref": "#/definitions/openai.ContentFilterResults"
-                },
-                "finish_reason": {
-                    "description": "FinishReason\nstop: API returned complete message,\nor a message terminated by one of the stop sequences provided via the stop parameter\nlength: Incomplete model output due to max_tokens parameter or token limit\nfunction_call: The model decided to call a function\ncontent_filter: Omitted content due to a flag from our content filters\nnull: API response still in progress or incomplete",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/openai.FinishReason"
-                        }
-                    ]
-                },
-                "index": {
-                    "type": "integer"
-                },
-                "logprobs": {
-                    "$ref": "#/definitions/openai.LogProbs"
-                },
-                "message": {
-                    "$ref": "#/definitions/openai.ChatCompletionMessage"
-                }
-            }
-        },
         "openai.ChatCompletionMessage": {
             "type": "object",
             "properties": {
@@ -2595,153 +3928,6 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/openai.ToolCall"
                     }
-                }
-            }
-        },
-        "openai.ChatCompletionRequest": {
-            "type": "object",
-            "properties": {
-                "chat_template_kwargs": {
-                    "description": "ChatTemplateKwargs provides a way to add non-standard parameters to the request body.\nAdditional kwargs to pass to the template renderer. Will be accessible by the chat template.\nSuch as think mode for qwen3. \"chat_template_kwargs\": {\"enable_thinking\": false}\nhttps://qwen.readthedocs.io/en/latest/deployment/vllm.html#thinking-non-thinking-modes",
-                    "type": "object",
-                    "additionalProperties": {}
-                },
-                "frequency_penalty": {
-                    "type": "number"
-                },
-                "function_call": {
-                    "description": "Deprecated: use ToolChoice instead."
-                },
-                "functions": {
-                    "description": "Deprecated: use Tools instead.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/openai.FunctionDefinition"
-                    }
-                },
-                "guided_choice": {
-                    "description": "GuidedChoice is a vLLM-specific extension that restricts the model's output\nto one of the predefined string choices provided in this field. This feature\nis used to constrain the model's responses to a controlled set of options,\nensuring predictable and consistent outputs in scenarios where specific\nchoices are required.",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "logit_bias": {
-                    "description": "LogitBias is must be a token id string (specified by their token ID in the tokenizer), not a word string.\nincorrect: ` + "`" + `\"logit_bias\":{\"You\": 6}` + "`" + `, correct: ` + "`" + `\"logit_bias\":{\"1639\": 6}` + "`" + `\nrefs: https://platform.openai.com/docs/api-reference/chat/create#chat/create-logit_bias",
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "integer"
-                    }
-                },
-                "logprobs": {
-                    "description": "LogProbs indicates whether to return log probabilities of the output tokens or not.\nIf true, returns the log probabilities of each output token returned in the content of message.\nThis option is currently not available on the gpt-4-vision-preview model.",
-                    "type": "boolean"
-                },
-                "max_completion_tokens": {
-                    "description": "MaxCompletionTokens An upper bound for the number of tokens that can be generated for a completion,\nincluding visible output tokens and reasoning tokens https://platform.openai.com/docs/guides/reasoning",
-                    "type": "integer"
-                },
-                "max_tokens": {
-                    "description": "MaxTokens The maximum number of tokens that can be generated in the chat completion.\nThis value can be used to control costs for text generated via API.\nDeprecated: use MaxCompletionTokens. Not compatible with o1-series models.\nrefs: https://platform.openai.com/docs/api-reference/chat/create#chat-create-max_tokens",
-                    "type": "integer"
-                },
-                "messages": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/openai.ChatCompletionMessage"
-                    }
-                },
-                "metadata": {
-                    "description": "Metadata to store with the completion.",
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "model": {
-                    "type": "string"
-                },
-                "n": {
-                    "type": "integer"
-                },
-                "parallel_tool_calls": {
-                    "description": "Disable the default behavior of parallel tool calls by setting it: false."
-                },
-                "prediction": {
-                    "description": "Configuration for a predicted output.",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/openai.Prediction"
-                        }
-                    ]
-                },
-                "presence_penalty": {
-                    "type": "number"
-                },
-                "reasoning_effort": {
-                    "description": "Controls effort on reasoning for reasoning models. It can be set to \"low\", \"medium\", or \"high\".",
-                    "type": "string"
-                },
-                "response_format": {
-                    "$ref": "#/definitions/openai.ChatCompletionResponseFormat"
-                },
-                "safety_identifier": {
-                    "description": "A stable identifier used to help detect users of your application that may be violating OpenAI's usage policies.\nThe IDs should be a string that uniquely identifies each user.\nWe recommend hashing their username or email address, in order to avoid sending us any identifying information.\nhttps://platform.openai.com/docs/api-reference/chat/create#chat_create-safety_identifier",
-                    "type": "string"
-                },
-                "seed": {
-                    "type": "integer"
-                },
-                "service_tier": {
-                    "description": "Specifies the latency tier to use for processing the request.",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/openai.ServiceTier"
-                        }
-                    ]
-                },
-                "stop": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "store": {
-                    "description": "Store can be set to true to store the output of this completion request for use in distillations and evals.\nhttps://platform.openai.com/docs/api-reference/chat/create#chat-create-store",
-                    "type": "boolean"
-                },
-                "stream": {
-                    "type": "boolean"
-                },
-                "stream_options": {
-                    "description": "Options for streaming response. Only set this when you set stream: true.",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/openai.StreamOptions"
-                        }
-                    ]
-                },
-                "temperature": {
-                    "type": "number"
-                },
-                "tool_choice": {
-                    "description": "This can be either a string or an ToolChoice object."
-                },
-                "tools": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/openai.Tool"
-                    }
-                },
-                "top_logprobs": {
-                    "description": "TopLogProbs is an integer between 0 and 5 specifying the number of most likely tokens to return at each\ntoken position, each with an associated log probability.\nlogprobs must be set to true if this parameter is used.",
-                    "type": "integer"
-                },
-                "top_p": {
-                    "type": "number"
-                },
-                "user": {
-                    "type": "string"
                 }
             }
         },
@@ -2820,65 +4006,6 @@ const docTemplate = `{
                 "ChatMessagePartTypeImageURL"
             ]
         },
-        "openai.CompletionTokensDetails": {
-            "type": "object",
-            "properties": {
-                "accepted_prediction_tokens": {
-                    "type": "integer"
-                },
-                "audio_tokens": {
-                    "type": "integer"
-                },
-                "reasoning_tokens": {
-                    "type": "integer"
-                },
-                "rejected_prediction_tokens": {
-                    "type": "integer"
-                }
-            }
-        },
-        "openai.ContentFilterResults": {
-            "type": "object",
-            "properties": {
-                "hate": {
-                    "$ref": "#/definitions/openai.Hate"
-                },
-                "jailbreak": {
-                    "$ref": "#/definitions/openai.JailBreak"
-                },
-                "profanity": {
-                    "$ref": "#/definitions/openai.Profanity"
-                },
-                "self_harm": {
-                    "$ref": "#/definitions/openai.SelfHarm"
-                },
-                "sexual": {
-                    "$ref": "#/definitions/openai.Sexual"
-                },
-                "violence": {
-                    "$ref": "#/definitions/openai.Violence"
-                }
-            }
-        },
-        "openai.FinishReason": {
-            "type": "string",
-            "enum": [
-                "stop",
-                "length",
-                "function_call",
-                "tool_calls",
-                "content_filter",
-                "null"
-            ],
-            "x-enum-varnames": [
-                "FinishReasonStop",
-                "FinishReasonLength",
-                "FinishReasonFunctionCall",
-                "FinishReasonToolCalls",
-                "FinishReasonContentFilter",
-                "FinishReasonNull"
-            ]
-        },
         "openai.FunctionCall": {
             "type": "object",
             "properties": {
@@ -2908,17 +4035,6 @@ const docTemplate = `{
                 }
             }
         },
-        "openai.Hate": {
-            "type": "object",
-            "properties": {
-                "filtered": {
-                    "type": "boolean"
-                },
-                "severity": {
-                    "type": "string"
-                }
-            }
-        },
         "openai.ImageURLDetail": {
             "type": "string",
             "enum": [
@@ -2932,54 +4048,6 @@ const docTemplate = `{
                 "ImageURLDetailAuto"
             ]
         },
-        "openai.JailBreak": {
-            "type": "object",
-            "properties": {
-                "detected": {
-                    "type": "boolean"
-                },
-                "filtered": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "openai.LogProb": {
-            "type": "object",
-            "properties": {
-                "bytes": {
-                    "description": "Omitting the field if it is null",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "logprob": {
-                    "type": "number"
-                },
-                "token": {
-                    "type": "string"
-                },
-                "top_logprobs": {
-                    "description": "TopLogProbs is a list of the most likely tokens and their log probability, at this token position.\nIn rare cases, there may be fewer than the number of requested top_logprobs returned.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/openai.TopLogProbs"
-                    }
-                }
-            }
-        },
-        "openai.LogProbs": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "description": "Content is a list of message content tokens with log probability information.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/openai.LogProb"
-                    }
-                }
-            }
-        },
         "openai.Prediction": {
             "type": "object",
             "properties": {
@@ -2987,39 +4055,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "openai.Profanity": {
-            "type": "object",
-            "properties": {
-                "detected": {
-                    "type": "boolean"
-                },
-                "filtered": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "openai.PromptTokensDetails": {
-            "type": "object",
-            "properties": {
-                "audio_tokens": {
-                    "type": "integer"
-                },
-                "cached_tokens": {
-                    "type": "integer"
-                }
-            }
-        },
-        "openai.SelfHarm": {
-            "type": "object",
-            "properties": {
-                "filtered": {
-                    "type": "boolean"
-                },
-                "severity": {
                     "type": "string"
                 }
             }
@@ -3038,17 +4073,6 @@ const docTemplate = `{
                 "ServiceTierFlex",
                 "ServiceTierPriority"
             ]
-        },
-        "openai.Sexual": {
-            "type": "object",
-            "properties": {
-                "filtered": {
-                    "type": "boolean"
-                },
-                "severity": {
-                    "type": "string"
-                }
-            }
         },
         "openai.StreamOptions": {
             "type": "object",
@@ -3096,54 +4120,6 @@ const docTemplate = `{
             "x-enum-varnames": [
                 "ToolTypeFunction"
             ]
-        },
-        "openai.TopLogProbs": {
-            "type": "object",
-            "properties": {
-                "bytes": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "logprob": {
-                    "type": "number"
-                },
-                "token": {
-                    "type": "string"
-                }
-            }
-        },
-        "openai.Usage": {
-            "type": "object",
-            "properties": {
-                "completion_tokens": {
-                    "type": "integer"
-                },
-                "completion_tokens_details": {
-                    "$ref": "#/definitions/openai.CompletionTokensDetails"
-                },
-                "prompt_tokens": {
-                    "type": "integer"
-                },
-                "prompt_tokens_details": {
-                    "$ref": "#/definitions/openai.PromptTokensDetails"
-                },
-                "total_tokens": {
-                    "type": "integer"
-                }
-            }
-        },
-        "openai.Violence": {
-            "type": "object",
-            "properties": {
-                "filtered": {
-                    "type": "boolean"
-                },
-                "severity": {
-                    "type": "string"
-                }
-            }
         }
     },
     "securityDefinitions": {

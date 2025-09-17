@@ -21,6 +21,99 @@ type ConversationAPI struct {
 	authService         *auth.AuthService
 }
 
+// Request structs
+type CreateConversationRequest struct {
+	Title    string                    `json:"title"`
+	Metadata map[string]string         `json:"metadata,omitempty"`
+	Items    []ConversationItemRequest `json:"items,omitempty"`
+}
+
+type UpdateConversationRequest struct {
+	Title    *string            `json:"title"`
+	Metadata *map[string]string `json:"metadata"`
+}
+
+type ConversationItemRequest struct {
+	Type    string                       `json:"type" binding:"required"`
+	Role    conversation.ItemRole        `json:"role,omitempty"`
+	Content []ConversationContentRequest `json:"content" binding:"required"`
+}
+
+type ConversationContentRequest struct {
+	Type string `json:"type" binding:"required"`
+	Text string `json:"text,omitempty"`
+}
+
+type CreateItemsRequest struct {
+	Items []ConversationItemRequest `json:"items" binding:"required"`
+}
+
+// Response structs
+type ExtendedConversationResponse struct {
+	ID        string            `json:"id"`
+	Title     string            `json:"title"`
+	Object    string            `json:"object"`
+	CreatedAt int64             `json:"created_at"`
+	Metadata  map[string]string `json:"metadata"`
+}
+
+type DeletedConversationResponse struct {
+	ID      string `json:"id"`
+	Object  string `json:"object"`
+	Deleted bool   `json:"deleted"`
+}
+
+type ConversationItemResponse struct {
+	ID        string            `json:"id"`
+	Object    string            `json:"object"`
+	Type      string            `json:"type"`
+	Role      *string           `json:"role,omitempty"`
+	Status    *string           `json:"status,omitempty"`
+	CreatedAt int64             `json:"created_at"`
+	Content   []ContentResponse `json:"content,omitempty"`
+}
+
+type ContentResponse struct {
+	Type       string                `json:"type"`
+	Text       *TextResponse         `json:"text,omitempty"`
+	InputText  *string               `json:"input_text,omitempty"`
+	OutputText *OutputTextResponse   `json:"output_text,omitempty"`
+	Image      *ImageContentResponse `json:"image,omitempty"`
+	File       *FileContentResponse  `json:"file,omitempty"`
+}
+
+type TextResponse struct {
+	Value string `json:"value"`
+}
+
+type OutputTextResponse struct {
+	Text        string               `json:"text"`
+	Annotations []AnnotationResponse `json:"annotations"`
+}
+
+type ImageContentResponse struct {
+	URL    string `json:"url,omitempty"`
+	FileID string `json:"file_id,omitempty"`
+	Detail string `json:"detail,omitempty"`
+}
+
+type FileContentResponse struct {
+	FileID   string `json:"file_id"`
+	Name     string `json:"name,omitempty"`
+	MimeType string `json:"mime_type,omitempty"`
+	Size     int64  `json:"size,omitempty"`
+}
+
+type AnnotationResponse struct {
+	Type       string `json:"type"`
+	Text       string `json:"text,omitempty"`
+	FileID     string `json:"file_id,omitempty"`
+	URL        string `json:"url,omitempty"`
+	StartIndex int    `json:"start_index"`
+	EndIndex   int    `json:"end_index"`
+	Index      int    `json:"index,omitempty"`
+}
+
 // NewConversationAPI creates a new conversation API instance
 func NewConversationAPI(
 	conversationService *conversation.ConversationService,
@@ -38,16 +131,15 @@ func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 		api.authService.RegisteredUserMiddleware(),
 	)
 
-	// OpenAI-compatible endpoints with Swagger documentation
-	conversationsRouter.POST("", api.createConversation)
-	conversationsRouter.GET("", api.listConversations)
+	conversationsRouter.POST("", api.CreateConversationHandler)
+	conversationsRouter.GET("", api.ListConversationsHandler)
 
 	conversationMiddleWare := api.conversationService.GetConversationMiddleWare()
-	conversationsRouter.GET(fmt.Sprintf("/:%s", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.getConversation)
-	conversationsRouter.PATCH(fmt.Sprintf("/:%s", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.updateConversation)
-	conversationsRouter.DELETE(fmt.Sprintf("/:%s", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.deleteConversation)
-	conversationsRouter.POST(fmt.Sprintf("/:%s/items", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.createItems)
-	conversationsRouter.GET(fmt.Sprintf("/:%s/items", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.listItems)
+	conversationsRouter.GET(fmt.Sprintf("/:%s", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.GetConversationHandler)
+	conversationsRouter.PATCH(fmt.Sprintf("/:%s", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.UpdateConversationHandler)
+	conversationsRouter.DELETE(fmt.Sprintf("/:%s", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.DeleteConversationHandler)
+	conversationsRouter.POST(fmt.Sprintf("/:%s/items", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.CreateItemsHandler)
+	conversationsRouter.GET(fmt.Sprintf("/:%s/items", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.ListItemsHandler)
 
 	conversationItemMiddleWare := api.conversationService.GetConversationItemMiddleWare()
 	conversationsRouter.GET(
@@ -58,7 +150,7 @@ func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 		),
 		conversationMiddleWare,
 		conversationItemMiddleWare,
-		api.getItem,
+		api.GetItemHandler,
 	)
 	conversationsRouter.DELETE(
 		fmt.Sprintf(
@@ -68,34 +160,34 @@ func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 		),
 		conversationMiddleWare,
 		conversationItemMiddleWare,
-		api.deleteItem,
+		api.DeleteItemHandler,
 	)
 }
 
-// ListConversations
 // @Summary List Conversations
-// @Description Retrieves a paginated list of conversations for the authenticated user.
+// @Description Retrieves a paginated list of conversations for the authenticated user with OpenAI-compatible response format.
 // @Tags Conversations
 // @Security BearerAuth
 // @Param limit query int false "The maximum number of items to return" default(20)
 // @Param after query string false "A cursor for use in pagination. The ID of the last object from the previous page"
 // @Param order query string false "Order of items (asc/desc)"
-// @Success 200 {object} openai.ListResponse[ConversationResponse] "Successfully retrieved the list of conversations"
+// @Success 200 {object} openai.ListResponse[ExtendedConversationResponse] "Successfully retrieved the list of conversations"
 // @Failure 400 {object} responses.ErrorResponse "Bad Request - Invalid pagination parameters"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - invalid or missing API key"
 // @Failure 500 {object} responses.ErrorResponse "Internal Server Error"
 // @Router /v1/conversations [get]
-func (api *ConversationAPI) listConversations(reqCtx *gin.Context) {
+func (api *ConversationAPI) ListConversationsHandler(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
 	user, _ := auth.GetUserFromContext(reqCtx)
 	userID := user.ID
+
 	pagination, err := query.GetCursorPaginationFromQuery(reqCtx, func(lastID string) (*uint, error) {
-		convs, err := api.conversationService.FindConversationsByFilter(ctx, conversation.ConversationFilter{
+		convs, convErr := api.conversationService.FindConversationsByFilter(ctx, conversation.ConversationFilter{
 			UserID:   &userID,
 			PublicID: &lastID,
 		}, nil)
-		if err != nil {
-			return nil, err
+		if convErr != nil {
+			return nil, convErr
 		}
 		if len(convs) != 1 {
 			return nil, fmt.Errorf("invalid conversation")
@@ -104,8 +196,8 @@ func (api *ConversationAPI) listConversations(reqCtx *gin.Context) {
 	})
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:          "5f89e23d-d4a0-45ce-ba43-ae2a9be0ca64",
-			ErrorInstance: err,
+			Code:  "5f89e23d-d4a0-45ce-ba43-ae2a9be0ca64",
+			Error: "Invalid pagination parameters",
 		})
 		return
 	}
@@ -113,19 +205,19 @@ func (api *ConversationAPI) listConversations(reqCtx *gin.Context) {
 	filter := conversation.ConversationFilter{
 		UserID: &userID,
 	}
-	conversations, err := api.conversationService.FindConversationsByFilter(ctx, filter, pagination)
-	if err != nil {
+	conversations, convErr := api.conversationService.FindConversationsByFilter(ctx, filter, pagination)
+	if convErr != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:          "ac74fc61-fd96-4d5b-a630-e7a8e1e46575",
-			ErrorInstance: err,
+			Code:          "019952d5-6876-7323-96fa-89784b7d082e",
+			ErrorInstance: convErr.GetError(),
 		})
 		return
 	}
-	count, err := api.conversationService.CountConversationsByFilter(ctx, filter)
-	if err != nil {
+	count, countErr := api.conversationService.CountConversationsByFilter(ctx, filter)
+	if countErr != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:          "ae349271-d67e-4f76-a220-6945d802cbe2",
-			ErrorInstance: err,
+			Code:          "019952d5-1afc-7229-bb57-6928f54d5171",
+			ErrorInstance: convErr.GetError(),
 		})
 		return
 	}
@@ -135,15 +227,15 @@ func (api *ConversationAPI) listConversations(reqCtx *gin.Context) {
 	if len(conversations) > 0 {
 		firstId = &conversations[0].PublicID
 		lastId = &conversations[len(conversations)-1].PublicID
-		moreRecords, err := api.conversationService.FindConversationsByFilter(ctx, filter, &query.Pagination{
+		moreRecords, moreErr := api.conversationService.FindConversationsByFilter(ctx, filter, &query.Pagination{
 			Order: pagination.Order,
 			Limit: ptr.ToInt(1),
 			After: &conversations[len(conversations)-1].ID,
 		})
-		if err != nil {
+		if moreErr != nil {
 			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:          "0b6b667c-aa25-4863-8494-a4ae2e5d12c4",
-				ErrorInstance: err,
+				Code:          "019952d5-983a-73a8-8439-290ae4b4ee51",
+				ErrorInstance: convErr.GetError(),
 			})
 			return
 		}
@@ -152,38 +244,33 @@ func (api *ConversationAPI) listConversations(reqCtx *gin.Context) {
 		}
 	}
 
-	reqCtx.JSON(http.StatusOK, openai.ListResponse[*ConversationResponse]{
-		Object:  openai.ObjectTypeListList,
+	result := functional.Map(conversations, domainToExtendedConversationResponse)
+
+	response := openai.ListResponse[*ExtendedConversationResponse]{
+		Object:  "list",
 		FirstID: firstId,
 		LastID:  lastId,
 		Total:   count,
 		HasMore: hasMore,
-		Data:    functional.Map(conversations, domainToConversationResponse),
-	})
+		Data:    result,
+	}
+
+	reqCtx.JSON(http.StatusOK, response)
 }
 
-// ConversationResponse represents the response structure
-type ConversationResponse struct {
-	ID        string            `json:"id"`
-	Object    string            `json:"object"`
-	CreatedAt int64             `json:"created_at"`
-	Metadata  map[string]string `json:"metadata"`
-}
-
-// createConversation handles conversation creation
 // @Summary Create a conversation
-// @Description Creates a new conversation for the authenticated user
+// @Description Creates a new conversation for the authenticated user with optional items
 // @Tags Conversations
 // @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Param request body CreateConversationRequest true "Create conversation request"
-// @Success 200 {object} ConversationResponse "Created conversation"
-// @Failure 400 {object} responses.ErrorResponse "Invalid request"
+// @Success 200 {object} ExtendedConversationResponse "Created conversation"
+// @Failure 400 {object} responses.ErrorResponse "Invalid request - Bad payload, too many items, or invalid item format"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations [post]
-func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
+func (api *ConversationAPI) CreateConversationHandler(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
 	user, _ := auth.GetUserFromContext(reqCtx)
 	userId := user.ID
@@ -199,7 +286,8 @@ func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
 
 	if len(request.Items) > 20 {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code: "0e5b8426-b1d2-4114-ac81-d3982dc497cf",
+			Code:  "0e5b8426-b1d2-4114-ac81-d3982dc497cf",
+			Error: "Too many items",
 		})
 		return
 	}
@@ -210,17 +298,19 @@ func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
 		item, ok := NewItemFromConversationItemRequest(itemReq)
 		if !ok {
 			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-				Code: "1fe8d03b-9e1e-4e52-b5b5-77a25954fc43",
+				Code:  "1fe8d03b-9e1e-4e52-b5b5-77a25954fc43",
+				Error: "Invalid item format",
 			})
 			return
 		}
 		itemsToCreate[i] = item
 	}
 
-	ok, errorCode := api.conversationService.ValidateItems(ctx, itemsToCreate)
-	if !ok {
+	err := api.conversationService.ValidateItems(ctx, itemsToCreate)
+	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code: *errorCode,
+			Code:          "019952d0-1dc9-746e-82ff-dd42b1e7930f",
+			ErrorInstance: err.GetError(),
 		})
 		return
 	}
@@ -228,9 +318,9 @@ func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
 	// Create conversation
 	conv, err := api.conversationService.CreateConversation(ctx, userId, &request.Title, true, request.Metadata)
 	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:          "8fc529d7-f384-40f2-ac15-cd1f1e109316",
-			ErrorInstance: err,
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:          "019952d0-3e32-76ba-a97f-711223df2c84",
+			ErrorInstance: err.GetError(),
 		})
 		return
 	}
@@ -239,70 +329,55 @@ func (api *ConversationAPI) createConversation(reqCtx *gin.Context) {
 	if len(request.Items) > 0 {
 		_, err := api.conversationService.AddMultipleItems(ctx, conv, userId, itemsToCreate)
 		if err != nil {
-			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:          "8fc529d7-f384-40f2-ac15-cd1f1e109316",
-				ErrorInstance: err,
-			})
-			return
-		}
-
-		// Reload conversation with items
-		conv, err = api.conversationService.GetConversationByPublicIDAndUserID(ctx, conv.PublicID, userId)
-		if err != nil {
-			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:          "8fc529d7-f384-40f2-ac15-cd1f1e109316",
-				ErrorInstance: err,
+			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+				Code:          "019952d0-6d70-7419-81ae-828d8009ee56",
+				ErrorInstance: err.GetError(),
 			})
 			return
 		}
 	}
 
-	reqCtx.JSON(http.StatusOK, domainToConversationResponse(conv))
+	response := domainToExtendedConversationResponse(conv)
+	reqCtx.JSON(http.StatusOK, response)
 }
 
-// getConversation handles conversation retrieval
 // @Summary Get a conversation
-// @Description Retrieves a conversation by its ID
+// @Description Retrieves a conversation by its ID with full metadata and title
 // @Tags Conversations
 // @Security BearerAuth
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
-// @Success 200 {object} ConversationResponse "Conversation details"
+// @Success 200 {object} ExtendedConversationResponse "Conversation details"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id} [get]
-func (api *ConversationAPI) getConversation(reqCtx *gin.Context) {
+func (api *ConversationAPI) GetConversationHandler(reqCtx *gin.Context) {
 	conv, ok := conversation.GetConversationFromContext(reqCtx)
 	if !ok {
 		return
 	}
-	reqCtx.JSON(http.StatusOK, domainToConversationResponse(conv))
+	response := domainToExtendedConversationResponse(conv)
+	reqCtx.JSON(http.StatusOK, response)
 }
 
-type UpdateConversationRequest struct {
-	Title    *string            `json:"title"`
-	Metadata *map[string]string `json:"metadata"`
-}
-
-// updateConversation handles conversation updates
 // @Summary Update a conversation
-// @Description Updates conversation metadata
+// @Description Updates conversation title and/or metadata
 // @Tags Conversations
 // @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
 // @Param request body UpdateConversationRequest true "Update conversation request"
-// @Success 200 {object} ConversationResponse "Updated conversation"
-// @Failure 400 {object} responses.ErrorResponse "Invalid request"
+// @Success 200 {object} ExtendedConversationResponse "Updated conversation"
+// @Failure 400 {object} responses.ErrorResponse "Invalid request payload or update failed"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id} [patch]
-func (api *ConversationAPI) updateConversation(reqCtx *gin.Context) {
+func (api *ConversationAPI) UpdateConversationHandler(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
 	conv, ok := conversation.GetConversationFromContext(reqCtx)
 	if !ok {
@@ -312,8 +387,8 @@ func (api *ConversationAPI) updateConversation(reqCtx *gin.Context) {
 	var request UpdateConversationRequest
 	if err := reqCtx.ShouldBindJSON(&request); err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:          "4183e285-08ef-4a79-8a68-d53cddd0c0e2",
-			ErrorInstance: err,
+			Code:  "4183e285-08ef-4a79-8a68-d53cddd0c0e2",
+			Error: "Invalid request payload",
 		})
 		return
 	}
@@ -328,25 +403,18 @@ func (api *ConversationAPI) updateConversation(reqCtx *gin.Context) {
 	conv, err := api.conversationService.UpdateConversation(ctx, conv)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:          "3901c185-94fa-4bbc-97ef-6031939ba8c2",
+			Code:          "019952d0-a754-73bc-adbc-781ac31e12d7",
 			ErrorInstance: err,
 		})
 		return
 	}
 
-	reqCtx.JSON(http.StatusOK, domainToConversationResponse(conv))
+	response := domainToExtendedConversationResponse(conv)
+	reqCtx.JSON(http.StatusOK, response)
 }
 
-// DeletedConversationResponse represents the deleted conversation response
-type DeletedConversationResponse struct {
-	ID      string `json:"id"`
-	Object  string `json:"object"`
-	Deleted bool   `json:"deleted"`
-}
-
-// deleteConversation handles conversation deletion
 // @Summary Delete a conversation
-// @Description Deletes a conversation and all its items
+// @Description Deletes a conversation and all its items permanently
 // @Tags Conversations
 // @Security BearerAuth
 // @Produce json
@@ -357,96 +425,31 @@ type DeletedConversationResponse struct {
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id} [delete]
-func (api *ConversationAPI) deleteConversation(reqCtx *gin.Context) {
+func (api *ConversationAPI) DeleteConversationHandler(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
 	conv, ok := conversation.GetConversationFromContext(reqCtx)
 	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code: "a4fb6e9b-00c8-423c-9836-a83080e34d28",
+			Code:  "a4fb6e9b-00c8-423c-9836-a83080e34d28",
+			Error: "Conversation not found",
 		})
 		return
 	}
-	err := api.conversationService.DeleteConversation(ctx, conv)
-	if err != nil {
+
+	success, err := api.conversationService.DeleteConversation(ctx, conv)
+	if !success {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:          "2d5345ba-a6db-441b-b52e-74cf358bdfcd",
-			ErrorInstance: err,
+			Code:          "019952c3-9836-75ea-9785-a8d035a7c136",
+			ErrorInstance: err.GetError(),
 		})
-		return
 	}
-	reqCtx.JSON(http.StatusOK, domainToDeletedConversationResponse(conv))
+	response := domainToDeletedConversationResponse(conv)
+
+	reqCtx.JSON(http.StatusOK, response)
 }
 
-// ConversationItemResponse represents an item in the response
-type ConversationItemResponse struct {
-	ID        string            `json:"id"`
-	Object    string            `json:"object"`
-	Type      string            `json:"type"`
-	Role      *string           `json:"role,omitempty"`
-	Status    *string           `json:"status,omitempty"`
-	CreatedAt int64             `json:"created_at"`
-	Content   []ContentResponse `json:"content,omitempty"`
-}
-
-// ContentResponse represents content in the response
-type ContentResponse struct {
-	Type       string                `json:"type"`
-	Text       *TextResponse         `json:"text,omitempty"`
-	InputText  *string               `json:"input_text,omitempty"`
-	OutputText *OutputTextResponse   `json:"output_text,omitempty"`
-	Image      *ImageContentResponse `json:"image,omitempty"`
-	File       *FileContentResponse  `json:"file,omitempty"`
-}
-
-// TextResponse represents text content in the response
-type TextResponse struct {
-	Value string `json:"value"`
-}
-
-// OutputTextResponse represents AI output text with annotations
-type OutputTextResponse struct {
-	Text        string               `json:"text"`
-	Annotations []AnnotationResponse `json:"annotations"`
-}
-
-// ImageContentResponse represents image content
-type ImageContentResponse struct {
-	URL    string `json:"url,omitempty"`
-	FileID string `json:"file_id,omitempty"`
-	Detail string `json:"detail,omitempty"`
-}
-
-// FileContentResponse represents file content
-type FileContentResponse struct {
-	FileID   string `json:"file_id"`
-	Name     string `json:"name,omitempty"`
-	MimeType string `json:"mime_type,omitempty"`
-	Size     int64  `json:"size,omitempty"`
-}
-
-// AnnotationResponse represents annotation in the response
-type AnnotationResponse struct {
-	Type       string `json:"type"`
-	Text       string `json:"text,omitempty"`
-	FileID     string `json:"file_id,omitempty"`
-	URL        string `json:"url,omitempty"`
-	StartIndex int    `json:"start_index"`
-	EndIndex   int    `json:"end_index"`
-	Index      int    `json:"index,omitempty"`
-}
-
-// ConversationItemListResponse represents the response for item lists
-type ConversationItemListResponse struct {
-	Object  string                      `json:"object"`
-	Data    []*ConversationItemResponse `json:"data"`
-	HasMore bool                        `json:"has_more"`
-	FirstID *string                     `json:"first_id,omitempty"`
-	LastID  *string                     `json:"last_id,omitempty"`
-}
-
-// createItems handles item creation
 // @Summary Create items in a conversation
-// @Description Adds multiple items to a conversation
+// @Description Adds multiple items to a conversation with OpenAI-compatible format
 // @Tags Conversations
 // @Security BearerAuth
 // @Accept json
@@ -454,55 +457,56 @@ type ConversationItemListResponse struct {
 // @Param conversation_id path string true "Conversation ID"
 // @Param request body CreateItemsRequest true "Create items request"
 // @Success 200 {object} openai.ListResponse[ConversationItemResponse] "Created items"
-// @Failure 400 {object} responses.ErrorResponse "Invalid request"
+// @Failure 400 {object} responses.ErrorResponse "Invalid request payload or invalid item format"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id}/items [post]
-func (api *ConversationAPI) createItems(reqCtx *gin.Context) {
+func (api *ConversationAPI) CreateItemsHandler(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
 	conv, _ := conversation.GetConversationFromContext(reqCtx)
 
 	var request CreateItemsRequest
 	if err := reqCtx.ShouldBindJSON(&request); err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:          "a4fb6e9b-00c8-423c-9836-a83080e34d28",
-			ErrorInstance: err,
+			Code:  "a4fb6e9b-00c8-423c-9836-a83080e34d28",
+			Error: "Invalid request payload",
 		})
 		return
 	}
+
 	itemsToCreate := make([]*conversation.Item, len(request.Items))
 	for i, itemReq := range request.Items {
 		item, ok := NewItemFromConversationItemRequest(itemReq)
 		if !ok {
 			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-				Code: "a4fb6e9b-00c8-423c-9836-a83080e34d28",
+				Code:  "a4fb6e9b-00c8-423c-9836-a83080e34d28",
+				Error: "Invalid item format",
 			})
 			return
 		}
 		itemsToCreate[i] = item
 	}
 
-	ok, errorCode := api.conversationService.ValidateItems(ctx, itemsToCreate)
-	if !ok {
-		if errorCode == nil {
-			errorCode = ptr.ToString("41b80303-0e55-4a24-a079-d2d9340d713b")
-		}
+	err := api.conversationService.ValidateItems(ctx, itemsToCreate)
+	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code: *errorCode,
+			Code:          "019952d1-265e-738b-bada-7918c32a61d2",
+			ErrorInstance: err.GetError(),
 		})
 		return
 	}
 
 	createdItems, err := api.conversationService.AddMultipleItems(ctx, conv, conv.UserID, itemsToCreate)
 	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:          *errorCode,
-			ErrorInstance: err,
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:          "019952d1-68dc-73f3-84e3-0f53d8fce318",
+			ErrorInstance: err.GetError(),
 		})
 		return
 	}
+
 	var firstId *string
 	var lastId *string
 	if len(createdItems) > 0 {
@@ -510,33 +514,35 @@ func (api *ConversationAPI) createItems(reqCtx *gin.Context) {
 		lastId = &createdItems[len(createdItems)-1].PublicID
 	}
 
-	reqCtx.JSON(http.StatusOK, openai.ListResponse[*ConversationItemResponse]{
-		Object:  openai.ObjectTypeListList,
+	response := &openai.ListResponse[*ConversationItemResponse]{
+		Object:  "list",
 		Data:    functional.Map(createdItems, domainToConversationItemResponse),
 		FirstID: firstId,
 		LastID:  lastId,
 		HasMore: false,
 		Total:   int64(len(createdItems)),
-	})
+	}
+
+	reqCtx.JSON(http.StatusOK, response)
 }
 
-// listItems handles item listing with optional pagination
 // @Summary List items in a conversation
-// @Description Lists all items in a conversation
+// @Description Lists all items in a conversation with OpenAI-compatible pagination
 // @Tags Conversations
 // @Security BearerAuth
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
 // @Param limit query int false "Number of items to return (1-100)"
-// @Param cursor query string false "Cursor for pagination"
+// @Param after query string false "Cursor for pagination - ID of the last item from previous page"
 // @Param order query string false "Order of items (asc/desc)"
-// @Success 200 {object} ConversationItemListResponse "List of items"
+// @Success 200 {object} openai.ListResponse[ConversationItemResponse] "List of items"
+// @Failure 400 {object} responses.ErrorResponse "Bad Request - Invalid pagination parameters"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id}/items [get]
-func (api *ConversationAPI) listItems(reqCtx *gin.Context) {
+func (api *ConversationAPI) ListItemsHandler(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
 	conv, _ := conversation.GetConversationFromContext(reqCtx)
 
@@ -546,7 +552,7 @@ func (api *ConversationAPI) listItems(reqCtx *gin.Context) {
 			ConversationID: &conv.ID,
 		}, nil)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s: %s", err.GetCode(), err.Error())
 		}
 		if len(items) != 1 {
 			return nil, fmt.Errorf("invalid conversation")
@@ -555,8 +561,8 @@ func (api *ConversationAPI) listItems(reqCtx *gin.Context) {
 	})
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:          "e9144b73-6fc1-4b16-b9c7-460d8a4ecf6b",
-			ErrorInstance: err,
+			Code:  "e9144b73-6fc1-4b16-b9c7-460d8a4ecf6b",
+			Error: "Invalid pagination parameters",
 		})
 		return
 	}
@@ -564,11 +570,11 @@ func (api *ConversationAPI) listItems(reqCtx *gin.Context) {
 	filter := conversation.ItemFilter{
 		ConversationID: &conv.ID,
 	}
-	itemEntities, err := api.conversationService.FindItemsByFilter(ctx, filter, pagination)
-	if err != nil {
+	itemEntities, filterErr := api.conversationService.FindItemsByFilter(ctx, filter, pagination)
+	if filterErr != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:          "49530db0-0c1c-414c-a769-a7a4811dd650",
-			ErrorInstance: err,
+			Code:          "019952d1-a6d2-76ff-9c10-3e9264056f90",
+			ErrorInstance: filterErr.GetError(),
 		})
 		return
 	}
@@ -579,15 +585,15 @@ func (api *ConversationAPI) listItems(reqCtx *gin.Context) {
 	if len(itemEntities) > 0 {
 		firstId = &itemEntities[0].PublicID
 		lastId = &itemEntities[len(itemEntities)-1].PublicID
-		moreRecords, err := api.conversationService.FindItemsByFilter(ctx, filter, &query.Pagination{
+		moreRecords, moreErr := api.conversationService.FindItemsByFilter(ctx, filter, &query.Pagination{
 			Order: pagination.Order,
 			Limit: ptr.ToInt(1),
 			After: &itemEntities[len(itemEntities)-1].ID,
 		})
-		if err != nil {
+		if moreErr != nil {
 			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-				Code:          "f3cefed4-6f86-4e26-9e74-e858601627ca",
-				ErrorInstance: err,
+				Code:          "019952d1-e914-7466-b527-49e498129426",
+				ErrorInstance: moreErr.GetError(),
 			})
 			return
 		}
@@ -596,19 +602,20 @@ func (api *ConversationAPI) listItems(reqCtx *gin.Context) {
 		}
 	}
 
-	reqCtx.JSON(http.StatusOK, openai.ListResponse[*ConversationItemResponse]{
-		Object:  openai.ObjectTypeListList,
+	response := &openai.ListResponse[*ConversationItemResponse]{
+		Object:  "list",
 		Data:    functional.Map(itemEntities, domainToConversationItemResponse),
 		FirstID: firstId,
 		LastID:  lastId,
 		HasMore: hasMore,
 		Total:   int64(len(itemEntities)),
-	})
+	}
+
+	reqCtx.JSON(http.StatusOK, response)
 }
 
-// getItem handles single item retrieval
 // @Summary Get an item from a conversation
-// @Description Retrieves a specific item from a conversation
+// @Description Retrieves a specific item from a conversation with full content details
 // @Tags Conversations
 // @Security BearerAuth
 // @Produce json
@@ -617,32 +624,34 @@ func (api *ConversationAPI) listItems(reqCtx *gin.Context) {
 // @Success 200 {object} ConversationItemResponse "Item details"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
-// @Failure 404 {object} responses.ErrorResponse "Conversation not found"
+// @Failure 404 {object} responses.ErrorResponse "Conversation or item not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id}/items/{item_id} [get]
-func (api *ConversationAPI) getItem(reqCtx *gin.Context) {
+func (api *ConversationAPI) GetItemHandler(reqCtx *gin.Context) {
 	item, ok := conversation.GetConversationItemFromContext(reqCtx)
 	if !ok {
 		return
 	}
-	reqCtx.JSON(http.StatusOK, domainToConversationItemResponse(item))
+
+	response := domainToConversationItemResponse(item)
+	reqCtx.JSON(http.StatusOK, response)
 }
 
-// deleteItem handles item deletion
 // @Summary Delete an item from a conversation
-// @Description Deletes a specific item from a conversation
+// @Description Deletes a specific item from a conversation and returns the deleted item details
 // @Tags Conversations
 // @Security BearerAuth
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
 // @Param item_id path string true "Item ID"
-// @Success 200 {object} ConversationResponse "Updated conversation"
+// @Success 200 {object} ConversationItemResponse "Deleted item details"
+// @Failure 400 {object} responses.ErrorResponse "Bad Request - Deletion failed"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
-// @Failure 404 {object} responses.ErrorResponse "Conversation not found"
+// @Failure 404 {object} responses.ErrorResponse "Conversation or item not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/conversations/{conversation_id}/items/{item_id} [delete]
-func (api *ConversationAPI) deleteItem(reqCtx *gin.Context) {
+func (api *ConversationAPI) DeleteItemHandler(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
 	conv, ok := conversation.GetConversationFromContext(reqCtx)
 	if !ok {
@@ -662,23 +671,61 @@ func (api *ConversationAPI) deleteItem(reqCtx *gin.Context) {
 	// Use efficient deletion with item public ID instead of loading all items
 	itemDeleted, err := api.conversationService.DeleteItemWithConversation(ctx, conv, item)
 	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code: "9c9cdf48-715b-44b9-9be1-6bb19e2401f8",
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:          "019952d2-0f0f-730c-9abc-3fecc1db55c2",
+			ErrorInstance: err,
 		})
 		return
 	}
-	reqCtx.JSON(http.StatusOK, domainToConversationItemResponse(itemDeleted))
+
+	response := domainToConversationItemResponse(itemDeleted)
+	reqCtx.JSON(http.StatusOK, response)
 }
 
-func domainToConversationResponse(entity *conversation.Conversation) *ConversationResponse {
+func NewItemFromConversationItemRequest(itemReq ConversationItemRequest) (*conversation.Item, bool) {
+	ok := conversation.ValidateItemType(string(itemReq.Type))
+	if !ok {
+		return nil, false
+	}
+	itemType := conversation.ItemType(itemReq.Type)
+
+	var role *conversation.ItemRole
+	if itemReq.Role != "" {
+		ok := conversation.ValidateItemRole(string(itemReq.Role))
+		if !ok {
+			return nil, false
+		}
+		r := conversation.ItemRole(itemReq.Role)
+		role = &r
+	}
+
+	content := make([]conversation.Content, len(itemReq.Content))
+	for j, c := range itemReq.Content {
+		content[j] = conversation.Content{
+			Type: c.Type,
+			Text: &conversation.Text{
+				Value: c.Text,
+			},
+		}
+	}
+
+	return &conversation.Item{
+		Type:    itemType,
+		Role:    role,
+		Content: content,
+	}, true
+}
+
+func domainToExtendedConversationResponse(entity *conversation.Conversation) *ExtendedConversationResponse {
 	metadata := entity.Metadata
 	if metadata == nil {
 		metadata = make(map[string]string)
 	}
-	return &ConversationResponse{
+	return &ExtendedConversationResponse{
 		ID:        entity.PublicID,
 		Object:    "conversation",
-		CreatedAt: entity.CreatedAt,
+		Title:     ptr.FromString(entity.Title),
+		CreatedAt: entity.CreatedAt.Unix(),
 		Metadata:  metadata,
 	}
 }
@@ -696,8 +743,8 @@ func domainToConversationItemResponse(entity *conversation.Item) *ConversationIt
 		ID:        entity.PublicID,
 		Object:    "conversation.item",
 		Type:      string(entity.Type),
-		Status:    entity.Status,
-		CreatedAt: entity.CreatedAt,
+		Status:    conversation.ItemStatusToStringPtr(entity.Status),
+		CreatedAt: entity.CreatedAt.Unix(),
 		Content:   domainToContentResponse(entity.Content),
 	}
 
@@ -781,67 +828,4 @@ func domainToAnnotationResponse(annotations []conversation.Annotation) []Annotat
 		}
 	}
 	return result
-}
-
-// AuthenticatedUser represents an authenticated user context
-type AuthenticatedUser struct {
-	ID uint
-}
-
-// CreateConversationRequest represents the input for creating a conversation
-type CreateConversationRequest struct {
-	Title    string                    `json:"title"`
-	Metadata map[string]string         `json:"metadata,omitempty"`
-	Items    []ConversationItemRequest `json:"items,omitempty"`
-}
-
-// ConversationItemRequest represents an item in the conversation request
-type ConversationItemRequest struct {
-	Type    string                       `json:"type" binding:"required"`
-	Role    conversation.ItemRole        `json:"role,omitempty"`
-	Content []ConversationContentRequest `json:"content" binding:"required"`
-}
-
-// ConversationContentRequest represents content in the request
-type ConversationContentRequest struct {
-	Type string `json:"type" binding:"required"`
-	Text string `json:"text,omitempty"`
-}
-
-func NewItemFromConversationItemRequest(itemReq ConversationItemRequest) (*conversation.Item, bool) {
-	ok := conversation.ValidateItemType(string(itemReq.Type))
-	if !ok {
-		return nil, false
-	}
-	itemType := conversation.ItemType(itemReq.Type)
-
-	var role *conversation.ItemRole
-	if itemReq.Role != "" {
-		ok := conversation.ValidateItemRole(string(itemReq.Role))
-		if !ok {
-			return nil, false
-		}
-		r := conversation.ItemRole(itemReq.Role)
-		role = &r
-	}
-
-	content := make([]conversation.Content, len(itemReq.Content))
-	for j, c := range itemReq.Content {
-		content[j] = conversation.Content{
-			Type: c.Type,
-			Text: &conversation.Text{
-				Value: c.Text,
-			},
-		}
-	}
-
-	return &conversation.Item{
-		Type:    itemType,
-		Role:    role,
-		Content: content,
-	}, true
-}
-
-type CreateItemsRequest struct {
-	Items []ConversationItemRequest `json:"items" binding:"required"`
 }

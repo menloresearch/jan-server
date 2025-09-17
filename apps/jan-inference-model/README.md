@@ -11,8 +11,13 @@ The fastest way to get started is using Docker, which provides a pre-configured 
 #### Prerequisites for Building
 
 - Docker installed and running
-- NVIDIA Docker runtime (for production image with GPU support)
+- NVIDIA Container Toolkit (for production image with GPU support)
 - At least 8GB free disk space for the production image
+
+**Installing NVIDIA Container Toolkit**:
+Follow the [official NVIDIA Container Toolkit installation guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) for your Linux distribution.
+
+> **Note**: This is different from the NVIDIA CUDA Toolkit. Make sure you're installing the **NVIDIA Container Toolkit** specifically.
 
 #### Production Image (vLLM with Jan Model)
 
@@ -62,6 +67,18 @@ docker run -d \
   --name jan-inference-mock \
   -p 8101:8101 \
   jan-inference-model:mock
+```
+
+### Checking if vLLM is Ready
+
+After starting the container, check the logs to see when vLLM is ready:
+
+```bash
+# Check container logs
+docker logs jan-inference
+
+# Follow logs in real-time
+docker logs -f jan-inference
 ```
 
 ## Manual Setup (Alternative)
