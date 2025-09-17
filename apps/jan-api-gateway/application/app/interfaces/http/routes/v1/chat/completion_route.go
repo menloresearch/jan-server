@@ -144,7 +144,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		if len(request.Messages) > 0 {
 			latestMessage = []openai.ChatCompletionMessage{request.Messages[len(request.Messages)-1]}
 		}
-		assistantItem, _ := api.completionNonStreamHandler.SaveMessagesToConversationWithAssistantAndIDs(reqCtx.Request.Context(), conv, user.ID, latestMessage, response.Choices[0].Message.Content, userItemID, assistantItemID)
+		assistantItem, _ := api.saveMessagesToConversation(reqCtx.Request.Context(), conv, user.ID, latestMessage, userItemID, assistantItemID, response.Choices[0].Message.Content)
 
 		// Modify response to include item ID and metadata
 		modifiedResponse := api.completionNonStreamHandler.ModifyCompletionResponse(response, conv, conversationCreated, assistantItem, userItemID, assistantItemID)
@@ -257,4 +257,105 @@ func (api *CompletionAPI) sendConversationMetadata(reqCtx *gin.Context, conv *co
 
 	reqCtx.Writer.Write([]byte(fmt.Sprintf("data: %s\n\n", string(jsonData))))
 	reqCtx.Writer.Flush()
+}
+
+// convertOpenAIMessageToConversationContent converts OpenAI message content to conversation content
+func (api *CompletionAPI) convertOpenAIMessageToConversationContent(msg openai.ChatCompletionMessage) []conversation.Content {
+	content := make([]conversation.Content, 0, len(msg.MultiContent))
+	for _, contentPart := range msg.MultiContent {
+		if contentPart.Type == openai.ChatMessagePartTypeText {
+			content = append(content, conversation.Content{
+				Type: "text",
+				Text: &conversation.Text{
+					Value: contentPart.Text,
+				},
+			})
+		}
+	}
+
+	// If no multi-content, use simple text content
+	if len(content) == 0 && msg.Content != "" {
+		content = append(content, conversation.Content{
+			Type: "text",
+			Text: &conversation.Text{
+				Value: msg.Content,
+			},
+		})
+	}
+
+	return content
+}
+
+// convertOpenAIRoleToConversationRole converts OpenAI role to conversation role
+func (api *CompletionAPI) convertOpenAIRoleToConversationRole(role string) conversation.ItemRole {
+	switch role {
+	case openai.ChatMessageRoleSystem:
+		return conversation.ItemRoleSystem
+	case openai.ChatMessageRoleUser:
+		return conversation.ItemRoleUser
+	case openai.ChatMessageRoleAssistant:
+		return conversation.ItemRoleAssistant
+	default:
+		return conversation.ItemRoleUser
+	}
+}
+
+// saveMessagesToConversation saves messages to conversation with optional custom IDs
+func (api *CompletionAPI) saveMessagesToConversation(ctx context.Context, conv *conversation.Conversation, userID uint, messages []openai.ChatCompletionMessage, userItemID string, assistantItemID string, assistantContent string) (*conversation.Item, *common.Error) {
+	if conv == nil {
+		return nil, nil // No conversation to save to
+	}
+
+	var assistantItem *conversation.Item
+
+	// Convert OpenAI messages to conversation items
+	for i, msg := range messages {
+		role := api.convertOpenAIRoleToConversationRole(msg.Role)
+		content := api.convertOpenAIMessageToConversationContent(msg)
+
+		// Add item to conversation - use userItemID for the last user message
+		var item *conversation.Item
+		var err *common.Error
+		if i == len(messages)-1 && msg.Role == openai.ChatMessageRoleUser && userItemID != "" {
+			item, err = api.conversationService.AddItemWithID(ctx, conv, userID, conversation.ItemTypeMessage, &role, content, userItemID)
+		} else {
+			item, err = api.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeMessage, &role, content)
+		}
+
+		if err != nil {
+			return nil, common.NewError(err, "b2c3d4e5-f6g7-8901-bcde-f23456789012")
+		}
+
+		// If this is an assistant message, store it for return
+		if msg.Role == openai.ChatMessageRoleAssistant {
+			assistantItem = item
+		}
+	}
+
+	// If assistant content is provided and no assistant message was found in the input, create one
+	if assistantContent != "" && assistantItem == nil {
+		content := []conversation.Content{
+			{
+				Type: "text",
+				Text: &conversation.Text{
+					Value: assistantContent,
+				},
+			},
+		}
+
+		assistantRole := conversation.ItemRoleAssistant
+		var item *conversation.Item
+		var err *common.Error
+		if assistantItemID != "" {
+			item, err = api.conversationService.AddItemWithID(ctx, conv, userID, conversation.ItemTypeMessage, &assistantRole, content, assistantItemID)
+		} else {
+			item, err = api.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeMessage, &assistantRole, content)
+		}
+		if err != nil {
+			return nil, common.NewError(err, "c3d4e5f6-g7h8-9012-cdef-345678901234")
+		}
+		assistantItem = item
+	}
+
+	return assistantItem, nil
 }

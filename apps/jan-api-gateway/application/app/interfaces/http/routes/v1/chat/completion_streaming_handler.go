@@ -206,6 +206,47 @@ func (s *CompletionStreamHandler) checkContextCancellation(ctx context.Context, 
 	}
 }
 
+// convertOpenAIMessageToConversationContent converts OpenAI message content to conversation content
+func (s *CompletionStreamHandler) convertOpenAIMessageToConversationContent(msg openai.ChatCompletionMessage) []conversation.Content {
+	content := make([]conversation.Content, 0, len(msg.MultiContent))
+	for _, contentPart := range msg.MultiContent {
+		if contentPart.Type == openai.ChatMessagePartTypeText {
+			content = append(content, conversation.Content{
+				Type: "text",
+				Text: &conversation.Text{
+					Value: contentPart.Text,
+				},
+			})
+		}
+	}
+
+	// If no multi-content, use simple text content
+	if len(content) == 0 && msg.Content != "" {
+		content = append(content, conversation.Content{
+			Type: "text",
+			Text: &conversation.Text{
+				Value: msg.Content,
+			},
+		})
+	}
+
+	return content
+}
+
+// convertOpenAIRoleToConversationRole converts OpenAI role to conversation role
+func (s *CompletionStreamHandler) convertOpenAIRoleToConversationRole(role string) conversation.ItemRole {
+	switch role {
+	case openai.ChatMessageRoleSystem:
+		return conversation.ItemRoleSystem
+	case openai.ChatMessageRoleUser:
+		return conversation.ItemRoleUser
+	case openai.ChatMessageRoleAssistant:
+		return conversation.ItemRoleAssistant
+	default:
+		return conversation.ItemRoleUser
+	}
+}
+
 // saveInputMessagesToConversation saves input messages to the conversation
 func (s *CompletionStreamHandler) saveInputMessagesToConversation(ctx context.Context, conv *conversation.Conversation, userID uint, messages []openai.ChatCompletionMessage, userItemID string) {
 	if conv == nil {
@@ -214,41 +255,8 @@ func (s *CompletionStreamHandler) saveInputMessagesToConversation(ctx context.Co
 
 	// Convert OpenAI messages to conversation items
 	for i, msg := range messages {
-		// Convert role
-		var role conversation.ItemRole
-		switch msg.Role {
-		case openai.ChatMessageRoleSystem:
-			role = conversation.ItemRoleSystem
-		case openai.ChatMessageRoleUser:
-			role = conversation.ItemRoleUser
-		case openai.ChatMessageRoleAssistant:
-			role = conversation.ItemRoleAssistant
-		default:
-			role = conversation.ItemRoleUser
-		}
-
-		// Convert content
-		content := make([]conversation.Content, 0, len(msg.MultiContent))
-		for _, contentPart := range msg.MultiContent {
-			if contentPart.Type == openai.ChatMessagePartTypeText {
-				content = append(content, conversation.Content{
-					Type: "text",
-					Text: &conversation.Text{
-						Value: contentPart.Text,
-					},
-				})
-			}
-		}
-
-		// If no multi-content, use simple text content
-		if len(content) == 0 && msg.Content != "" {
-			content = append(content, conversation.Content{
-				Type: "text",
-				Text: &conversation.Text{
-					Value: msg.Content,
-				},
-			})
-		}
+		role := s.convertOpenAIRoleToConversationRole(msg.Role)
+		content := s.convertOpenAIMessageToConversationContent(msg)
 
 		// Add item to conversation - use userItemID for the last user message
 		if i == len(messages)-1 && msg.Role == openai.ChatMessageRoleUser {
