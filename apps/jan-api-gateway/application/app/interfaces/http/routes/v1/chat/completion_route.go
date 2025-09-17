@@ -13,6 +13,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/common"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
+	"menlo.ai/jan-api-gateway/app/utils/idgen"
 )
 
 type CompletionAPI struct {
@@ -88,14 +89,18 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		return
 	}
 
-	// Always send conversation metadata event for streaming requests
-	if request.Stream {
-		api.sendConversationMetadata(reqCtx, conv, conversationCreated)
-	}
+	// Generate item IDs for tracking
+	userItemID, _ := idgen.GenerateSecureID("msg", 42)
+	assistantItemID, _ := idgen.GenerateSecureID("msg", 42)
 
 	// Handle streaming vs non-streaming requests
 	if request.Stream {
-		err := api.completionStreamHandler.StreamCompletion(reqCtx, "", request.ChatCompletionRequest, conv, user)
+
+		// Send conversation metadata event
+		api.sendConversationMetadata(reqCtx, conv, conversationCreated, userItemID, assistantItemID)
+
+		// Handle streaming completion
+		err := api.completionStreamHandler.StreamCompletion(reqCtx, "", request.ChatCompletionRequest, conv, user, userItemID, assistantItemID)
 		if err != nil {
 			// Check if context was cancelled (timeout)
 			if reqCtx.Request.Context().Err() == context.DeadlineExceeded {
@@ -139,10 +144,10 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		if len(request.Messages) > 0 {
 			latestMessage = []openai.ChatCompletionMessage{request.Messages[len(request.Messages)-1]}
 		}
-		assistantItem, _ := api.completionNonStreamHandler.SaveMessagesToConversationWithAssistant(reqCtx.Request.Context(), conv, user.ID, latestMessage, response.Choices[0].Message.Content)
+		assistantItem, _ := api.completionNonStreamHandler.SaveMessagesToConversationWithAssistantAndIDs(reqCtx.Request.Context(), conv, user.ID, latestMessage, response.Choices[0].Message.Content, userItemID, assistantItemID)
 
 		// Modify response to include item ID and metadata
-		modifiedResponse := api.completionNonStreamHandler.ModifyCompletionResponse(response, conv, conversationCreated, assistantItem)
+		modifiedResponse := api.completionNonStreamHandler.ModifyCompletionResponse(response, conv, conversationCreated, assistantItem, userItemID, assistantItemID)
 		reqCtx.JSON(http.StatusOK, modifiedResponse)
 		return
 	}
@@ -231,7 +236,7 @@ func (api *CompletionAPI) generateTitleFromMessages(messages []openai.ChatComple
 }
 
 // sendConversationMetadata sends conversation metadata as SSE event
-func (api *CompletionAPI) sendConversationMetadata(reqCtx *gin.Context, conv *conversation.Conversation, conversationCreated bool) {
+func (api *CompletionAPI) sendConversationMetadata(reqCtx *gin.Context, conv *conversation.Conversation, conversationCreated bool, userItemID string, assistantItemID string) {
 	if conv == nil {
 		return
 	}
@@ -241,6 +246,8 @@ func (api *CompletionAPI) sendConversationMetadata(reqCtx *gin.Context, conv *co
 		"conversation_id":      conv.PublicID,
 		"conversation_created": conversationCreated,
 		"conversation_title":   conv.Title,
+		"user_item_id":         userItemID,
+		"assistant_item_id":    assistantItemID,
 	}
 
 	jsonData, err := json.Marshal(metadata)
