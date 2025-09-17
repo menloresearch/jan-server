@@ -13,7 +13,6 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth/google"
-	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
 type AuthRoute struct {
@@ -117,34 +116,7 @@ func (authRoute *AuthRoute) Logout(reqCtx *gin.Context) {
 // @Router /v1/auth/refresh-token [get]
 func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
-	refreshTokenString, err := reqCtx.Cookie(auth.RefreshTokenKey)
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "b95e8123-2590-48ed-bbad-e02d88464513",
-			Error: err.Error(),
-		})
-		return
-	}
-
-	token, err := jwt.ParseWithClaims(refreshTokenString, &auth.UserClaim{}, func(token *jwt.Token) (interface{}, error) {
-		return environment_variables.EnvironmentVariables.JWT_SECRET, nil
-	})
-	if err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code:  "7c7b8a48-311c-4beb-a2a1-1c13a87610bb",
-			Error: err.Error(),
-		})
-		return
-	}
-
-	if !token.Valid {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code: "ec5fa88c-78bb-462a-ab90-b046f269d5eb",
-		})
-		return
-	}
-
-	userClaim, ok := token.Claims.(*auth.UserClaim)
+	userClaim, ok := auth.GetUserClaimFromRefreshToken(reqCtx)
 	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 			Code: "c2019018-b71c-4f13-8ac6-854fbd61c9dd",
@@ -181,7 +153,7 @@ func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 	}
 
 	refreshTokenExp := time.Now().Add(7 * 24 * time.Hour)
-	refreshTokenString, err = auth.CreateJwtSignedString(auth.UserClaim{
+	refreshTokenString, err := auth.CreateJwtSignedString(auth.UserClaim{
 		Email: userClaim.Email,
 		Name:  userClaim.Name,
 		ID:    userClaim.ID,
@@ -233,8 +205,9 @@ func (authRoute *AuthRoute) GuestLogin(reqCtx *gin.Context) {
 		randomStr := strings.ToUpper(uuid.New().String())
 		user, err := authRoute.authService.RegisterUser(ctx, &user.User{
 			Name:    fmt.Sprintf("Jan-%s", randomStr),
-			Email:   fmt.Sprintf("Jan-%s@jan.ai", randomStr),
+			Email:   fmt.Sprintf("Jan-%s@guest.jan.ai", randomStr),
 			Enabled: true,
+			IsGuest: true,
 		})
 		if err != nil {
 			reqCtx.AbortWithStatusJSON(http.StatusOK, responses.ErrorResponse{
