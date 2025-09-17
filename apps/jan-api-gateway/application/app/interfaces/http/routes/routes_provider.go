@@ -22,6 +22,8 @@ var RouteProvider = wire.NewSet(
 	organization.NewAdminApiKeyAPI,
 	organization.NewOrganizationRoute,
 	mcp_impl.NewSerperMCP,
+	chat.NewCompletionNonStreamHandler,
+	chat.NewCompletionStreamHandler,
 	chat.NewCompletionAPI,
 	chat.NewChatRoute,
 	mcp.NewMCPAPI,
