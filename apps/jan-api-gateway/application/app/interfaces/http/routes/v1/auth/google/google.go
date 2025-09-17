@@ -228,10 +228,15 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 	})
 }
 
+type GoogleLoginUrl struct {
+	Object string `json:"object"`
+	Url    string `json:"url"`
+}
+
 // @Summary Google OAuth2 Login
 // @Description Redirects the user to the Google OAuth2 authorization page to initiate the login process.
 // @Tags Authentication
-// @Success 307 "Redirects to Google's login page"
+// @Success 200 {object} GoogleLoginUrl "redirect url"
 // @Failure 500 {object} responses.ErrorResponse "Internal Server Error"
 // @Router /v1/auth/google/login [get]
 func (googleAuthAPI *GoogleAuthAPI) GetGoogleLoginUrl(reqCtx *gin.Context) {
@@ -244,8 +249,10 @@ func (googleAuthAPI *GoogleAuthAPI) GetGoogleLoginUrl(reqCtx *gin.Context) {
 		return
 	}
 
-	// 5 minutes csrf token
 	reqCtx.SetCookie(auth.OAuthStateKey, state, 300, "/", "", true, true)
 	authURL := googleAuthAPI.oAuth2Config.AuthCodeURL(state, oauth2.AccessTypeOffline)
-	reqCtx.Redirect(http.StatusTemporaryRedirect, authURL)
+	reqCtx.JSON(http.StatusOK, GoogleLoginUrl{
+		Object: "google.login.url",
+		Url:    authURL,
+	})
 }

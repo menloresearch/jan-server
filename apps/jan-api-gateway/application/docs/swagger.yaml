@@ -58,6 +58,13 @@ definitions:
     required:
     - code
     type: object
+  app_interfaces_http_routes_v1_auth_google.GoogleLoginUrl:
+    properties:
+      object:
+        type: string
+      url:
+        type: string
+    type: object
   app_interfaces_http_routes_v1_chat.CompletionChoice:
     properties:
       finish_reason:
@@ -1463,8 +1470,10 @@ paths:
       description: Redirects the user to the Google OAuth2 authorization page to initiate
         the login process.
       responses:
-        "307":
-          description: Redirects to Google's login page
+        "200":
+          description: redirect url
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_auth_google.GoogleLoginUrl'
         "500":
           description: Internal Server Error
           schema:

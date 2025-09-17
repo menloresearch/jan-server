@@ -75,8 +75,11 @@ const docTemplate = `{
                 ],
                 "summary": "Google OAuth2 Login",
                 "responses": {
-                    "307": {
-                        "description": "Redirects to Google's login page"
+                    "200": {
+                        "description": "redirect url",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_auth_google.GoogleLoginUrl"
+                        }
                     },
                     "500": {
                         "description": "Internal Server Error",
@@ -2177,6 +2180,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "state": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_auth_google.GoogleLoginUrl": {
+            "type": "object",
+            "properties": {
+                "object": {
+                    "type": "string"
+                },
+                "url": {
                     "type": "string"
                 }
             }
