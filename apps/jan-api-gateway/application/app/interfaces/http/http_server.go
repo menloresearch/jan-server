@@ -2,7 +2,6 @@ package http
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -25,16 +24,6 @@ func (s *HttpServer) bindSwagger() {
 	g := s.engine.Group("/")
 
 	g.GET("/api/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-	g.GET("/google/testcallback", func(c *gin.Context) {
-		code := c.Query("code")
-		state := c.Query("state")
-		curlCommand := fmt.Sprintf(`curl --request POST \
-  --url 'http://localhost:8080/v1/auth/google/callback' \
-  --header 'Content-Type: application/json' \
-  --cookie 'jan_oauth_state=%s' \
-  --data '{"code": "%s", "state": "%s"}'`, state, code, state)
-		c.String(http.StatusOK, curlCommand)
-	})
 }
 
 func NewHttpServer(v1Route *v1.V1Route) *HttpServer {
@@ -48,6 +37,7 @@ func NewHttpServer(v1Route *v1.V1Route) *HttpServer {
 	// TODO: we should enable cors later
 	server.engine.Use(middleware.CORS())
 	server.engine.Use(middleware.LoggerMiddleware(logger.Logger))
+	server.engine.Use(middleware.TransactionMiddleware())
 	server.engine.GET("/healthcheck", func(c *gin.Context) {
 		c.JSON(200, "ok")
 	})
