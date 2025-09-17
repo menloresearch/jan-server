@@ -8,7 +8,6 @@ package main
 
 import (
 	"context"
-
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
@@ -28,22 +27,22 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/inference"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
-	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	auth2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth/google"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
-	chat2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
-	mcpimpl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	organization2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
-	apikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects/api_keys"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects/api_keys"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/responses"
-	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
+	"menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
+)
 
+import (
 	_ "github.com/grafana/pyroscope-go/godeltaprof/http/pprof"
-
 	_ "net/http/pprof"
 )
 
@@ -76,8 +75,8 @@ func CreateApplication() (*Application, error) {
 	conversationService := conversation.NewService(conversationRepository, itemRepository)
 	completionNonStreamHandler := chat.NewCompletionNonStreamHandler(inferenceProvider, conversationService)
 	completionStreamHandler := chat.NewCompletionStreamHandler(inferenceProvider, conversationService)
-	completionAPI := chat2.NewCompletionAPI(completionNonStreamHandler, completionStreamHandler, conversationService, authService)
-	chatRoute := chat2.NewChatRoute(completionAPI, authService)
+	completionAPI := chat.NewCompletionAPI(completionNonStreamHandler, completionStreamHandler, conversationService, authService)
+	chatRoute := chat.NewChatRoute(completionAPI, authService)
 	conversationAPI := conversations.NewConversationAPI(conversationService, authService)
 	modelAPI := v1.NewModelAPI()
 	serperService := serpermcp.NewSerperService()
