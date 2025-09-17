@@ -89,6 +89,7 @@ func generateState() (string, error) {
 // @Failure 500 {object} responses.ErrorResponse "Internal Server Error"
 // @Router /v1/auth/google/callback [post]
 func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
+	ctx := reqCtx.Request.Context()
 	var req GoogleCallbackRequest
 	if err := reqCtx.ShouldBindJSON(&req); err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
@@ -160,7 +161,40 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 		return
 	}
 	if exists == nil {
-		exists, err = googleAuthAPI.userService.RegisterUser(reqCtx.Request.Context(), &user.User{
+		exists, err = func() (*user.User, error) {
+			userClaim, ok := auth.GetUserClaimFromRefreshToken(reqCtx)
+			if !ok {
+				return nil, nil
+			}
+			user, err := googleAuthAPI.userService.FindByEmail(ctx, userClaim.Email)
+			if err != nil {
+				return nil, err
+			}
+			if user == nil {
+				return nil, nil
+			}
+			if user.IsGuest {
+				user.IsGuest = false
+				user.Name = claims.Name
+				user.Email = claims.Email
+				exists, err = googleAuthAPI.userService.UpdateUser(ctx, user)
+				if err != nil {
+					return nil, err
+				}
+				return exists, nil
+			}
+			return nil, nil
+		}()
+		if err != nil {
+			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+				Code:          "f7c545df-bdcd-4e6a-843e-9699f0239552",
+				ErrorInstance: err,
+			})
+			return
+		}
+	}
+	if exists == nil {
+		exists, err = googleAuthAPI.authService.RegisterUser(ctx, &user.User{
 			Name:    claims.Name,
 			Email:   claims.Email,
 			Enabled: true,
@@ -173,7 +207,6 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 			return
 		}
 	}
-
 	accessTokenExp := time.Now().Add(auth.AccessTokenExpirationDuration)
 	accessTokenString, err := auth.CreateJwtSignedString(auth.UserClaim{
 		Email: exists.Email,
