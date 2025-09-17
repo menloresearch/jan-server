@@ -41,7 +41,7 @@ func NewCompletionStreamHandler(inferenceProvider inference.InferenceProvider, c
 }
 
 // StreamCompletion handles streaming chat completion using buffered channels
-func (s *CompletionStreamHandler) StreamCompletion(reqCtx *gin.Context, apiKey string, request openai.ChatCompletionRequest, conv *conversation.Conversation, user *user.User) *common.Error {
+func (s *CompletionStreamHandler) StreamCompletion(reqCtx *gin.Context, apiKey string, request openai.ChatCompletionRequest, conv *conversation.Conversation, user *user.User, userItemID string, assistantItemID string) *common.Error {
 	// Add timeout context
 	ctx, cancel := context.WithTimeout(reqCtx.Request.Context(), RequestTimeout)
 	defer cancel()
@@ -64,7 +64,7 @@ func (s *CompletionStreamHandler) StreamCompletion(reqCtx *gin.Context, apiKey s
 	wg.Add(1)
 
 	// Start streaming in a goroutine
-	go s.streamResponseToChannel(reqCtx, request, dataChan, errChan, conv, user, &wg)
+	go s.streamResponseToChannel(reqCtx, request, dataChan, errChan, conv, user, userItemID, assistantItemID, &wg)
 
 	// Wait for streaming to complete and close channels
 	go func() {
@@ -94,7 +94,7 @@ func (s *CompletionStreamHandler) StreamCompletion(reqCtx *gin.Context, apiKey s
 }
 
 // streamResponseToChannel handles streaming and sends data to channels
-func (s *CompletionStreamHandler) streamResponseToChannel(reqCtx *gin.Context, request openai.ChatCompletionRequest, dataChan chan<- string, errChan chan<- error, conv *conversation.Conversation, user *user.User, wg *sync.WaitGroup) {
+func (s *CompletionStreamHandler) streamResponseToChannel(reqCtx *gin.Context, request openai.ChatCompletionRequest, dataChan chan<- string, errChan chan<- error, conv *conversation.Conversation, user *user.User, userItemID string, assistantItemID string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	// Save input messages to conversation first
@@ -104,7 +104,7 @@ func (s *CompletionStreamHandler) streamResponseToChannel(reqCtx *gin.Context, r
 		if len(request.Messages) > 0 {
 			latestMessage = []openai.ChatCompletionMessage{request.Messages[len(request.Messages)-1]}
 		}
-		s.saveInputMessagesToConversation(reqCtx.Request.Context(), conv, user.ID, latestMessage)
+		s.saveInputMessagesToConversation(reqCtx.Request.Context(), conv, user.ID, latestMessage, userItemID)
 	}
 
 	// Get streaming reader from inference provider
@@ -150,7 +150,6 @@ func (s *CompletionStreamHandler) streamResponseToChannel(reqCtx *gin.Context, r
 
 	// Save the complete assistant message to conversation if we have content
 	if conv != nil && fullResponse != "" {
-		assistantItemID := s.generateAssistantItemID()
 		s.saveAssistantMessageToConversation(reqCtx.Request.Context(), conv, user, assistantItemID, fullResponse)
 	}
 }
@@ -207,21 +206,14 @@ func (s *CompletionStreamHandler) checkContextCancellation(ctx context.Context, 
 	}
 }
 
-// generateAssistantItemID generates a unique ID for the assistant message item
-func (s *CompletionStreamHandler) generateAssistantItemID() string {
-	// For now, use a simple UUID-like string
-	// TODO: Use conversation service's ID generation when method is made public
-	return fmt.Sprintf("msg_%d", time.Now().UnixNano())
-}
-
 // saveInputMessagesToConversation saves input messages to the conversation
-func (s *CompletionStreamHandler) saveInputMessagesToConversation(ctx context.Context, conv *conversation.Conversation, userID uint, messages []openai.ChatCompletionMessage) {
+func (s *CompletionStreamHandler) saveInputMessagesToConversation(ctx context.Context, conv *conversation.Conversation, userID uint, messages []openai.ChatCompletionMessage, userItemID string) {
 	if conv == nil {
 		return
 	}
 
 	// Convert OpenAI messages to conversation items
-	for _, msg := range messages {
+	for i, msg := range messages {
 		// Convert role
 		var role conversation.ItemRole
 		switch msg.Role {
@@ -258,8 +250,12 @@ func (s *CompletionStreamHandler) saveInputMessagesToConversation(ctx context.Co
 			})
 		}
 
-		// Add item to conversation
-		s.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeMessage, &role, content)
+		// Add item to conversation - use userItemID for the last user message
+		if i == len(messages)-1 && msg.Role == openai.ChatMessageRoleUser {
+			s.conversationService.AddItemWithID(ctx, conv, userID, conversation.ItemTypeMessage, &role, content, userItemID)
+		} else {
+			s.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeMessage, &role, content)
+		}
 	}
 }
 
@@ -279,7 +275,7 @@ func (s *CompletionStreamHandler) saveAssistantMessageToConversation(ctx context
 		},
 	}
 
-	// Add the assistant message to conversation
+	// Add the assistant message to conversation with the provided itemID
 	assistantRole := conversation.ItemRoleAssistant
-	s.conversationService.AddItem(ctx, conv, user.ID, conversation.ItemTypeMessage, &assistantRole, conversationContent)
+	s.conversationService.AddItemWithID(ctx, conv, user.ID, conversation.ItemTypeMessage, &assistantRole, conversationContent, itemID)
 }

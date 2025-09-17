@@ -669,7 +669,7 @@ func (api *ConversationAPI) DeleteItemHandler(reqCtx *gin.Context) {
 	}
 
 	// Use efficient deletion with item public ID instead of loading all items
-	itemDeleted, err := api.conversationService.DeleteItemWithConversation(ctx, conv, item)
+	_, err := api.conversationService.DeleteItemWithConversation(ctx, conv, item)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:          "019952d2-0f0f-730c-9abc-3fecc1db55c2",
@@ -678,7 +678,8 @@ func (api *ConversationAPI) DeleteItemHandler(reqCtx *gin.Context) {
 		return
 	}
 
-	response := domainToConversationItemResponse(itemDeleted)
+	// OpenAI: Returns the updated Conversation object.
+	response := domainToExtendedConversationResponse(conv)
 	reqCtx.JSON(http.StatusOK, response)
 }
 

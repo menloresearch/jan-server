@@ -75,6 +75,11 @@ func (c *CompletionNonStreamHandler) SaveMessagesToConversationWithAssistant(ctx
 	return c.saveMessagesToConversationWithAssistant(ctx, conv, userID, messages, assistantContent)
 }
 
+// SaveMessagesToConversationWithAssistantAndIDs saves all messages including the assistant response with custom item IDs
+func (c *CompletionNonStreamHandler) SaveMessagesToConversationWithAssistantAndIDs(ctx context.Context, conv *conversation.Conversation, userID uint, messages []openai.ChatCompletionMessage, assistantContent string, userItemID string, assistantItemID string) (*conversation.Item, *common.Error) {
+	return c.saveMessagesToConversationWithAssistantAndIDs(ctx, conv, userID, messages, assistantContent, userItemID, assistantItemID)
+}
+
 // saveMessagesToConversationWithAssistant internal method that saves messages and optionally the assistant response
 func (c *CompletionNonStreamHandler) saveMessagesToConversationWithAssistant(ctx context.Context, conv *conversation.Conversation, userID uint, messages []openai.ChatCompletionMessage, assistantContent string) (*conversation.Item, *common.Error) {
 	if conv == nil {
@@ -155,6 +160,93 @@ func (c *CompletionNonStreamHandler) saveMessagesToConversationWithAssistant(ctx
 	return assistantItem, nil
 }
 
+// saveMessagesToConversationWithAssistantAndIDs internal method that saves messages with custom item IDs
+func (c *CompletionNonStreamHandler) saveMessagesToConversationWithAssistantAndIDs(ctx context.Context, conv *conversation.Conversation, userID uint, messages []openai.ChatCompletionMessage, assistantContent string, userItemID string, assistantItemID string) (*conversation.Item, *common.Error) {
+	if conv == nil {
+		return nil, nil // No conversation to save to
+	}
+
+	var assistantItem *conversation.Item
+
+	// Convert OpenAI messages to conversation items
+	for i, msg := range messages {
+		// Convert role
+		var role conversation.ItemRole
+		switch msg.Role {
+		case openai.ChatMessageRoleSystem:
+			role = conversation.ItemRoleSystem
+		case openai.ChatMessageRoleUser:
+			role = conversation.ItemRoleUser
+		case openai.ChatMessageRoleAssistant:
+			role = conversation.ItemRoleAssistant
+		default:
+			role = conversation.ItemRoleUser
+		}
+
+		// Convert content
+		content := make([]conversation.Content, 0, len(msg.MultiContent))
+		for _, contentPart := range msg.MultiContent {
+			if contentPart.Type == openai.ChatMessagePartTypeText {
+				content = append(content, conversation.Content{
+					Type: "text",
+					Text: &conversation.Text{
+						Value: contentPart.Text,
+					},
+				})
+			}
+		}
+
+		// If no multi-content, use simple text content
+		if len(content) == 0 && msg.Content != "" {
+			content = append(content, conversation.Content{
+				Type: "text",
+				Text: &conversation.Text{
+					Value: msg.Content,
+				},
+			})
+		}
+
+		// Add item to conversation - use userItemID for the last user message
+		var item *conversation.Item
+		var err *common.Error
+		if i == len(messages)-1 && msg.Role == openai.ChatMessageRoleUser {
+			item, err = c.conversationService.AddItemWithID(ctx, conv, userID, conversation.ItemTypeMessage, &role, content, userItemID)
+		} else {
+			item, err = c.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeMessage, &role, content)
+		}
+
+		if err != nil {
+			return nil, common.NewError(err, "b2c3d4e5-f6g7-8901-bcde-f23456789012")
+		}
+
+		// If this is an assistant message, store it for return
+		if msg.Role == openai.ChatMessageRoleAssistant {
+			assistantItem = item
+		}
+	}
+
+	// If assistant content is provided and no assistant message was found in the input, create one
+	if assistantContent != "" && assistantItem == nil {
+		content := []conversation.Content{
+			{
+				Type: "text",
+				Text: &conversation.Text{
+					Value: assistantContent,
+				},
+			},
+		}
+
+		assistantRole := conversation.ItemRoleAssistant
+		item, err := c.conversationService.AddItemWithID(ctx, conv, userID, conversation.ItemTypeMessage, &assistantRole, content, assistantItemID)
+		if err != nil {
+			return nil, common.NewError(err, "c3d4e5f6-g7h8-9012-cdef-345678901234")
+		}
+		assistantItem = item
+	}
+
+	return assistantItem, nil
+}
+
 // CompletionResponse represents the response from chat completion
 type CompletionResponse struct {
 	ID       string                 `json:"id"`
@@ -184,7 +276,7 @@ type Usage struct {
 }
 
 // ModifyCompletionResponse modifies the completion response to include item ID and metadata
-func (uc *CompletionNonStreamHandler) ModifyCompletionResponse(response *CompletionResponse, conv *conversation.Conversation, conversationCreated bool, assistantItem *conversation.Item) *CompletionResponse {
+func (uc *CompletionNonStreamHandler) ModifyCompletionResponse(response *CompletionResponse, conv *conversation.Conversation, conversationCreated bool, assistantItem *conversation.Item, userItemID string, assistantItemID string) *CompletionResponse {
 	// Create modified response
 	modifiedResponse := &CompletionResponse{
 		ID:      response.ID, // Default to original ID
@@ -222,6 +314,8 @@ func (uc *CompletionNonStreamHandler) ModifyCompletionResponse(response *Complet
 			"conversation_id":      conv.PublicID,
 			"conversation_created": conversationCreated,
 			"conversation_title":   conv.Title,
+			"user_item_id":         userItemID,
+			"assistant_item_id":    assistantItemID,
 		}
 	}
 

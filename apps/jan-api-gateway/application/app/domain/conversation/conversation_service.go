@@ -159,11 +159,42 @@ func (s *ConversationService) AddItem(ctx context.Context, conversation *Convers
 	}
 
 	item := &Item{
-		PublicID:    itemPublicID,
-		Type:        itemType,
-		Role:        role,
-		Content:     content,
-		Status:      ToItemStatusPtr(ItemStatusCompleted), 
+		PublicID: itemPublicID,
+		Type:     itemType,
+		Role:     role,
+		Content:  content,
+		Status:   ToItemStatusPtr(ItemStatusCompleted),
+	}
+
+	if err := s.conversationRepo.AddItem(ctx, conversation.ID, item); err != nil {
+		return nil, common.NewError(err, "q7r8s9t0-u1v2-3456-qrst-789012345678")
+	}
+
+	// Update conversation timestamp
+	if err := s.updateConversationTimestamp(ctx, conversation, "r8s9t0u1-v2w3-4567-rstu-890123456789"); err != nil {
+		return nil, err
+	}
+
+	return item, nil
+}
+
+// AddItemWithID adds an item to a conversation with a custom public ID
+func (s *ConversationService) AddItemWithID(ctx context.Context, conversation *Conversation, userID uint, itemType ItemType, role *ItemRole, content []Content, customPublicID string) (*Item, *common.Error) {
+	// Check access permissions
+	if conversation.IsPrivate && conversation.UserID != userID {
+		return nil, common.NewErrorWithMessage("Private conversation access denied", "n4o5p6q7-r8s9-0123-nopq-456789012345")
+	}
+
+	if err := s.validator.ValidateItemContent(content); err != nil {
+		return nil, common.NewError(err, "o5p6q7r8-s9t0-1234-opqr-567890123456")
+	}
+
+	item := &Item{
+		PublicID: customPublicID,
+		Type:     itemType,
+		Role:     role,
+		Content:  content,
+		Status:   ToItemStatusPtr(ItemStatusCompleted),
 	}
 
 	if err := s.conversationRepo.AddItem(ctx, conversation.ID, item); err != nil {
@@ -212,7 +243,7 @@ func (s *ConversationService) updateConversationTimestamp(ctx context.Context, c
 	return nil
 }
 
-func (s *ConversationService) ValidateItems(ctx context.Context, items []*Item) (*common.Error) {
+func (s *ConversationService) ValidateItems(ctx context.Context, items []*Item) *common.Error {
 	if len(items) > 100 {
 		return common.NewErrorWithMessage("Too many items", "g3h4i5j6-k7l8-9012-ghij-345678901234")
 	}
