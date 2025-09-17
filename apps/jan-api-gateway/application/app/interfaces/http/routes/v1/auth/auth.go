@@ -3,16 +3,15 @@ package auth
 import (
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth/google"
+	"menlo.ai/jan-api-gateway/app/utils/idgen"
 )
 
 type AuthRoute struct {
@@ -202,15 +201,21 @@ func (authRoute *AuthRoute) GuestLogin(reqCtx *gin.Context) {
 	name := ""
 	var id string = ""
 	if !ok {
-		randomStr := strings.ToUpper(uuid.New().String())
+		tempId, err := idgen.GenerateSecureID("jan", 12)
+		if err != nil {
+			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+				Code: "3cb11e83-98ed-4c4f-8823-73c26f0c2d75",
+			})
+			return
+		}
 		user, err := authRoute.authService.RegisterUser(ctx, &user.User{
-			Name:    fmt.Sprintf("Jan-%s", randomStr),
-			Email:   fmt.Sprintf("Jan-%s@guest.jan.ai", randomStr),
+			Name:    tempId,
+			Email:   fmt.Sprintf("%s@guest.jan.ai", tempId),
 			Enabled: true,
 			IsGuest: true,
 		})
 		if err != nil {
-			reqCtx.AbortWithStatusJSON(http.StatusOK, responses.ErrorResponse{
+			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
 				Code: "9576b6ba-fcc6-4bd2-b13a-33d59d6a71f1",
 			})
 			return
