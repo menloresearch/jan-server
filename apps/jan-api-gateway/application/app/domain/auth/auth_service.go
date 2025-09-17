@@ -493,7 +493,7 @@ func (s *AuthService) AdminInviteMiddleware() gin.HandlerFunc {
 		if publicID == "" {
 			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 				Code:  "5cbdb58e-6228-4d9a-9893-7f744608a9e8",
-				Error: "missing project public ID",
+				Error: "missing invite public ID",
 			})
 			return
 		}
@@ -504,8 +504,8 @@ func (s *AuthService) AdminInviteMiddleware() gin.HandlerFunc {
 		})
 		if err != nil || inviteEntity == nil {
 			reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-				Code:  "121ef112-cb39-4235-9500-b116adb69984",
-				Error: "proj not found",
+				Code:  "2daa8be0-df7d-4faa-ba4d-00c4dae8ceae",
+				Error: "invite not found",
 			})
 			return
 		}

@@ -209,7 +209,7 @@ func (api *InvitesRoute) CreateInvite(reqCtx *gin.Context) {
 		return proj.ID
 	})
 
-	if len((projectIDs)) > 0 {
+	if len(projectIDs) > 0 {
 		projects, err := api.projectService.Find(ctx, project.ProjectFilter{
 			PublicIDs: &projectIDs,
 		}, nil)
@@ -221,7 +221,7 @@ func (api *InvitesRoute) CreateInvite(reqCtx *gin.Context) {
 			})
 			return
 		}
-		if len(projects) != len((projectIDs)) {
+		if len(projects) != len(projectIDs) {
 			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 				Code: "a08c5ee3-651e-4465-a7c9-5009fec9d5c2",
 			})
@@ -311,7 +311,7 @@ func (api *InvitesRoute) DeleteInvite(reqCtx *gin.Context) {
 
 	err := api.inviteService.DeleteInviteByID(ctx, inviteEntity.ID)
 	if err != nil {
-		reqCtx.JSON(http.StatusNotFound, responses.ErrorResponse{
+		reqCtx.JSON(http.StatusInternalServerError, responses.ErrorResponse{
 			Code: "ea8900d2-cf26-461a-a985-64760e300be1",
 		})
 		return
