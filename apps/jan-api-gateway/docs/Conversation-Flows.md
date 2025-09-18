@@ -8,6 +8,14 @@ This guide explains how to integrate with the Jan API Gateway's conversation sys
 
 The completion API automatically handles conversation creation and message appending.
 
+#### Storage Options
+
+The completion API supports two storage flags to control how messages are persisted:
+
+- **`store`** (boolean, optional, default: `false`): When set to `true`, saves both the user message and assistant response to the conversation. When `false`, messages are not stored in the conversation history.
+
+- **`store_reasoning`** (boolean, optional, default: `false`): When set to `true`, includes reasoning content in stored messages. This only takes effect when `store` is also `true`. Useful for models that provide reasoning explanations.
+
 #### Flow:
 1. **First Request** (No conversation ID):
    ```json
@@ -17,7 +25,9 @@ The completion API automatically handles conversation creation and message appen
      "messages": [
        {"role": "user", "content": "Hello, how are you?"}
      ],
-     "stream": false
+     "stream": false,
+     "store": true,
+     "store_reasoning": false
    }
    ```
 
@@ -41,8 +51,8 @@ The completion API automatically handles conversation creation and message appen
        "conversation_id": "conv_8zrnfsrj9d8424ngl0n2jbien0af3845gfhvpqc5un",
        "conversation_created": true,
        "conversation_title": "Hello, how are you?",
-       "user_item_id": "msg_049gu35s5kwj65tegn398fnut9o1o7p194xu6a61u3",
-       "assistant_item_id": "msg_oc07tomng5fqqi8w6bbxzmbuco19v3f9bq7xriuvpq"
+       "ask_item_id": "msg_049gu35s5kwj65tegn398fnut9o1o7p194xu6a61u3",
+       "completion_item_id": "msg_oc07tomng5fqqi8w6bbxzmbuco19v3f9bq7xriuvpq"
      }
    }
    ```
@@ -56,7 +66,9 @@ The completion API automatically handles conversation creation and message appen
        {"role": "user", "content": "What's the weather like?"}
      ],
      "conversation": "conv_uzaxr1z1mq38k23r99kl1qq9eelobeam0gw21n8q9z",
-     "stream": false
+     "stream": false,
+     "store": true,
+     "store_reasoning": false
    }
    ```
 
@@ -70,7 +82,9 @@ POST /v1/chat/completions
   "messages": [
     {"role": "user", "content": "Hello, how are you?"}
   ],
-  "stream": true
+  "stream": true,
+  "store": true,
+  "store_reasoning": false
 }
 ```
 
@@ -80,7 +94,7 @@ The server sends multiple SSE events. The first event contains conversation meta
 
 1. **Metadata Event** (sent first):
 ```
-data: {"assistant_item_id":"msg_oc07tomng5fqqi8w6bbxzmbuco19v3f9bq7xriuvpq","conversation_created":true,"conversation_id":"conv_8zrnfsrj9d8424ngl0n2jbien0af3845gfhvpqc5un","conversation_title":"333 Tell me name of largest ocean","object":"chat.completion.metadata","user_item_id":"msg_049gu35s5kwj65tegn398fnut9o1o7p194xu6a61u3"}
+data: {"completion_item_id":"msg_oc07tomng5fqqi8w6bbxzmbuco19v3f9bq7xriuvpq","conversation_created":true,"conversation_id":"conv_8zrnfsrj9d8424ngl0n2jbien0af3845gfhvpqc5un","conversation_title":"333 Tell me name of largest ocean","object":"chat.completion.metadata","ask_item_id":"msg_049gu35s5kwj65tegn398fnut9o1o7p194xu6a61u3"}
 
 ```
 
@@ -89,9 +103,17 @@ data: {"assistant_item_id":"msg_oc07tomng5fqqi8w6bbxzmbuco19v3f9bq7xriuvpq","con
 - `conversation_created`: (boolean) Indicates if a new conversation was created as a result of this request.
 - `conversation_id`: (string) The unique string identifier for the conversation. Use this for subsequent messages in the same conversation.
 - `conversation_title`: (string) The title or summary of the conversation, often generated from the initial user message.
-- `user_item_id`: (string) The unique string identifier for the user's message that was just sent. This ID can be used to reference the specific user message in the database.
-- `assistant_item_id`: (string) The unique string identifier for the assistant's response message. This ID can be used to reference the specific assistant message in the database.
+- `ask_item_id`: (string) The unique string identifier for the user's message that was just sent. This ID can be used to reference the specific ask message in the database.
+- `completion_item_id`: (string) The unique string identifier for the assistant's response message. This ID can be used to reference the specific completion message in the database.
 - `object`: (string) The type of object returned. For this event, it is always `"chat.completion.metadata"` to indicate metadata about the chat completion.
+
+**Finish Reason Values:**
+
+The `finish_reason` field indicates why the completion ended:
+
+- `stop`: The model completed its response naturally
+- `function_call`: The model is requesting to call a function (legacy format)
+- `tool_calls`: The model is requesting to call one or more tools (new format)
 
 2. **Content Chunk Events** (sent continuously):
 ```
@@ -100,6 +122,16 @@ data: {"id":"chatcmpl-b61389e4-eddf-935d-9ef4-7c9ab6a6d689","object":"chat.compl
 data: {"id":"chatcmpl-b61389e4-eddf-935d-9ef4-7c9ab6a6d689","object":"chat.completion.chunk","created":1758067863,"model":"jan-v1-4b","choices":[{"index":0,"delta":{"content":" doing"},"logprobs":null,"finish_reason":null}]}
 
 data: {"id":"chatcmpl-b61389e4-eddf-935d-9ef4-7c9ab6a6d689","object":"chat.completion.chunk","created":1758067863,"model":"jan-v1-4b","choices":[{"index":0,"delta":{"content":" well, thank you!"},"logprobs":null,"finish_reason":"stop"}]}
+```
+
+**Example with Tool Calls:**
+```
+data: {"id":"chatcmpl-b61389e4-eddf-935d-9ef4-7c9ab6a6d689","object":"chat.completion.chunk","created":1758067863,"model":"jan-v1-4b","choices":[{"index":0,"delta":{"tool_calls":[{"id":"call_123","type":"function","function":{"name":"get_weather","arguments":"{\"location\":\"New York\"}"}}]},"logprobs":null,"finish_reason":"tool_calls"}]}
+```
+
+**Example with Function Call (Legacy):**
+```
+data: {"id":"chatcmpl-b61389e4-eddf-935d-9ef4-7c9ab6a6d689","object":"chat.completion.chunk","created":1758067863,"model":"jan-v1-4b","choices":[{"index":0,"delta":{"function_call":{"name":"get_weather","arguments":"{\"location\":\"New York\"}"}},"logprobs":null,"finish_reason":"function_call"}]}
 ```
 
 
@@ -112,7 +144,9 @@ data: {"id":"chatcmpl-b61389e4-eddf-935d-9ef4-7c9ab6a6d689","object":"chat.compl
        {"role": "user", "content": "What's the weather like?"}
      ],
      "conversation": "conv_uzaxr1z1mq38k23r99kl1qq9eelobeam0gw21n8q9z",
-     "stream": false
+     "stream": false,
+     "store": true,
+     "store_reasoning": false
    }
    ```
 
