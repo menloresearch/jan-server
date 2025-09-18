@@ -130,7 +130,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		return
 	} else {
 
-		response, err := api.completionNonStreamHandler.CreateCompletion(reqCtx.Request.Context(), "", request.ChatCompletionRequest)
+		response, err := api.completionNonStreamHandler.GetCompletionRestResponse(reqCtx.Request.Context(), "", request.ChatCompletionRequest)
 		if err != nil {
 			reqCtx.AbortWithStatusJSON(
 				http.StatusBadRequest,
