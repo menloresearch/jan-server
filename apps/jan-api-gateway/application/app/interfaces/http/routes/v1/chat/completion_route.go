@@ -18,7 +18,6 @@ import (
 	"menlo.ai/jan-api-gateway/app/utils/logger"
 )
 
-// Constants
 const (
 	DefaultConversationTitle = "New Conversation"
 	MaxTitleLength           = 50
@@ -44,12 +43,12 @@ func (completionAPI *CompletionAPI) RegisterRouter(router *gin.RouterGroup) {
 	router.POST("/completions", completionAPI.PostCompletion)
 }
 
-// ExtendedChatCompletionRequest extends OpenAI's request with conversation field
+// ExtendedChatCompletionRequest extends OpenAI's request with conversation field and store and store_reasoning fields
 type ExtendedChatCompletionRequest struct {
 	openai.ChatCompletionRequest
 	Conversation   string `json:"conversation,omitempty"`
-	Store          bool   `json:"store,omitempty"`           // If true, the response will be stored in the conversation
-	StoreReasoning bool   `json:"store_reasoning,omitempty"` // If true, the reasoning will be stored in the conversation
+	Store          bool   `json:"store,omitempty"`           // If true, the response will be stored in the conversation, default is false
+	StoreReasoning bool   `json:"store_reasoning,omitempty"` // If true, the reasoning will be stored in the conversation, default is false
 }
 
 // ResponseMetadata contains additional metadata about the completion response
@@ -141,7 +140,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	var err *common.Error
 
 	if request.Stream {
-		// Handle streaming completion - collect response and process normally
+		// Handle streaming completion - streams SSE events and accumulates response
 		response, err = api.completionStreamHandler.StreamCompletionAndAccumulateResponse(reqCtx, "", request.ChatCompletionRequest, conv, conversationCreated, askItemID, completionItemID)
 	} else {
 		// Handle non-streaming completion
@@ -173,8 +172,8 @@ func (api *CompletionAPI) processCompletionResponse(reqCtx *gin.Context, respons
 
 	// Store messages conditionally based on store flag
 	if request.Store {
-		// Store user message
-		if storeErr := api.StoreMessagesIfRequested(reqCtx.Request.Context(), request.ChatCompletionRequest, conv, user.ID, askItemID, completionItemID, request.Store, request.StoreReasoning); storeErr != nil {
+		// Store last input message (user or tool)
+		if storeErr := api.StoreLastInputMessageIfRequested(reqCtx.Request.Context(), request.ChatCompletionRequest, conv, user.ID, askItemID, completionItemID, request.Store, request.StoreReasoning); storeErr != nil {
 			reqCtx.AbortWithStatusJSON(
 				http.StatusBadRequest,
 				responses.ErrorResponse{
@@ -414,8 +413,8 @@ func (api *CompletionAPI) saveAssistantMessageToConversation(ctx context.Context
 	api.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeMessage, &assistantRole, conversationContent)
 }
 
-// StoreMessagesIfRequested conditionally stores messages based on the store flag
-func (api *CompletionAPI) StoreMessagesIfRequested(ctx context.Context, request openai.ChatCompletionRequest, conv *conversation.Conversation, userID uint, askItemID string, completionItemID string, store bool, storeReasoning bool) *common.Error {
+// StoreLastInputMessageIfRequested conditionally stores the last input message (user or tool) based on the store flag
+func (api *CompletionAPI) StoreLastInputMessageIfRequested(ctx context.Context, request openai.ChatCompletionRequest, conv *conversation.Conversation, userID uint, askItemID string, completionItemID string, store bool, storeReasoning bool) *common.Error {
 	if !store {
 		return nil // Don't store if store flag is false
 	}
@@ -425,7 +424,7 @@ func (api *CompletionAPI) StoreMessagesIfRequested(ctx context.Context, request 
 		return common.NewError(nil, "c1d2e3f4-g5h6-7890-abcd-ef1234567890")
 	}
 
-	// Store the latest user message
+	// Store the latest input message (user or tool)
 	if len(request.Messages) == 0 {
 		return nil // No messages to store
 	}
