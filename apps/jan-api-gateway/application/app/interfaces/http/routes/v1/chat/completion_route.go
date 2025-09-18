@@ -53,7 +53,7 @@ type ExtendedChatCompletionRequest struct {
 // @Produce json
 // @Produce text/event-stream
 // @Param request body ExtendedChatCompletionRequest true "Extended chat completion request payload"
-// @Success 200 {object} CompletionResponse "Successful non-streaming response"
+// @Success 200 {object} ExtendedCompletionResponse "Successful non-streaming response"
 // @Success 200 {string} string "Successful streaming response (SSE format, event: 'data', data: JSON object per chunk)"
 // @Failure 400 {object} responses.ErrorResponse "Invalid request payload"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
@@ -500,7 +500,7 @@ func (api *CompletionAPI) saveMessagesToConversation(ctx context.Context, conv *
 }
 
 // handleCompletionResponseAndUpdateConversation handles completion response based on finish_reason and updates conversation
-func (api *CompletionAPI) handleCompletionResponseAndUpdateConversation(ctx context.Context, response *CompletionResponse, conv *conversation.Conversation, userID uint, skipStorage bool) {
+func (api *CompletionAPI) handleCompletionResponseAndUpdateConversation(ctx context.Context, response *ExtendedCompletionResponse, conv *conversation.Conversation, userID uint, skipStorage bool) {
 	if conv == nil || len(response.Choices) == 0 {
 		return
 	}
@@ -699,7 +699,7 @@ func (api *CompletionAPI) StoreMessagesIfRequested(ctx context.Context, request 
 }
 
 // StoreAssistantResponseIfRequested conditionally stores the assistant response based on the store flag
-func (api *CompletionAPI) StoreAssistantResponseIfRequested(ctx context.Context, response *CompletionResponse, conv *conversation.Conversation, userID uint, assistantItemID string, store bool, storeReasoning bool) (*conversation.Item, *common.Error) {
+func (api *CompletionAPI) StoreAssistantResponseIfRequested(ctx context.Context, response *ExtendedCompletionResponse, conv *conversation.Conversation, userID uint, assistantItemID string, store bool, storeReasoning bool) (*conversation.Item, *common.Error) {
 	if !store {
 		return nil, nil // Don't store if store flag is false
 	}
@@ -719,7 +719,7 @@ func (api *CompletionAPI) StoreAssistantResponseIfRequested(ctx context.Context,
 	choice := response.Choices[0]
 	content := choice.Message.Content
 	reasoningContent := choice.Message.ReasoningContent
-	finishReason := choice.FinishReason
+	finishReason := string(choice.FinishReason)
 
 	// Don't store if no content available
 	if content == "" && reasoningContent == "" {
@@ -747,7 +747,7 @@ func (api *CompletionAPI) StoreAssistantResponseIfRequested(ctx context.Context,
 }
 
 // createContentArray creates the content array based on finish reason and choice
-func (api *CompletionAPI) createContentArray(choice CompletionChoice, finishReason, content string) ([]conversation.Content, *common.Error) {
+func (api *CompletionAPI) createContentArray(choice openai.ChatCompletionChoice, finishReason, content string) ([]conversation.Content, *common.Error) {
 	switch finishReason {
 	case "tool_calls":
 		if len(choice.Message.ToolCalls) > 0 {
