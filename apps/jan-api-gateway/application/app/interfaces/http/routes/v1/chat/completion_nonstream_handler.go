@@ -23,8 +23,8 @@ func NewCompletionNonStreamHandler(inferenceProvider inference.InferenceProvider
 	}
 }
 
-// GetCompletionRestResponse calls the inference model and returns a non-streaming REST response
-func (uc *CompletionNonStreamHandler) GetCompletionRestResponse(ctx context.Context, apiKey string, request openai.ChatCompletionRequest) (*ExtendedCompletionResponse, *common.Error) {
+// CallCompletionAndGetRestResponse calls the inference model and returns a non-streaming REST response
+func (uc *CompletionNonStreamHandler) CallCompletionAndGetRestResponse(ctx context.Context, apiKey string, request openai.ChatCompletionRequest) (*ExtendedCompletionResponse, *common.Error) {
 
 	// Call inference provider
 	response, err := uc.inferenceProvider.CreateCompletion(ctx, apiKey, request)

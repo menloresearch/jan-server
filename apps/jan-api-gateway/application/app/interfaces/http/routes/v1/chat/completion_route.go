@@ -15,6 +15,13 @@ import (
 	userdomain "menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
+	"menlo.ai/jan-api-gateway/app/utils/logger"
+)
+
+// Constants
+const (
+	DefaultConversationTitle = "New Conversation"
+	MaxTitleLength           = 50
 )
 
 type CompletionAPI struct {
@@ -64,17 +71,33 @@ type ExtendedCompletionResponse struct {
 
 // CreateChatCompletion
 // @Summary Create a chat completion
-// @Description Generates a model response for the given chat conversation. If `stream` is true, the response is sent as a stream of events. If `stream` is false or omitted, a single JSON response is returned.
+// @Description Generates a model response for the given chat conversation. Supports both streaming and non-streaming modes with conversation management and storage options.
+// @Description
+// @Description **Streaming Mode (stream=true):**
+// @Description - Returns Server-Sent Events (SSE) with real-time streaming
+// @Description - First event contains conversation metadata
+// @Description - Subsequent events contain completion chunks
+// @Description - Final event contains "[DONE]" marker
+// @Description
+// @Description **Non-Streaming Mode (stream=false or omitted):**
+// @Description - Returns single JSON response with complete completion
+// @Description - Includes conversation metadata in response
+// @Description
+// @Description **Storage Options:**
+// @Description - `store=true`: Saves user message and assistant response to conversation
+// @Description - `store_reasoning=true`: Includes reasoning content in stored messages
+// @Description - `conversation`: ID of existing conversation or empty for new conversation
 // @Tags Chat
 // @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Produce text/event-stream
-// @Param request body ExtendedChatCompletionRequest true "Extended chat completion request payload"
-// @Success 200 {object} ExtendedCompletionResponse "Successful non-streaming response"
-// @Success 200 {string} string "Successful streaming response (SSE format, event: 'data', data: JSON object per chunk)"
-// @Failure 400 {object} responses.ErrorResponse "Invalid request payload"
-// @Failure 401 {object} responses.ErrorResponse "Unauthorized"
+// @Param request body ExtendedChatCompletionRequest true "Chat completion request with streaming, storage, and conversation options"
+// @Success 200 {object} ExtendedCompletionResponse "Successful non-streaming response (when stream=false)"
+// @Success 200 {string} string "Successful streaming response (when stream=true) - SSE format with data: {json} events"
+// @Failure 400 {object} responses.ErrorResponse "Invalid request payload or conversation not found"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized - missing or invalid authentication"
+// @Failure 404 {object} responses.ErrorResponse "Conversation not found or user not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/chat/completions [post]
 func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
@@ -103,8 +126,8 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	if convErr != nil {
 		// Conversation doesn't exist, return error
 		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  convErr.GetCode(),
-			Error: convErr.GetMessage(),
+			Code:          convErr.GetCode(),
+			ErrorInstance: convErr.GetError(),
 		})
 		return
 	}
@@ -119,24 +142,24 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 
 	if request.Stream {
 		// Handle streaming completion - collect response and process normally
-		response, err = api.completionStreamHandler.GetCompletionStreamResponse(reqCtx, "", request.ChatCompletionRequest, conv, conversationCreated, askItemID, completionItemID)
+		response, err = api.completionStreamHandler.StreamCompletionAndAccumulateResponse(reqCtx, "", request.ChatCompletionRequest, conv, conversationCreated, askItemID, completionItemID)
 	} else {
 		// Handle non-streaming completion
-		response, err = api.completionNonStreamHandler.GetCompletionRestResponse(reqCtx.Request.Context(), "", request.ChatCompletionRequest)
+		response, err = api.completionNonStreamHandler.CallCompletionAndGetRestResponse(reqCtx.Request.Context(), "", request.ChatCompletionRequest)
 	}
 
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(
 			http.StatusBadRequest,
 			responses.ErrorResponse{
-				Code:  err.GetCode(),
-				Error: err.GetMessage(),
+				Code:          err.GetCode(),
+				ErrorInstance: err.GetError(),
 			})
 		return
 	}
 
 	// Process response (common logic for both streaming and non-streaming)
-	modifiedResponse := api.processCompletionResponse(reqCtx, response, request, conv, user, askItemID, completionItemID, conversationCreated, request.Stream)
+	modifiedResponse := api.processCompletionResponse(reqCtx, response, request, conv, user, askItemID, completionItemID, conversationCreated)
 
 	// Only send JSON response for non-streaming requests (streaming uses SSE)
 	if !request.Stream && modifiedResponse != nil {
@@ -145,7 +168,7 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 }
 
 // processCompletionResponse handles the common response processing logic for both streaming and non-streaming
-func (api *CompletionAPI) processCompletionResponse(reqCtx *gin.Context, response *ExtendedCompletionResponse, request ExtendedChatCompletionRequest, conv *conversation.Conversation, user *userdomain.User, askItemID string, completionItemID string, conversationCreated bool, isStreaming bool) *ExtendedCompletionResponse {
+func (api *CompletionAPI) processCompletionResponse(reqCtx *gin.Context, response *ExtendedCompletionResponse, request ExtendedChatCompletionRequest, conv *conversation.Conversation, user *userdomain.User, askItemID string, completionItemID string, conversationCreated bool) *ExtendedCompletionResponse {
 	var assistantItem *conversation.Item
 
 	// Store messages conditionally based on store flag
@@ -155,8 +178,8 @@ func (api *CompletionAPI) processCompletionResponse(reqCtx *gin.Context, respons
 			reqCtx.AbortWithStatusJSON(
 				http.StatusBadRequest,
 				responses.ErrorResponse{
-					Code:  storeErr.GetCode(),
-					Error: storeErr.GetMessage(),
+					Code:          storeErr.GetCode(),
+					ErrorInstance: storeErr.GetError(),
 				})
 			return nil
 		}
@@ -166,8 +189,8 @@ func (api *CompletionAPI) processCompletionResponse(reqCtx *gin.Context, respons
 			reqCtx.AbortWithStatusJSON(
 				http.StatusBadRequest,
 				responses.ErrorResponse{
-					Code:  err.GetCode(),
-					Error: err.GetMessage(),
+					Code:          err.GetCode(),
+					ErrorInstance: err.GetError(),
 				})
 			return nil
 		} else {
@@ -249,234 +272,21 @@ func (api *CompletionAPI) createNewConversation(reqCtx *gin.Context, messages []
 // generateTitleFromMessages creates a title from the first user message
 func (api *CompletionAPI) generateTitleFromMessages(messages []openai.ChatCompletionMessage) string {
 	if len(messages) == 0 {
-		return "New Conversation"
+		return DefaultConversationTitle
 	}
 
 	// Find the first user message
 	for _, msg := range messages {
 		if msg.Role == "user" && msg.Content != "" {
 			title := strings.TrimSpace(msg.Content)
-			if len(title) > 50 {
-				return title[:50] + "..."
+			if len(title) > MaxTitleLength {
+				return title[:MaxTitleLength] + "..."
 			}
 			return title
 		}
 	}
 
-	return "New Conversation"
-}
-
-// convertOpenAIMessageToConversationContent converts OpenAI message content to conversation content
-func (api *CompletionAPI) convertOpenAIMessageToConversationContent(msg openai.ChatCompletionMessage) []conversation.Content {
-	content := make([]conversation.Content, 0, len(msg.MultiContent))
-	for _, contentPart := range msg.MultiContent {
-		if contentPart.Type == openai.ChatMessagePartTypeText {
-			content = append(content, conversation.Content{
-				Type: "text",
-				Text: &conversation.Text{
-					Value: contentPart.Text,
-				},
-			})
-		}
-	}
-
-	// If no multi-content, use simple text content
-	if len(content) == 0 && msg.Content != "" {
-		content = append(content, conversation.Content{
-			Type: "text",
-			Text: &conversation.Text{
-				Value: msg.Content,
-			},
-		})
-	}
-
-	return content
-}
-
-// isFunctionToolResult checks if a message is a function tool result
-func (api *CompletionAPI) isFunctionToolResult(msg openai.ChatCompletionMessage) bool {
-	// Check if the message has tool role (MCP function results)
-	if msg.Role == openai.ChatMessageRoleTool {
-		return true
-	}
-
-	// Check if the message has tool_calls or function_call_result indicators
-	if len(msg.ToolCalls) > 0 {
-		return true
-	}
-
-	// Check content for function result patterns
-	if msg.Content != "" {
-		content := strings.ToLower(msg.Content)
-		// Look for common function result patterns
-		if strings.Contains(content, "function_result") ||
-			strings.Contains(content, "tool_result") ||
-			strings.Contains(content, "call_id") {
-			return true
-		}
-	}
-
-	return false
-}
-
-// parseFunctionToolResult parses function tool result from message content
-func (api *CompletionAPI) parseFunctionToolResult(msg openai.ChatCompletionMessage) *conversation.Content {
-	if !api.isFunctionToolResult(msg) {
-		return nil
-	}
-
-	// Handle tool role messages (MCP function results)
-	if msg.Role == openai.ChatMessageRoleTool {
-		// Try to parse the JSON content to extract function name and result
-		var toolResult map[string]interface{}
-		if err := json.Unmarshal([]byte(msg.Content), &toolResult); err == nil {
-			// Extract function name from the result structure
-			var functionName string
-			if searchParams, ok := toolResult["searchParameters"].(map[string]interface{}); ok {
-				if query, exists := searchParams["q"]; exists {
-					functionName = fmt.Sprintf("google_search (query: %v)", query)
-				} else {
-					functionName = "google_search"
-				}
-			} else {
-				functionName = "unknown_function"
-			}
-
-			resultContent := fmt.Sprintf("MCP Function Result - %s\nResult: %s", functionName, msg.Content)
-
-			return &conversation.Content{
-				Type: "text",
-				Text: &conversation.Text{
-					Value: resultContent,
-				},
-			}
-		}
-
-		// Fallback for non-JSON tool results
-		resultContent := fmt.Sprintf("MCP Function Result: %s", msg.Content)
-
-		return &conversation.Content{
-			Type: "text",
-			Text: &conversation.Text{
-				Value: resultContent,
-			},
-		}
-	}
-
-	// If message has tool_calls, create function call result content
-	if len(msg.ToolCalls) > 0 {
-		toolCall := msg.ToolCalls[0]
-		resultContent := fmt.Sprintf("Function Result - Call ID: %s\nType: %s\nResult: %s",
-			toolCall.ID, toolCall.Type, msg.Content)
-		reasoningContent := fmt.Sprintf("Tool call %s (%s) executed. Call ID: %s. Result: %s",
-			toolCall.ID, toolCall.Type, toolCall.ID, msg.Content)
-
-		return &conversation.Content{
-			Type: "text",
-			Text: &conversation.Text{
-				Value: resultContent,
-			},
-			ReasoningContent: &reasoningContent,
-		}
-	}
-
-	// For text-based function results, format them appropriately
-	resultContent := fmt.Sprintf("Function Result: %s", msg.Content)
-	reasoningContent := fmt.Sprintf("Generic function execution completed. Result: %s", msg.Content)
-
-	return &conversation.Content{
-		Type: "text",
-		Text: &conversation.Text{
-			Value: resultContent,
-		},
-		ReasoningContent: &reasoningContent,
-	}
-}
-
-// convertOpenAIRoleToConversationRole converts OpenAI role to conversation role
-func (api *CompletionAPI) convertOpenAIRoleToConversationRole(role string) conversation.ItemRole {
-	switch role {
-	case openai.ChatMessageRoleSystem:
-		return conversation.ItemRoleSystem
-	case openai.ChatMessageRoleUser:
-		return conversation.ItemRoleUser
-	case openai.ChatMessageRoleAssistant:
-		return conversation.ItemRoleAssistant
-	case openai.ChatMessageRoleTool:
-		return conversation.ItemRoleTool // Tool results use dedicated tool role
-	default:
-		return conversation.ItemRoleUser
-	}
-}
-
-// saveMessagesToConversation saves messages to conversation with optional custom IDs
-func (api *CompletionAPI) saveMessagesToConversation(ctx context.Context, conv *conversation.Conversation, userID uint, messages []openai.ChatCompletionMessage, askItemID string, completionItemID string, assistantContent string) (*conversation.Item, *common.Error) {
-	if conv == nil {
-		return nil, nil // No conversation to save to
-	}
-
-	var assistantItem *conversation.Item
-
-	// Convert OpenAI messages to conversation items
-	for i, msg := range messages {
-		role := api.convertOpenAIRoleToConversationRole(msg.Role)
-		content := api.convertOpenAIMessageToConversationContent(msg)
-
-		// Check if this is a function tool result
-		var itemType conversation.ItemType = conversation.ItemTypeMessage
-		if api.isFunctionToolResult(msg) {
-			itemType = conversation.ItemTypeFunctionCall
-			// Parse function tool result content
-			if functionResultContent := api.parseFunctionToolResult(msg); functionResultContent != nil {
-				content = []conversation.Content{*functionResultContent}
-			}
-		}
-
-		// Add item to conversation - use askItemID for the last user message
-		var item *conversation.Item
-		var err *common.Error
-		if i == len(messages)-1 && msg.Role == openai.ChatMessageRoleUser && askItemID != "" {
-			item, err = api.conversationService.AddItemWithID(ctx, conv, userID, itemType, &role, content, askItemID)
-		} else {
-			item, err = api.conversationService.AddItem(ctx, conv, userID, itemType, &role, content)
-		}
-
-		if err != nil {
-			return nil, common.NewError(err, "b2c3d4e5-f6g7-8901-bcde-f23456789012")
-		}
-
-		// If this is an assistant message, store it for return
-		if msg.Role == openai.ChatMessageRoleAssistant {
-			assistantItem = item
-		}
-	}
-
-	// If assistant content is provided and no assistant message was found in the input, create one
-	if assistantContent != "" && assistantItem == nil {
-		content := []conversation.Content{
-			{
-				Type: "text",
-				Text: &conversation.Text{
-					Value: assistantContent,
-				},
-			},
-		}
-
-		assistantRole := conversation.ItemRoleAssistant
-		var item *conversation.Item
-		var err *common.Error
-		if completionItemID != "" {
-			item, err = api.conversationService.AddItemWithID(ctx, conv, userID, conversation.ItemTypeMessage, &assistantRole, content, completionItemID)
-		} else {
-			item, err = api.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeMessage, &assistantRole, content)
-		}
-		if err != nil {
-			return nil, common.NewError(err, "c3d4e5f6-g7h8-9012-cdef-345678901234")
-		}
-		assistantItem = item
-	}
-
-	return assistantItem, nil
+	return DefaultConversationTitle
 }
 
 // handleCompletionResponseAndUpdateConversation handles completion response based on finish_reason and updates conversation
@@ -513,13 +323,13 @@ func (api *CompletionAPI) handleCompletionResponseAndUpdateConversation(ctx cont
 			}
 		case "length":
 			// Do nothing -> tracking via log
-			// TODO: Add logging for length finish reason
+			logger.GetLogger().Error("length finish reason: " + message.Content)
 		case "content_filter":
 			// Do nothing -> tracking via log
-			// TODO: Add logging for content filter finish reason
+			logger.GetLogger().Error("content filter finish reason: " + message.Content)
 		default:
 			// Handle unknown finish reasons
-			// TODO: Add logging for unknown finish reasons
+			logger.GetLogger().Error("unknown finish reason: " + message.Content)
 		}
 	}
 }
@@ -602,45 +412,6 @@ func (api *CompletionAPI) saveAssistantMessageToConversation(ctx context.Context
 	// Add the assistant message to conversation
 	assistantRole := conversation.ItemRoleAssistant
 	api.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeMessage, &assistantRole, conversationContent)
-}
-
-// saveLatestMessageToConversation saves the latest message from request to conversation
-func (api *CompletionAPI) saveLatestMessageToConversation(ctx context.Context, request openai.ChatCompletionRequest, conv *conversation.Conversation, userID uint, askItemID string) {
-	if conv == nil || len(request.Messages) == 0 {
-		return
-	}
-
-	// Get the latest message (last message in the request)
-	latestMessage := request.Messages[len(request.Messages)-1]
-
-	// Convert OpenAI message to conversation content
-	content := api.convertOpenAIMessageToConversationContent(latestMessage)
-
-	// Determine item type
-	var itemType conversation.ItemType = conversation.ItemTypeMessage
-	if api.isFunctionToolResult(latestMessage) {
-		itemType = conversation.ItemTypeFunctionCall
-		// Parse function tool result content
-		if functionResultContent := api.parseFunctionToolResult(latestMessage); functionResultContent != nil {
-			content = []conversation.Content{*functionResultContent}
-		}
-	}
-
-	// Convert role
-	role := api.convertOpenAIRoleToConversationRole(latestMessage.Role)
-
-	// Save the latest message to conversation
-	var err *common.Error
-	if askItemID != "" {
-		_, err = api.conversationService.AddItemWithID(ctx, conv, userID, itemType, &role, content, askItemID)
-	} else {
-		_, err = api.conversationService.AddItem(ctx, conv, userID, itemType, &role, content)
-	}
-
-	if err != nil {
-		// TODO: Add proper logging here
-		return
-	}
 }
 
 // StoreMessagesIfRequested conditionally stores messages based on the store flag

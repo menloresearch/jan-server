@@ -52,8 +52,8 @@ type ToolCallAccumulator struct {
 	Complete bool
 }
 
-// GetCompletionStreamResponse forwards SSE events to client and returns a complete response
-func (s *CompletionStreamHandler) GetCompletionStreamResponse(reqCtx *gin.Context, apiKey string, request openai.ChatCompletionRequest, conv *conversation.Conversation, conversationCreated bool, askItemID string, completionItemID string) (*ExtendedCompletionResponse, *common.Error) {
+// StreamCompletionAndAccumulateResponse streams SSE events to client and accumulates a complete response
+func (s *CompletionStreamHandler) StreamCompletionAndAccumulateResponse(reqCtx *gin.Context, apiKey string, request openai.ChatCompletionRequest, conv *conversation.Conversation, conversationCreated bool, askItemID string, completionItemID string) (*ExtendedCompletionResponse, *common.Error) {
 	// Set up SSE headers
 	s.setupSSEHeaders(reqCtx)
 
