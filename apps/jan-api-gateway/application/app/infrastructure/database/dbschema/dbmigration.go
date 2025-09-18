@@ -10,5 +10,5 @@ func init() {
 
 type DatabaseMigration struct {
 	BaseModel
-	Version string `gorm:"size:64;not null;uniqueIndex"`
+	Version int64 `gorm:"not null;uniqueIndex"`
 }
