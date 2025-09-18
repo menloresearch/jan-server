@@ -93,19 +93,16 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	}
 
 	// Generate item IDs for tracking
-	userItemID, _ := idgen.GenerateSecureID("msg", 42)
-	assistantItemID, _ := idgen.GenerateSecureID("msg", 42)
+	askItemID, _ := idgen.GenerateSecureID("msg", 42)
+	completionItemID, _ := idgen.GenerateSecureID("msg", 42)
 
 	// Handle streaming vs non-streaming requests
 	var response *ExtendedCompletionResponse
 	var err *common.Error
 
 	if request.Stream {
-		// Send conversation metadata event
-		api.sendConversationMetadata(reqCtx, conv, conversationCreated, userItemID, assistantItemID)
-
-		// Handle streaming completion - get complete response
-		response, err = api.completionStreamHandler.GetCompletionStreamResponse(reqCtx.Request.Context(), "", request.ChatCompletionRequest)
+		// Handle streaming completion - collect response and process normally
+		response, err = api.completionStreamHandler.GetCompletionStreamResponse(reqCtx, "", request.ChatCompletionRequest, conv, conversationCreated, askItemID, completionItemID)
 	} else {
 		// Handle non-streaming completion
 		response, err = api.completionNonStreamHandler.GetCompletionRestResponse(reqCtx.Request.Context(), "", request.ChatCompletionRequest)
@@ -122,35 +119,40 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	}
 
 	// Process response (common logic for both streaming and non-streaming)
-	api.processCompletionResponse(reqCtx, response, request, conv, user, userItemID, assistantItemID, conversationCreated)
+	modifiedResponse := api.processCompletionResponse(reqCtx, response, request, conv, user, askItemID, completionItemID, conversationCreated, request.Stream)
+
+	// Only send JSON response for non-streaming requests (streaming uses SSE)
+	if !request.Stream && modifiedResponse != nil {
+		reqCtx.JSON(http.StatusOK, modifiedResponse)
+	}
 }
 
 // processCompletionResponse handles the common response processing logic for both streaming and non-streaming
-func (api *CompletionAPI) processCompletionResponse(reqCtx *gin.Context, response *ExtendedCompletionResponse, request ExtendedChatCompletionRequest, conv *conversation.Conversation, user *userdomain.User, userItemID string, assistantItemID string, conversationCreated bool) {
+func (api *CompletionAPI) processCompletionResponse(reqCtx *gin.Context, response *ExtendedCompletionResponse, request ExtendedChatCompletionRequest, conv *conversation.Conversation, user *userdomain.User, askItemID string, completionItemID string, conversationCreated bool, isStreaming bool) *ExtendedCompletionResponse {
 	var assistantItem *conversation.Item
 
 	// Store messages conditionally based on store flag
 	if request.Store {
 		// Store user message
-		if storeErr := api.StoreMessagesIfRequested(reqCtx.Request.Context(), request.ChatCompletionRequest, conv, user.ID, userItemID, assistantItemID, request.Store, request.StoreReasoning); storeErr != nil {
+		if storeErr := api.StoreMessagesIfRequested(reqCtx.Request.Context(), request.ChatCompletionRequest, conv, user.ID, askItemID, completionItemID, request.Store, request.StoreReasoning); storeErr != nil {
 			reqCtx.AbortWithStatusJSON(
 				http.StatusBadRequest,
 				responses.ErrorResponse{
 					Code:  storeErr.GetCode(),
 					Error: storeErr.GetMessage(),
 				})
-			return
+			return nil
 		}
 
 		// Store assistant response
-		if item, err := api.StoreAssistantResponseIfRequested(reqCtx.Request.Context(), response, conv, user.ID, assistantItemID, request.Store, request.StoreReasoning); err != nil {
+		if item, err := api.StoreAssistantResponseIfRequested(reqCtx.Request.Context(), response, conv, user.ID, completionItemID, request.Store, request.StoreReasoning); err != nil {
 			reqCtx.AbortWithStatusJSON(
 				http.StatusBadRequest,
 				responses.ErrorResponse{
 					Code:  err.GetCode(),
 					Error: err.GetMessage(),
 				})
-			return
+			return nil
 		} else {
 			assistantItem = item
 		}
@@ -162,8 +164,7 @@ func (api *CompletionAPI) processCompletionResponse(reqCtx *gin.Context, respons
 	api.handleCompletionResponseAndUpdateConversation(reqCtx.Request.Context(), response, conv, user.ID, request.Store)
 
 	// Modify response to include item ID and metadata
-	modifiedResponse := api.completionNonStreamHandler.ModifyCompletionResponse(response, conv, conversationCreated, assistantItem, userItemID, assistantItemID, request.Store, request.StoreReasoning)
-	reqCtx.JSON(http.StatusOK, modifiedResponse)
+	return api.completionNonStreamHandler.ModifyCompletionResponse(response, conv, conversationCreated, assistantItem, askItemID, completionItemID, request.Store, request.StoreReasoning)
 }
 
 // handleConversationManagement handles conversation loading or creation and returns conversation, created flag, and error
@@ -246,30 +247,6 @@ func (api *CompletionAPI) generateTitleFromMessages(messages []openai.ChatComple
 	}
 
 	return "New Conversation"
-}
-
-// sendConversationMetadata sends conversation metadata as SSE event
-func (api *CompletionAPI) sendConversationMetadata(reqCtx *gin.Context, conv *conversation.Conversation, conversationCreated bool, userItemID string, assistantItemID string) {
-	if conv == nil {
-		return
-	}
-
-	metadata := map[string]any{
-		"object":               "chat.completion.metadata",
-		"conversation_id":      conv.PublicID,
-		"conversation_created": conversationCreated,
-		"conversation_title":   conv.Title,
-		"user_item_id":         userItemID,
-		"assistant_item_id":    assistantItemID,
-	}
-
-	jsonData, err := json.Marshal(metadata)
-	if err != nil {
-		return
-	}
-
-	reqCtx.Writer.Write([]byte(fmt.Sprintf("data: %s\n\n", string(jsonData))))
-	reqCtx.Writer.Flush()
 }
 
 // convertOpenAIMessageToConversationContent converts OpenAI message content to conversation content
@@ -416,7 +393,7 @@ func (api *CompletionAPI) convertOpenAIRoleToConversationRole(role string) conve
 }
 
 // saveMessagesToConversation saves messages to conversation with optional custom IDs
-func (api *CompletionAPI) saveMessagesToConversation(ctx context.Context, conv *conversation.Conversation, userID uint, messages []openai.ChatCompletionMessage, userItemID string, assistantItemID string, assistantContent string) (*conversation.Item, *common.Error) {
+func (api *CompletionAPI) saveMessagesToConversation(ctx context.Context, conv *conversation.Conversation, userID uint, messages []openai.ChatCompletionMessage, askItemID string, completionItemID string, assistantContent string) (*conversation.Item, *common.Error) {
 	if conv == nil {
 		return nil, nil // No conversation to save to
 	}
@@ -438,11 +415,11 @@ func (api *CompletionAPI) saveMessagesToConversation(ctx context.Context, conv *
 			}
 		}
 
-		// Add item to conversation - use userItemID for the last user message
+		// Add item to conversation - use askItemID for the last user message
 		var item *conversation.Item
 		var err *common.Error
-		if i == len(messages)-1 && msg.Role == openai.ChatMessageRoleUser && userItemID != "" {
-			item, err = api.conversationService.AddItemWithID(ctx, conv, userID, itemType, &role, content, userItemID)
+		if i == len(messages)-1 && msg.Role == openai.ChatMessageRoleUser && askItemID != "" {
+			item, err = api.conversationService.AddItemWithID(ctx, conv, userID, itemType, &role, content, askItemID)
 		} else {
 			item, err = api.conversationService.AddItem(ctx, conv, userID, itemType, &role, content)
 		}
@@ -471,8 +448,8 @@ func (api *CompletionAPI) saveMessagesToConversation(ctx context.Context, conv *
 		assistantRole := conversation.ItemRoleAssistant
 		var item *conversation.Item
 		var err *common.Error
-		if assistantItemID != "" {
-			item, err = api.conversationService.AddItemWithID(ctx, conv, userID, conversation.ItemTypeMessage, &assistantRole, content, assistantItemID)
+		if completionItemID != "" {
+			item, err = api.conversationService.AddItemWithID(ctx, conv, userID, conversation.ItemTypeMessage, &assistantRole, content, completionItemID)
 		} else {
 			item, err = api.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeMessage, &assistantRole, content)
 		}
@@ -611,7 +588,7 @@ func (api *CompletionAPI) saveAssistantMessageToConversation(ctx context.Context
 }
 
 // saveLatestMessageToConversation saves the latest message from request to conversation
-func (api *CompletionAPI) saveLatestMessageToConversation(ctx context.Context, request openai.ChatCompletionRequest, conv *conversation.Conversation, userID uint, userItemID string) {
+func (api *CompletionAPI) saveLatestMessageToConversation(ctx context.Context, request openai.ChatCompletionRequest, conv *conversation.Conversation, userID uint, askItemID string) {
 	if conv == nil || len(request.Messages) == 0 {
 		return
 	}
@@ -637,8 +614,8 @@ func (api *CompletionAPI) saveLatestMessageToConversation(ctx context.Context, r
 
 	// Save the latest message to conversation
 	var err *common.Error
-	if userItemID != "" {
-		_, err = api.conversationService.AddItemWithID(ctx, conv, userID, itemType, &role, content, userItemID)
+	if askItemID != "" {
+		_, err = api.conversationService.AddItemWithID(ctx, conv, userID, itemType, &role, content, askItemID)
 	} else {
 		_, err = api.conversationService.AddItem(ctx, conv, userID, itemType, &role, content)
 	}
@@ -650,7 +627,7 @@ func (api *CompletionAPI) saveLatestMessageToConversation(ctx context.Context, r
 }
 
 // StoreMessagesIfRequested conditionally stores messages based on the store flag
-func (api *CompletionAPI) StoreMessagesIfRequested(ctx context.Context, request openai.ChatCompletionRequest, conv *conversation.Conversation, userID uint, userItemID string, assistantItemID string, store bool, storeReasoning bool) *common.Error {
+func (api *CompletionAPI) StoreMessagesIfRequested(ctx context.Context, request openai.ChatCompletionRequest, conv *conversation.Conversation, userID uint, askItemID string, completionItemID string, store bool, storeReasoning bool) *common.Error {
 	if !store {
 		return nil // Don't store if store flag is false
 	}
@@ -677,7 +654,7 @@ func (api *CompletionAPI) StoreMessagesIfRequested(ctx context.Context, request 
 		},
 	}
 
-	if _, err := api.conversationService.AddItemWithID(ctx, conv, userID, conversation.ItemTypeMessage, &role, content, userItemID); err != nil {
+	if _, err := api.conversationService.AddItemWithID(ctx, conv, userID, conversation.ItemTypeMessage, &role, content, askItemID); err != nil {
 		return err
 	}
 
@@ -685,7 +662,7 @@ func (api *CompletionAPI) StoreMessagesIfRequested(ctx context.Context, request 
 }
 
 // StoreAssistantResponseIfRequested conditionally stores the assistant response based on the store flag
-func (api *CompletionAPI) StoreAssistantResponseIfRequested(ctx context.Context, response *ExtendedCompletionResponse, conv *conversation.Conversation, userID uint, assistantItemID string, store bool, storeReasoning bool) (*conversation.Item, *common.Error) {
+func (api *CompletionAPI) StoreAssistantResponseIfRequested(ctx context.Context, response *ExtendedCompletionResponse, conv *conversation.Conversation, userID uint, completionItemID string, store bool, storeReasoning bool) (*conversation.Item, *common.Error) {
 	if !store {
 		return nil, nil // Don't store if store flag is false
 	}
@@ -724,7 +701,7 @@ func (api *CompletionAPI) StoreAssistantResponseIfRequested(ctx context.Context,
 	}
 
 	role := conversation.ItemRoleAssistant
-	createdItem, err := api.conversationService.AddItemWithID(ctx, conv, userID, conversation.ItemTypeMessage, &role, contentArray, assistantItemID)
+	createdItem, err := api.conversationService.AddItemWithID(ctx, conv, userID, conversation.ItemTypeMessage, &role, contentArray, completionItemID)
 	if err != nil {
 		return nil, err
 	}
