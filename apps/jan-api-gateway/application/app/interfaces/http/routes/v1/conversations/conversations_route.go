@@ -74,12 +74,14 @@ type ConversationItemResponse struct {
 }
 
 type ContentResponse struct {
-	Type       string                `json:"type"`
-	Text       *TextResponse         `json:"text,omitempty"`
-	InputText  *string               `json:"input_text,omitempty"`
-	OutputText *OutputTextResponse   `json:"output_text,omitempty"`
-	Image      *ImageContentResponse `json:"image,omitempty"`
-	File       *FileContentResponse  `json:"file,omitempty"`
+	Type             string                `json:"type"`
+	FinishReason     *string               `json:"finish_reason,omitempty"`
+	Text             *TextResponse         `json:"text,omitempty"`
+	InputText        *string               `json:"input_text,omitempty"`
+	OutputText       *OutputTextResponse   `json:"output_text,omitempty"`
+	ReasoningContent *string               `json:"reasoning_content,omitempty"`
+	Image            *ImageContentResponse `json:"image,omitempty"`
+	File             *FileContentResponse  `json:"file,omitempty"`
 }
 
 type TextResponse struct {
@@ -766,6 +768,16 @@ func domainToContentResponse(content []conversation.Content) []ContentResponse {
 	for i, c := range content {
 		contentResp := ContentResponse{
 			Type: c.Type,
+		}
+
+		// Handle finish reason (available for all content types)
+		if c.FinishReason != nil {
+			contentResp.FinishReason = c.FinishReason
+		}
+
+		// Handle reasoning content (available for all content types)
+		if c.ReasoningContent != nil {
+			contentResp.ReasoningContent = c.ReasoningContent
 		}
 
 		// Handle different content types

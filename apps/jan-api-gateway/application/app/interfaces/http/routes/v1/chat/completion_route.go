@@ -39,7 +39,9 @@ func (completionAPI *CompletionAPI) RegisterRouter(router *gin.RouterGroup) {
 // ExtendedChatCompletionRequest extends OpenAI's request with conversation field
 type ExtendedChatCompletionRequest struct {
 	openai.ChatCompletionRequest
-	Conversation string `json:"conversation,omitempty"`
+	Conversation   string `json:"conversation,omitempty"`
+	Store          bool   `json:"store,omitempty"`           // If true, the response will be stored in the conversation
+	StoreReasoning bool   `json:"store_reasoning,omitempty"` // If true, the reasoning will be stored in the conversation
 }
 
 // CreateChatCompletion
@@ -139,15 +141,40 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 			return
 		}
 
-		// Save messages to conversation and get the assistant message item
-		var latestMessage []openai.ChatCompletionMessage
-		if len(request.Messages) > 0 {
-			latestMessage = []openai.ChatCompletionMessage{request.Messages[len(request.Messages)-1]}
+		var assistantItem *conversation.Item
+
+		// Store messages conditionally based on store flag
+		if request.Store {
+			// Store user message
+			if storeErr := api.StoreMessagesIfRequested(reqCtx.Request.Context(), request.ChatCompletionRequest, conv, user.ID, userItemID, assistantItemID, request.Store, request.StoreReasoning); storeErr != nil {
+				reqCtx.AbortWithStatusJSON(
+					http.StatusBadRequest,
+					responses.ErrorResponse{
+						Code:  storeErr.GetCode(),
+						Error: storeErr.GetMessage(),
+					})
+				return
+			}
+
+			// Store assistant response
+			if assistantItem, err = api.StoreAssistantResponseIfRequested(reqCtx.Request.Context(), response, conv, user.ID, assistantItemID, request.Store, request.StoreReasoning); err != nil {
+				reqCtx.AbortWithStatusJSON(
+					http.StatusBadRequest,
+					responses.ErrorResponse{
+						Code:  err.GetCode(),
+						Error: err.GetMessage(),
+					})
+				return
+			}
 		}
-		assistantItem, _ := api.saveMessagesToConversation(reqCtx.Request.Context(), conv, user.ID, latestMessage, userItemID, assistantItemID, response.Choices[0].Message.Content)
+
+		// Always handle completion response for other logic (like function calls, tool calls, etc.)
+		// This ensures the response is properly set up regardless of store flag
+		// Skip storage if we already handled it with the new store logic
+		api.handleCompletionResponseAndUpdateConversation(reqCtx.Request.Context(), response, conv, user.ID, request.Store)
 
 		// Modify response to include item ID and metadata
-		modifiedResponse := api.completionNonStreamHandler.ModifyCompletionResponse(response, conv, conversationCreated, assistantItem, userItemID, assistantItemID)
+		modifiedResponse := api.completionNonStreamHandler.ModifyCompletionResponse(response, conv, conversationCreated, assistantItem, userItemID, assistantItemID, request.Store, request.StoreReasoning)
 		reqCtx.JSON(http.StatusOK, modifiedResponse)
 		return
 	}
@@ -286,6 +313,106 @@ func (api *CompletionAPI) convertOpenAIMessageToConversationContent(msg openai.C
 	return content
 }
 
+// isFunctionToolResult checks if a message is a function tool result
+func (api *CompletionAPI) isFunctionToolResult(msg openai.ChatCompletionMessage) bool {
+	// Check if the message has tool role (MCP function results)
+	if msg.Role == openai.ChatMessageRoleTool {
+		return true
+	}
+
+	// Check if the message has tool_calls or function_call_result indicators
+	if len(msg.ToolCalls) > 0 {
+		return true
+	}
+
+	// Check content for function result patterns
+	if msg.Content != "" {
+		content := strings.ToLower(msg.Content)
+		// Look for common function result patterns
+		if strings.Contains(content, "function_result") ||
+			strings.Contains(content, "tool_result") ||
+			strings.Contains(content, "call_id") {
+			return true
+		}
+	}
+
+	return false
+}
+
+// parseFunctionToolResult parses function tool result from message content
+func (api *CompletionAPI) parseFunctionToolResult(msg openai.ChatCompletionMessage) *conversation.Content {
+	if !api.isFunctionToolResult(msg) {
+		return nil
+	}
+
+	// Handle tool role messages (MCP function results)
+	if msg.Role == openai.ChatMessageRoleTool {
+		// Try to parse the JSON content to extract function name and result
+		var toolResult map[string]interface{}
+		if err := json.Unmarshal([]byte(msg.Content), &toolResult); err == nil {
+			// Extract function name from the result structure
+			var functionName string
+			if searchParams, ok := toolResult["searchParameters"].(map[string]interface{}); ok {
+				if query, exists := searchParams["q"]; exists {
+					functionName = fmt.Sprintf("google_search (query: %v)", query)
+				} else {
+					functionName = "google_search"
+				}
+			} else {
+				functionName = "unknown_function"
+			}
+
+			resultContent := fmt.Sprintf("MCP Function Result - %s\nResult: %s", functionName, msg.Content)
+
+			return &conversation.Content{
+				Type: "text",
+				Text: &conversation.Text{
+					Value: resultContent,
+				},
+			}
+		}
+
+		// Fallback for non-JSON tool results
+		resultContent := fmt.Sprintf("MCP Function Result: %s", msg.Content)
+
+		return &conversation.Content{
+			Type: "text",
+			Text: &conversation.Text{
+				Value: resultContent,
+			},
+		}
+	}
+
+	// If message has tool_calls, create function call result content
+	if len(msg.ToolCalls) > 0 {
+		toolCall := msg.ToolCalls[0]
+		resultContent := fmt.Sprintf("Function Result - Call ID: %s\nType: %s\nResult: %s",
+			toolCall.ID, toolCall.Type, msg.Content)
+		reasoningContent := fmt.Sprintf("Tool call %s (%s) executed. Call ID: %s. Result: %s",
+			toolCall.ID, toolCall.Type, toolCall.ID, msg.Content)
+
+		return &conversation.Content{
+			Type: "text",
+			Text: &conversation.Text{
+				Value: resultContent,
+			},
+			ReasoningContent: &reasoningContent,
+		}
+	}
+
+	// For text-based function results, format them appropriately
+	resultContent := fmt.Sprintf("Function Result: %s", msg.Content)
+	reasoningContent := fmt.Sprintf("Generic function execution completed. Result: %s", msg.Content)
+
+	return &conversation.Content{
+		Type: "text",
+		Text: &conversation.Text{
+			Value: resultContent,
+		},
+		ReasoningContent: &reasoningContent,
+	}
+}
+
 // convertOpenAIRoleToConversationRole converts OpenAI role to conversation role
 func (api *CompletionAPI) convertOpenAIRoleToConversationRole(role string) conversation.ItemRole {
 	switch role {
@@ -295,6 +422,8 @@ func (api *CompletionAPI) convertOpenAIRoleToConversationRole(role string) conve
 		return conversation.ItemRoleUser
 	case openai.ChatMessageRoleAssistant:
 		return conversation.ItemRoleAssistant
+	case openai.ChatMessageRoleTool:
+		return conversation.ItemRoleTool // Tool results use dedicated tool role
 	default:
 		return conversation.ItemRoleUser
 	}
@@ -313,13 +442,23 @@ func (api *CompletionAPI) saveMessagesToConversation(ctx context.Context, conv *
 		role := api.convertOpenAIRoleToConversationRole(msg.Role)
 		content := api.convertOpenAIMessageToConversationContent(msg)
 
+		// Check if this is a function tool result
+		var itemType conversation.ItemType = conversation.ItemTypeMessage
+		if api.isFunctionToolResult(msg) {
+			itemType = conversation.ItemTypeFunctionCall
+			// Parse function tool result content
+			if functionResultContent := api.parseFunctionToolResult(msg); functionResultContent != nil {
+				content = []conversation.Content{*functionResultContent}
+			}
+		}
+
 		// Add item to conversation - use userItemID for the last user message
 		var item *conversation.Item
 		var err *common.Error
 		if i == len(messages)-1 && msg.Role == openai.ChatMessageRoleUser && userItemID != "" {
-			item, err = api.conversationService.AddItemWithID(ctx, conv, userID, conversation.ItemTypeMessage, &role, content, userItemID)
+			item, err = api.conversationService.AddItemWithID(ctx, conv, userID, itemType, &role, content, userItemID)
 		} else {
-			item, err = api.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeMessage, &role, content)
+			item, err = api.conversationService.AddItem(ctx, conv, userID, itemType, &role, content)
 		}
 
 		if err != nil {
@@ -358,4 +497,300 @@ func (api *CompletionAPI) saveMessagesToConversation(ctx context.Context, conv *
 	}
 
 	return assistantItem, nil
+}
+
+// handleCompletionResponseAndUpdateConversation handles completion response based on finish_reason and updates conversation
+func (api *CompletionAPI) handleCompletionResponseAndUpdateConversation(ctx context.Context, response *CompletionResponse, conv *conversation.Conversation, userID uint, skipStorage bool) {
+	if conv == nil || len(response.Choices) == 0 {
+		return
+	}
+
+	// Loop through all choices in the response
+	for _, choice := range response.Choices {
+		finishReason := choice.FinishReason
+		message := choice.Message
+
+		// Skip storage if already handled by new store logic
+		if skipStorage {
+			continue
+		}
+
+		switch finishReason {
+		case "function_call":
+			// Save the function call to the conversation
+			if message.FunctionCall != nil {
+				api.saveFunctionCallToConversation(ctx, conv, userID, message.FunctionCall, message.ReasoningContent)
+			}
+		case "tool_calls":
+			// Save the tool calls to the conversation
+			if len(message.ToolCalls) > 0 {
+				api.saveToolCallsToConversation(ctx, conv, userID, message.ToolCalls, message.ReasoningContent)
+			}
+		case "stop":
+			// Save the response as assistant message to the conversation
+			if message.Content != "" {
+				api.saveAssistantMessageToConversation(ctx, conv, userID, message.Content, message.ReasoningContent)
+			}
+		case "length":
+			// Do nothing -> tracking via log
+			// TODO: Add logging for length finish reason
+		case "content_filter":
+			// Do nothing -> tracking via log
+			// TODO: Add logging for content filter finish reason
+		default:
+			// Handle unknown finish reasons
+			// TODO: Add logging for unknown finish reasons
+		}
+	}
+}
+
+// saveFunctionCallToConversation saves a function call to the conversation
+func (api *CompletionAPI) saveFunctionCallToConversation(ctx context.Context, conv *conversation.Conversation, userID uint, functionCall *openai.FunctionCall, reasoningContent string) {
+	if conv == nil || functionCall == nil {
+		return
+	}
+
+	functionCallContent := []conversation.Content{
+		{
+			Type: "text",
+			Text: &conversation.Text{
+				Value: fmt.Sprintf("Function: %s\nArguments: %s", functionCall.Name, functionCall.Arguments),
+			},
+		},
+	}
+
+	// Add reasoning content if present
+	if reasoningContent != "" {
+		functionCallContent[0].ReasoningContent = &reasoningContent
+	}
+
+	// Add the function call to conversation as a separate item
+	assistantRole := conversation.ItemRoleAssistant
+	api.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeFunction, &assistantRole, functionCallContent)
+}
+
+// saveToolCallsToConversation saves tool calls to the conversation
+func (api *CompletionAPI) saveToolCallsToConversation(ctx context.Context, conv *conversation.Conversation, userID uint, toolCalls []openai.ToolCall, reasoningContent string) {
+	if conv == nil || len(toolCalls) == 0 {
+		return
+	}
+
+	// Save each tool call as a separate conversation item
+	for _, toolCall := range toolCalls {
+		toolCallContent := []conversation.Content{
+			{
+				Type: "text",
+				Text: &conversation.Text{
+					Value: fmt.Sprintf("Tool Call ID: %s\nType: %s\nFunction: %s\nArguments: %s",
+						toolCall.ID, toolCall.Type, toolCall.Function.Name, toolCall.Function.Arguments),
+				},
+			},
+		}
+
+		// Add reasoning content if present
+		if reasoningContent != "" {
+			toolCallContent[0].ReasoningContent = &reasoningContent
+		}
+
+		// Add the tool call to conversation as a separate item
+		assistantRole := conversation.ItemRoleAssistant
+		api.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeFunction, &assistantRole, toolCallContent)
+	}
+}
+
+// saveAssistantMessageToConversation saves assistant message to the conversation
+func (api *CompletionAPI) saveAssistantMessageToConversation(ctx context.Context, conv *conversation.Conversation, userID uint, content string, reasoningContent string) {
+	if conv == nil || content == "" {
+		return
+	}
+
+	// Create content structure
+	conversationContent := []conversation.Content{
+		{
+			Type: "text",
+			Text: &conversation.Text{
+				Value: content,
+			},
+		},
+	}
+
+	// Add reasoning content if present
+	if reasoningContent != "" {
+		conversationContent[0].ReasoningContent = &reasoningContent
+	}
+
+	// Add the assistant message to conversation
+	assistantRole := conversation.ItemRoleAssistant
+	api.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeMessage, &assistantRole, conversationContent)
+}
+
+// saveLatestMessageToConversation saves the latest message from request to conversation
+func (api *CompletionAPI) saveLatestMessageToConversation(ctx context.Context, request openai.ChatCompletionRequest, conv *conversation.Conversation, userID uint, userItemID string) {
+	if conv == nil || len(request.Messages) == 0 {
+		return
+	}
+
+	// Get the latest message (last message in the request)
+	latestMessage := request.Messages[len(request.Messages)-1]
+
+	// Convert OpenAI message to conversation content
+	content := api.convertOpenAIMessageToConversationContent(latestMessage)
+
+	// Determine item type
+	var itemType conversation.ItemType = conversation.ItemTypeMessage
+	if api.isFunctionToolResult(latestMessage) {
+		itemType = conversation.ItemTypeFunctionCall
+		// Parse function tool result content
+		if functionResultContent := api.parseFunctionToolResult(latestMessage); functionResultContent != nil {
+			content = []conversation.Content{*functionResultContent}
+		}
+	}
+
+	// Convert role
+	role := api.convertOpenAIRoleToConversationRole(latestMessage.Role)
+
+	// Save the latest message to conversation
+	var err *common.Error
+	if userItemID != "" {
+		_, err = api.conversationService.AddItemWithID(ctx, conv, userID, itemType, &role, content, userItemID)
+	} else {
+		_, err = api.conversationService.AddItem(ctx, conv, userID, itemType, &role, content)
+	}
+
+	if err != nil {
+		// TODO: Add proper logging here
+		return
+	}
+}
+
+// StoreMessagesIfRequested conditionally stores messages based on the store flag
+func (api *CompletionAPI) StoreMessagesIfRequested(ctx context.Context, request openai.ChatCompletionRequest, conv *conversation.Conversation, userID uint, userItemID string, assistantItemID string, store bool, storeReasoning bool) *common.Error {
+	if !store {
+		return nil // Don't store if store flag is false
+	}
+
+	// Validate required parameters
+	if conv == nil {
+		return common.NewError(nil, "c1d2e3f4-g5h6-7890-abcd-ef1234567890")
+	}
+
+	// Store the latest user message
+	if len(request.Messages) == 0 {
+		return nil // No messages to store
+	}
+
+	latestMessage := request.Messages[len(request.Messages)-1]
+	role := conversation.ItemRole(latestMessage.Role)
+
+	content := []conversation.Content{
+		{
+			Type: "text",
+			Text: &conversation.Text{
+				Value: latestMessage.Content,
+			},
+		},
+	}
+
+	if _, err := api.conversationService.AddItemWithID(ctx, conv, userID, conversation.ItemTypeMessage, &role, content, userItemID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// StoreAssistantResponseIfRequested conditionally stores the assistant response based on the store flag
+func (api *CompletionAPI) StoreAssistantResponseIfRequested(ctx context.Context, response *CompletionResponse, conv *conversation.Conversation, userID uint, assistantItemID string, store bool, storeReasoning bool) (*conversation.Item, *common.Error) {
+	if !store {
+		return nil, nil // Don't store if store flag is false
+	}
+
+	// Validate required parameters
+	if response == nil {
+		return nil, common.NewErrorWithMessage("Response is nil", "d2e3f4g5-h6i7-8901-bcde-f23456789012")
+	}
+	if conv == nil {
+		return nil, common.NewErrorWithMessage("Conversation is nil", "e3f4g5h6-i7j8-9012-cdef-345678901234")
+	}
+
+	if len(response.Choices) == 0 {
+		return nil, common.NewErrorWithMessage("No choices to store", "01995b18-1638-719d-8ee2-01375bb2a19c")
+	}
+
+	choice := response.Choices[0]
+	content := choice.Message.Content
+	reasoningContent := choice.Message.ReasoningContent
+	finishReason := choice.FinishReason
+
+	// Don't store if no content available
+	if content == "" && reasoningContent == "" {
+		return nil, nil
+	}
+
+	// Create content array based on finish reason
+	contentArray, err := api.createContentArray(choice, finishReason, content)
+	if err != nil {
+		return nil, err
+	}
+
+	// Add reasoning content if requested
+	if storeReasoning && reasoningContent != "" {
+		contentArray[0].ReasoningContent = &reasoningContent
+	}
+
+	role := conversation.ItemRoleAssistant
+	createdItem, err := api.conversationService.AddItemWithID(ctx, conv, userID, conversation.ItemTypeMessage, &role, contentArray, assistantItemID)
+	if err != nil {
+		return nil, err
+	}
+
+	return createdItem, nil
+}
+
+// createContentArray creates the content array based on finish reason and choice
+func (api *CompletionAPI) createContentArray(choice CompletionChoice, finishReason, content string) ([]conversation.Content, *common.Error) {
+	switch finishReason {
+	case "tool_calls":
+		if len(choice.Message.ToolCalls) > 0 {
+			toolCallsJSON, err := json.Marshal(choice.Message.ToolCalls)
+			if err != nil {
+				return nil, common.NewError(err, "f4g5h6i7-j8k9-0123-defg-456789012345")
+			}
+			return []conversation.Content{
+				{
+					Type:         "text",
+					FinishReason: &finishReason,
+					Text: &conversation.Text{
+						Value: string(toolCallsJSON),
+					},
+				},
+			}, nil
+		}
+	case "function_call":
+		if choice.Message.FunctionCall != nil {
+			functionCallJSON, err := json.Marshal(choice.Message.FunctionCall)
+			if err != nil {
+				return nil, common.NewError(err, "g5h6i7j8-k9l0-1234-efgh-567890123456")
+			}
+			return []conversation.Content{
+				{
+					Type:         "text",
+					FinishReason: &finishReason,
+					Text: &conversation.Text{
+						Value: string(functionCallJSON),
+					},
+				},
+			}, nil
+		}
+	}
+
+	// Default case: store regular content (for "stop" and other finish reasons)
+	return []conversation.Content{
+		{
+			Type:         "text",
+			FinishReason: &finishReason,
+			Text: &conversation.Text{
+				Value: content,
+			},
+		},
+	}, nil
 }

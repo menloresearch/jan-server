@@ -33,18 +33,21 @@ func (uc *CompletionNonStreamHandler) CreateCompletion(ctx context.Context, apiK
 	}
 
 	// Convert response
-	return uc.convertResponse(response), nil
+	return uc.ConvertResponse(response), nil
 }
 
-// convertResponse converts OpenAI response to our domain response
-func (uc *CompletionNonStreamHandler) convertResponse(response *openai.ChatCompletionResponse) *CompletionResponse {
+// ConvertResponse converts OpenAI response to our domain response
+func (uc *CompletionNonStreamHandler) ConvertResponse(response *openai.ChatCompletionResponse) *CompletionResponse {
 	choices := make([]CompletionChoice, len(response.Choices))
 	for i, choice := range response.Choices {
 		choices[i] = CompletionChoice{
 			Index: choice.Index,
 			Message: CompletionMessage{
-				Role:    choice.Message.Role,
-				Content: choice.Message.Content,
+				Role:             choice.Message.Role,
+				Content:          choice.Message.Content,
+				ReasoningContent: choice.Message.ReasoningContent,
+				FunctionCall:     choice.Message.FunctionCall,
+				ToolCalls:        choice.Message.ToolCalls,
 			},
 			FinishReason: string(choice.FinishReason),
 		}
@@ -64,80 +67,74 @@ func (uc *CompletionNonStreamHandler) convertResponse(response *openai.ChatCompl
 	}
 }
 
-// Note: Message saving logic has been moved to completion_route.go to eliminate duplication
-// These methods are kept for backward compatibility but should be deprecated
-
 // CompletionResponse represents the response from chat completion
 type CompletionResponse struct {
-	ID       string                 `json:"id"`
-	Object   string                 `json:"object"`
-	Created  int64                  `json:"created"`
-	Model    string                 `json:"model"`
-	Choices  []CompletionChoice     `json:"choices"`
-	Usage    Usage                  `json:"usage"`
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	ID       string             `json:"id"`
+	Object   string             `json:"object"`
+	Created  int64              `json:"created"`
+	Model    string             `json:"model"`
+	Choices  []CompletionChoice `json:"choices"`
+	Usage    Usage              `json:"usage"`
+	Metadata *ResponseMetadata  `json:"metadata,omitempty"`
 }
 
+// CompletionChoice represents a single completion choice from the AI model
 type CompletionChoice struct {
 	Index        int               `json:"index"`
 	Message      CompletionMessage `json:"message"`
 	FinishReason string            `json:"finish_reason"`
 }
 
+// CompletionMessage represents a message in the completion response
 type CompletionMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role             string               `json:"role"`
+	Content          string               `json:"content"`
+	ReasoningContent string               `json:"reasoning_content"`
+	FunctionCall     *openai.FunctionCall `json:"function_call,omitempty"`
+	ToolCalls        []openai.ToolCall    `json:"tool_calls,omitempty"`
 }
 
+// Usage represents token usage statistics for the completion
 type Usage struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
 	TotalTokens      int `json:"total_tokens"`
 }
 
+// ResponseMetadata contains additional metadata about the completion response
+type ResponseMetadata struct {
+	ConversationID      string `json:"conversation_id"`
+	ConversationCreated bool   `json:"conversation_created"`
+	ConversationTitle   string `json:"conversation_title"`
+	UserItemID          string `json:"user_item_id"`
+	AssistantItemID     string `json:"assistant_item_id"`
+	Store               bool   `json:"store"`
+	StoreReasoning      bool   `json:"store_reasoning"`
+}
+
 // ModifyCompletionResponse modifies the completion response to include item ID and metadata
-func (uc *CompletionNonStreamHandler) ModifyCompletionResponse(response *CompletionResponse, conv *conversation.Conversation, conversationCreated bool, assistantItem *conversation.Item, userItemID string, assistantItemID string) *CompletionResponse {
-	// Create modified response
-	modifiedResponse := &CompletionResponse{
-		ID:      response.ID, // Default to original ID
-		Object:  response.Object,
-		Created: response.Created,
-		Model:   response.Model,
-		Choices: make([]CompletionChoice, len(response.Choices)),
-		Usage: Usage{
-			PromptTokens:     response.Usage.PromptTokens,
-			CompletionTokens: response.Usage.CompletionTokens,
-			TotalTokens:      response.Usage.TotalTokens,
-		},
-	}
-
-	// Copy choices
-	for i, choice := range response.Choices {
-		modifiedResponse.Choices[i] = CompletionChoice{
-			Index: choice.Index,
-			Message: CompletionMessage{
-				Role:    choice.Message.Role,
-				Content: choice.Message.Content,
-			},
-			FinishReason: choice.FinishReason,
-		}
-	}
-
+func (uc *CompletionNonStreamHandler) ModifyCompletionResponse(response *CompletionResponse, conv *conversation.Conversation, conversationCreated bool, assistantItem *conversation.Item, userItemID string, assistantItemID string, store bool, storeReasoning bool) *CompletionResponse {
 	// Replace ID with item ID if assistant item exists
 	if assistantItem != nil {
-		modifiedResponse.ID = assistantItem.PublicID
+		response.ID = assistantItem.PublicID
 	}
 
 	// Add metadata if conversation exists
 	if conv != nil {
-		modifiedResponse.Metadata = map[string]interface{}{
-			"conversation_id":      conv.PublicID,
-			"conversation_created": conversationCreated,
-			"conversation_title":   conv.Title,
-			"user_item_id":         userItemID,
-			"assistant_item_id":    assistantItemID,
+		title := ""
+		if conv.Title != nil {
+			title = *conv.Title
+		}
+		response.Metadata = &ResponseMetadata{
+			ConversationID:      conv.PublicID,
+			ConversationCreated: conversationCreated,
+			ConversationTitle:   title,
+			UserItemID:          userItemID,
+			AssistantItemID:     assistantItemID,
+			Store:               store,
+			StoreReasoning:      storeReasoning,
 		}
 	}
 
-	return modifiedResponse
+	return response
 }
