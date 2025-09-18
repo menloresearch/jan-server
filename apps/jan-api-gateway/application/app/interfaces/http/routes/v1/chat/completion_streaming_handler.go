@@ -14,6 +14,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/common"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/inference"
+	"menlo.ai/jan-api-gateway/app/utils/logger"
 )
 
 // Constants for streaming configuration
@@ -84,13 +85,6 @@ func (s *CompletionStreamHandler) StreamCompletionAndAccumulateResponse(reqCtx *
 	// Start streaming in a goroutine
 	go s.streamResponseToChannel(ctx, apiKey, request, dataChan, errChan, &wg)
 
-	// Wait for streaming to complete and close channels
-	go func() {
-		wg.Wait()
-		close(dataChan)
-		close(errChan)
-	}()
-
 	// Accumulators for different types of content
 	var fullContent string
 	var fullReasoning string
@@ -156,6 +150,13 @@ func (s *CompletionStreamHandler) StreamCompletionAndAccumulateResponse(reqCtx *
 			return nil, common.NewError(ctx.Err(), "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
 		}
 	}
+
+	// Wait for streaming goroutine to complete and close channels
+	wg.Wait()
+
+	close(dataChan)
+	close(errChan)
+
 	// Build the complete response
 	response := s.buildCompleteResponse(fullContent, fullReasoning, functionCallAccumulator, toolCallAccumulator, completionItemID, request.Model, request)
 
@@ -175,7 +176,13 @@ func (s *CompletionStreamHandler) streamResponseToChannel(ctx context.Context, a
 		errChan <- err
 		return
 	}
-	defer reader.Close()
+	defer func() {
+		if closeErr := reader.Close(); closeErr != nil {
+			// Log the close error but don't send it to errChan to avoid overriding the original error
+			// In a production environment, you might want to use a proper logger here
+			logger.GetLogger().Errorf("unable to close reader: %v", closeErr)
+		}
+	}()
 
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
@@ -191,6 +198,7 @@ func (s *CompletionStreamHandler) streamResponseToChannel(ctx context.Context, a
 
 	if err := scanner.Err(); err != nil {
 		errChan <- err
+		return
 	}
 }
 
@@ -261,7 +269,8 @@ func (s *CompletionStreamHandler) processStreamChunkForChannel(data string) (str
 	}
 
 	if err := json.Unmarshal([]byte(data), &streamData); err != nil {
-		// If JSON parsing fails, return empty chunks
+		// Log JSON parsing errors for debugging
+		logger.GetLogger().Errorf("failed to parse stream chunk JSON: %v, data: %s", err, data)
 		return "", "", nil, nil
 	}
 
@@ -431,6 +440,7 @@ func (s *CompletionStreamHandler) buildCompleteResponse(content string, reasonin
 	}
 }
 
+// TODO it's raw solution, we need to use the official openai tokenizer like tiktoken
 // estimateTokens provides a rough estimation of token count for messages
 func (s *CompletionStreamHandler) estimateTokens(messages []openai.ChatCompletionMessage) int {
 	var allText strings.Builder
@@ -456,7 +466,8 @@ func (s *CompletionStreamHandler) estimateTokens(messages []openai.ChatCompletio
 		}
 	}
 
-	// Split by spaces and count words
-	words := strings.Fields(allText.String())
+	// Split by spaces and count words, but normalize whitespace
+	normalized := strings.Join(strings.Fields(allText.String()), " ") // Collapse multiple spaces
+	words := strings.Fields(normalized)
 	return len(words)
 }
