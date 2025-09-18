@@ -12,6 +12,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/common"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
+	userdomain "menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
 )
@@ -96,42 +97,53 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	assistantItemID, _ := idgen.GenerateSecureID("msg", 42)
 
 	// Handle streaming vs non-streaming requests
-	if request.Stream {
+	var response *ExtendedCompletionResponse
+	var err *common.Error
 
+	if request.Stream {
 		// Send conversation metadata event
 		api.sendConversationMetadata(reqCtx, conv, conversationCreated, userItemID, assistantItemID)
 
-		// Handle streaming completion
-		err := api.completionStreamHandler.StreamCompletion(reqCtx, "", request.ChatCompletionRequest, conv, user, userItemID, assistantItemID)
-		if err != nil {
-			// Check if context was cancelled (timeout)
-			if reqCtx.Request.Context().Err() == context.DeadlineExceeded {
-				reqCtx.AbortWithStatusJSON(
-					http.StatusRequestTimeout,
-					responses.ErrorResponse{
-						Code: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-					})
-			} else if reqCtx.Request.Context().Err() == context.Canceled {
-				reqCtx.AbortWithStatusJSON(
-					http.StatusRequestTimeout,
-					responses.ErrorResponse{
-						Code: "b2c3d4e5-f6g7-8901-bcde-f23456789012",
-					})
-			} else {
-				reqCtx.AbortWithStatusJSON(
-					http.StatusBadRequest,
-					responses.ErrorResponse{
-						Code:  err.GetCode(),
-						Error: err.GetMessage(),
-					})
-			}
+		// Handle streaming completion - get complete response
+		response, err = api.completionStreamHandler.GetCompletionStreamResponse(reqCtx.Request.Context(), "", request.ChatCompletionRequest)
+	} else {
+		// Handle non-streaming completion
+		response, err = api.completionNonStreamHandler.GetCompletionRestResponse(reqCtx.Request.Context(), "", request.ChatCompletionRequest)
+	}
+
+	if err != nil {
+		reqCtx.AbortWithStatusJSON(
+			http.StatusBadRequest,
+			responses.ErrorResponse{
+				Code:  err.GetCode(),
+				Error: err.GetMessage(),
+			})
+		return
+	}
+
+	// Process response (common logic for both streaming and non-streaming)
+	api.processCompletionResponse(reqCtx, response, request, conv, user, userItemID, assistantItemID, conversationCreated)
+}
+
+// processCompletionResponse handles the common response processing logic for both streaming and non-streaming
+func (api *CompletionAPI) processCompletionResponse(reqCtx *gin.Context, response *ExtendedCompletionResponse, request ExtendedChatCompletionRequest, conv *conversation.Conversation, user *userdomain.User, userItemID string, assistantItemID string, conversationCreated bool) {
+	var assistantItem *conversation.Item
+
+	// Store messages conditionally based on store flag
+	if request.Store {
+		// Store user message
+		if storeErr := api.StoreMessagesIfRequested(reqCtx.Request.Context(), request.ChatCompletionRequest, conv, user.ID, userItemID, assistantItemID, request.Store, request.StoreReasoning); storeErr != nil {
+			reqCtx.AbortWithStatusJSON(
+				http.StatusBadRequest,
+				responses.ErrorResponse{
+					Code:  storeErr.GetCode(),
+					Error: storeErr.GetMessage(),
+				})
 			return
 		}
-		return
-	} else {
 
-		response, err := api.completionNonStreamHandler.GetCompletionRestResponse(reqCtx.Request.Context(), "", request.ChatCompletionRequest)
-		if err != nil {
+		// Store assistant response
+		if item, err := api.StoreAssistantResponseIfRequested(reqCtx.Request.Context(), response, conv, user.ID, assistantItemID, request.Store, request.StoreReasoning); err != nil {
 			reqCtx.AbortWithStatusJSON(
 				http.StatusBadRequest,
 				responses.ErrorResponse{
@@ -139,45 +151,19 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 					Error: err.GetMessage(),
 				})
 			return
+		} else {
+			assistantItem = item
 		}
-
-		var assistantItem *conversation.Item
-
-		// Store messages conditionally based on store flag
-		if request.Store {
-			// Store user message
-			if storeErr := api.StoreMessagesIfRequested(reqCtx.Request.Context(), request.ChatCompletionRequest, conv, user.ID, userItemID, assistantItemID, request.Store, request.StoreReasoning); storeErr != nil {
-				reqCtx.AbortWithStatusJSON(
-					http.StatusBadRequest,
-					responses.ErrorResponse{
-						Code:  storeErr.GetCode(),
-						Error: storeErr.GetMessage(),
-					})
-				return
-			}
-
-			// Store assistant response
-			if assistantItem, err = api.StoreAssistantResponseIfRequested(reqCtx.Request.Context(), response, conv, user.ID, assistantItemID, request.Store, request.StoreReasoning); err != nil {
-				reqCtx.AbortWithStatusJSON(
-					http.StatusBadRequest,
-					responses.ErrorResponse{
-						Code:  err.GetCode(),
-						Error: err.GetMessage(),
-					})
-				return
-			}
-		}
-
-		// Always handle completion response for other logic (like function calls, tool calls, etc.)
-		// This ensures the response is properly set up regardless of store flag
-		// Skip storage if we already handled it with the new store logic
-		api.handleCompletionResponseAndUpdateConversation(reqCtx.Request.Context(), response, conv, user.ID, request.Store)
-
-		// Modify response to include item ID and metadata
-		modifiedResponse := api.completionNonStreamHandler.ModifyCompletionResponse(response, conv, conversationCreated, assistantItem, userItemID, assistantItemID, request.Store, request.StoreReasoning)
-		reqCtx.JSON(http.StatusOK, modifiedResponse)
-		return
 	}
+
+	// Always handle completion response for other logic (like function calls, tool calls, etc.)
+	// This ensures the response is properly set up regardless of store flag
+	// Skip storage if we already handled it with the new store logic
+	api.handleCompletionResponseAndUpdateConversation(reqCtx.Request.Context(), response, conv, user.ID, request.Store)
+
+	// Modify response to include item ID and metadata
+	modifiedResponse := api.completionNonStreamHandler.ModifyCompletionResponse(response, conv, conversationCreated, assistantItem, userItemID, assistantItemID, request.Store, request.StoreReasoning)
+	reqCtx.JSON(http.StatusOK, modifiedResponse)
 }
 
 // handleConversationManagement handles conversation loading or creation and returns conversation, created flag, and error
