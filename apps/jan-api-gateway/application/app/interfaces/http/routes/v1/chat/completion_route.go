@@ -12,7 +12,15 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/common"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
+	userdomain "menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
+	"menlo.ai/jan-api-gateway/app/utils/idgen"
+	"menlo.ai/jan-api-gateway/app/utils/logger"
+)
+
+const (
+	DefaultConversationTitle = "New Conversation"
+	MaxTitleLength           = 50
 )
 
 type CompletionAPI struct {
@@ -35,25 +43,60 @@ func (completionAPI *CompletionAPI) RegisterRouter(router *gin.RouterGroup) {
 	router.POST("/completions", completionAPI.PostCompletion)
 }
 
-// ExtendedChatCompletionRequest extends OpenAI's request with conversation field
+// ExtendedChatCompletionRequest extends OpenAI's request with conversation field and store and store_reasoning fields
 type ExtendedChatCompletionRequest struct {
 	openai.ChatCompletionRequest
-	Conversation string `json:"conversation,omitempty"`
+	Conversation   string `json:"conversation,omitempty"`
+	Store          bool   `json:"store,omitempty"`           // If true, the response will be stored in the conversation, default is false
+	StoreReasoning bool   `json:"store_reasoning,omitempty"` // If true, the reasoning will be stored in the conversation, default is false
+}
+
+// ResponseMetadata contains additional metadata about the completion response
+type ResponseMetadata struct {
+	ConversationID      string `json:"conversation_id"`
+	ConversationCreated bool   `json:"conversation_created"`
+	ConversationTitle   string `json:"conversation_title"`
+	AskItemId           string `json:"ask_item_id"`
+	CompletionItemId    string `json:"completion_item_id"`
+	Store               bool   `json:"store"`
+	StoreReasoning      bool   `json:"store_reasoning"`
+}
+
+// ExtendedCompletionResponse extends OpenAI's ChatCompletionResponse with additional metadata
+type ExtendedCompletionResponse struct {
+	openai.ChatCompletionResponse
+	Metadata *ResponseMetadata `json:"metadata,omitempty"`
 }
 
 // CreateChatCompletion
 // @Summary Create a chat completion
-// @Description Generates a model response for the given chat conversation. If `stream` is true, the response is sent as a stream of events. If `stream` is false or omitted, a single JSON response is returned.
+// @Description Generates a model response for the given chat conversation. Supports both streaming and non-streaming modes with conversation management and storage options.
+// @Description
+// @Description **Streaming Mode (stream=true):**
+// @Description - Returns Server-Sent Events (SSE) with real-time streaming
+// @Description - First event contains conversation metadata
+// @Description - Subsequent events contain completion chunks
+// @Description - Final event contains "[DONE]" marker
+// @Description
+// @Description **Non-Streaming Mode (stream=false or omitted):**
+// @Description - Returns single JSON response with complete completion
+// @Description - Includes conversation metadata in response
+// @Description
+// @Description **Storage Options:**
+// @Description - `store=true`: Saves user message and assistant response to conversation
+// @Description - `store_reasoning=true`: Includes reasoning content in stored messages
+// @Description - `conversation`: ID of existing conversation or empty for new conversation
 // @Tags Chat
 // @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Produce text/event-stream
-// @Param request body ExtendedChatCompletionRequest true "Extended chat completion request payload"
-// @Success 200 {object} CompletionResponse "Successful non-streaming response"
-// @Success 200 {string} string "Successful streaming response (SSE format, event: 'data', data: JSON object per chunk)"
-// @Failure 400 {object} responses.ErrorResponse "Invalid request payload"
-// @Failure 401 {object} responses.ErrorResponse "Unauthorized"
+// @Param request body ExtendedChatCompletionRequest true "Chat completion request with streaming, storage, and conversation options"
+// @Success 200 {object} ExtendedCompletionResponse "Successful non-streaming response (when stream=false)"
+// @Success 200 {string} string "Successful streaming response (when stream=true) - SSE format with data: {json} events"
+// @Failure 400 {object} responses.ErrorResponse "Invalid request payload or conversation not found"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized - missing or invalid authentication"
+// @Failure 404 {object} responses.ErrorResponse "Conversation not found or user not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/chat/completions [post]
 func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
@@ -82,70 +125,85 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	if convErr != nil {
 		// Conversation doesn't exist, return error
 		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  convErr.GetCode(),
-			Error: convErr.GetMessage(),
+			Code:          convErr.GetCode(),
+			ErrorInstance: convErr.GetError(),
 		})
 		return
 	}
 
-	// Always send conversation metadata event for streaming requests
-	if request.Stream {
-		api.sendConversationMetadata(reqCtx, conv, conversationCreated)
-	}
+	// Generate item IDs for tracking
+	askItemID, _ := idgen.GenerateSecureID("msg", 42)
+	completionItemID, _ := idgen.GenerateSecureID("msg", 42)
 
 	// Handle streaming vs non-streaming requests
-	if request.Stream {
-		err := api.completionStreamHandler.StreamCompletion(reqCtx, "", request.ChatCompletionRequest, conv, user)
-		if err != nil {
-			// Check if context was cancelled (timeout)
-			if reqCtx.Request.Context().Err() == context.DeadlineExceeded {
-				reqCtx.AbortWithStatusJSON(
-					http.StatusRequestTimeout,
-					responses.ErrorResponse{
-						Code: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-					})
-			} else if reqCtx.Request.Context().Err() == context.Canceled {
-				reqCtx.AbortWithStatusJSON(
-					http.StatusRequestTimeout,
-					responses.ErrorResponse{
-						Code: "b2c3d4e5-f6g7-8901-bcde-f23456789012",
-					})
-			} else {
-				reqCtx.AbortWithStatusJSON(
-					http.StatusBadRequest,
-					responses.ErrorResponse{
-						Code:  err.GetCode(),
-						Error: err.GetMessage(),
-					})
-			}
-			return
-		}
-		return
-	} else {
+	var response *ExtendedCompletionResponse
+	var err *common.Error
 
-		response, err := api.completionNonStreamHandler.CreateCompletion(reqCtx.Request.Context(), "", request.ChatCompletionRequest)
-		if err != nil {
+	if request.Stream {
+		// Handle streaming completion - streams SSE events and accumulates response
+		response, err = api.completionStreamHandler.StreamCompletionAndAccumulateResponse(reqCtx, "", request.ChatCompletionRequest, conv, conversationCreated, askItemID, completionItemID)
+	} else {
+		// Handle non-streaming completion
+		response, err = api.completionNonStreamHandler.CallCompletionAndGetRestResponse(reqCtx.Request.Context(), "", request.ChatCompletionRequest)
+	}
+
+	if err != nil {
+		reqCtx.AbortWithStatusJSON(
+			http.StatusBadRequest,
+			responses.ErrorResponse{
+				Code:          err.GetCode(),
+				ErrorInstance: err.GetError(),
+			})
+		return
+	}
+
+	// Process response (common logic for both streaming and non-streaming)
+	modifiedResponse := api.processCompletionResponse(reqCtx, response, request, conv, user, askItemID, completionItemID, conversationCreated)
+
+	// Only send JSON response for non-streaming requests (streaming uses SSE)
+	if !request.Stream && modifiedResponse != nil {
+		reqCtx.JSON(http.StatusOK, modifiedResponse)
+	}
+}
+
+// processCompletionResponse handles the common response processing logic for both streaming and non-streaming
+func (api *CompletionAPI) processCompletionResponse(reqCtx *gin.Context, response *ExtendedCompletionResponse, request ExtendedChatCompletionRequest, conv *conversation.Conversation, user *userdomain.User, askItemID string, completionItemID string, conversationCreated bool) *ExtendedCompletionResponse {
+	var assistantItem *conversation.Item
+
+	// Store messages conditionally based on store flag
+	if request.Store {
+		// Store last input message (user or tool)
+		if storeErr := api.StoreLastInputMessageIfRequested(reqCtx.Request.Context(), request.ChatCompletionRequest, conv, user.ID, askItemID, completionItemID, request.Store, request.StoreReasoning); storeErr != nil {
 			reqCtx.AbortWithStatusJSON(
 				http.StatusBadRequest,
 				responses.ErrorResponse{
-					Code:  err.GetCode(),
-					Error: err.GetMessage(),
+					Code:          storeErr.GetCode(),
+					ErrorInstance: storeErr.GetError(),
 				})
-			return
+			return nil
 		}
 
-		// Save messages to conversation and get the assistant message item
-		var latestMessage []openai.ChatCompletionMessage
-		if len(request.Messages) > 0 {
-			latestMessage = []openai.ChatCompletionMessage{request.Messages[len(request.Messages)-1]}
+		// Store assistant response
+		if item, err := api.StoreAssistantResponseIfRequested(reqCtx.Request.Context(), response, conv, user.ID, completionItemID, request.Store, request.StoreReasoning); err != nil {
+			reqCtx.AbortWithStatusJSON(
+				http.StatusBadRequest,
+				responses.ErrorResponse{
+					Code:          err.GetCode(),
+					ErrorInstance: err.GetError(),
+				})
+			return nil
+		} else {
+			assistantItem = item
 		}
-		assistantItem, _ := api.completionNonStreamHandler.SaveMessagesToConversationWithAssistant(reqCtx.Request.Context(), conv, user.ID, latestMessage, response.Choices[0].Message.Content)
-
-		// Modify response to include item ID and metadata
-		modifiedResponse := api.completionNonStreamHandler.ModifyCompletionResponse(response, conv, conversationCreated, assistantItem)
-		reqCtx.JSON(http.StatusOK, modifiedResponse)
-		return
 	}
+
+	// Always handle completion response for other logic (like function calls, tool calls, etc.)
+	// This ensures the response is properly set up regardless of store flag
+	// Skip storage if we already handled it with the new store logic
+	api.handleCompletionResponseAndUpdateConversation(reqCtx.Request.Context(), response, conv, user.ID, request.Store)
+
+	// Modify response to include item ID and metadata
+	return api.completionNonStreamHandler.ModifyCompletionResponse(response, conv, conversationCreated, assistantItem, askItemID, completionItemID, request.Store, request.StoreReasoning)
 }
 
 // handleConversationManagement handles conversation loading or creation and returns conversation, created flag, and error
@@ -213,41 +271,276 @@ func (api *CompletionAPI) createNewConversation(reqCtx *gin.Context, messages []
 // generateTitleFromMessages creates a title from the first user message
 func (api *CompletionAPI) generateTitleFromMessages(messages []openai.ChatCompletionMessage) string {
 	if len(messages) == 0 {
-		return "New Conversation"
+		return DefaultConversationTitle
 	}
 
 	// Find the first user message
 	for _, msg := range messages {
 		if msg.Role == "user" && msg.Content != "" {
 			title := strings.TrimSpace(msg.Content)
-			if len(title) > 50 {
-				return title[:50] + "..."
+			if len(title) > MaxTitleLength {
+				return title[:MaxTitleLength] + "..."
 			}
 			return title
 		}
 	}
 
-	return "New Conversation"
+	return DefaultConversationTitle
 }
 
-// sendConversationMetadata sends conversation metadata as SSE event
-func (api *CompletionAPI) sendConversationMetadata(reqCtx *gin.Context, conv *conversation.Conversation, conversationCreated bool) {
+// handleCompletionResponseAndUpdateConversation handles completion response based on finish_reason and updates conversation
+func (api *CompletionAPI) handleCompletionResponseAndUpdateConversation(ctx context.Context, response *ExtendedCompletionResponse, conv *conversation.Conversation, userID uint, skipStorage bool) {
+	if conv == nil || len(response.Choices) == 0 {
+		return
+	}
+
+	// Loop through all choices in the response
+	for _, choice := range response.Choices {
+		finishReason := choice.FinishReason
+		message := choice.Message
+
+		// Skip storage if already handled by new store logic
+		if skipStorage {
+			continue
+		}
+
+		switch finishReason {
+		case "function_call":
+			// Save the function call to the conversation
+			if message.FunctionCall != nil {
+				api.saveFunctionCallToConversation(ctx, conv, userID, message.FunctionCall, message.ReasoningContent)
+			}
+		case "tool_calls":
+			// Save the tool calls to the conversation
+			if len(message.ToolCalls) > 0 {
+				api.saveToolCallsToConversation(ctx, conv, userID, message.ToolCalls, message.ReasoningContent)
+			}
+		case "stop":
+			// Save the response as assistant message to the conversation
+			if message.Content != "" {
+				api.saveAssistantMessageToConversation(ctx, conv, userID, message.Content, message.ReasoningContent)
+			}
+		case "length":
+			// Do nothing -> tracking via log
+			logger.GetLogger().Error("length finish reason: " + message.Content)
+		case "content_filter":
+			// Do nothing -> tracking via log
+			logger.GetLogger().Error("content filter finish reason: " + message.Content)
+		default:
+			// Handle unknown finish reasons
+			logger.GetLogger().Error("unknown finish reason: " + message.Content)
+		}
+	}
+}
+
+// saveFunctionCallToConversation saves a function call to the conversation
+func (api *CompletionAPI) saveFunctionCallToConversation(ctx context.Context, conv *conversation.Conversation, userID uint, functionCall *openai.FunctionCall, reasoningContent string) {
+	if conv == nil || functionCall == nil {
+		return
+	}
+
+	functionCallContent := []conversation.Content{
+		{
+			Type: "text",
+			Text: &conversation.Text{
+				Value: fmt.Sprintf("Function: %s\nArguments: %s", functionCall.Name, functionCall.Arguments),
+			},
+		},
+	}
+
+	// Add reasoning content if present
+	if reasoningContent != "" {
+		functionCallContent[0].ReasoningContent = &reasoningContent
+	}
+
+	// Add the function call to conversation as a separate item
+	assistantRole := conversation.ItemRoleAssistant
+	api.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeFunction, &assistantRole, functionCallContent)
+}
+
+// saveToolCallsToConversation saves tool calls to the conversation
+func (api *CompletionAPI) saveToolCallsToConversation(ctx context.Context, conv *conversation.Conversation, userID uint, toolCalls []openai.ToolCall, reasoningContent string) {
+	if conv == nil || len(toolCalls) == 0 {
+		return
+	}
+
+	// Save each tool call as a separate conversation item
+	for _, toolCall := range toolCalls {
+		toolCallContent := []conversation.Content{
+			{
+				Type: "text",
+				Text: &conversation.Text{
+					Value: fmt.Sprintf("Tool Call ID: %s\nType: %s\nFunction: %s\nArguments: %s",
+						toolCall.ID, toolCall.Type, toolCall.Function.Name, toolCall.Function.Arguments),
+				},
+			},
+		}
+
+		// Add reasoning content if present
+		if reasoningContent != "" {
+			toolCallContent[0].ReasoningContent = &reasoningContent
+		}
+
+		// Add the tool call to conversation as a separate item
+		assistantRole := conversation.ItemRoleAssistant
+		api.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeFunction, &assistantRole, toolCallContent)
+	}
+}
+
+// saveAssistantMessageToConversation saves assistant message to the conversation
+func (api *CompletionAPI) saveAssistantMessageToConversation(ctx context.Context, conv *conversation.Conversation, userID uint, content string, reasoningContent string) {
+	if conv == nil || content == "" {
+		return
+	}
+
+	// Create content structure
+	conversationContent := []conversation.Content{
+		{
+			Type: "text",
+			Text: &conversation.Text{
+				Value: content,
+			},
+		},
+	}
+
+	// Add reasoning content if present
+	if reasoningContent != "" {
+		conversationContent[0].ReasoningContent = &reasoningContent
+	}
+
+	// Add the assistant message to conversation
+	assistantRole := conversation.ItemRoleAssistant
+	api.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeMessage, &assistantRole, conversationContent)
+}
+
+// StoreLastInputMessageIfRequested conditionally stores the last input message (user or tool) based on the store flag
+func (api *CompletionAPI) StoreLastInputMessageIfRequested(ctx context.Context, request openai.ChatCompletionRequest, conv *conversation.Conversation, userID uint, askItemID string, completionItemID string, store bool, storeReasoning bool) *common.Error {
+	if !store {
+		return nil // Don't store if store flag is false
+	}
+
+	// Validate required parameters
 	if conv == nil {
-		return
+		return common.NewError(nil, "c1d2e3f4-g5h6-7890-abcd-ef1234567890")
 	}
 
-	metadata := map[string]any{
-		"object":               "chat.completion.metadata",
-		"conversation_id":      conv.PublicID,
-		"conversation_created": conversationCreated,
-		"conversation_title":   conv.Title,
+	// Store the latest input message (user or tool)
+	if len(request.Messages) == 0 {
+		return nil // No messages to store
 	}
 
-	jsonData, err := json.Marshal(metadata)
+	latestMessage := request.Messages[len(request.Messages)-1]
+	role := conversation.ItemRole(latestMessage.Role)
+
+	content := []conversation.Content{
+		{
+			Type: "text",
+			Text: &conversation.Text{
+				Value: latestMessage.Content,
+			},
+		},
+	}
+
+	if _, err := api.conversationService.AddItemWithID(ctx, conv, userID, conversation.ItemTypeMessage, &role, content, askItemID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// StoreAssistantResponseIfRequested conditionally stores the assistant response based on the store flag
+func (api *CompletionAPI) StoreAssistantResponseIfRequested(ctx context.Context, response *ExtendedCompletionResponse, conv *conversation.Conversation, userID uint, completionItemID string, store bool, storeReasoning bool) (*conversation.Item, *common.Error) {
+	if !store {
+		return nil, nil // Don't store if store flag is false
+	}
+
+	// Validate required parameters
+	if response == nil {
+		return nil, common.NewErrorWithMessage("Response is nil", "d2e3f4g5-h6i7-8901-bcde-f23456789012")
+	}
+	if conv == nil {
+		return nil, common.NewErrorWithMessage("Conversation is nil", "e3f4g5h6-i7j8-9012-cdef-345678901234")
+	}
+
+	if len(response.Choices) == 0 {
+		return nil, common.NewErrorWithMessage("No choices to store", "01995b18-1638-719d-8ee2-01375bb2a19c")
+	}
+
+	choice := response.Choices[0]
+	content := choice.Message.Content
+	reasoningContent := choice.Message.ReasoningContent
+	finishReason := string(choice.FinishReason)
+
+	// Don't store if no content available
+	if content == "" && reasoningContent == "" {
+		return nil, nil
+	}
+
+	// Create content array based on finish reason
+	contentArray, err := api.createContentArray(choice, finishReason, content)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	reqCtx.Writer.Write([]byte(fmt.Sprintf("data: %s\n\n", string(jsonData))))
-	reqCtx.Writer.Flush()
+	// Add reasoning content if requested
+	if storeReasoning && reasoningContent != "" {
+		contentArray[0].ReasoningContent = &reasoningContent
+	}
+
+	role := conversation.ItemRoleAssistant
+	createdItem, err := api.conversationService.AddItemWithID(ctx, conv, userID, conversation.ItemTypeMessage, &role, contentArray, completionItemID)
+	if err != nil {
+		return nil, err
+	}
+
+	return createdItem, nil
+}
+
+// createContentArray creates the content array based on finish reason and choice
+func (api *CompletionAPI) createContentArray(choice openai.ChatCompletionChoice, finishReason, content string) ([]conversation.Content, *common.Error) {
+	switch finishReason {
+	case "tool_calls":
+		if len(choice.Message.ToolCalls) > 0 {
+			toolCallsJSON, err := json.Marshal(choice.Message.ToolCalls)
+			if err != nil {
+				return nil, common.NewError(err, "f4g5h6i7-j8k9-0123-defg-456789012345")
+			}
+			return []conversation.Content{
+				{
+					Type:         "text",
+					FinishReason: &finishReason,
+					Text: &conversation.Text{
+						Value: string(toolCallsJSON),
+					},
+				},
+			}, nil
+		}
+	case "function_call":
+		if choice.Message.FunctionCall != nil {
+			functionCallJSON, err := json.Marshal(choice.Message.FunctionCall)
+			if err != nil {
+				return nil, common.NewError(err, "g5h6i7j8-k9l0-1234-efgh-567890123456")
+			}
+			return []conversation.Content{
+				{
+					Type:         "text",
+					FinishReason: &finishReason,
+					Text: &conversation.Text{
+						Value: string(functionCallJSON),
+					},
+				},
+			}, nil
+		}
+	}
+
+	// Default case: store regular content (for "stop" and other finish reasons)
+	return []conversation.Content{
+		{
+			Type:         "text",
+			FinishReason: &finishReason,
+			Text: &conversation.Text{
+				Value: content,
+			},
+		},
+	}, nil
 }

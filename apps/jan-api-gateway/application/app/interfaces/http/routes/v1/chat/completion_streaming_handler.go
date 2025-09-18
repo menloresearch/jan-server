@@ -14,16 +14,16 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/common"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/inference"
-	"menlo.ai/jan-api-gateway/app/domain/user"
+	"menlo.ai/jan-api-gateway/app/utils/logger"
 )
 
 // Constants for streaming configuration
 const (
 	RequestTimeout    = 120 * time.Second
-	DataPrefix        = "data: "
-	DoneMarker        = "[DONE]"
 	ChannelBufferSize = 100
 	ErrorBufferSize   = 10
+	DataPrefix        = "data: "
+	DoneMarker        = "[DONE]"
 )
 
 // CompletionStreamHandler handles streaming chat completions
@@ -40,21 +40,40 @@ func NewCompletionStreamHandler(inferenceProvider inference.InferenceProvider, c
 	}
 }
 
-// StreamCompletion handles streaming chat completion using buffered channels
-func (s *CompletionStreamHandler) StreamCompletion(reqCtx *gin.Context, apiKey string, request openai.ChatCompletionRequest, conv *conversation.Conversation, user *user.User) *common.Error {
+// FunctionCallAccumulator handles streaming function call accumulation
+type FunctionCallAccumulator struct {
+	Name      string
+	Arguments string
+	Complete  bool
+}
+
+// ToolCallAccumulator handles streaming tool call accumulation
+type ToolCallAccumulator struct {
+	ID       string
+	Type     string
+	Index    int
+	Function struct {
+		Name      string
+		Arguments string
+	}
+	Complete bool
+}
+
+// StreamCompletionAndAccumulateResponse streams SSE events to client and accumulates a complete response for internal processing
+func (s *CompletionStreamHandler) StreamCompletionAndAccumulateResponse(reqCtx *gin.Context, apiKey string, request openai.ChatCompletionRequest, conv *conversation.Conversation, conversationCreated bool, askItemID string, completionItemID string) (*ExtendedCompletionResponse, *common.Error) {
 	// Add timeout context
 	ctx, cancel := context.WithTimeout(reqCtx.Request.Context(), RequestTimeout)
 	defer cancel()
 
-	// Use ctx for long-running operations
-	reqCtx.Request = reqCtx.Request.WithContext(ctx)
+	// Set up SSE headers
+	s.setupSSEHeaders(reqCtx)
 
-	// Set up streaming headers
-	reqCtx.Header("Content-Type", "text/event-stream")
-	reqCtx.Header("Cache-Control", "no-cache")
-	reqCtx.Header("Connection", "keep-alive")
-	reqCtx.Header("Access-Control-Allow-Origin", "*")
-	reqCtx.Header("Access-Control-Allow-Headers", "Cache-Control")
+	// Send conversation metadata event first
+	if conv != nil {
+		if err := s.sendConversationMetadata(reqCtx, conv, conversationCreated, askItemID, completionItemID); err != nil {
+			return nil, common.NewError(err, "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
+		}
+	}
 
 	// Create buffered channels for data and errors
 	dataChan := make(chan string, ChannelBufferSize)
@@ -64,82 +83,116 @@ func (s *CompletionStreamHandler) StreamCompletion(reqCtx *gin.Context, apiKey s
 	wg.Add(1)
 
 	// Start streaming in a goroutine
-	go s.streamResponseToChannel(reqCtx, request, dataChan, errChan, conv, user, &wg)
+	go s.streamResponseToChannel(ctx, apiKey, request, dataChan, errChan, &wg)
 
-	// Wait for streaming to complete and close channels
-	go func() {
-		wg.Wait()
-		close(dataChan)
-		close(errChan)
-	}()
+	// Accumulators for different types of content
+	var fullContent string
+	var fullReasoning string
+	var functionCallAccumulator = make(map[int]*FunctionCallAccumulator)
+	var toolCallAccumulator = make(map[int]*ToolCallAccumulator)
 
-	// Process data and errors from channels
-	for {
+	// Process data from channels
+	streamingComplete := false
+	for !streamingComplete {
 		select {
 		case line, ok := <-dataChan:
 			if !ok {
-				return nil
+				// Channel closed, streaming complete
+				streamingComplete = true
+				break
 			}
-			_, err := reqCtx.Writer.Write([]byte(line))
+
+			// Forward the raw line to client
+			if err := s.writeSSELine(reqCtx, line); err != nil {
+				return nil, common.NewError(err, "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
+			}
+
+			if data, found := strings.CutPrefix(line, DataPrefix); found {
+				if data == DoneMarker {
+					streamingComplete = true
+					break
+				}
+
+				// Process stream chunk and accumulate content
+				contentChunk, reasoningChunk, functionCallChunk, toolCallChunk := s.processStreamChunkForChannel(data)
+
+				// Accumulate content
+				if contentChunk != "" {
+					fullContent += contentChunk
+				}
+
+				// Accumulate reasoning
+				if reasoningChunk != "" {
+					fullReasoning += reasoningChunk
+				}
+
+				// Handle function call accumulation
+				if functionCallChunk != nil {
+					s.handleStreamingFunctionCall(functionCallChunk, functionCallAccumulator)
+				}
+
+				// Handle tool call accumulation
+				if toolCallChunk != nil {
+					s.handleStreamingToolCall(toolCallChunk, toolCallAccumulator)
+				}
+			}
+
+		case err, ok := <-errChan:
+			if !ok {
+				// Channel closed, no more errors
+				continue
+			}
 			if err != nil {
-				return common.NewError(err, "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
+				return nil, common.NewError(err, "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
 			}
-			reqCtx.Writer.Flush()
-		case err := <-errChan:
-			if err != nil {
-				return common.NewError(err, "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
-			}
+
+		case <-ctx.Done():
+			return nil, common.NewError(ctx.Err(), "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
 		}
 	}
+
+	// Wait for streaming goroutine to complete and close channels
+	wg.Wait()
+
+	close(dataChan)
+	close(errChan)
+
+	// Build the complete response
+	response := s.buildCompleteResponse(fullContent, fullReasoning, functionCallAccumulator, toolCallAccumulator, completionItemID, request.Model, request)
+
+	// Return as ExtendedCompletionResponse
+	return &ExtendedCompletionResponse{
+		ChatCompletionResponse: response,
+	}, nil
 }
 
-// streamResponseToChannel handles streaming and sends data to channels
-func (s *CompletionStreamHandler) streamResponseToChannel(reqCtx *gin.Context, request openai.ChatCompletionRequest, dataChan chan<- string, errChan chan<- error, conv *conversation.Conversation, user *user.User, wg *sync.WaitGroup) {
+// streamResponseToChannel streams the response from inference provider to channels
+func (s *CompletionStreamHandler) streamResponseToChannel(ctx context.Context, apiKey string, request openai.ChatCompletionRequest, dataChan chan<- string, errChan chan<- error, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	// Save input messages to conversation first
-	if conv != nil {
-		// Save messages to conversation and get the assistant message item
-		var latestMessage []openai.ChatCompletionMessage
-		if len(request.Messages) > 0 {
-			latestMessage = []openai.ChatCompletionMessage{request.Messages[len(request.Messages)-1]}
-		}
-		s.saveInputMessagesToConversation(reqCtx.Request.Context(), conv, user.ID, latestMessage)
-	}
-
 	// Get streaming reader from inference provider
-	reader, err := s.inferenceProvider.CreateCompletionStream(reqCtx.Request.Context(), "", request)
+	reader, err := s.inferenceProvider.CreateCompletionStream(ctx, apiKey, request)
 	if err != nil {
 		errChan <- err
 		return
 	}
-	defer reader.Close()
+	defer func() {
+		if closeErr := reader.Close(); closeErr != nil {
+			// Log the close error but don't send it to errChan to avoid overriding the original error
+			// In a production environment, you might want to use a proper logger here
+			logger.GetLogger().Errorf("unable to close reader: %v", closeErr)
+		}
+	}()
 
-	// Variables to collect full response for conversation saving
-	var fullResponse string
-
-	// Process the stream line by line
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
-		// Check if context was cancelled
-		if s.checkContextCancellation(reqCtx.Request.Context(), errChan) {
+		select {
+		case <-ctx.Done():
+			errChan <- ctx.Err()
 			return
-		}
-
-		line := scanner.Text()
-		if data, found := strings.CutPrefix(line, DataPrefix); found {
-			if data == DoneMarker {
-				break
-			}
-
-			// Process stream chunk and send to data channel
-			processedData, contentChunk := s.processStreamChunkForChannel(data)
-			dataChan <- processedData
-
-			// Collect content for conversation saving
-			if contentChunk != "" {
-				fullResponse += contentChunk
-			}
+		default:
+			line := scanner.Text()
+			dataChan <- line
 		}
 	}
 
@@ -147,139 +200,274 @@ func (s *CompletionStreamHandler) streamResponseToChannel(reqCtx *gin.Context, r
 		errChan <- err
 		return
 	}
-
-	// Save the complete assistant message to conversation if we have content
-	if conv != nil && fullResponse != "" {
-		assistantItemID := s.generateAssistantItemID()
-		s.saveAssistantMessageToConversation(reqCtx.Request.Context(), conv, user, assistantItemID, fullResponse)
-	}
 }
 
-// processStreamChunkForChannel processes a single stream chunk and returns formatted data and content
-func (s *CompletionStreamHandler) processStreamChunkForChannel(data string) (string, string) {
-	// Parse the JSON data to extract content
+// setupSSEHeaders sets up the required headers for Server-Sent Events
+func (s *CompletionStreamHandler) setupSSEHeaders(reqCtx *gin.Context) {
+	reqCtx.Header("Content-Type", "text/event-stream")
+	reqCtx.Header("Cache-Control", "no-cache")
+	reqCtx.Header("Connection", "keep-alive")
+	reqCtx.Header("Access-Control-Allow-Origin", "*")
+	reqCtx.Header("Access-Control-Allow-Headers", "Cache-Control")
+}
+
+// writeSSELine writes a line to the SSE stream
+func (s *CompletionStreamHandler) writeSSELine(reqCtx *gin.Context, line string) error {
+	_, err := reqCtx.Writer.Write([]byte(line + "\n"))
+	if err != nil {
+		return err
+	}
+	reqCtx.Writer.Flush()
+	return nil
+}
+
+// writeSSEEvent writes a properly formatted SSE event
+func (s *CompletionStreamHandler) writeSSEEvent(reqCtx *gin.Context, data string) error {
+	_, err := reqCtx.Writer.Write([]byte(fmt.Sprintf("data: %s\n\n", data)))
+	if err != nil {
+		return err
+	}
+	reqCtx.Writer.Flush()
+	return nil
+}
+
+// sendConversationMetadata sends conversation metadata as SSE event
+func (s *CompletionStreamHandler) sendConversationMetadata(reqCtx *gin.Context, conv *conversation.Conversation, conversationCreated bool, askItemID string, completionItemID string) error {
+	if conv == nil {
+		return nil
+	}
+
+	metadata := ResponseMetadata{
+		ConversationID:      conv.PublicID,
+		ConversationCreated: conversationCreated,
+		ConversationTitle:   *conv.Title,
+		AskItemId:           askItemID,
+		CompletionItemId:    completionItemID,
+	}
+
+	jsonData, err := json.Marshal(metadata)
+	if err != nil {
+		return err
+	}
+
+	// Send proper SSE formatted event with double newline
+	return s.writeSSEEvent(reqCtx, string(jsonData))
+}
+
+// processStreamChunkForChannel processes a single stream chunk and returns separate chunks
+func (s *CompletionStreamHandler) processStreamChunkForChannel(data string) (string, string, *openai.FunctionCall, *openai.ToolCall) {
+	// Parse the JSON data to extract content and calls
 	var streamData struct {
 		Choices []struct {
 			Delta struct {
-				Content          string `json:"content"`
-				ReasoningContent string `json:"reasoning_content"`
-				ToolCalls        []struct {
-					Function struct {
-						Arguments string `json:"arguments"`
-					} `json:"function"`
-				} `json:"tool_calls"`
+				Content          string               `json:"content"`
+				ReasoningContent string               `json:"reasoning_content"`
+				FunctionCall     *openai.FunctionCall `json:"function_call,omitempty"`
+				ToolCalls        []openai.ToolCall    `json:"tool_calls,omitempty"`
 			} `json:"delta"`
 		} `json:"choices"`
 	}
 
 	if err := json.Unmarshal([]byte(data), &streamData); err != nil {
-		// If JSON parsing fails, still send raw data but with empty content
-		return fmt.Sprintf("data: %s\n\n", data), ""
+		// Log JSON parsing errors for debugging
+		logger.GetLogger().Errorf("failed to parse stream chunk JSON: %v, data: %s", err, data)
+		return "", "", nil, nil
 	}
 
-	// Extract content from all choices
+	// Extract content, reasoning content, function calls, and tool calls from all choices
 	var contentChunk string
+	var reasoningChunk string
+	var functionCall *openai.FunctionCall
+	var toolCall *openai.ToolCall
+
 	for _, choice := range streamData.Choices {
 		// Check for regular content
 		if choice.Delta.Content != "" {
 			contentChunk += choice.Delta.Content
 		}
 
-		// Check for reasoning content (internal reasoning, don't save to conversation)
-		// Note: reasoning_content is not saved to conversation
+		// Check for reasoning content
+		if choice.Delta.ReasoningContent != "" {
+			reasoningChunk += choice.Delta.ReasoningContent
+		}
 
-		// Check for tool calls
-		// Note: tool_calls are logged for debugging but not processed here
+		// Extract function calls (legacy format)
+		if choice.Delta.FunctionCall != nil {
+			functionCall = choice.Delta.FunctionCall
+		}
+
+		// Extract tool calls (new format)
+		if len(choice.Delta.ToolCalls) > 0 {
+			toolCall = &choice.Delta.ToolCalls[0]
+		}
 	}
 
-	// Return formatted data and extracted content
-	return fmt.Sprintf("data: %s\n\n", data), contentChunk
+	// Return separate chunks
+	return contentChunk, reasoningChunk, functionCall, toolCall
 }
 
-// checkContextCancellation checks if context was cancelled and sends error to channel
-func (s *CompletionStreamHandler) checkContextCancellation(ctx context.Context, errChan chan<- error) bool {
-	select {
-	case <-ctx.Done():
-		errChan <- ctx.Err()
-		return true
-	default:
-		return false
-	}
-}
-
-// generateAssistantItemID generates a unique ID for the assistant message item
-func (s *CompletionStreamHandler) generateAssistantItemID() string {
-	// For now, use a simple UUID-like string
-	// TODO: Use conversation service's ID generation when method is made public
-	return fmt.Sprintf("msg_%d", time.Now().UnixNano())
-}
-
-// saveInputMessagesToConversation saves input messages to the conversation
-func (s *CompletionStreamHandler) saveInputMessagesToConversation(ctx context.Context, conv *conversation.Conversation, userID uint, messages []openai.ChatCompletionMessage) {
-	if conv == nil {
+// handleStreamingFunctionCall handles function call accumulation
+func (s *CompletionStreamHandler) handleStreamingFunctionCall(functionCall *openai.FunctionCall, accumulator map[int]*FunctionCallAccumulator) {
+	if functionCall == nil {
 		return
 	}
 
-	// Convert OpenAI messages to conversation items
-	for _, msg := range messages {
-		// Convert role
-		var role conversation.ItemRole
-		switch msg.Role {
-		case openai.ChatMessageRoleSystem:
-			role = conversation.ItemRoleSystem
-		case openai.ChatMessageRoleUser:
-			role = conversation.ItemRoleUser
-		case openai.ChatMessageRoleAssistant:
-			role = conversation.ItemRoleAssistant
-		default:
-			role = conversation.ItemRoleUser
-		}
+	// Use index 0 for function calls (legacy format doesn't have index)
+	index := 0
+	if accumulator[index] == nil {
+		accumulator[index] = &FunctionCallAccumulator{}
+	}
 
-		// Convert content
-		content := make([]conversation.Content, 0, len(msg.MultiContent))
-		for _, contentPart := range msg.MultiContent {
-			if contentPart.Type == openai.ChatMessagePartTypeText {
-				content = append(content, conversation.Content{
-					Type: "text",
-					Text: &conversation.Text{
-						Value: contentPart.Text,
+	// Add chunk to accumulator
+	if functionCall.Name != "" {
+		accumulator[index].Name = functionCall.Name
+	}
+	if functionCall.Arguments != "" {
+		accumulator[index].Arguments += functionCall.Arguments
+	}
+
+	// Check if complete (has name and arguments ending with })
+	if accumulator[index].Name != "" && accumulator[index].Arguments != "" && strings.HasSuffix(accumulator[index].Arguments, "}") {
+		accumulator[index].Complete = true
+	}
+}
+
+// handleStreamingToolCall handles tool call accumulation
+func (s *CompletionStreamHandler) handleStreamingToolCall(toolCall *openai.ToolCall, accumulator map[int]*ToolCallAccumulator) {
+	if toolCall == nil || toolCall.Index == nil {
+		return
+	}
+
+	index := *toolCall.Index
+	if accumulator[index] == nil {
+		accumulator[index] = &ToolCallAccumulator{
+			ID:    toolCall.ID,
+			Type:  string(toolCall.Type),
+			Index: index,
+		}
+	}
+
+	// Add chunk to accumulator
+	if toolCall.Function.Name != "" {
+		accumulator[index].Function.Name = toolCall.Function.Name
+	}
+	if toolCall.Function.Arguments != "" {
+		accumulator[index].Function.Arguments += toolCall.Function.Arguments
+	}
+
+	// Check if complete (has name and arguments ending with })
+	if accumulator[index].Function.Name != "" && accumulator[index].Function.Arguments != "" && strings.HasSuffix(accumulator[index].Function.Arguments, "}") {
+		accumulator[index].Complete = true
+	}
+}
+
+// buildCompleteResponse builds the complete ChatCompletionResponse from accumulated data
+func (s *CompletionStreamHandler) buildCompleteResponse(content string, reasoning string, functionCallAccumulator map[int]*FunctionCallAccumulator, toolCallAccumulator map[int]*ToolCallAccumulator, completionItemID string, model string, request openai.ChatCompletionRequest) openai.ChatCompletionResponse {
+	// Build a single choice that combines all content, reasoning, and calls
+	message := openai.ChatCompletionMessage{
+		Role:    openai.ChatMessageRoleAssistant,
+		Content: content,
+	}
+
+	// Add reasoning content if present
+	if reasoning != "" {
+		message.ReasoningContent = reasoning
+	}
+
+	var finishReason openai.FinishReason = openai.FinishReasonStop
+
+	// Check for function calls first (legacy format)
+	if len(functionCallAccumulator) > 0 {
+		for _, acc := range functionCallAccumulator {
+			if acc.Complete {
+				message.FunctionCall = &openai.FunctionCall{
+					Name:      acc.Name,
+					Arguments: acc.Arguments,
+				}
+				finishReason = openai.FinishReasonFunctionCall
+				break
+			}
+		}
+	}
+
+	// Check for tool calls (new format) - these take precedence over function calls
+	if len(toolCallAccumulator) > 0 {
+		var toolCalls []openai.ToolCall
+		for _, acc := range toolCallAccumulator {
+			if acc.Complete {
+				toolCalls = append(toolCalls, openai.ToolCall{
+					ID:   acc.ID,
+					Type: openai.ToolType(acc.Type),
+					Function: openai.FunctionCall{
+						Name:      acc.Function.Name,
+						Arguments: acc.Function.Arguments,
 					},
 				})
 			}
 		}
 
-		// If no multi-content, use simple text content
-		if len(content) == 0 && msg.Content != "" {
-			content = append(content, conversation.Content{
-				Type: "text",
-				Text: &conversation.Text{
-					Value: msg.Content,
-				},
-			})
+		if len(toolCalls) > 0 {
+			message.ToolCalls = toolCalls
+			finishReason = openai.FinishReasonToolCalls
 		}
-
-		// Add item to conversation
-		s.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeMessage, &role, content)
-	}
-}
-
-// saveAssistantMessageToConversation saves the complete assistant message to the conversation
-func (s *CompletionStreamHandler) saveAssistantMessageToConversation(ctx context.Context, conv *conversation.Conversation, user *user.User, itemID string, content string) {
-	if conv == nil || content == "" {
-		return
 	}
 
-	// Create content structure
-	conversationContent := []conversation.Content{
+	// Create the single choice with all combined content
+	choices := []openai.ChatCompletionChoice{
 		{
-			Type: "text",
-			Text: &conversation.Text{
-				Value: content,
-			},
+			Index:        0,
+			Message:      message,
+			FinishReason: finishReason,
 		},
 	}
 
-	// Add the assistant message to conversation
-	assistantRole := conversation.ItemRoleAssistant
-	s.conversationService.AddItem(ctx, conv, user.ID, conversation.ItemTypeMessage, &assistantRole, conversationContent)
+	// Calculate token usage
+	promptTokens := s.estimateTokens(request.Messages)
+	completionTokens := s.estimateTokens([]openai.ChatCompletionMessage{message})
+	totalTokens := promptTokens + completionTokens
+
+	return openai.ChatCompletionResponse{
+		ID:      completionItemID,
+		Object:  "chat.completion",
+		Created: time.Now().Unix(),
+		Model:   model,
+		Choices: choices,
+		Usage: openai.Usage{
+			PromptTokens:     promptTokens,
+			CompletionTokens: completionTokens,
+			TotalTokens:      totalTokens,
+		},
+	}
+}
+
+// TODO it's raw solution, we need to use the official openai tokenizer like tiktoken
+// estimateTokens provides a rough estimation of token count for messages
+func (s *CompletionStreamHandler) estimateTokens(messages []openai.ChatCompletionMessage) int {
+	var allText strings.Builder
+
+	for _, msg := range messages {
+		allText.WriteString(msg.Content)
+		allText.WriteString(" ")
+
+		if msg.FunctionCall != nil {
+			allText.WriteString(msg.FunctionCall.Name)
+			allText.WriteString(" ")
+			allText.WriteString(msg.FunctionCall.Arguments)
+			allText.WriteString(" ")
+		}
+
+		for _, toolCall := range msg.ToolCalls {
+			allText.WriteString(toolCall.ID)
+			allText.WriteString(" ")
+			allText.WriteString(toolCall.Function.Name)
+			allText.WriteString(" ")
+			allText.WriteString(toolCall.Function.Arguments)
+			allText.WriteString(" ")
+		}
+	}
+
+	// Split by spaces and count words, but normalize whitespace
+	normalized := strings.Join(strings.Fields(allText.String()), " ") // Collapse multiple spaces
+	words := strings.Fields(normalized)
+	return len(words)
 }

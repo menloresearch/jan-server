@@ -33,18 +33,19 @@ func ValidateItemType(input string) bool {
 	}
 }
 
-// @Enum(system, user, assistant)
+// @Enum(system, user, assistant, tool)
 type ItemRole string
 
 const (
 	ItemRoleSystem    ItemRole = "system"
 	ItemRoleUser      ItemRole = "user"
 	ItemRoleAssistant ItemRole = "assistant"
+	ItemRoleTool      ItemRole = "tool"
 )
 
 func ValidateItemRole(input string) bool {
 	switch ItemRole(input) {
-	case ItemRoleSystem, ItemRoleUser, ItemRoleAssistant:
+	case ItemRoleSystem, ItemRoleUser, ItemRoleAssistant, ItemRoleTool:
 		return true
 	default:
 		return false
@@ -101,12 +102,14 @@ type Item struct {
 }
 
 type Content struct {
-	Type       string        `json:"type"`
-	Text       *Text         `json:"text,omitempty"`        // Generic text content
-	InputText  *string       `json:"input_text,omitempty"`  // User input text (simple)
-	OutputText *OutputText   `json:"output_text,omitempty"` // AI output text (with annotations)
-	Image      *ImageContent `json:"image,omitempty"`       // Image content
-	File       *FileContent  `json:"file,omitempty"`        // File content
+	Type             string        `json:"type"`
+	FinishReason     *string       `json:"finish_reason,omitempty"`     // Finish reason
+	Text             *Text         `json:"text,omitempty"`              // Generic text content
+	InputText        *string       `json:"input_text,omitempty"`        // User input text (simple)
+	OutputText       *OutputText   `json:"output_text,omitempty"`       // AI output text (with annotations)
+	ReasoningContent *string       `json:"reasoning_content,omitempty"` // AI reasoning content
+	Image            *ImageContent `json:"image,omitempty"`             // Image content
+	File             *FileContent  `json:"file,omitempty"`              // File content
 }
 
 // Generic text content (backward compatibility)
