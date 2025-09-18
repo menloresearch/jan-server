@@ -164,13 +164,12 @@ func (s *CompletionStreamHandler) sendConversationMetadata(reqCtx *gin.Context, 
 		return nil
 	}
 
-	metadata := map[string]any{
-		"object":               "chat.completion.metadata",
-		"conversation_id":      conv.PublicID,
-		"conversation_created": conversationCreated,
-		"conversation_title":   conv.Title,
-		"ask_item_id":          askItemID,
-		"completion_item_id":   completionItemID,
+	metadata := ResponseMetadata{
+		ConversationID:      conv.PublicID,
+		ConversationCreated: conversationCreated,
+		ConversationTitle:   *conv.Title,
+		AskItemId:           askItemID,
+		CompletionItemId:    completionItemID,
 	}
 
 	jsonData, err := json.Marshal(metadata)

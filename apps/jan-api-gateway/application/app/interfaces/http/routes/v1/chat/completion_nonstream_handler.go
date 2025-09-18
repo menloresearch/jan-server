@@ -43,25 +43,8 @@ func (uc *CompletionNonStreamHandler) ConvertResponse(response *openai.ChatCompl
 	}
 }
 
-// ExtendedCompletionResponse extends OpenAI's ChatCompletionResponse with additional metadata
-type ExtendedCompletionResponse struct {
-	openai.ChatCompletionResponse
-	Metadata *ResponseMetadata `json:"metadata,omitempty"`
-}
-
-// ResponseMetadata contains additional metadata about the completion response
-type ResponseMetadata struct {
-	ConversationID      string `json:"conversation_id"`
-	ConversationCreated bool   `json:"conversation_created"`
-	ConversationTitle   string `json:"conversation_title"`
-	UserItemID          string `json:"user_item_id"`
-	AssistantItemID     string `json:"assistant_item_id"`
-	Store               bool   `json:"store"`
-	StoreReasoning      bool   `json:"store_reasoning"`
-}
-
 // ModifyCompletionResponse modifies the completion response to include item ID and metadata
-func (uc *CompletionNonStreamHandler) ModifyCompletionResponse(response *ExtendedCompletionResponse, conv *conversation.Conversation, conversationCreated bool, assistantItem *conversation.Item, userItemID string, assistantItemID string, store bool, storeReasoning bool) *ExtendedCompletionResponse {
+func (uc *CompletionNonStreamHandler) ModifyCompletionResponse(response *ExtendedCompletionResponse, conv *conversation.Conversation, conversationCreated bool, assistantItem *conversation.Item, askItemID string, completionItemID string, store bool, storeReasoning bool) *ExtendedCompletionResponse {
 	// Replace ID with item ID if assistant item exists
 	if assistantItem != nil {
 		response.ID = assistantItem.PublicID
@@ -77,8 +60,8 @@ func (uc *CompletionNonStreamHandler) ModifyCompletionResponse(response *Extende
 			ConversationID:      conv.PublicID,
 			ConversationCreated: conversationCreated,
 			ConversationTitle:   title,
-			UserItemID:          userItemID,
-			AssistantItemID:     assistantItemID,
+			AskItemId:           askItemID,
+			CompletionItemId:    completionItemID,
 			Store:               store,
 			StoreReasoning:      storeReasoning,
 		}

@@ -45,6 +45,23 @@ type ExtendedChatCompletionRequest struct {
 	StoreReasoning bool   `json:"store_reasoning,omitempty"` // If true, the reasoning will be stored in the conversation
 }
 
+// ResponseMetadata contains additional metadata about the completion response
+type ResponseMetadata struct {
+	ConversationID      string `json:"conversation_id"`
+	ConversationCreated bool   `json:"conversation_created"`
+	ConversationTitle   string `json:"conversation_title"`
+	AskItemId           string `json:"ask_item_id"`
+	CompletionItemId    string `json:"completion_item_id"`
+	Store               bool   `json:"store"`
+	StoreReasoning      bool   `json:"store_reasoning"`
+}
+
+// ExtendedCompletionResponse extends OpenAI's ChatCompletionResponse with additional metadata
+type ExtendedCompletionResponse struct {
+	openai.ChatCompletionResponse
+	Metadata *ResponseMetadata `json:"metadata,omitempty"`
+}
+
 // CreateChatCompletion
 // @Summary Create a chat completion
 // @Description Generates a model response for the given chat conversation. If `stream` is true, the response is sent as a stream of events. If `stream` is false or omitted, a single JSON response is returned.
