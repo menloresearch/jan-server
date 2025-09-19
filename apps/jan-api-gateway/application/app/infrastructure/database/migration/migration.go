@@ -3,22 +3,27 @@ package migration
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"gorm.io/gorm"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/dbschema"
 )
 
 type SchemaVersion struct {
-	Migrations []int `json:"migrations"`
+	Migrations []int64 `json:"migrations"`
 }
 
 func NewSchemaVersion() SchemaVersion {
-	return SchemaVersion{
-		Migrations: []int{
+	sv := SchemaVersion{
+		Migrations: []int64{
 			1,
 			0,
 		},
 	}
+	sort.Slice(sv.Migrations, func(i, j int) bool {
+		return sv.Migrations[i] < sv.Migrations[j]
+	})
+	return sv
 }
 
 type DBMigrator struct {
@@ -87,7 +92,7 @@ func (d *DBMigrator) Migrate() (err error) {
 	if err = d.initialize(); err != nil {
 		return err
 	}
-	migrations := NewSchemaVersion()
+	migrations := NewSchemaVersion().Migrations
 	ctx := context.Background()
 	db := d.db
 	tx := db.WithContext(ctx).Begin()
@@ -96,6 +101,13 @@ func (d *DBMigrator) Migrate() (err error) {
 	if err != nil {
 		return
 	}
-	for migrations[0]
+	for _, migrationVersion := range migrations {
+		if currentVersion.Version > migrationVersion {
+			continue
+		}
+
+		
+	}
+
 	tx.Commit()
 }
