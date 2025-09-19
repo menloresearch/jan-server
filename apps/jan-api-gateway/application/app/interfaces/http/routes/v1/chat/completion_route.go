@@ -45,35 +45,34 @@ func (completionAPI *CompletionAPI) RegisterRouter(router *gin.RouterGroup) {
 	router.POST("/completions", completionAPI.PostCompletion)
 }
 
-// CreateChatCompletion
+// PostCompletion
 // @Summary Create a chat completion
-// @Description Generates a model response for the given chat conversation. Supports both streaming and non-streaming modes with conversation management and storage options.
+// @Description Generates a model response for the given chat conversation. This is a standard chat completion API that supports both streaming and non-streaming modes without conversation persistence.
 // @Description
 // @Description **Streaming Mode (stream=true):**
 // @Description - Returns Server-Sent Events (SSE) with real-time streaming
-// @Description - First event contains conversation metadata
-// @Description - Subsequent events contain completion chunks
+// @Description - Streams completion chunks directly from the inference model
 // @Description - Final event contains "[DONE]" marker
 // @Description
 // @Description **Non-Streaming Mode (stream=false or omitted):**
 // @Description - Returns single JSON response with complete completion
-// @Description - Includes conversation metadata in response
+// @Description - Standard OpenAI ChatCompletionResponse format
 // @Description
-// @Description **Storage Options:**
-// @Description - `store=true`: Saves user message and assistant response to conversation
-// @Description - `store_reasoning=true`: Includes reasoning content in stored messages
-// @Description - `conversation`: ID of existing conversation or empty for new conversation
+// @Description **Features:**
+// @Description - Supports all OpenAI ChatCompletionRequest parameters
+// @Description - User authentication required
+// @Description - Direct inference model integration
+// @Description - No conversation persistence (stateless)
 // @Tags Chat
 // @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Produce text/event-stream
-// @Param request body openai.ChatCompletionRequest. true "Chat completion request with streaming, storage, and conversation options"
-// @Success 200 {object} openai.ChatCompletionResponse. "Successful non-streaming response (when stream=false)"
+// @Param request body openai.ChatCompletionRequest true "Chat completion request with streaming options"
+// @Success 200 {object} openai.ChatCompletionResponse "Successful non-streaming response (when stream=false)"
 // @Success 200 {string} string "Successful streaming response (when stream=true) - SSE format with data: {json} events"
-// @Failure 400 {object} responses.ErrorResponse "Invalid request payload or conversation not found"
+// @Failure 400 {object} responses.ErrorResponse "Invalid request payload, empty messages, or inference failure"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - missing or invalid authentication"
-// @Failure 404 {object} responses.ErrorResponse "Conversation not found or user not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/chat/completions [post]
 func (cApi *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
@@ -94,7 +93,7 @@ func (cApi *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		return
 	}
 
-	// Get user ID for saving messages
+	// Get authenticated user (required for API access)
 	user, ok := auth.GetUserFromContext(reqCtx)
 	if !ok || user == nil {
 		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
@@ -104,16 +103,16 @@ func (cApi *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		return
 	}
 
-	// TODO: Implement admin API key check
+	// TODO: Implement admin API key check for enhanced security
 
 	var err *common.Error
 	var response *openai.ChatCompletionResponse
 
 	if request.Stream {
-		// Handle streaming completion - streams SSE events and accumulates response
+		// Handle streaming completion - streams SSE events directly to client
 		err = cApi.StreamCompletionResponse(reqCtx, "", request)
 	} else {
-		// Handle non-streaming completion
+		// Handle non-streaming completion - returns complete response
 		response, err = cApi.CallCompletionAndGetRestResponse(reqCtx.Request.Context(), "", request)
 	}
 
@@ -128,16 +127,15 @@ func (cApi *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		return
 	}
 
-	// Only send JSON response for non-streaming requests (streaming uses SSE)
+	// Send JSON response for non-streaming requests (streaming responses use SSE)
 	if !request.Stream {
 		reqCtx.JSON(http.StatusOK, response)
 	}
 }
 
-// CallCompletionAndGetRestResponse calls the inference model and returns a non-streaming REST response
+// CallCompletionAndGetRestResponse calls the inference model and returns a complete non-streaming response
 func (cApi *CompletionAPI) CallCompletionAndGetRestResponse(ctx context.Context, apiKey string, request openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, *common.Error) {
-
-	// Call inference provider
+	// Call inference provider to get complete response
 	response, err := cApi.inferenceProvider.CreateCompletion(ctx, apiKey, request)
 	if err != nil {
 		logger.GetLogger().Errorf("inference failed: %v", err)
@@ -147,9 +145,9 @@ func (cApi *CompletionAPI) CallCompletionAndGetRestResponse(ctx context.Context,
 	return response, nil
 }
 
-// StreamCompletionAndAccumulateResponse streams SSE events to client and accumulates a complete response for internal processing
+// StreamCompletionResponse streams SSE events directly to the client
 func (cApi *CompletionAPI) StreamCompletionResponse(reqCtx *gin.Context, apiKey string, request openai.ChatCompletionRequest) *common.Error {
-	// Add timeout context
+	// Create timeout context for streaming request
 	ctx, cancel := context.WithTimeout(reqCtx.Request.Context(), RequestTimeout)
 	defer cancel()
 
@@ -158,19 +156,19 @@ func (cApi *CompletionAPI) StreamCompletionResponse(reqCtx *gin.Context, apiKey 
 		return common.NewError(reqCtx.Request.Context().Err(), "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
 	}
 
-	// Set up SSE headers
+	// Set up SSE headers for streaming response
 	cApi.setupSSEHeaders(reqCtx)
-	// Create buffered channels for data and errors
+	// Create buffered channels for streaming data and errors
 	dataChan := make(chan string, ChannelBufferSize)
 	errChan := make(chan error, ErrorBufferSize)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	// Start streaming in a goroutine
+	// Start streaming from inference model in a goroutine
 	go cApi.streamResponseToChannel(ctx, apiKey, request, dataChan, errChan, &wg)
 
-	// Process data from channels
+	// Process streaming data from channels
 	streamingComplete := false
 	for !streamingComplete {
 		select {
@@ -181,7 +179,7 @@ func (cApi *CompletionAPI) StreamCompletionResponse(reqCtx *gin.Context, apiKey 
 				break
 			}
 
-			// Forward the raw line to client
+			// Forward streaming line directly to client
 			if err := cApi.writeSSELine(reqCtx, line); err != nil {
 				return common.NewError(err, "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
 			}
@@ -211,9 +209,10 @@ func (cApi *CompletionAPI) StreamCompletionResponse(reqCtx *gin.Context, apiKey 
 		}
 	}
 
-	// Wait for streaming goroutine to complete and close channels
+	// Wait for streaming goroutine to complete
 	wg.Wait()
 
+	// Clean up channels
 	close(dataChan)
 	close(errChan)
 
@@ -236,13 +235,12 @@ func (cApi *CompletionAPI) streamResponseToChannel(ctx context.Context, apiKey s
 	defer func() {
 		if closeErr := reader.Close(); closeErr != nil {
 			// Log the close error but don't send it to errChan to avoid overriding the original error
-			// In a production environment, you might want to use a proper logger here
 			logger.GetLogger().Errorf("unable to close reader: %v", closeErr)
 		}
 	}()
 
 	scanner := bufio.NewScanner(reader)
-	//Increase scanner buffer size
+	// Increase scanner buffer size for better performance with large responses
 	scanner.Buffer(make([]byte, 0, ScannerInitialBuffer), ScannerMaxBuffer)
 	for scanner.Scan() {
 		select {
@@ -261,7 +259,7 @@ func (cApi *CompletionAPI) streamResponseToChannel(ctx context.Context, apiKey s
 	}
 }
 
-// setupSSEHeaders sets up the required headers for Server-Sent Events
+// setupSSEHeaders sets up the required headers for Server-Sent Events streaming
 func (cApi *CompletionAPI) setupSSEHeaders(reqCtx *gin.Context) {
 	reqCtx.Header("Content-Type", "text/event-stream")
 	reqCtx.Header("Cache-Control", "no-cache")

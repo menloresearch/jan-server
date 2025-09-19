@@ -68,9 +68,9 @@ type ExtendedCompletionResponse struct {
 	Metadata *ResponseMetadata `json:"metadata,omitempty"`
 }
 
-// CreateChatCompletion
-// @Summary Create a chat completion
-// @Description Generates a model response for the given chat conversation. Supports both streaming and non-streaming modes with conversation management and storage options.
+// PostCompletion
+// @Summary Create a conversation-aware chat completion
+// @Description Generates a model response for the given chat conversation with conversation persistence and management. This is the conversation-aware version of the chat completion API that supports both streaming and non-streaming modes with conversation management and storage options.
 // @Description
 // @Description **Streaming Mode (stream=true):**
 // @Description - Returns Server-Sent Events (SSE) with real-time streaming
@@ -86,19 +86,25 @@ type ExtendedCompletionResponse struct {
 // @Description - `store=true`: Saves user message and assistant response to conversation
 // @Description - `store_reasoning=true`: Includes reasoning content in stored messages
 // @Description - `conversation`: ID of existing conversation or empty for new conversation
-// @Tags Chat
+// @Description
+// @Description **Features:**
+// @Description - Conversation persistence and history management
+// @Description - Extended request format with conversation and storage options
+// @Description - User authentication required
+// @Description - Automatic conversation creation and management
+// @Tags Conversations
 // @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Produce text/event-stream
-// @Param request body ExtendedChatCompletionRequest true "Chat completion request with streaming, storage, and conversation options"
+// @Param request body ExtendedChatCompletionRequest true "Extended chat completion request with streaming, storage, and conversation options"
 // @Success 200 {object} ExtendedCompletionResponse "Successful non-streaming response (when stream=false)"
 // @Success 200 {string} string "Successful streaming response (when stream=true) - SSE format with data: {json} events"
 // @Failure 400 {object} responses.ErrorResponse "Invalid request payload or conversation not found"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - missing or invalid authentication"
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found or user not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
-// @Router /v1/chat/completions [post]
+// @Router /v1/conv/chat/completions [post]
 func (api *ConvCompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	var request ExtendedChatCompletionRequest
 	if err := reqCtx.ShouldBindJSON(&request); err != nil {
