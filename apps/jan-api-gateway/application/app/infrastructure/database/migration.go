@@ -82,17 +82,17 @@ func (d *DBMigrator) lockVersion(ctx context.Context, tx *gorm.DB) (DatabaseMigr
 	var m DatabaseMigration
 
 	if err := tx.WithContext(ctx).
-		Raw("SELECT id, version FROM migration_versions ORDER BY id LIMIT 1").
+		Raw("SELECT id, version FROM database_migration ORDER BY id LIMIT 1").
 		Scan(&m).Error; err != nil {
 		return m, err
 	}
 
 	if m.ID == 0 {
-		return m, fmt.Errorf("no row found in migration_versions")
+		return m, fmt.Errorf("no row found in database_migration")
 	}
 
 	if err := tx.WithContext(ctx).
-		Raw("SELECT id, version FROM migration_versions WHERE id = ? FOR UPDATE", m.ID).
+		Raw("SELECT id, version FROM database_migration WHERE id = ? FOR UPDATE", m.ID).
 		Scan(&m).Error; err != nil {
 		return m, err
 	}
