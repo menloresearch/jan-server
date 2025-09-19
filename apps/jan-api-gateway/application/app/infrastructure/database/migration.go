@@ -23,6 +23,13 @@ type SchemaVersion struct {
 
 func NewSchemaVersion() SchemaVersion {
 	sv := SchemaVersion{
+		// Consider supporting semantic versioning, such as:
+		// ```
+		// Version {
+		//   ReleaseVersion: "v0.0.3",
+		//   DbVersion: 2
+		// }
+		// ```
 		Migrations: []int64{
 			2,
 			1,
@@ -62,6 +69,7 @@ func (d *DBMigrator) initialize() error {
 	}
 
 	if reset {
+		// Still experiencing a race condition here, need to consult with DevOps regarding deployment strategy.
 		if err := db.Exec("DROP SCHEMA IF EXISTS public CASCADE;").Error; err != nil {
 			return fmt.Errorf("failed to drop public schema: %w", err)
 		}
@@ -127,6 +135,7 @@ func (d *DBMigrator) Migrate() (err error) {
 		if currentVersion.Version >= migrationVersion {
 			continue
 		}
+		// get version sql file
 		sqlFile := filepath.Join(migrationSqlFolder, fmt.Sprintf("%d.sql", migrationVersion))
 		content, err := os.ReadFile(sqlFile)
 		if err != nil {
