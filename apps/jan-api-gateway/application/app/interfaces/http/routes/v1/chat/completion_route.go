@@ -167,9 +167,6 @@ func (cApi *CompletionAPI) StreamCompletionResponse(reqCtx *gin.Context, apiKey 
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	// Log stream start for observability
-	logger.GetLogger().Infof("Starting SSE stream for user %s" /* user.ID from context if available */, "anonymous")
-
 	// Start streaming from inference model in a goroutine
 	go cApi.streamResponseToChannel(ctx, apiKey, request, msgChan, &wg)
 
@@ -238,7 +235,6 @@ func (cApi *CompletionAPI) StreamCompletionResponse(reqCtx *gin.Context, apiKey 
 	// Wait for streaming goroutine to complete
 	wg.Wait()
 
-	logger.GetLogger().Infof("SSE stream completed successfully")
 	return nil
 }
 
