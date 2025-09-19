@@ -105,9 +105,10 @@ func (d *DBMigrator) Migrate() (err error) {
 		if currentVersion.Version > migrationVersion {
 			continue
 		}
-
 		
 	}
 
+	// release the select for update
 	tx.Commit()
+	return nil
 }
