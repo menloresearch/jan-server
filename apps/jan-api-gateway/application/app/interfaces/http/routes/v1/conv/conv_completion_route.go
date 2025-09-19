@@ -220,6 +220,10 @@ func (api *ConvCompletionAPI) handleConversationManagement(reqCtx *gin.Context, 
 		if convErr != nil {
 			return nil, false, convErr
 		}
+		if conv.Title == nil || *conv.Title == "" || *conv.Title == DefaultConversationTitle {
+			title := api.generateTitleFromMessages(messages)
+			conv.Title = &title
+		}
 		return conv, false, nil
 	} else {
 		// Create new conversation
