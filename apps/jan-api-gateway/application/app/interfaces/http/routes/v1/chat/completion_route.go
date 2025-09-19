@@ -170,6 +170,12 @@ func (cApi *CompletionAPI) StreamCompletionResponse(reqCtx *gin.Context, apiKey 
 	// Start streaming from inference model in a goroutine
 	go cApi.streamResponseToChannel(ctx, apiKey, request, msgChan, &wg)
 
+	// Close the message channel once all producers complete
+	go func() {
+		wg.Wait()
+		close(msgChan)
+	}()
+
 	// Set up client disconnection notifier
 	clientGone := reqCtx.Writer.CloseNotify()
 
@@ -241,7 +247,6 @@ func (cApi *CompletionAPI) StreamCompletionResponse(reqCtx *gin.Context, apiKey 
 // streamResponseToChannel streams the response from inference provider to a unified channel
 func (cApi *CompletionAPI) streamResponseToChannel(ctx context.Context, apiKey string, request openai.ChatCompletionRequest, msgChan chan<- StreamMessage, wg *sync.WaitGroup) {
 	defer wg.Done()
-	defer close(msgChan)
 
 	// Get streaming reader from inference provider
 	reader, err := cApi.inferenceProvider.CreateCompletionStream(ctx, apiKey, request)
