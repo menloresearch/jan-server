@@ -200,7 +200,7 @@ func (cApi *CompletionAPI) StreamCompletionResponse(reqCtx *gin.Context, apiKey 
 				logger.GetLogger().Warnf("Client disconnected during streaming: %v", err)
 				cancel()
 				wg.Wait()
-				return common.NewError(err, "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
+				return common.NewError(err, "8a3f6c2e-1d47-4f89-9a6b-02f3e4b1c7d2")
 			}
 
 			// Check for [DONE] marker
@@ -224,7 +224,7 @@ func (cApi *CompletionAPI) StreamCompletionResponse(reqCtx *gin.Context, apiKey 
 				logger.GetLogger().Errorf("Streaming timeout: %v", ctx.Err())
 			}
 			wg.Wait()
-			return common.NewError(ctx.Err(), "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
+			return common.NewError(ctx.Err(), "d41f0b2c-3e5a-47c8-8f1a-9b2c6d7e4a1f")
 
 		case <-reqCtx.Request.Context().Done():
 			// Original request context cancellation (e.g., server shutdown)
