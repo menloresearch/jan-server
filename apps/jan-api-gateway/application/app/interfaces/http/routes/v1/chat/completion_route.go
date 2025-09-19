@@ -21,7 +21,7 @@ import (
 const (
 	RequestTimeout       = 120 * time.Second
 	ChannelBufferSize    = 100
-	ErrorBufferSize      = 10
+	ErrorBufferSize      = 10 // Retained for backward compatibility, but unified now
 	DataPrefix           = "data: "
 	DoneMarker           = "[DONE]"
 	NewlineChar          = "\n"
@@ -29,6 +29,13 @@ const (
 	ScannerMaxBuffer     = 1024 * 1024 // 1MB
 )
 
+// StreamMessage unifies data and error payloads for simplified channel handling
+type StreamMessage struct {
+	Line string
+	Err  error
+}
+
+// CompletionAPI handles chat completion requests with streaming support
 type CompletionAPI struct {
 	inferenceProvider inference.InferenceProvider
 	authService       *auth.AuthService
@@ -147,115 +154,145 @@ func (cApi *CompletionAPI) CallCompletionAndGetRestResponse(ctx context.Context,
 
 // StreamCompletionResponse streams SSE events directly to the client
 func (cApi *CompletionAPI) StreamCompletionResponse(reqCtx *gin.Context, apiKey string, request openai.ChatCompletionRequest) *common.Error {
-	// Create timeout context for streaming request
+	// Create timeout context wrapping the request context
 	ctx, cancel := context.WithTimeout(reqCtx.Request.Context(), RequestTimeout)
 	defer cancel()
 
-	// Check for client disconnection
-	if reqCtx.Request.Context().Err() != nil {
-		return common.NewError(reqCtx.Request.Context().Err(), "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
-	}
-
 	// Set up SSE headers for streaming response
 	cApi.setupSSEHeaders(reqCtx)
-	// Create buffered channels for streaming data and errors
-	dataChan := make(chan string, ChannelBufferSize)
-	errChan := make(chan error, ErrorBufferSize)
+
+	// Create unified buffered channel for streaming messages (data or errors)
+	msgChan := make(chan StreamMessage, ChannelBufferSize)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	// Start streaming from inference model in a goroutine
-	go cApi.streamResponseToChannel(ctx, apiKey, request, dataChan, errChan, &wg)
+	// Log stream start for observability
+	logger.GetLogger().Infof("Starting SSE stream for user %s" /* user.ID from context if available */, "anonymous")
 
-	// Process streaming data from channels
+	// Start streaming from inference model in a goroutine
+	go cApi.streamResponseToChannel(ctx, apiKey, request, msgChan, &wg)
+
+	// Set up client disconnection notifier
+	clientGone := reqCtx.Writer.CloseNotify()
+
+	// Process streaming data from channel
 	streamingComplete := false
 	for !streamingComplete {
 		select {
-		case line, ok := <-dataChan:
+		case msg, ok := <-msgChan:
 			if !ok {
 				// Channel closed, streaming complete
 				streamingComplete = true
 				break
 			}
 
+			if msg.Err != nil {
+				// Handle error: cancel and wait
+				logger.GetLogger().Errorf("Stream error: %v", msg.Err)
+				cancel()
+				wg.Wait()
+				return common.NewError(msg.Err, "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
+			}
+
 			// Forward streaming line directly to client
-			if err := cApi.writeSSELine(reqCtx, line); err != nil {
+			if err := cApi.writeSSELine(reqCtx, msg.Line); err != nil {
+				logger.GetLogger().Warnf("Client disconnected during streaming: %v", err)
+				cancel()
+				wg.Wait()
 				return common.NewError(err, "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
 			}
 
-			if data, found := strings.CutPrefix(line, DataPrefix); found {
+			// Check for [DONE] marker
+			if data, found := strings.CutPrefix(msg.Line, DataPrefix); found {
 				if data == DoneMarker {
 					streamingComplete = true
+					cancel()
 					break
 				}
 			}
 
-		case err, ok := <-errChan:
-			if !ok {
-				// Channel closed, no more errors
-				continue
-			}
-			if err != nil {
-				return common.NewError(err, "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
-			}
+		case <-clientGone:
+			// Proactive client disconnection
+			logger.GetLogger().Warnf("Client disconnected proactively")
+			cancel()
+			wg.Wait()
+			return common.NewError(context.Canceled, "client disconnected proactively")
 
 		case <-ctx.Done():
 			if ctx.Err() == context.DeadlineExceeded {
-				logger.GetLogger().Errorf("streaming timeout: %v", ctx.Err())
-				return common.NewError(ctx.Err(), "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
+				logger.GetLogger().Errorf("Streaming timeout: %v", ctx.Err())
 			}
+			wg.Wait()
 			return common.NewError(ctx.Err(), "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
+
+		case <-reqCtx.Request.Context().Done():
+			// Original request context cancellation (e.g., server shutdown)
+			logger.GetLogger().Warnf("Request context cancelled")
+			cancel()
+			wg.Wait()
+			return common.NewError(reqCtx.Request.Context().Err(), "request cancelled")
 		}
 	}
 
 	// Wait for streaming goroutine to complete
 	wg.Wait()
 
-	// Clean up channels
-	close(dataChan)
-	close(errChan)
-
+	logger.GetLogger().Infof("SSE stream completed successfully")
 	return nil
 }
 
-// streamResponseToChannel streams the response from inference provider to channels
-func (cApi *CompletionAPI) streamResponseToChannel(ctx context.Context, apiKey string, request openai.ChatCompletionRequest, dataChan chan<- string, errChan chan<- error, wg *sync.WaitGroup) {
+// streamResponseToChannel streams the response from inference provider to a unified channel
+func (cApi *CompletionAPI) streamResponseToChannel(ctx context.Context, apiKey string, request openai.ChatCompletionRequest, msgChan chan<- StreamMessage, wg *sync.WaitGroup) {
 	defer wg.Done()
-	// Ensure channels are closed in case of early return
-	defer close(dataChan)
-	defer close(errChan)
+	defer close(msgChan)
 
 	// Get streaming reader from inference provider
 	reader, err := cApi.inferenceProvider.CreateCompletionStream(ctx, apiKey, request)
 	if err != nil {
-		errChan <- err
+		select {
+		case msgChan <- StreamMessage{Err: err}:
+		default:
+			// Non-blocking send if channel full
+		}
 		return
 	}
 	defer func() {
 		if closeErr := reader.Close(); closeErr != nil {
-			// Log the close error but don't send it to errChan to avoid overriding the original error
-			logger.GetLogger().Errorf("unable to close reader: %v", closeErr)
+			logger.GetLogger().Errorf("Unable to close reader: %v", closeErr)
 		}
 	}()
 
 	scanner := bufio.NewScanner(reader)
 	// Increase scanner buffer size for better performance with large responses
 	scanner.Buffer(make([]byte, 0, ScannerInitialBuffer), ScannerMaxBuffer)
+
 	for scanner.Scan() {
 		select {
 		case <-ctx.Done():
-			errChan <- ctx.Err()
+			// Context cancelled, send error and exit
+			select {
+			case msgChan <- StreamMessage{Err: ctx.Err()}:
+			default:
+			}
 			return
 		default:
 			line := scanner.Text()
-			dataChan <- line
+			select {
+			case msgChan <- StreamMessage{Line: line}:
+				// Successfully sent data
+			case <-ctx.Done():
+				// Context cancelled while trying to send
+				return
+			}
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		errChan <- err
-		return
+		select {
+		case msgChan <- StreamMessage{Err: err}:
+		default:
+		}
 	}
 }
 
@@ -266,6 +303,8 @@ func (cApi *CompletionAPI) setupSSEHeaders(reqCtx *gin.Context) {
 	reqCtx.Header("Connection", "keep-alive")
 	reqCtx.Header("Access-Control-Allow-Origin", "*")
 	reqCtx.Header("Access-Control-Allow-Headers", "Cache-Control")
+	reqCtx.Header("Transfer-Encoding", "chunked") // Added for better SSE compliance
+	reqCtx.Writer.WriteHeaderNow()
 }
 
 // writeSSELine writes a line to the SSE stream
