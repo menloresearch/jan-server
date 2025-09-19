@@ -9,6 +9,7 @@ import (
 
 	"github.com/mileusna/crontab"
 	"menlo.ai/jan-api-gateway/app/domain/healthcheck"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database"
 	apphttp "menlo.ai/jan-api-gateway/app/interfaces/http"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
 	"menlo.ai/jan-api-gateway/app/utils/httpclients/serper"
@@ -59,6 +60,10 @@ func main() {
 	}()
 
 	application, err := CreateApplication()
+	if err != nil {
+		panic(err)
+	}
+	err = database.Migration()
 	if err != nil {
 		panic(err)
 	}

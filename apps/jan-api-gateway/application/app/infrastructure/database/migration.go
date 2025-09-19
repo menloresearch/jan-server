@@ -1,4 +1,4 @@
-package migration
+package database
 
 import (
 	"context"
@@ -6,8 +6,12 @@ import (
 	"sort"
 
 	"gorm.io/gorm"
-	"menlo.ai/jan-api-gateway/app/infrastructure/database/dbschema"
 )
+
+type DatabaseMigration struct {
+	gorm.Model
+	Version int64 `gorm:"not null;uniqueIndex"`
+}
 
 type SchemaVersion struct {
 	Migrations []int64 `json:"migrations"`
@@ -30,10 +34,16 @@ type DBMigrator struct {
 	db *gorm.DB
 }
 
+func NewDBMigrator(db *gorm.DB) *DBMigrator {
+	return &DBMigrator{
+		db: db,
+	}
+}
+
 func (d *DBMigrator) initialize() error {
 	db := d.db
 	var reset bool
-	var record dbschema.DatabaseMigration
+	var record DatabaseMigration
 
 	hasTable := db.Migrator().HasTable("database_migration")
 	if hasTable {
@@ -52,12 +62,14 @@ func (d *DBMigrator) initialize() error {
 		if err := db.Exec("DROP SCHEMA IF EXISTS public CASCADE;").Error; err != nil {
 			return fmt.Errorf("failed to drop public schema: %w", err)
 		}
-
-		if err := db.AutoMigrate(&dbschema.DatabaseMigration{}); err != nil {
+		if err := db.Exec("CREATE SCHEMA public;").Error; err != nil {
+			return fmt.Errorf("failed to create public schema: %w", err)
+		}
+		if err := db.AutoMigrate(&DatabaseMigration{}); err != nil {
 			return fmt.Errorf("failed to create 'database_migration' table: %w", err)
 		}
 
-		initialRecord := dbschema.DatabaseMigration{Version: 0}
+		initialRecord := DatabaseMigration{Version: 0}
 		if err := db.Create(&initialRecord).Error; err != nil {
 			return fmt.Errorf("failed to insert initial migration record: %w", err)
 		}
@@ -66,8 +78,8 @@ func (d *DBMigrator) initialize() error {
 	return nil
 }
 
-func (d *DBMigrator) LockVersion(ctx context.Context, tx *gorm.DB) (dbschema.DatabaseMigration, error) {
-	var m dbschema.DatabaseMigration
+func (d *DBMigrator) lockVersion(ctx context.Context, tx *gorm.DB) (DatabaseMigration, error) {
+	var m DatabaseMigration
 
 	if err := tx.WithContext(ctx).
 		Raw("SELECT id, version FROM migration_versions ORDER BY id LIMIT 1").
@@ -97,7 +109,7 @@ func (d *DBMigrator) Migrate() (err error) {
 	db := d.db
 	tx := db.WithContext(ctx).Begin()
 	// select for update
-	currentVersion, err := d.LockVersion(ctx, tx)
+	currentVersion, err := d.lockVersion(ctx, tx)
 	if err != nil {
 		return
 	}
@@ -105,7 +117,7 @@ func (d *DBMigrator) Migrate() (err error) {
 		if currentVersion.Version > migrationVersion {
 			continue
 		}
-		
+
 	}
 
 	// release the select for update
