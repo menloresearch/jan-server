@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
+	"slices"
 	"strings"
 
 	"gorm.io/gorm"
@@ -24,13 +24,12 @@ type SchemaVersion struct {
 func NewSchemaVersion() SchemaVersion {
 	sv := SchemaVersion{
 		Migrations: []int64{
+			2,
 			1,
 			0,
 		},
 	}
-	sort.Slice(sv.Migrations, func(i, j int) bool {
-		return sv.Migrations[i] < sv.Migrations[j]
-	})
+	slices.Sort(sv.Migrations)
 	return sv
 }
 
@@ -123,6 +122,7 @@ func (d *DBMigrator) Migrate() (err error) {
 	}
 	migrationSqlFolder := filepath.Join(filepath.Dir(filename), "migrationsqls")
 
+	updated := false
 	for _, migrationVersion := range migrations {
 		if currentVersion.Version >= migrationVersion {
 			continue
@@ -138,11 +138,14 @@ func (d *DBMigrator) Migrate() (err error) {
 		for _, command := range sqlCommands {
 			db.Exec(command)
 		}
+		updated = true
 	}
-	currentVersion.Version = migrations[len(migrations)-1]
-	if err := tx.Save(currentVersion).Error; err != nil {
-		tx.Rollback()
-		return err
+	if updated {
+		currentVersion.Version = migrations[len(migrations)-1]
+		if err := tx.Save(currentVersion).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
 	}
 	tx.Commit()
 	return nil
