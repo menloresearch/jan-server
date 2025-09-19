@@ -1,4 +1,4 @@
-package chat
+package conv
 
 import (
 	"context"
