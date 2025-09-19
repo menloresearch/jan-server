@@ -33,6 +33,7 @@ import (
 	auth2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth/google"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conv"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
@@ -76,13 +77,15 @@ func CreateApplication() (*Application, error) {
 	context := provideContext()
 	janInferenceClient := janinference.NewJanInferenceClient(context)
 	inferenceProvider := inference.NewJanInferenceProvider(janInferenceClient)
+	completionAPI := chat.NewCompletionAPI(inferenceProvider, authService)
+	chatRoute := chat.NewChatRoute(authService, completionAPI)
 	conversationRepository := conversationrepo.NewConversationGormRepository(transactionDatabase)
 	itemRepository := itemrepo.NewItemGormRepository(transactionDatabase)
 	conversationService := conversation.NewService(conversationRepository, itemRepository)
-	completionNonStreamHandler := chat.NewCompletionNonStreamHandler(inferenceProvider, conversationService)
-	completionStreamHandler := chat.NewCompletionStreamHandler(inferenceProvider, conversationService)
-	completionAPI := chat.NewCompletionAPI(completionNonStreamHandler, completionStreamHandler, conversationService, authService)
-	chatRoute := chat.NewChatRoute(completionAPI, authService)
+	completionNonStreamHandler := conv.NewCompletionNonStreamHandler(inferenceProvider, conversationService)
+	completionStreamHandler := conv.NewCompletionStreamHandler(inferenceProvider, conversationService)
+	convCompletionAPI := conv.NewConvCompletionAPI(completionNonStreamHandler, completionStreamHandler, conversationService, authService)
+	convChatRoute := conv.NewConvChatRoute(authService, convCompletionAPI)
 	conversationAPI := conversations.NewConversationAPI(conversationService, authService)
 	modelAPI := v1.NewModelAPI()
 	serperService := serpermcp.NewSerperService()
@@ -96,7 +99,7 @@ func CreateApplication() (*Application, error) {
 	streamModelService := response.NewStreamModelService(responseModelService)
 	nonStreamModelService := response.NewNonStreamModelService(responseModelService)
 	responseRoute := responses.NewResponseRoute(responseModelService, authService, responseService, streamModelService, nonStreamModelService)
-	v1Route := v1.NewV1Route(organizationRoute, chatRoute, conversationAPI, modelAPI, mcpapi, authRoute, responseRoute)
+	v1Route := v1.NewV1Route(organizationRoute, chatRoute, convChatRoute, conversationAPI, modelAPI, mcpapi, authRoute, responseRoute)
 	httpServer := http.NewHttpServer(v1Route)
 	application := &Application{
 		HttpServer: httpServer,

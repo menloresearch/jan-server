@@ -6,21 +6,22 @@ import (
 )
 
 type ChatRoute struct {
-	completionAPI *CompletionAPI
 	authService   *auth.AuthService
+	completionAPI *CompletionAPI
 }
 
 func NewChatRoute(
-	completionAPI *CompletionAPI,
 	authService *auth.AuthService,
+	completionAPI *CompletionAPI,
 ) *ChatRoute {
 	return &ChatRoute{
-		completionAPI: completionAPI,
 		authService:   authService,
+		completionAPI: completionAPI,
 	}
 }
 
 func (chatRoute *ChatRoute) RegisterRouter(router gin.IRouter) {
+	// Register /v1/chat routes
 	chatRouter := router.Group("/chat",
 		chatRoute.authService.AppUserAuthMiddleware(),
 		chatRoute.authService.RegisteredUserMiddleware(),

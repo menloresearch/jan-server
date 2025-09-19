@@ -1,41 +1,50 @@
 package chat
 
 import (
+	"bufio"
 	"context"
-	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/common"
-	"menlo.ai/jan-api-gateway/app/domain/conversation"
-	userdomain "menlo.ai/jan-api-gateway/app/domain/user"
+	"menlo.ai/jan-api-gateway/app/domain/inference"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
-	"menlo.ai/jan-api-gateway/app/utils/idgen"
 	"menlo.ai/jan-api-gateway/app/utils/logger"
 )
 
+// Constants for streaming configuration
 const (
-	DefaultConversationTitle = "New Conversation"
-	MaxTitleLength           = 50
+	RequestTimeout       = 120 * time.Second
+	ChannelBufferSize    = 100
+	ErrorBufferSize      = 10 // Retained for backward compatibility, but unified now
+	DataPrefix           = "data: "
+	DoneMarker           = "[DONE]"
+	NewlineChar          = "\n"
+	ScannerInitialBuffer = 12 * 1024   // 12KB
+	ScannerMaxBuffer     = 1024 * 1024 // 1MB
 )
 
-type CompletionAPI struct {
-	completionNonStreamHandler *CompletionNonStreamHandler
-	completionStreamHandler    *CompletionStreamHandler
-	conversationService        *conversation.ConversationService
-	authService                *auth.AuthService
+// StreamMessage unifies data and error payloads for simplified channel handling
+type StreamMessage struct {
+	Line string
+	Err  error
 }
 
-func NewCompletionAPI(completionNonStreamHandler *CompletionNonStreamHandler, completionStreamHandler *CompletionStreamHandler, conversationService *conversation.ConversationService, authService *auth.AuthService) *CompletionAPI {
+// CompletionAPI handles chat completion requests with streaming support
+type CompletionAPI struct {
+	inferenceProvider inference.InferenceProvider
+	authService       *auth.AuthService
+}
+
+func NewCompletionAPI(inferenceProvider inference.InferenceProvider, authService *auth.AuthService) *CompletionAPI {
 	return &CompletionAPI{
-		completionNonStreamHandler: completionNonStreamHandler,
-		completionStreamHandler:    completionStreamHandler,
-		conversationService:        conversationService,
-		authService:                authService,
+		inferenceProvider: inferenceProvider,
+		authService:       authService,
 	}
 }
 
@@ -43,111 +52,79 @@ func (completionAPI *CompletionAPI) RegisterRouter(router *gin.RouterGroup) {
 	router.POST("/completions", completionAPI.PostCompletion)
 }
 
-// ExtendedChatCompletionRequest extends OpenAI's request with conversation field and store and store_reasoning fields
-type ExtendedChatCompletionRequest struct {
-	openai.ChatCompletionRequest
-	Conversation   string `json:"conversation,omitempty"`
-	Store          bool   `json:"store,omitempty"`           // If true, the response will be stored in the conversation, default is false
-	StoreReasoning bool   `json:"store_reasoning,omitempty"` // If true, the reasoning will be stored in the conversation, default is false
-}
-
-// ResponseMetadata contains additional metadata about the completion response
-type ResponseMetadata struct {
-	ConversationID      string `json:"conversation_id"`
-	ConversationCreated bool   `json:"conversation_created"`
-	ConversationTitle   string `json:"conversation_title"`
-	AskItemId           string `json:"ask_item_id"`
-	CompletionItemId    string `json:"completion_item_id"`
-	Store               bool   `json:"store"`
-	StoreReasoning      bool   `json:"store_reasoning"`
-}
-
-// ExtendedCompletionResponse extends OpenAI's ChatCompletionResponse with additional metadata
-type ExtendedCompletionResponse struct {
-	openai.ChatCompletionResponse
-	Metadata *ResponseMetadata `json:"metadata,omitempty"`
-}
-
-// CreateChatCompletion
+// PostCompletion
 // @Summary Create a chat completion
-// @Description Generates a model response for the given chat conversation. Supports both streaming and non-streaming modes with conversation management and storage options.
+// @Description Generates a model response for the given chat conversation. This is a standard chat completion API that supports both streaming and non-streaming modes without conversation persistence.
 // @Description
 // @Description **Streaming Mode (stream=true):**
 // @Description - Returns Server-Sent Events (SSE) with real-time streaming
-// @Description - First event contains conversation metadata
-// @Description - Subsequent events contain completion chunks
+// @Description - Streams completion chunks directly from the inference model
 // @Description - Final event contains "[DONE]" marker
 // @Description
 // @Description **Non-Streaming Mode (stream=false or omitted):**
 // @Description - Returns single JSON response with complete completion
-// @Description - Includes conversation metadata in response
+// @Description - Standard OpenAI ChatCompletionResponse format
 // @Description
-// @Description **Storage Options:**
-// @Description - `store=true`: Saves user message and assistant response to conversation
-// @Description - `store_reasoning=true`: Includes reasoning content in stored messages
-// @Description - `conversation`: ID of existing conversation or empty for new conversation
+// @Description **Features:**
+// @Description - Supports all OpenAI ChatCompletionRequest parameters
+// @Description - User authentication required
+// @Description - Direct inference model integration
+// @Description - No conversation persistence (stateless)
 // @Tags Chat
 // @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Produce text/event-stream
-// @Param request body ExtendedChatCompletionRequest true "Chat completion request with streaming, storage, and conversation options"
-// @Success 200 {object} ExtendedCompletionResponse "Successful non-streaming response (when stream=false)"
+// @Param request body openai.ChatCompletionRequest true "Chat completion request with streaming options"
+// @Success 200 {object} openai.ChatCompletionResponse "Successful non-streaming response (when stream=false)"
 // @Success 200 {string} string "Successful streaming response (when stream=true) - SSE format with data: {json} events"
-// @Failure 400 {object} responses.ErrorResponse "Invalid request payload or conversation not found"
+// @Failure 400 {object} responses.ErrorResponse "Invalid request payload, empty messages, or inference failure"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - missing or invalid authentication"
-// @Failure 404 {object} responses.ErrorResponse "Conversation not found or user not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
 // @Router /v1/chat/completions [post]
-func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
-	var request ExtendedChatCompletionRequest
+func (cApi *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
+	var request openai.ChatCompletionRequest
 	if err := reqCtx.ShouldBindJSON(&request); err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "cf237451-8932-48d1-9cf6-42c4db2d4805",
-			Error: err.Error(),
+			Code:          "0199600b-86d3-7339-8402-8ef1c7840475",
+			ErrorInstance: err,
 		})
 		return
 	}
 
-	// Get user ID for saving messages
+	if len(request.Messages) == 0 {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  "0199600f-2cbe-7518-be5c-9989cce59472",
+			Error: "messages cannot be empty",
+		})
+		return
+	}
+
+	// Get authenticated user (required for API access)
 	user, ok := auth.GetUserFromContext(reqCtx)
-	if !ok {
-		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  "0199506b-314d-70e2-a8aa-d5fde1569d1d",
-			Error: "user not found",
-		})
-		return
-	}
-	// TODO: Implement admin API key check
-
-	// Handle conversation management
-	conv, conversationCreated, convErr := api.handleConversationManagement(reqCtx, request.Conversation, request.Messages)
-	if convErr != nil {
-		// Conversation doesn't exist, return error
-		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:          convErr.GetCode(),
-			ErrorInstance: convErr.GetError(),
+	if !ok || user == nil {
+		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+			Code:  "0199600b-961c-71ba-846b-9ca5b384e382",
+			Error: "user not authenticated",
 		})
 		return
 	}
 
-	// Generate item IDs for tracking
-	askItemID, _ := idgen.GenerateSecureID("msg", 42)
-	completionItemID, _ := idgen.GenerateSecureID("msg", 42)
+	// TODO: Implement admin API key check for enhanced security
 
-	// Handle streaming vs non-streaming requests
-	var response *ExtendedCompletionResponse
 	var err *common.Error
+	var response *openai.ChatCompletionResponse
 
 	if request.Stream {
-		// Handle streaming completion - streams SSE events and accumulates response
-		response, err = api.completionStreamHandler.StreamCompletionAndAccumulateResponse(reqCtx, "", request.ChatCompletionRequest, conv, conversationCreated, askItemID, completionItemID)
+		// Handle streaming completion - streams SSE events directly to client
+		err = cApi.StreamCompletionResponse(reqCtx, "", request)
 	} else {
-		// Handle non-streaming completion
-		response, err = api.completionNonStreamHandler.CallCompletionAndGetRestResponse(reqCtx.Request.Context(), "", request.ChatCompletionRequest)
+		// Handle non-streaming completion - returns complete response
+		response, err = cApi.CallCompletionAndGetRestResponse(reqCtx.Request.Context(), "", request)
 	}
 
 	if err != nil {
+		logger.GetLogger().Errorf("completion failed: %v", err)
 		reqCtx.AbortWithStatusJSON(
 			http.StatusBadRequest,
 			responses.ErrorResponse{
@@ -157,390 +134,186 @@ func (api *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		return
 	}
 
-	// Process response (common logic for both streaming and non-streaming)
-	modifiedResponse := api.processCompletionResponse(reqCtx, response, request, conv, user, askItemID, completionItemID, conversationCreated)
-
-	// Only send JSON response for non-streaming requests (streaming uses SSE)
-	if !request.Stream && modifiedResponse != nil {
-		reqCtx.JSON(http.StatusOK, modifiedResponse)
+	// Send JSON response for non-streaming requests (streaming responses use SSE)
+	if !request.Stream {
+		reqCtx.JSON(http.StatusOK, response)
 	}
 }
 
-// processCompletionResponse handles the common response processing logic for both streaming and non-streaming
-func (api *CompletionAPI) processCompletionResponse(reqCtx *gin.Context, response *ExtendedCompletionResponse, request ExtendedChatCompletionRequest, conv *conversation.Conversation, user *userdomain.User, askItemID string, completionItemID string, conversationCreated bool) *ExtendedCompletionResponse {
-	var assistantItem *conversation.Item
-
-	// Store messages conditionally based on store flag
-	if request.Store {
-		// Store last input message (user or tool)
-		if storeErr := api.StoreLastInputMessageIfRequested(reqCtx.Request.Context(), request.ChatCompletionRequest, conv, user.ID, askItemID, completionItemID, request.Store, request.StoreReasoning); storeErr != nil {
-			reqCtx.AbortWithStatusJSON(
-				http.StatusBadRequest,
-				responses.ErrorResponse{
-					Code:          storeErr.GetCode(),
-					ErrorInstance: storeErr.GetError(),
-				})
-			return nil
-		}
-
-		// Store assistant response
-		if item, err := api.StoreAssistantResponseIfRequested(reqCtx.Request.Context(), response, conv, user.ID, completionItemID, request.Store, request.StoreReasoning); err != nil {
-			reqCtx.AbortWithStatusJSON(
-				http.StatusBadRequest,
-				responses.ErrorResponse{
-					Code:          err.GetCode(),
-					ErrorInstance: err.GetError(),
-				})
-			return nil
-		} else {
-			assistantItem = item
-		}
+// CallCompletionAndGetRestResponse calls the inference model and returns a complete non-streaming response
+func (cApi *CompletionAPI) CallCompletionAndGetRestResponse(ctx context.Context, apiKey string, request openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, *common.Error) {
+	// Call inference provider to get complete response
+	response, err := cApi.inferenceProvider.CreateCompletion(ctx, apiKey, request)
+	if err != nil {
+		logger.GetLogger().Errorf("inference failed: %v", err)
+		return nil, common.NewError(err, "0199600c-3b65-7618-83ca-443a583d91c9")
 	}
 
-	// Always handle completion response for other logic (like function calls, tool calls, etc.)
-	// This ensures the response is properly set up regardless of store flag
-	// Skip storage if we already handled it with the new store logic
-	api.handleCompletionResponseAndUpdateConversation(reqCtx.Request.Context(), response, conv, user.ID, request.Store)
-
-	// Modify response to include item ID and metadata
-	return api.completionNonStreamHandler.ModifyCompletionResponse(response, conv, conversationCreated, assistantItem, askItemID, completionItemID, request.Store, request.StoreReasoning)
+	return response, nil
 }
 
-// handleConversationManagement handles conversation loading or creation and returns conversation, created flag, and error
-func (api *CompletionAPI) handleConversationManagement(reqCtx *gin.Context, conversationID string, messages []openai.ChatCompletionMessage) (*conversation.Conversation, bool, *common.Error) {
-	if conversationID != "" {
-		// Try to load existing conversation
-		conv, convErr := api.loadConversation(reqCtx, conversationID)
-		if convErr != nil {
-			return nil, false, convErr
-		}
-		return conv, false, nil
-	} else {
-		// Create new conversation
-		conv, conversationCreated := api.createNewConversation(reqCtx, messages)
-		return conv, conversationCreated, nil
-	}
-}
+// StreamCompletionResponse streams SSE events directly to the client
+func (cApi *CompletionAPI) StreamCompletionResponse(reqCtx *gin.Context, apiKey string, request openai.ChatCompletionRequest) *common.Error {
+	// Create timeout context wrapping the request context
+	ctx, cancel := context.WithTimeout(reqCtx.Request.Context(), RequestTimeout)
+	defer cancel()
 
-// loadConversation loads an existing conversation by ID
-func (api *CompletionAPI) loadConversation(reqCtx *gin.Context, conversationID string) (*conversation.Conversation, *common.Error) {
-	ctx := reqCtx.Request.Context()
+	// Set up SSE headers for streaming response
+	cApi.setupSSEHeaders(reqCtx)
 
-	// Get user from context (set by AppUserAuthMiddleware)
-	user, ok := auth.GetUserFromContext(reqCtx)
-	if !ok {
-		return nil, common.NewErrorWithMessage("User not authenticated", "c1d2e3f4-g5h6-7890-cdef-123456789012")
-	}
+	// Create unified buffered channel for streaming messages (data or errors)
+	msgChan := make(chan StreamMessage, ChannelBufferSize)
 
-	conv, convErr := api.conversationService.GetConversationByPublicIDAndUserID(ctx, conversationID, user.ID)
-	if convErr != nil {
-		return nil, common.NewErrorWithMessage(fmt.Sprintf("Conversation with ID '%s' not found", conversationID), "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
-	}
+	var wg sync.WaitGroup
+	wg.Add(1)
 
-	if conv == nil {
-		return nil, common.NewErrorWithMessage(fmt.Sprintf("Conversation with ID '%s' not found", conversationID), "b2c3d4e5-f6g7-8901-bcde-f23456789012")
-	}
+	// Start streaming from inference model in a goroutine
+	go cApi.streamResponseToChannel(ctx, apiKey, request, msgChan, &wg)
 
-	return conv, nil
-}
+	// Close the message channel once all producers complete
+	go func() {
+		wg.Wait()
+		close(msgChan)
+	}()
 
-// createNewConversation creates a new conversation
-func (api *CompletionAPI) createNewConversation(reqCtx *gin.Context, messages []openai.ChatCompletionMessage) (*conversation.Conversation, bool) {
-	ctx := reqCtx.Request.Context()
+	// Set up client disconnection notifier
+	clientGone := reqCtx.Writer.CloseNotify()
 
-	// Get user from context (set by AppUserAuthMiddleware)
-	user, ok := auth.GetUserFromContext(reqCtx)
-	if !ok {
-		// If no user context, return nil
-		return nil, false
-	}
-
-	title := api.generateTitleFromMessages(messages)
-	conv, convErr := api.conversationService.CreateConversation(ctx, user.ID, &title, true, map[string]string{
-		"model": "jan-v1-4b", // Default model
-	})
-	if convErr != nil {
-		// If creation fails, return nil
-		return nil, false
-	}
-
-	return conv, true // Created new conversation
-}
-
-// TODO should be generate from models, now we just use the first user message
-// generateTitleFromMessages creates a title from the first user message
-func (api *CompletionAPI) generateTitleFromMessages(messages []openai.ChatCompletionMessage) string {
-	if len(messages) == 0 {
-		return DefaultConversationTitle
-	}
-
-	// Find the first user message
-	for _, msg := range messages {
-		if msg.Role == "user" && msg.Content != "" {
-			title := strings.TrimSpace(msg.Content)
-			if len(title) > MaxTitleLength {
-				return title[:MaxTitleLength] + "..."
+	// Process streaming data from channel
+	streamingComplete := false
+	for !streamingComplete {
+		select {
+		case msg, ok := <-msgChan:
+			if !ok {
+				// Channel closed, streaming complete
+				streamingComplete = true
+				break
 			}
-			return title
-		}
-	}
 
-	return DefaultConversationTitle
-}
-
-// handleCompletionResponseAndUpdateConversation handles completion response based on finish_reason and updates conversation
-func (api *CompletionAPI) handleCompletionResponseAndUpdateConversation(ctx context.Context, response *ExtendedCompletionResponse, conv *conversation.Conversation, userID uint, skipStorage bool) {
-	if conv == nil || len(response.Choices) == 0 {
-		return
-	}
-
-	// Loop through all choices in the response
-	for _, choice := range response.Choices {
-		finishReason := choice.FinishReason
-		message := choice.Message
-
-		// Skip storage if already handled by new store logic
-		if skipStorage {
-			continue
-		}
-
-		switch finishReason {
-		case "function_call":
-			// Save the function call to the conversation
-			if message.FunctionCall != nil {
-				api.saveFunctionCallToConversation(ctx, conv, userID, message.FunctionCall, message.ReasoningContent)
+			if msg.Err != nil {
+				// Handle error: cancel and wait
+				logger.GetLogger().Errorf("Stream error: %v", msg.Err)
+				cancel()
+				wg.Wait()
+				return common.NewError(msg.Err, "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
 			}
-		case "tool_calls":
-			// Save the tool calls to the conversation
-			if len(message.ToolCalls) > 0 {
-				api.saveToolCallsToConversation(ctx, conv, userID, message.ToolCalls, message.ReasoningContent)
+
+			// Forward streaming line directly to client
+			if err := cApi.writeSSELine(reqCtx, msg.Line); err != nil {
+				logger.GetLogger().Warnf("Client disconnected during streaming: %v", err)
+				cancel()
+				wg.Wait()
+				return common.NewError(err, "8a3f6c2e-1d47-4f89-9a6b-02f3e4b1c7d2")
 			}
-		case "stop":
-			// Save the response as assistant message to the conversation
-			if message.Content != "" {
-				api.saveAssistantMessageToConversation(ctx, conv, userID, message.Content, message.ReasoningContent)
+
+			// Check for [DONE] marker
+			if data, found := strings.CutPrefix(msg.Line, DataPrefix); found {
+				if data == DoneMarker {
+					streamingComplete = true
+					cancel()
+					break
+				}
 			}
-		case "length":
-			// Do nothing -> tracking via log
-			logger.GetLogger().Error("length finish reason: " + message.Content)
-		case "content_filter":
-			// Do nothing -> tracking via log
-			logger.GetLogger().Error("content filter finish reason: " + message.Content)
-		default:
-			// Handle unknown finish reasons
-			logger.GetLogger().Error("unknown finish reason: " + message.Content)
+
+		case <-clientGone:
+			// Proactive client disconnection
+			logger.GetLogger().Warnf("Client disconnected proactively")
+			cancel()
+			wg.Wait()
+			return common.NewError(context.Canceled, "client disconnected proactively")
+
+		case <-ctx.Done():
+			if ctx.Err() == context.DeadlineExceeded {
+				logger.GetLogger().Errorf("Streaming timeout: %v", ctx.Err())
+			}
+			wg.Wait()
+			return common.NewError(ctx.Err(), "d41f0b2c-3e5a-47c8-8f1a-9b2c6d7e4a1f")
+
+		case <-reqCtx.Request.Context().Done():
+			// Original request context cancellation (e.g., server shutdown)
+			logger.GetLogger().Warnf("Request context cancelled")
+			cancel()
+			wg.Wait()
+			return common.NewError(reqCtx.Request.Context().Err(), "request cancelled")
 		}
 	}
-}
 
-// saveFunctionCallToConversation saves a function call to the conversation
-func (api *CompletionAPI) saveFunctionCallToConversation(ctx context.Context, conv *conversation.Conversation, userID uint, functionCall *openai.FunctionCall, reasoningContent string) {
-	if conv == nil || functionCall == nil {
-		return
-	}
-
-	functionCallContent := []conversation.Content{
-		{
-			Type: "text",
-			Text: &conversation.Text{
-				Value: fmt.Sprintf("Function: %s\nArguments: %s", functionCall.Name, functionCall.Arguments),
-			},
-		},
-	}
-
-	// Add reasoning content if present
-	if reasoningContent != "" {
-		functionCallContent[0].ReasoningContent = &reasoningContent
-	}
-
-	// Add the function call to conversation as a separate item
-	assistantRole := conversation.ItemRoleAssistant
-	api.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeFunction, &assistantRole, functionCallContent)
-}
-
-// saveToolCallsToConversation saves tool calls to the conversation
-func (api *CompletionAPI) saveToolCallsToConversation(ctx context.Context, conv *conversation.Conversation, userID uint, toolCalls []openai.ToolCall, reasoningContent string) {
-	if conv == nil || len(toolCalls) == 0 {
-		return
-	}
-
-	// Save each tool call as a separate conversation item
-	for _, toolCall := range toolCalls {
-		toolCallContent := []conversation.Content{
-			{
-				Type: "text",
-				Text: &conversation.Text{
-					Value: fmt.Sprintf("Tool Call ID: %s\nType: %s\nFunction: %s\nArguments: %s",
-						toolCall.ID, toolCall.Type, toolCall.Function.Name, toolCall.Function.Arguments),
-				},
-			},
-		}
-
-		// Add reasoning content if present
-		if reasoningContent != "" {
-			toolCallContent[0].ReasoningContent = &reasoningContent
-		}
-
-		// Add the tool call to conversation as a separate item
-		assistantRole := conversation.ItemRoleAssistant
-		api.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeFunction, &assistantRole, toolCallContent)
-	}
-}
-
-// saveAssistantMessageToConversation saves assistant message to the conversation
-func (api *CompletionAPI) saveAssistantMessageToConversation(ctx context.Context, conv *conversation.Conversation, userID uint, content string, reasoningContent string) {
-	if conv == nil || content == "" {
-		return
-	}
-
-	// Create content structure
-	conversationContent := []conversation.Content{
-		{
-			Type: "text",
-			Text: &conversation.Text{
-				Value: content,
-			},
-		},
-	}
-
-	// Add reasoning content if present
-	if reasoningContent != "" {
-		conversationContent[0].ReasoningContent = &reasoningContent
-	}
-
-	// Add the assistant message to conversation
-	assistantRole := conversation.ItemRoleAssistant
-	api.conversationService.AddItem(ctx, conv, userID, conversation.ItemTypeMessage, &assistantRole, conversationContent)
-}
-
-// StoreLastInputMessageIfRequested conditionally stores the last input message (user or tool) based on the store flag
-func (api *CompletionAPI) StoreLastInputMessageIfRequested(ctx context.Context, request openai.ChatCompletionRequest, conv *conversation.Conversation, userID uint, askItemID string, completionItemID string, store bool, storeReasoning bool) *common.Error {
-	if !store {
-		return nil // Don't store if store flag is false
-	}
-
-	// Validate required parameters
-	if conv == nil {
-		return common.NewError(nil, "c1d2e3f4-g5h6-7890-abcd-ef1234567890")
-	}
-
-	// Store the latest input message (user or tool)
-	if len(request.Messages) == 0 {
-		return nil // No messages to store
-	}
-
-	latestMessage := request.Messages[len(request.Messages)-1]
-	role := conversation.ItemRole(latestMessage.Role)
-
-	content := []conversation.Content{
-		{
-			Type: "text",
-			Text: &conversation.Text{
-				Value: latestMessage.Content,
-			},
-		},
-	}
-
-	if _, err := api.conversationService.AddItemWithID(ctx, conv, userID, conversation.ItemTypeMessage, &role, content, askItemID); err != nil {
-		return err
-	}
+	// Wait for streaming goroutine to complete
+	wg.Wait()
 
 	return nil
 }
 
-// StoreAssistantResponseIfRequested conditionally stores the assistant response based on the store flag
-func (api *CompletionAPI) StoreAssistantResponseIfRequested(ctx context.Context, response *ExtendedCompletionResponse, conv *conversation.Conversation, userID uint, completionItemID string, store bool, storeReasoning bool) (*conversation.Item, *common.Error) {
-	if !store {
-		return nil, nil // Don't store if store flag is false
-	}
+// streamResponseToChannel streams the response from inference provider to a unified channel
+func (cApi *CompletionAPI) streamResponseToChannel(ctx context.Context, apiKey string, request openai.ChatCompletionRequest, msgChan chan<- StreamMessage, wg *sync.WaitGroup) {
+	defer wg.Done()
 
-	// Validate required parameters
-	if response == nil {
-		return nil, common.NewErrorWithMessage("Response is nil", "d2e3f4g5-h6i7-8901-bcde-f23456789012")
-	}
-	if conv == nil {
-		return nil, common.NewErrorWithMessage("Conversation is nil", "e3f4g5h6-i7j8-9012-cdef-345678901234")
-	}
-
-	if len(response.Choices) == 0 {
-		return nil, common.NewErrorWithMessage("No choices to store", "01995b18-1638-719d-8ee2-01375bb2a19c")
-	}
-
-	choice := response.Choices[0]
-	content := choice.Message.Content
-	reasoningContent := choice.Message.ReasoningContent
-	finishReason := string(choice.FinishReason)
-
-	// Don't store if no content available
-	if content == "" && reasoningContent == "" {
-		return nil, nil
-	}
-
-	// Create content array based on finish reason
-	contentArray, err := api.createContentArray(choice, finishReason, content)
+	// Get streaming reader from inference provider
+	reader, err := cApi.inferenceProvider.CreateCompletionStream(ctx, apiKey, request)
 	if err != nil {
-		return nil, err
+		select {
+		case msgChan <- StreamMessage{Err: err}:
+		default:
+			// Non-blocking send if channel full
+		}
+		return
+	}
+	defer func() {
+		if closeErr := reader.Close(); closeErr != nil {
+			logger.GetLogger().Errorf("Unable to close reader: %v", closeErr)
+		}
+	}()
+
+	scanner := bufio.NewScanner(reader)
+	// Increase scanner buffer size for better performance with large responses
+	scanner.Buffer(make([]byte, 0, ScannerInitialBuffer), ScannerMaxBuffer)
+
+	for scanner.Scan() {
+		select {
+		case <-ctx.Done():
+			// Context cancelled, send error and exit
+			select {
+			case msgChan <- StreamMessage{Err: ctx.Err()}:
+			default:
+			}
+			return
+		default:
+			line := scanner.Text()
+			select {
+			case msgChan <- StreamMessage{Line: line}:
+				// Successfully sent data
+			case <-ctx.Done():
+				// Context cancelled while trying to send
+				return
+			}
+		}
 	}
 
-	// Add reasoning content if requested
-	if storeReasoning && reasoningContent != "" {
-		contentArray[0].ReasoningContent = &reasoningContent
+	if err := scanner.Err(); err != nil {
+		select {
+		case msgChan <- StreamMessage{Err: err}:
+		default:
+		}
 	}
-
-	role := conversation.ItemRoleAssistant
-	createdItem, err := api.conversationService.AddItemWithID(ctx, conv, userID, conversation.ItemTypeMessage, &role, contentArray, completionItemID)
-	if err != nil {
-		return nil, err
-	}
-
-	return createdItem, nil
 }
 
-// createContentArray creates the content array based on finish reason and choice
-func (api *CompletionAPI) createContentArray(choice openai.ChatCompletionChoice, finishReason, content string) ([]conversation.Content, *common.Error) {
-	switch finishReason {
-	case "tool_calls":
-		if len(choice.Message.ToolCalls) > 0 {
-			toolCallsJSON, err := json.Marshal(choice.Message.ToolCalls)
-			if err != nil {
-				return nil, common.NewError(err, "f4g5h6i7-j8k9-0123-defg-456789012345")
-			}
-			return []conversation.Content{
-				{
-					Type:         "text",
-					FinishReason: &finishReason,
-					Text: &conversation.Text{
-						Value: string(toolCallsJSON),
-					},
-				},
-			}, nil
-		}
-	case "function_call":
-		if choice.Message.FunctionCall != nil {
-			functionCallJSON, err := json.Marshal(choice.Message.FunctionCall)
-			if err != nil {
-				return nil, common.NewError(err, "g5h6i7j8-k9l0-1234-efgh-567890123456")
-			}
-			return []conversation.Content{
-				{
-					Type:         "text",
-					FinishReason: &finishReason,
-					Text: &conversation.Text{
-						Value: string(functionCallJSON),
-					},
-				},
-			}, nil
-		}
-	}
+// setupSSEHeaders sets up the required headers for Server-Sent Events streaming
+func (cApi *CompletionAPI) setupSSEHeaders(reqCtx *gin.Context) {
+	reqCtx.Header("Content-Type", "text/event-stream")
+	reqCtx.Header("Cache-Control", "no-cache")
+	reqCtx.Header("Connection", "keep-alive")
+	reqCtx.Header("Access-Control-Allow-Origin", "*")
+	reqCtx.Header("Access-Control-Allow-Headers", "Cache-Control")
+	reqCtx.Header("Transfer-Encoding", "chunked") // Added for better SSE compliance
+	reqCtx.Writer.WriteHeaderNow()
+}
 
-	// Default case: store regular content (for "stop" and other finish reasons)
-	return []conversation.Content{
-		{
-			Type:         "text",
-			FinishReason: &finishReason,
-			Text: &conversation.Text{
-				Value: content,
-			},
-		},
-	}, nil
+// writeSSELine writes a line to the SSE stream
+func (cApi *CompletionAPI) writeSSELine(reqCtx *gin.Context, line string) error {
+	_, err := reqCtx.Writer.Write([]byte(line + NewlineChar))
+	if err != nil {
+		return err
+	}
+	reqCtx.Writer.Flush()
+	return nil
 }
