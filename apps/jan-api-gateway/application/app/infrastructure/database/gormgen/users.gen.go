@@ -36,6 +36,7 @@ func newUser(db *gorm.DB, opts ...gen.DOOption) user {
 	_user.Email = field.NewString(tableName, "email")
 	_user.PublicID = field.NewString(tableName, "public_id")
 	_user.Enabled = field.NewBool(tableName, "enabled")
+	_user.IsGuest = field.NewBool(tableName, "is_guest")
 	_user.Organizations = userHasManyOrganizations{
 		db: db.Session(&gorm.Session{}),
 
@@ -65,6 +66,7 @@ type user struct {
 	Email         field.String
 	PublicID      field.String
 	Enabled       field.Bool
+	IsGuest       field.Bool
 	Organizations userHasManyOrganizations
 
 	Projects userHasManyProjects
@@ -92,6 +94,7 @@ func (u *user) updateTableName(table string) *user {
 	u.Email = field.NewString(table, "email")
 	u.PublicID = field.NewString(table, "public_id")
 	u.Enabled = field.NewBool(table, "enabled")
+	u.IsGuest = field.NewBool(table, "is_guest")
 
 	u.fillFieldMap()
 
@@ -108,7 +111,7 @@ func (u *user) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (u *user) fillFieldMap() {
-	u.fieldMap = make(map[string]field.Expr, 10)
+	u.fieldMap = make(map[string]field.Expr, 11)
 	u.fieldMap["id"] = u.ID
 	u.fieldMap["created_at"] = u.CreatedAt
 	u.fieldMap["updated_at"] = u.UpdatedAt
@@ -117,6 +120,7 @@ func (u *user) fillFieldMap() {
 	u.fieldMap["email"] = u.Email
 	u.fieldMap["public_id"] = u.PublicID
 	u.fieldMap["enabled"] = u.Enabled
+	u.fieldMap["is_guest"] = u.IsGuest
 
 }
 

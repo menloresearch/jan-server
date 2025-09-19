@@ -31,6 +31,7 @@ func generateHcl(branchName string) {
 		log.Fatalf("failed to create schema: %v", err)
 		return
 	}
+	db.AutoMigrate(database.DatabaseMigration{})
 	for _, model := range database.SchemaRegistry {
 		err = db.AutoMigrate(model)
 		if err != nil {
