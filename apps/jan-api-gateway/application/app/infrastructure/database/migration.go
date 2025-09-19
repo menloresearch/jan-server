@@ -3,7 +3,11 @@ package database
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
 	"sort"
+	"strings"
 
 	"gorm.io/gorm"
 )
@@ -113,14 +117,33 @@ func (d *DBMigrator) Migrate() (err error) {
 	if err != nil {
 		return
 	}
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		return fmt.Errorf("da75e6a4-af0e-46a0-8cf8-569263651443")
+	}
+	migrationSqlFolder := filepath.Join(filepath.Dir(filename), "migrationsqls")
+
 	for _, migrationVersion := range migrations {
-		if currentVersion.Version > migrationVersion {
+		if currentVersion.Version >= migrationVersion {
 			continue
 		}
+		sqlFile := filepath.Join(migrationSqlFolder, fmt.Sprintf("%d.sql", migrationVersion))
+		content, err := os.ReadFile(sqlFile)
+		if err != nil {
+			return err
+		}
 
+		fileContentAsString := string(content)
+		sqlCommands := strings.Split(fileContentAsString, ";")
+		for _, command := range sqlCommands {
+			db.Exec(command)
+		}
 	}
-
-	// release the select for update
+	currentVersion.Version = migrations[len(migrations)-1]
+	if err := tx.Save(currentVersion).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
 	tx.Commit()
 	return nil
 }
