@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 
 	"gorm.io/gorm"
@@ -14,11 +13,11 @@ import (
 
 type DatabaseMigration struct {
 	gorm.Model
-	Version int64 `gorm:"not null;uniqueIndex"`
+	Version string `gorm:"not null;uniqueIndex"`
 }
 
 type SchemaVersion struct {
-	Migrations []int64 `json:"migrations"`
+	Migrations []string `json:"migrations"`
 }
 
 func NewSchemaVersion() SchemaVersion {
@@ -30,13 +29,11 @@ func NewSchemaVersion() SchemaVersion {
 		//   DbVersion: 2
 		// }
 		// ```
-		Migrations: []int64{
-			2,
-			1,
-			0,
+		Migrations: []string{
+			"000001",
+			"000002",
 		},
 	}
-	slices.Sort(sv.Migrations)
 	return sv
 }
 
@@ -80,7 +77,7 @@ func (d *DBMigrator) initialize() error {
 			return fmt.Errorf("failed to create 'database_migration' table: %w", err)
 		}
 
-		initialRecord := DatabaseMigration{Version: 0}
+		initialRecord := DatabaseMigration{Version: "000000"}
 		if err := db.Create(&initialRecord).Error; err != nil {
 			return fmt.Errorf("failed to insert initial migration record: %w", err)
 		}
@@ -136,7 +133,7 @@ func (d *DBMigrator) Migrate() (err error) {
 			continue
 		}
 		// get version sql file
-		sqlFile := filepath.Join(migrationSqlFolder, fmt.Sprintf("%d.sql", migrationVersion))
+		sqlFile := filepath.Join(migrationSqlFolder, fmt.Sprintf("%s.sql", migrationVersion))
 		content, err := os.ReadFile(sqlFile)
 		if err != nil {
 			return err
