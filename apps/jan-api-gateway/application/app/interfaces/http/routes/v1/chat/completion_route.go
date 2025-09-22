@@ -70,7 +70,7 @@ func (completionAPI *CompletionAPI) RegisterRouter(router *gin.RouterGroup) {
 // @Description - User authentication required
 // @Description - Direct inference model integration
 // @Description - No conversation persistence (stateless)
-// @Tags Chat
+// @Tags Chat Completions API
 // @Security BearerAuth
 // @Accept json
 // @Produce json

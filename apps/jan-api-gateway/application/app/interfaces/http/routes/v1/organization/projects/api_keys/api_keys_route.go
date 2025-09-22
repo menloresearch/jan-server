@@ -45,7 +45,7 @@ func (api *ProjectApiKeyRoute) RegisterRouter(router gin.IRouter) {
 
 // @Summary List new project API key
 // @Description List API keys for a specific project.
-// @Tags Organizations
+// @Tags Administration API
 // @Accept json
 // @Produce json
 // @Security BearerAuth
@@ -127,7 +127,7 @@ type CreateApiKeyRequest struct {
 
 // @Summary Create a new project API key
 // @Description Creates a new API key for a specific project.
-// @Tags Organizations
+// @Tags Administration API
 // @Accept json
 // @Produce json
 // @Security BearerAuth

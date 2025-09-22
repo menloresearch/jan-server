@@ -65,7 +65,7 @@ type GetMeResponse struct {
 
 // @Summary Get user profile
 // @Description Retrieves the profile of the authenticated user based on the provided JWT.
-// @Tags Authentication
+// @Tags Authentication API
 // @Security BearerAuth
 // @Produce json
 // @Success 200 {object} GetMeResponse "Successfully retrieved user profile"
@@ -83,7 +83,7 @@ func (authRoute *AuthRoute) GetMe(reqCtx *gin.Context) {
 
 // @Summary Refresh an access token
 // @Description Use a valid refresh token to obtain a new access token. The refresh token is typically sent in a cookie.
-// @Tags Authentication
+// @Tags Authentication API
 // @Accept json
 // @Produce json
 // @Success 200 {object} nil "Successfully logout"
@@ -106,7 +106,7 @@ func (authRoute *AuthRoute) Logout(reqCtx *gin.Context) {
 
 // @Summary Refresh an access token
 // @Description Use a valid refresh token to obtain a new access token. The refresh token is typically sent in a cookie.
-// @Tags Authentication
+// @Tags Authentication API
 // @Accept json
 // @Produce json
 // @Success 200 {object} AccessTokenResponse "Successfully refreshed the access token"
@@ -188,7 +188,7 @@ func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 
 // @Summary Guest Login
 // @Description JWT-base Guest Login.
-// @Tags Authentication
+// @Tags Authentication API
 // @Produce json
 // @Success 200 {object} AccessTokenResponse "Successfully refreshed the access token"
 // @Failure 400 {object} responses.ErrorResponse "Bad Request (e.g., invalid refresh token)"

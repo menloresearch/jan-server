@@ -1820,7 +1820,7 @@ paths:
             $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       summary: Google OAuth2 Callback
       tags:
-      - Authentication
+      - Authentication API
   /v1/auth/google/login:
     get:
       description: Redirects the user to the Google OAuth2 authorization page to initiate
@@ -1836,7 +1836,7 @@ paths:
             $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       summary: Google OAuth2 Login
       tags:
-      - Authentication
+      - Authentication API
   /v1/auth/guest-login:
     post:
       description: JWT-base Guest Login.
@@ -1857,7 +1857,7 @@ paths:
             $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       summary: Guest Login
       tags:
-      - Authentication
+      - Authentication API
   /v1/auth/logout:
     get:
       consumes:
@@ -1879,7 +1879,7 @@ paths:
             $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       summary: Refresh an access token
       tags:
-      - Authentication
+      - Authentication API
   /v1/auth/me:
     get:
       description: Retrieves the profile of the authenticated user based on the provided
@@ -1899,7 +1899,7 @@ paths:
       - BearerAuth: []
       summary: Get user profile
       tags:
-      - Authentication
+      - Authentication API
   /v1/auth/refresh-token:
     get:
       consumes:
@@ -1923,7 +1923,7 @@ paths:
             $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       summary: Refresh an access token
       tags:
-      - Authentication
+      - Authentication API
   /v1/chat/completions:
     post:
       consumes:
@@ -1977,7 +1977,7 @@ paths:
       - BearerAuth: []
       summary: Create a chat completion
       tags:
-      - Chat
+      - Chat Completions API
   /v1/conv/chat/completions:
     post:
       consumes:
@@ -2042,7 +2042,7 @@ paths:
       - BearerAuth: []
       summary: Create a conversation-aware chat completion
       tags:
-      - Chat Conversations
+      - Conversation-aware Chat API
   /v1/conv/mcp:
     post:
       consumes:
@@ -2067,7 +2067,7 @@ paths:
       - BearerAuth: []
       summary: MCP streamable endpoint for conversation-aware chat
       tags:
-      - Chat Conversations
+      - Conversation-aware Chat API
   /v1/conv/models:
     get:
       consumes:
@@ -2091,7 +2091,7 @@ paths:
       - BearerAuth: []
       summary: List available models for conversation-aware chat
       tags:
-      - Chat Conversations
+      - Conversation-aware Chat API
   /v1/conversations:
     get:
       description: Retrieves a paginated list of conversations for the authenticated
@@ -2132,7 +2132,7 @@ paths:
       - BearerAuth: []
       summary: List Conversations
       tags:
-      - Conversations
+      - Conversations API
     post:
       consumes:
       - application/json
@@ -2169,7 +2169,7 @@ paths:
       - BearerAuth: []
       summary: Create a conversation
       tags:
-      - Conversations
+      - Conversations API
   /v1/conversations/{conversation_id}:
     delete:
       description: Deletes a conversation and all its items permanently
@@ -2206,7 +2206,7 @@ paths:
       - BearerAuth: []
       summary: Delete a conversation
       tags:
-      - Conversations
+      - Conversations API
     get:
       description: Retrieves a conversation by its ID with full metadata and title
       parameters:
@@ -2242,7 +2242,7 @@ paths:
       - BearerAuth: []
       summary: Get a conversation
       tags:
-      - Conversations
+      - Conversations API
     patch:
       consumes:
       - application/json
@@ -2290,7 +2290,7 @@ paths:
       - BearerAuth: []
       summary: Update a conversation
       tags:
-      - Conversations
+      - Conversations API
   /v1/conversations/{conversation_id}/items:
     get:
       description: Lists all items in a conversation with OpenAI-compatible pagination
@@ -2343,7 +2343,7 @@ paths:
       - BearerAuth: []
       summary: List items in a conversation
       tags:
-      - Conversations
+      - Conversations API
     post:
       consumes:
       - application/json
@@ -2391,7 +2391,7 @@ paths:
       - BearerAuth: []
       summary: Create items in a conversation
       tags:
-      - Conversations
+      - Conversations API
   /v1/conversations/{conversation_id}/items/{item_id}:
     delete:
       description: Deletes a specific item from a conversation and returns the deleted
@@ -2438,7 +2438,7 @@ paths:
       - BearerAuth: []
       summary: Delete an item from a conversation
       tags:
-      - Conversations
+      - Conversations API
     get:
       description: Retrieves a specific item from a conversation with full content
         details
@@ -2480,7 +2480,7 @@ paths:
       - BearerAuth: []
       summary: Get an item from a conversation
       tags:
-      - Conversations
+      - Conversations API
   /v1/mcp:
     post:
       consumes:
@@ -2504,7 +2504,7 @@ paths:
       - BearerAuth: []
       summary: MCP streamable endpoint
       tags:
-      - Chat
+      - Chat Completions API
   /v1/models:
     get:
       consumes:
@@ -2522,7 +2522,7 @@ paths:
       - BearerAuth: []
       summary: List available models
       tags:
-      - Chat
+      - Chat Completions API
   /v1/organization/admin_api_keys:
     get:
       description: Retrieves a paginated list of all admin API keys for the authenticated
@@ -2555,7 +2555,7 @@ paths:
       - BearerAuth: []
       summary: List Admin API Keys
       tags:
-      - Organizations
+      - Administration API
     post:
       consumes:
       - application/json
@@ -2587,7 +2587,7 @@ paths:
       - BearerAuth: []
       summary: Create Admin API Key
       tags:
-      - Organizations
+      - Administration API
   /v1/organization/admin_api_keys/{id}:
     delete:
       description: Deletes an admin API key by its ID.
@@ -2615,7 +2615,7 @@ paths:
       - BearerAuth: []
       summary: Delete Admin API Key
       tags:
-      - Organizations
+      - Administration API
     get:
       description: Retrieves a specific admin API key by its ID.
       parameters:
@@ -2642,7 +2642,7 @@ paths:
       - BearerAuth: []
       summary: Get Admin API Key
       tags:
-      - Organizations
+      - Administration API
   /v1/organization/invites:
     get:
       description: Retrieves a paginated list of invites for the current organization.
@@ -2676,7 +2676,7 @@ paths:
       - BearerAuth: []
       summary: List Organization Invites
       tags:
-      - Organizations
+      - Administration API
     post:
       consumes:
       - application/json
@@ -2711,7 +2711,7 @@ paths:
       - BearerAuth: []
       summary: Create Invite
       tags:
-      - Organizations
+      - Administration API
   /v1/organization/invites/{invite_id}:
     delete:
       description: Deletes a specific invite by its ID. Only organization owners can
@@ -2743,7 +2743,7 @@ paths:
       - BearerAuth: []
       summary: Delete Invite
       tags:
-      - Organizations
+      - Administration API
     get:
       description: Retrieves a specific invite by its ID.
       parameters:
@@ -2769,7 +2769,7 @@ paths:
       - BearerAuth: []
       summary: Retrieve Invite
       tags:
-      - Organizations
+      - Administration API
   /v1/organization/projects:
     get:
       description: Retrieves a paginated list of all projects for the authenticated
@@ -2806,7 +2806,7 @@ paths:
       - BearerAuth: []
       summary: List Projects
       tags:
-      - Organizations
+      - Administration API
     post:
       consumes:
       - application/json
@@ -2841,7 +2841,7 @@ paths:
       - BearerAuth: []
       summary: Create Project
       tags:
-      - Organizations
+      - Administration API
   /v1/organization/projects/{project_id}:
     get:
       description: Retrieves a specific project by its ID.
@@ -2869,7 +2869,7 @@ paths:
       - BearerAuth: []
       summary: Get Project
       tags:
-      - Organizations
+      - Administration API
     post:
       consumes:
       - application/json
@@ -2909,7 +2909,7 @@ paths:
       - BearerAuth: []
       summary: Update Project
       tags:
-      - Organizations
+      - Administration API
   /v1/organization/projects/{project_id}/archive:
     post:
       description: Archives a specific project by its ID, making it inactive.
@@ -2936,7 +2936,7 @@ paths:
       - BearerAuth: []
       summary: Archive Project
       tags:
-      - Organizations
+      - Administration API
   /v1/organization/projects/{project_public_id}/api_keys:
     get:
       consumes:
@@ -2975,7 +2975,7 @@ paths:
       - BearerAuth: []
       summary: List new project API key
       tags:
-      - Organizations
+      - Administration API
     post:
       consumes:
       - application/json
@@ -3019,7 +3019,7 @@ paths:
       - BearerAuth: []
       summary: Create a new project API key
       tags:
-      - Organizations
+      - Administration API
   /v1/responses:
     post:
       consumes:
@@ -3132,8 +3132,7 @@ paths:
       - BearerAuth: []
       summary: Create a response
       tags:
-      - Jan
-      - Jan-Responses
+      - Responses API
   /v1/responses/{response_id}:
     delete:
       consumes:
@@ -3188,8 +3187,7 @@ paths:
       - BearerAuth: []
       summary: Delete a response
       tags:
-      - Jan
-      - Jan-Responses
+      - Responses API
     get:
       consumes:
       - application/json
@@ -3243,8 +3241,7 @@ paths:
       - BearerAuth: []
       summary: Get a response
       tags:
-      - Jan
-      - Jan-Responses
+      - Responses API
   /v1/responses/{response_id}/cancel:
     post:
       consumes:
@@ -3299,8 +3296,7 @@ paths:
       - BearerAuth: []
       summary: Cancel a response
       tags:
-      - Jan
-      - Jan-Responses
+      - Responses API
   /v1/responses/{response_id}/input_items:
     get:
       consumes:
@@ -3385,8 +3381,7 @@ paths:
       - BearerAuth: []
       summary: List input items
       tags:
-      - Jan
-      - Jan-Responses
+      - Responses API
   /v1/version:
     get:
       description: Returns the current build version of the API server.
@@ -3401,7 +3396,7 @@ paths:
             type: object
       summary: Get API build version
       tags:
-      - Jan Server
+      - Server API
 securityDefinitions:
   BearerAuth:
     description: Type "Bearer" followed by a space and JWT token.
