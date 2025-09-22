@@ -278,7 +278,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/conv/chat/completions": {
+        "/v1/conv/completions": {
             "post": {
                 "security": [
                     {
@@ -294,7 +294,7 @@ const docTemplate = `{
                     "text/event-stream"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Chat Conversations"
                 ],
                 "summary": "Create a conversation-aware chat completion",
                 "parameters": [
@@ -335,6 +335,77 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/conv/mcp": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Handles Model Context Protocol (MCP) requests over an HTTP stream for conversation-aware chat functionality. The response is sent as a continuous stream of data with conversation context.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "Chat Conversations"
+                ],
+                "summary": "MCP streamable endpoint for conversation-aware chat",
+                "parameters": [
+                    {
+                        "description": "MCP request payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {}
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Streamed response (SSE or chunked transfer)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/conv/models": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves a list of available models that can be used for conversation-aware chat completions. This endpoint provides the same model list as the standard /v1/models endpoint but is specifically designed for conversation-aware chat functionality.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Chat Conversations"
+                ],
+                "summary": "List available models for conversation-aware chat",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conv.ModelsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - missing or invalid authentication",
                         "schema": {
                             "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
                         }
@@ -951,7 +1022,7 @@ const docTemplate = `{
                     "text/event-stream"
                 ],
                 "tags": [
-                    "MCP"
+                    "Chat"
                 ],
                 "summary": "MCP streamable endpoint",
                 "parameters": [
@@ -988,7 +1059,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Models"
+                    "Chat"
                 ],
                 "summary": "List available models",
                 "responses": {
@@ -2451,6 +2522,37 @@ const docTemplate = `{
                 },
                 "usage": {
                     "$ref": "#/definitions/openai.Usage"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_conv.Model": {
+            "type": "object",
+            "properties": {
+                "created": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "object": {
+                    "type": "string"
+                },
+                "owned_by": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_conv.ModelsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app_interfaces_http_routes_v1_conv.Model"
+                    }
+                },
+                "object": {
+                    "type": "string"
                 }
             }
         },

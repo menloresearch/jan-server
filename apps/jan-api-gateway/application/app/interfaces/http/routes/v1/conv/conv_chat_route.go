@@ -25,10 +25,10 @@ func NewConvChatRoute(
 }
 
 // RegisterRouter registers the conversation-aware chat completion routes
-// This creates the /v1/conv/chat/completions endpoint with authentication middleware
+// This creates the /v1/conv/completions endpoint with authentication middleware
 func (convChatRoute *ConvChatRoute) RegisterRouter(router gin.IRouter) {
-	// Register /v1/conv/chat routes with authentication middleware
-	convChatRouter := router.Group("/conv/chat",
+	// Register /v1/conv routes with authentication middleware
+	convChatRouter := router.Group("/conv",
 		convChatRoute.authService.AppUserAuthMiddleware(),
 		convChatRoute.authService.RegisteredUserMiddleware(),
 	)
