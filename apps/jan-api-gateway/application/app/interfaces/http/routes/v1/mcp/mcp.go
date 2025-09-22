@@ -57,7 +57,7 @@ func NewMCPAPI(serperMCP *mcpimpl.SerperMCP, authService *auth.AuthService) *MCP
 // MCPStream
 // @Summary MCP streamable endpoint
 // @Description Handles Model Context Protocol (MCP) requests over an HTTP stream. The response is sent as a continuous stream of data.
-// @Tags MCP
+// @Tags Chat
 // @Security BearerAuth
 // @Accept json
 // @Produce text/event-stream

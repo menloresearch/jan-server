@@ -228,6 +228,26 @@ definitions:
       usage:
         $ref: '#/definitions/openai.Usage'
     type: object
+  app_interfaces_http_routes_v1_conv.Model:
+    properties:
+      created:
+        type: integer
+      id:
+        type: string
+      object:
+        type: string
+      owned_by:
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_conv.ModelsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_conv.Model'
+        type: array
+      object:
+        type: string
+    type: object
   app_interfaces_http_routes_v1_conv.ResponseMetadata:
     properties:
       ask_item_id:
@@ -2022,7 +2042,56 @@ paths:
       - BearerAuth: []
       summary: Create a conversation-aware chat completion
       tags:
-      - Conversations
+      - Chat Conversations
+  /v1/conv/mcp:
+    post:
+      consumes:
+      - application/json
+      description: Handles Model Context Protocol (MCP) requests over an HTTP stream
+        for conversation-aware chat functionality. The response is sent as a continuous
+        stream of data with conversation context.
+      parameters:
+      - description: MCP request payload
+        in: body
+        name: request
+        required: true
+        schema: {}
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: Streamed response (SSE or chunked transfer)
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: MCP streamable endpoint for conversation-aware chat
+      tags:
+      - Chat Conversations
+  /v1/conv/models:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a list of available models that can be used for conversation-aware
+        chat completions. This endpoint provides the same model list as the standard
+        /v1/models endpoint but is specifically designed for conversation-aware chat
+        functionality.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successful response
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_conv.ModelsResponse'
+        "401":
+          description: Unauthorized - missing or invalid authentication
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List available models for conversation-aware chat
+      tags:
+      - Chat Conversations
   /v1/conversations:
     get:
       description: Retrieves a paginated list of conversations for the authenticated
@@ -2435,7 +2504,7 @@ paths:
       - BearerAuth: []
       summary: MCP streamable endpoint
       tags:
-      - MCP
+      - Chat
   /v1/models:
     get:
       consumes:
@@ -2453,7 +2522,7 @@ paths:
       - BearerAuth: []
       summary: List available models
       tags:
-      - Models
+      - Chat
   /v1/organization/admin_api_keys:
     get:
       description: Retrieves a paginated list of all admin API keys for the authenticated
