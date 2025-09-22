@@ -54,8 +54,21 @@ const (
 	UserContextKeyID     UserContextKey = "UserContextKeyID"
 )
 
+func (s *AuthService) CreateDefaultOrganization(ctx context.Context) error {
+	admin, err := s.userService.FindByEmail(ctx, "admin@jan.ai")
+	if err != nil {
+		return err
+	}
+	if admin == nil {
+		s.RegisterUser(ctx, &user.User{})
+	}
+}
+
 func (s *AuthService) RegisterUser(ctx context.Context, user *user.User) (*user.User, error) {
-	s.userService.RegisterUser(ctx, user)
+	_, err := s.userService.RegisterUser(ctx, user)
+	if err != nil {
+		return nil, err
+	}
 	orgEntity, err := s.organizationService.CreateOrganizationWithPublicID(ctx, &organization.Organization{
 		Name:    "Default",
 		Enabled: true,

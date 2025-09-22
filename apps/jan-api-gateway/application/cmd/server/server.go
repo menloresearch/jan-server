@@ -63,7 +63,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	
+	dataInitializer, err := CreateDataInitializer()
+	if err != nil {
+		panic(err)
+	}
+	err = dataInitializer.Install()
+	if err != nil {
+		logger.GetLogger().Errorf("pprof server failed: %v", err)
+	}
 	err = database.Migration()
 	if err != nil {
 		panic(err)
