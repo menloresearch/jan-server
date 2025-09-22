@@ -3,12 +3,9 @@ package database
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
 
 	"gorm.io/gorm"
+	"menlo.ai/jan-api-gateway/app/utils/logger"
 )
 
 type DatabaseMigration struct {
@@ -112,47 +109,63 @@ func (d *DBMigrator) Migrate() (err error) {
 	if err = d.initialize(); err != nil {
 		return err
 	}
-	migrations := NewSchemaVersion().Migrations
-	ctx := context.Background()
-	db := d.db
-	tx := db.WithContext(ctx).Begin()
-	// select for update
-	currentVersion, err := d.lockVersion(ctx, tx)
-	if err != nil {
-		return
-	}
-	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		return fmt.Errorf("da75e6a4-af0e-46a0-8cf8-569263651443")
-	}
-	migrationSqlFolder := filepath.Join(filepath.Dir(filename), "migrationsqls")
-
-	updated := false
-	for _, migrationVersion := range migrations {
-		if currentVersion.Version >= migrationVersion {
-			continue
-		}
-		// get version sql file
-		sqlFile := filepath.Join(migrationSqlFolder, fmt.Sprintf("%s.sql", migrationVersion))
-		content, err := os.ReadFile(sqlFile)
+	for _, model := range SchemaRegistry {
+		err = d.db.AutoMigrate(model)
 		if err != nil {
-			return err
-		}
-
-		fileContentAsString := string(content)
-		sqlCommands := strings.Split(fileContentAsString, ";")
-		for _, command := range sqlCommands {
-			db.Exec(command)
-		}
-		updated = true
-	}
-	if updated {
-		currentVersion.Version = migrations[len(migrations)-1]
-		if err := tx.Save(currentVersion).Error; err != nil {
-			tx.Rollback()
+			logger.GetLogger().
+				WithField("error_code", "75333e43-8157-4f0a-8e34-aa34e6e7c285").
+				Fatalf("failed to auto migrate schema: %T, error: %v", model, err)
 			return err
 		}
 	}
-	tx.Commit()
 	return nil
 }
+
+// func (d *DBMigrator) Migrate() (err error) {
+// 	if err = d.initialize(); err != nil {
+// 		return err
+// 	}
+// 	migrations := NewSchemaVersion().Migrations
+// 	ctx := context.Background()
+// 	db := d.db
+// 	tx := db.WithContext(ctx).Begin()
+// 	// select for update
+// 	currentVersion, err := d.lockVersion(ctx, tx)
+// 	if err != nil {
+// 		return
+// 	}
+// 	_, filename, _, ok := runtime.Caller(0)
+// 	if !ok {
+// 		return fmt.Errorf("da75e6a4-af0e-46a0-8cf8-569263651443")
+// 	}
+// 	migrationSqlFolder := filepath.Join(filepath.Dir(filename), "migrationsqls")
+
+// 	updated := false
+// 	for _, migrationVersion := range migrations {
+// 		if currentVersion.Version >= migrationVersion {
+// 			continue
+// 		}
+// 		// get version sql file
+// 		sqlFile := filepath.Join(migrationSqlFolder, fmt.Sprintf("%s.sql", migrationVersion))
+// 		content, err := os.ReadFile(sqlFile)
+// 		if err != nil {
+// 			return err
+// 		}
+
+// 		fileContentAsString := string(content)
+// 		sqlCommands := strings.Split(fileContentAsString, ";")
+// 		for _, command := range sqlCommands {
+// 			db.Exec(command)
+// 		}
+// 		updated = true
+// 	}
+// 	if updated {
+// 		currentVersion.Version = migrations[len(migrations)-1]
+// 		if err := tx.Save(currentVersion).Error; err != nil {
+// 			tx.Rollback()
+// 			return err
+// 		}
+// 	}
+// 	tx.Commit()
+// 	return nil
+// }
