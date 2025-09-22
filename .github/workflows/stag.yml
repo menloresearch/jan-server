@@ -5,7 +5,7 @@ on:
       - stag
     paths:
       - "apps/jan-api-gateway/**"
-      - .github/workflows/stag.yaml
+      - .github/workflows/stag.yml
       - .github/workflows/template-docker.yml
 
 jobs:
