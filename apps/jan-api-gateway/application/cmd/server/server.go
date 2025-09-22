@@ -63,6 +63,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	
 	err = database.Migration()
 	if err != nil {
 		panic(err)

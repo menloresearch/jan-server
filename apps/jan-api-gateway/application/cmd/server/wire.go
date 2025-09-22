@@ -28,6 +28,16 @@ func CreateApplication() (*Application, error) {
 	return nil, nil
 }
 
+func CreateDataInitializer() (*DataInitializer, error) {
+	wire.Build(
+		database.DB,
+		repository.RepositoryProvider,
+		domain.ServiceProvider,
+		wire.Struct(new(DataInitializer), "*"),
+	)
+	return nil, nil
+}
+
 func provideContext() context.Context {
 	return context.Background()
 }
