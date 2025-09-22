@@ -1978,7 +1978,7 @@ paths:
       summary: Create a chat completion
       tags:
       - Chat
-  /v1/conv/completions:
+  /v1/conv/chat/completions:
     post:
       consumes:
       - application/json

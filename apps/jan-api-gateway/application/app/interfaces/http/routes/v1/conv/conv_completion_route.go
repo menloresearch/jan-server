@@ -63,7 +63,11 @@ func NewConvCompletionAPI(completionNonStreamHandler *CompletionNonStreamHandler
 // @Success 200 {string} string "Streamed response (SSE or chunked transfer)"
 // @Router /v1/conv/mcp [post]
 func (completionAPI *ConvCompletionAPI) RegisterRouter(router *gin.RouterGroup) {
-	router.POST("/completions", completionAPI.PostCompletion)
+	// Register chat completions under /chat subroute
+	chatRouter := router.Group("/chat")
+	chatRouter.POST("/completions", completionAPI.PostCompletion)
+
+	// Register other endpoints at root level
 	router.GET("/models", completionAPI.GetModels)
 
 	// Register MCP endpoint
@@ -197,7 +201,7 @@ type ModelsResponse struct {
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - missing or invalid authentication"
 // @Failure 404 {object} responses.ErrorResponse "Conversation not found or user not found"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
-// @Router /v1/conv/completions [post]
+// @Router /v1/conv/chat/completions [post]
 func (api *ConvCompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	var request ExtendedChatCompletionRequest
 	if err := reqCtx.ShouldBindJSON(&request); err != nil {

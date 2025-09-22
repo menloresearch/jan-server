@@ -278,7 +278,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/conv/completions": {
+        "/v1/conv/chat/completions": {
             "post": {
                 "security": [
                     {
