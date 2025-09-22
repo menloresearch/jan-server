@@ -125,7 +125,7 @@ func (responseRoute *ResponseRoute) registerRoutes(router *gin.RouterGroup) {
 // @Description - `processing`: Response is being generated
 // @Description - `failed`: Response generation failed
 // @Description - `cancelled`: Response was cancelled
-// @Tags Jan, Jan-Responses
+// @Tags Responses API
 // @Security BearerAuth
 // @Accept json
 // @Produce json
@@ -241,7 +241,7 @@ func (responseRoute *ResponseRoute) handleResponseCreation(reqCtx *gin.Context, 
 // @Description - `status`: Response status
 // @Description - `input`: Input data
 // @Description - `output`: Generated output
-// @Tags Jan, Jan-Responses
+// @Tags Responses API
 // @Security BearerAuth
 // @Accept json
 // @Produce json
@@ -277,7 +277,7 @@ func (responseRoute *ResponseRoute) GetResponse(reqCtx *gin.Context) {
 // @Description - `status`: Response status (will be "cancelled")
 // @Description - `input`: Input data
 // @Description - `cancelled_at`: Cancellation timestamp
-// @Tags Jan, Jan-Responses
+// @Tags Responses API
 // @Security BearerAuth
 // @Accept json
 // @Produce json
@@ -326,7 +326,7 @@ func (responseRoute *ResponseRoute) DeleteResponse(reqCtx *gin.Context) {
 // @Description - `status`: Response status (will be "cancelled")
 // @Description - `input`: Input data
 // @Description - `cancelled_at`: Cancellation timestamp
-// @Tags Jan, Jan-Responses
+// @Tags Responses API
 // @Security BearerAuth
 // @Accept json
 // @Produce json
@@ -405,7 +405,7 @@ func (responseRoute *ResponseRoute) CancelResponse(reqCtx *gin.Context) {
 // @Description   "text": "Hello, world!"
 // @Description }
 // @Description ```
-// @Tags Jan, Jan-Responses
+// @Tags Responses API
 // @Security BearerAuth
 // @Accept json
 // @Produce json

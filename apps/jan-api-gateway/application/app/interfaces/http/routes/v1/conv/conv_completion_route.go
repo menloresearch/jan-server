@@ -55,7 +55,7 @@ func NewConvCompletionAPI(completionNonStreamHandler *CompletionNonStreamHandler
 // ConvMCP
 // @Summary MCP streamable endpoint for conversation-aware chat
 // @Description Handles Model Context Protocol (MCP) requests over an HTTP stream for conversation-aware chat functionality. The response is sent as a continuous stream of data with conversation context.
-// @Tags Chat Conversations
+// @Tags Conversation-aware Chat API
 // @Security BearerAuth
 // @Accept json
 // @Produce text/event-stream
@@ -189,7 +189,7 @@ type ModelsResponse struct {
 // @Description - Extended request format with conversation and storage options
 // @Description - User authentication required
 // @Description - Automatic conversation creation and management
-// @Tags Chat Conversations
+// @Tags Conversation-aware Chat API
 // @Security BearerAuth
 // @Accept json
 // @Produce json
@@ -272,7 +272,7 @@ func (api *ConvCompletionAPI) PostCompletion(reqCtx *gin.Context) {
 // GetModels
 // @Summary List available models for conversation-aware chat
 // @Description Retrieves a list of available models that can be used for conversation-aware chat completions. This endpoint provides the same model list as the standard /v1/models endpoint but is specifically designed for conversation-aware chat functionality.
-// @Tags Chat Conversations
+// @Tags Conversation-aware Chat API
 // @Security BearerAuth
 // @Accept json
 // @Produce json

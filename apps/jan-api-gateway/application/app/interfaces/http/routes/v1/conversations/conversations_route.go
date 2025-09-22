@@ -168,7 +168,7 @@ func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 
 // @Summary List Conversations
 // @Description Retrieves a paginated list of conversations for the authenticated user with OpenAI-compatible response format.
-// @Tags Conversations
+// @Tags Conversations API
 // @Security BearerAuth
 // @Param limit query int false "The maximum number of items to return" default(20)
 // @Param after query string false "A cursor for use in pagination. The ID of the last object from the previous page"
@@ -262,7 +262,7 @@ func (api *ConversationAPI) ListConversationsHandler(reqCtx *gin.Context) {
 
 // @Summary Create a conversation
 // @Description Creates a new conversation for the authenticated user with optional items
-// @Tags Conversations
+// @Tags Conversations API
 // @Security BearerAuth
 // @Accept json
 // @Produce json
@@ -345,7 +345,7 @@ func (api *ConversationAPI) CreateConversationHandler(reqCtx *gin.Context) {
 
 // @Summary Get a conversation
 // @Description Retrieves a conversation by its ID with full metadata and title
-// @Tags Conversations
+// @Tags Conversations API
 // @Security BearerAuth
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
@@ -366,7 +366,7 @@ func (api *ConversationAPI) GetConversationHandler(reqCtx *gin.Context) {
 
 // @Summary Update a conversation
 // @Description Updates conversation title and/or metadata
-// @Tags Conversations
+// @Tags Conversations API
 // @Security BearerAuth
 // @Accept json
 // @Produce json
@@ -417,7 +417,7 @@ func (api *ConversationAPI) UpdateConversationHandler(reqCtx *gin.Context) {
 
 // @Summary Delete a conversation
 // @Description Deletes a conversation and all its items permanently
-// @Tags Conversations
+// @Tags Conversations API
 // @Security BearerAuth
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
@@ -452,7 +452,7 @@ func (api *ConversationAPI) DeleteConversationHandler(reqCtx *gin.Context) {
 
 // @Summary Create items in a conversation
 // @Description Adds multiple items to a conversation with OpenAI-compatible format
-// @Tags Conversations
+// @Tags Conversations API
 // @Security BearerAuth
 // @Accept json
 // @Produce json
@@ -530,7 +530,7 @@ func (api *ConversationAPI) CreateItemsHandler(reqCtx *gin.Context) {
 
 // @Summary List items in a conversation
 // @Description Lists all items in a conversation with OpenAI-compatible pagination
-// @Tags Conversations
+// @Tags Conversations API
 // @Security BearerAuth
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
@@ -618,7 +618,7 @@ func (api *ConversationAPI) ListItemsHandler(reqCtx *gin.Context) {
 
 // @Summary Get an item from a conversation
 // @Description Retrieves a specific item from a conversation with full content details
-// @Tags Conversations
+// @Tags Conversations API
 // @Security BearerAuth
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
@@ -641,7 +641,7 @@ func (api *ConversationAPI) GetItemHandler(reqCtx *gin.Context) {
 
 // @Summary Delete an item from a conversation
 // @Description Deletes a specific item from a conversation and returns the deleted item details
-// @Tags Conversations
+// @Tags Conversations API
 // @Security BearerAuth
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
