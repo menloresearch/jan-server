@@ -1,17 +1,21 @@
 # LLM Load Tests with k6
 
-This directory contains k6 scripts to load test the Jan Server's LLM-style chat completions API, including both streaming and non-streaming scenarios. The tests compare different prompt types ("short" vs "chain-of-thought") and record key latency metrics including TTFB (Time to First Byte), total duration, optional queue time, and tokens per second.
+This directory contains k6 scripts to load test the Jan Server's LLM-style chat completions API, including both streaming and non-streaming scenarios. The tests use **guest authentication** (no API keys required) and cover comprehensive conversation flows with conversation management, message persistence, and response validation.
 
 ## What this test covers
 
-- **Smoke tests**: `GET /v1/version`, `GET /v1/models`
-- **Chat – non-stream**: Returns full JSON response after complete generation  
-- **Chat – stream**: Server-Sent Events / chunked response for real-time streaming
-- **Prompt variants**:
-  - `short`: Concise instruction (no elaborate reasoning)
-  - `cot`: Chain-of-thought style instruction (asks for step-by-step reasoning)
+- **Authentication**: Guest login with automatic token refresh
+- **Standard Completions**: Non-streaming and streaming chat completions
+- **Conversation Management**: Create, retrieve, and list conversations
+- **Message Persistence**: Store and retrieve conversation items
+- **Response API**: Non-streaming and streaming responses with/without tools
+- **Comprehensive Flow Testing**: End-to-end conversation lifecycle validation
 
-Metrics are tagged by scenario (`chat_nonstream` / `chat_stream`) and prompt type (`short` / `cot`), with TTFB thresholds applied only to successful responses (status=200).
+### Test Categories
+
+1. **`test-completion-standard.js`**: Basic completion flows (guest login, models, completions)
+2. **`test-completion-conversation.js`**: Conversation management with both non-streaming and streaming messages
+3. **`test-responses.js`**: Response API testing with tools and streaming support
 
 ## Prerequisites
 
@@ -41,67 +45,88 @@ Download from [k6.io/docs/get-started/installation](https://k6.io/docs/get-start
 
 ## Files
 
-- **`chat-completion.js`** — The main k6 script that defines:
-  - Scenarios for smoke tests, non-stream, and stream
-  - Prompt variants (short & chain-of-thought)  
-  - Custom metrics and performance thresholds
+- **`test-completion-standard.js`** — Basic completion flows:
+  - Guest authentication with token refresh
+  - Model listing and validation
+  - Non-streaming and streaming completions
+  - Comprehensive error handling and metrics
+
+- **`test-completion-conversation.js`** — Conversation management flows:
+  - Conversation creation and retrieval
+  - Non-streaming and streaming message exchange
+  - Conversation listing and item persistence
+  - End-to-end conversation lifecycle testing
+
+- **`test-responses.js`** — Response API testing:
+  - Non-streaming and streaming responses
+  - Tool integration testing
+  - Response validation and completion detection
 
 ## Quick start (local)
 
-### Method 1: Using the bash script (Recommended)
+### Method 1: Using the batch script (Windows)
 
-1. **Configure environment (optional)**:
+1. **Run individual tests**:
 
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
+   ```batch
+   # Test standard completions
+   k6 run src\test-completion-standard.js
+   
+   # Test conversation flows
+   k6 run src\test-completion-conversation.js
+   
+   # Test response API
+   k6 run src\test-responses.js
    ```
 
-2. **Run all test cases**:
+2. **Run with custom configuration**:
 
-   ```bash
-   ./run-loadtest.sh
-   ```
-
-3. **Run a specific test case**:
-
-   ```bash
-   ./run-loadtest.sh chat-completion
-   ```
-
-4. **View available test cases**:
-
-   ```bash
-   ./run-loadtest.sh --list
+   ```batch
+   # Set environment variables
+   set BASE=https://api-dev.jan.ai
+   set MODEL=jan-v1-4b
+   set DEBUG=true
+   
+   # Run test
+   k6 run src\test-completion-conversation.js
    ```
 
 ### Method 2: Direct k6 execution
 
-From the `tests/loadtests` directory:
+From the `tests/` directory:
 
 ```bash
-BASE=https://api.jan.ai \
+# Basic completion test
+BASE=https://api-dev.jan.ai \
 MODEL=jan-v1-4b \
-NONSTREAM_RPS=3 \
-STREAM_RPS=1 \
-DURATION_MIN=1 \
-k6 run chat-completion.js
+DEBUG=true \
+k6 run src/test-completion-standard.js
+
+# Conversation test with both streaming and non-streaming
+BASE=https://api-dev.jan.ai \
+MODEL=jan-v1-4b \
+DEBUG=true \
+k6 run src/test-completion-conversation.js
+
+# Response API test
+BASE=https://api-dev.jan.ai \
+MODEL=jan-v1-4b \
+DEBUG=true \
+k6 run src/test-responses.js
 ```
 
-### With authentication and Cloudflare bypass
+### Method 3: Using the test runner script (Recommended for CI/CD)
 
 ```bash
-API_KEY="your_api_key" \
-LOADTEST_TOKEN="your_secret_bypass_token" \
-BASE=https://api.jan.ai \
-MODEL=jan-v1-4b \
-NONSTREAM_RPS=3 \
-STREAM_RPS=1 \
-DURATION_MIN=1 \
-k6 run chat-completion.js
-```
+# Run all tests
+./run-loadtest.sh
 
-The script will attach `Authorization: Bearer <API_KEY>` and `X-LoadTest-Token: <LOADTEST_TOKEN>` headers if provided.
+# Run specific test
+./run-loadtest.sh test-completion-conversation
+
+# List available tests
+./run-loadtest.sh --list
+```
 
 ## Run via Docker
 
@@ -117,15 +142,14 @@ docker build -t janai/k6-tests:local ./tests
 
 Run with your local tests mounted (so changes are picked up and results persist):
 
+**Using run-loadtest.sh script (Recommended):**
 ```bash
 docker run --rm -it \
-   -e BASE=https://api.jan.ai \
+   -e BASE=https://api-stag.jan.ai \
    -e MODEL=jan-v1-4b \
    -e NONSTREAM_RPS=3 \
    -e STREAM_RPS=1 \
-   -e DURATION_MIN=1 \
-   -e API_KEY=your_api_key \
-   -e LOADTEST_TOKEN=your_secret_bypass_token \
+   -e DURATION_MIN=2 \
    -e K6_PROMETHEUS_RW_SERVER_URL="$K6_PROMETHEUS_RW_SERVER_URL" \
    -e K6_PROMETHEUS_RW_USERNAME="$K6_PROMETHEUS_RW_USERNAME" \
    -e K6_PROMETHEUS_RW_PASSWORD="$K6_PROMETHEUS_RW_PASSWORD" \
@@ -135,52 +159,74 @@ docker run --rm -it \
    janai/k6-tests:local run-all
 ```
 
-Run a specific test case (e.g., `chat-completion`):
+Run a specific test case:
 
 ```bash
 docker run --rm -it \
-   -e BASE=https://api.jan.ai \
+   -e BASE=https://api-dev.jan.ai \
    -e MODEL=jan-v1-4b \
-   -e NONSTREAM_RPS=3 \
-   -e STREAM_RPS=1 \
-   -e DURATION_MIN=1 \
-   -e API_KEY=your_api_key \
-   -e LOADTEST_TOKEN=your_secret_bypass_token \
+   -e DEBUG=true \
    -v "$PWD/tests":/tests \
-   janai/k6-tests:local run chat-completion
+   janai/k6-tests:local run test-completion-conversation
 ```
 
 Notes:
 
-- If you don’t mount `/tests`, the container runs with a baked-in copy at `/app` (copied at build time).
-- If a `.env` file exists inside the mounted `/tests`, it’s automatically loaded.
+- If you don't mount `/tests`, the container runs with a baked-in copy at `/app` (copied at build time).
+- If a `.env` file exists inside the mounted `/tests`, it's automatically loaded.
 
 ### Option B: Use upstream `grafana/k6` image
 
 ```bash
 docker run --rm -it \
-   -e BASE=https://api.jan.ai \
+   -e BASE=https://api-stag.jan.ai \
    -e MODEL=jan-v1-4b \
-   -e NONSTREAM_RPS=3 \
-   -e STREAM_RPS=1 \
-   -e DURATION_MIN=1 \
-   -e API_KEY=your_api_key \
-   -e LOADTEST_TOKEN=your_secret_bypass_token \
+   -e DEBUG=true \
    -v "$PWD/tests":/work -w /work \
-   grafana/k6 run src/chat-completion.js
+   grafana/k6 run src/test-completion-conversation.js
 ```
 
 ## Environment variables (knobs)
 
+### Core Configuration
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `BASE` | `https://api-dev.jan.ai` | Base URL for your Jan Server API |
+| `BASE` | `https://api-stag.jan.ai` | Base URL for your Jan Server API |
 | `MODEL` | `jan-v1-4b` | Model name passed to the API |
-| `NONSTREAM_RPS` | `2` | Target arrival rate (req/s) for non-stream scenarios |
-| `STREAM_RPS` | `1` | Target arrival rate (req/s) for stream scenarios (set 0 to disable) |
+| `DEBUG` | `false` | Enable detailed request/response logging |
+| `SINGLE_RUN` | `false` | Run tests in single iteration mode (for validation) |
+
+### Load Testing Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NONSTREAM_RPS` | `2` | Target arrival rate (req/s) for non-streaming scenarios |
+| `STREAM_RPS` | `1` | Target arrival rate (req/s) for streaming scenarios (set 0 to disable) |
 | `DURATION_MIN` | `5` | Test duration (minutes) for each scenario stage (ramped) |
-| `API_KEY` | (empty) | Bearer token; adds `Authorization: Bearer ...` |
-| `LOADTEST_TOKEN` | (empty) | Adds `X-LoadTest-Token` header (e.g., to bypass WAF rules) |
+
+### Authentication
+
+**No API keys required!** All tests use **guest authentication**:
+
+- Tests automatically perform guest login (`POST /v1/auth/guest-login`)
+- Access tokens are refreshed before each request to prevent timeouts
+- Refresh tokens are extracted from `Set-Cookie` headers
+- No manual token management needed
+
+## Testing Modes
+
+### Functional Testing (`SINGLE_RUN=true`)
+- **Purpose**: Validate API functionality and flow correctness
+- **Behavior**: Runs each test step once
+- **Use case**: Development, debugging, CI/CD validation
+- **Performance**: Fast execution, detailed logging
+
+### Load Testing (`SINGLE_RUN=false` or omitted)
+- **Purpose**: Test API performance under load
+- **Behavior**: Runs multiple iterations with specified RPS
+- **Use case**: Performance testing, capacity planning, SLA validation
+- **Performance**: Sustained load over specified duration
 
 ### Prometheus Remote Write Configuration (Optional)
 
@@ -196,120 +242,182 @@ docker run --rm -it \
 
 Docker tip: pass these environment variables with `-e` flags as shown above. Make sure the endpoint is reachable from the container network.
 
-## Disable scenarios
+## Test Flow Details
 
-- **Disable stream scenarios**: Set `STREAM_RPS=0`
-- **Disable non-stream scenarios**: Set `NONSTREAM_RPS=0`
-- **Test only specific prompt types**: Comment out unwanted scenario blocks in the script
+### Standard Completion Test (`test-completion-standard.js`)
+1. **Guest Login**: Authenticate and get access token
+2. **Token Refresh**: Refresh access token to prevent timeouts
+3. **List Models**: Validate available models
+4. **Non-Streaming Completion**: Test standard chat completion
+5. **Streaming Completion**: Test streaming with `data: [DONE]` detection
+
+### Conversation Test (`test-completion-conversation.js`)
+1. **Guest Login**: Authenticate and get access token
+2. **Token Refresh**: Refresh access token
+3. **Create Conversation**: Create new conversation
+4. **Non-Streaming Message**: Add first message (non-streaming)
+5. **Streaming Message**: Add second message (streaming)
+6. **Get Conversation**: Retrieve conversation details
+7. **List Conversations**: Get all conversations
+8. **Get Conversation Items**: Retrieve stored messages
+
+### Response API Test (`test-responses.js`)
+1. **Guest Login**: Authenticate and get access token
+2. **Token Refresh**: Refresh access token
+3. **Non-Streaming Response**: Test without tools
+4. **Non-Streaming Response with Tools**: Test with tool integration
+5. **Streaming Response**: Test streaming without tools
+6. **Streaming Response with Tools**: Test streaming with tools
 
 ## What you'll see in the output
 
-### Thresholds
+### Test Results Summary
 
-- `http_req_failed` — Global error rate (must be < 2% by default)
-- `llm_ttfb_ms{scenario:chat_stream,status:200,prompt:short} p(95)<1000` — Stream TTFB SLA for short prompts
-- `llm_ttfb_ms{scenario:chat_stream,status:200,prompt:cot} p(95)<3000` — Stream TTFB SLA for chain-of-thought prompts
+Each test provides comprehensive output including:
 
-**Note**: TTFB metrics are filtered to `status=200` to avoid "passing" on error responses.
+- **Step-by-step progress**: Clear indication of each test step
+- **Success/failure indicators**: ✅ for success, ❌ for failures
+- **Debug information**: Detailed request/response data when `DEBUG=true`
+- **Performance metrics**: Response times, token counts, completion rates
+- **Conversation details**: IDs, titles, message counts, and content previews
 
-### Custom metrics (highlights)
+### Key Metrics
 
-- **`llm_ttfb_ms`** — Time-to-first-byte (aka time to first token for streaming)
-- **`llm_receiving_ms`** — Time spent receiving data after TTFB (longer for streams with longer outputs)
-- **`llm_total_ms`** — Total end-to-end duration per request
-- **`llm_queue_ms`** — Parsed from `X-Queue-Time` header (if your backend sets it). Absent header = metric not recorded
-- **`llm_tokens_per_sec`** — Completion tokens per second (if the response includes `usage.completion_tokens`)
+- **Authentication time**: Guest login and token refresh duration
+- **Completion time**: Non-streaming and streaming response times
+- **Conversation metrics**: Creation, retrieval, and listing performance
+- **Error rates**: Failed requests and validation failures
+- **Streaming metrics**: Chunk counts and completion detection
 
-### Built-in metrics
+### Debug Mode
 
-- **`http_req_duration{scenario:chat_nonstream}`** — Total time for non-stream responses (returns full JSON)
-- **`http_req_duration{scenario:chat_stream}`** — Total time for stream to finish (first token + full stream duration)
-- **`http_req_failed`** — Failure rate
-- **Counts**: `http_reqs`, `iterations`, `VUs`, etc.
+When `DEBUG=true`, you'll see:
+- Full HTTP request details (method, URL, headers, body)
+- Complete HTTP response details (status, headers, body)
+- Parsed JSON data and extracted values
+- Token refresh operations and cookie management
 
 ## Interpreting results
 
-### User-perceived responsiveness (stream)
+### Test Success Indicators
 
-Look at `llm_ttfb_ms{scenario:chat_stream,status:200,prompt:*}`.
+- **All steps completed**: Each test step shows ✅ success
+- **Low error rates**: `http_req_failed` should be 0% or very low
+- **Fast response times**: Completion times under thresholds
+- **Proper streaming**: `data: [DONE]` signals received
+- **Data persistence**: Conversation items stored and retrieved correctly
 
-- `p95 < 1s` (short) and `p95 < 3s` (COT) are good starting SLAs.
+### Performance Expectations
 
-### Full answer latency (non-stream)
+- **Guest login**: Should complete in < 500ms
+- **Token refresh**: Should complete in < 200ms  
+- **Non-streaming completions**: 1-5 seconds depending on model and prompt length
+- **Streaming completions**: First token in < 1 second, full completion varies
+- **Conversation operations**: < 300ms for CRUD operations
 
-Look at `http_req_duration{scenario:chat_nonstream}` p95.
+### Debugging Failed Tests
 
-- Expect higher values, because server returns only after the answer is fully generated.
-
-### Throughput
-
-`llm_tokens_per_sec` reflects generation speed (if usage is provided). Compare short vs COT prompts to quantify computational cost.
-
-### Queue time
-
-If your backend sets `X-Queue-Time`, use `llm_queue_ms` to separate queuing delay from compute/stream time.
+When tests fail, check:
+1. **Network connectivity**: Can reach the API endpoint
+2. **API availability**: Server is running and responding
+3. **Model availability**: Specified model exists and is accessible
+4. **Authentication**: Guest login is working (no API key issues)
+5. **Rate limits**: Not hitting API rate limits
 
 ## Common pitfalls & tips
 
-- **File not found**: Run k6 from the directory that contains `chat-completion.js`, or pass a correct path (`k6 run ./tests/loadtests/chat-completion.js`)
-- **Docker**: Mount your directory (`-v "$PWD":/work -w /work`) so the script is visible inside the container
-- **Cloudflare/WAF interference**: If you load test production paths, use a scoped bypass header (e.g., `X-LoadTest-Token`) with a Cloudflare rule to skip WAF/bot/rate limits only for test traffic
-- **Token safety**: If you exposed `LOADTEST_TOKEN` or API keys in a terminal/screenshot, rotate them
-- **Prompt impact**: COT prompts usually increase total duration and reduce tokens/sec. Keep a "short baseline" test for SLA tracking
+- **File not found**: Run k6 from the `tests/` directory, or pass correct paths (`k6 run src/test-completion-conversation.js`)
+- **Docker**: Mount your directory (`-v "$PWD/tests":/work -w /work`) so scripts are visible inside the container
+- **Authentication issues**: Guest login should work automatically - no API keys needed
+- **Token timeouts**: Tests automatically refresh tokens before each request
+- **Streaming issues**: Ensure `data: [DONE]` signals are properly detected
+- **Debug mode**: Use `DEBUG=true` to see detailed request/response information
+- **Model availability**: Verify the specified model exists and is accessible
+- **Rate limits**: Tests use single iterations by default to avoid rate limiting
 
 ## Extending
 
-- Add more prompt fixtures (longer input, bigger `max_tokens`) and attach a `prompt: name` tag
-- Add thresholds for non-stream latency (e.g., `http_req_duration{scenario:chat_nonstream,prompt:short} p(95)<4000` if that's your SLA)
-- Split network timing: Record `res.timings.connecting`, `tls_handshaking`, etc., into Trends if you need to isolate network vs compute
+- **Add new test scenarios**: Create additional `.js` files in `src/` directory
+- **Custom conversation flows**: Test specific conversation patterns or edge cases
+- **Additional API endpoints**: Test other Jan Server endpoints beyond completions
+- **Performance thresholds**: Add custom performance requirements for your use case
+- **Integration testing**: Test with external services or tool integrations
+- **Load testing**: Modify tests to run multiple iterations for performance testing
 
 ## Example commands
 
-### Stream + non-stream for 1 minute, low RPS
+### Functional Testing (Single Run)
 
 ```bash
-BASE=https://api.jan.ai \
+# Basic completion test
+BASE=https://api-stag.jan.ai \
+MODEL=jan-v1-4b \
+DEBUG=true \
+SINGLE_RUN=true \
+k6 run src/test-completion-standard.js
+
+# Conversation flow test
+BASE=https://api-stag.jan.ai \
+MODEL=jan-v1-4b \
+DEBUG=true \
+SINGLE_RUN=true \
+k6 run src/test-completion-conversation.js
+```
+
+### Load Testing (Performance)
+
+```bash
+# Load test with moderate traffic
+BASE=https://api-stag.jan.ai \
 MODEL=jan-v1-4b \
 NONSTREAM_RPS=3 \
 STREAM_RPS=1 \
-DURATION_MIN=1 \
-k6 run chat-completion.js
-```
+DURATION_MIN=2 \
+k6 run src/test-completion-conversation.js
 
-### Stream-only quick check
-
-```bash
-STREAM_RPS=2 NONSTREAM_RPS=0 DURATION_MIN=1 \
-k6 run chat-completion.js
-```
-
-### Non-stream only with higher RPS
-
-```bash
-NONSTREAM_RPS=5 STREAM_RPS=0 DURATION_MIN=2 \
-k6 run chat-completion.js
-```
-
-### With auth and bypass header
-
-```bash
-API_KEY="sk-xxx" LOADTEST_TOKEN="lt-xxx" \
-BASE=https://api.jan.ai \
+# High load test
+BASE=https://api-stag.jan.ai \
 MODEL=jan-v1-4b \
-k6 run chat-completion.js
+NONSTREAM_RPS=10 \
+STREAM_RPS=5 \
+DURATION_MIN=5 \
+k6 run src/test-completion-conversation.js
+
+# Streaming only test
+BASE=https://api-stag.jan.ai \
+MODEL=jan-v1-4b \
+NONSTREAM_RPS=0 \
+STREAM_RPS=3 \
+DURATION_MIN=3 \
+k6 run src/test-completion-conversation.js
+```
+
+### Test against local development server
+
+```bash
+# Functional test
+BASE=http://localhost:8080 \
+MODEL=jan-v1-4b \
+DEBUG=true \
+SINGLE_RUN=true \
+k6 run src/test-completion-conversation.js
+
+# Load test
+BASE=http://localhost:8080 \
+MODEL=jan-v1-4b \
+NONSTREAM_RPS=2 \
+STREAM_RPS=1 \
+DURATION_MIN=1 \
+k6 run src/test-completion-conversation.js
 ```
 
 ## CI/CD Integration
 
-The repository includes a GitHub Actions workflow for automated load testing that can be triggered manually.
+The repository includes a GitHub Actions workflow for automated load testing that uses the `run-loadtest.sh` script for all deployment and setup commands.
 
 ### Setup GitHub Secrets
 
-Before using the CI workflow, configure the following repository secrets:
-
-**Required secrets:**
-
-- `LOADTEST_API_KEY` or `LOADTEST_TOKEN` - Authentication for the API
+**No authentication secrets required!** Tests use guest authentication automatically.
 
 **Optional secrets (for Prometheus metrics - following k6 official docs):**
 
@@ -331,10 +439,9 @@ Before using the CI workflow, configure the following repository secrets:
 3. Click **Run workflow**
 4. Configure the test parameters:
    - Test case: Leave empty to run **all tests**, or select specific test
-   - Base URL
-   - Model name
-   - Duration in minutes
-   - RPS settings
+   - Base URL (default: `https://api-stag.jan.ai`)
+   - Model name (default: `jan-v1-4b`)
+   - Debug mode (default: `false`)
 
 **Default behavior:** If no test case is selected, all tests will be executed automatically.
 
@@ -344,6 +451,7 @@ Before using the CI workflow, configure the following repository secrets:
 - **All tests by default**: Runs all available tests unless specific test is selected
 - **Auto-detection**: Automatically discovers test cases from `src/` directory
 - **Test results**: Automatically uploaded as artifacts
+- **Guest authentication**: No API keys or tokens required
 - **Direct metrics export**: k6 sends metrics directly to Prometheus remote write endpoint
 - **Test ID tagging**: Each test run gets unique `testid` tag for metrics segmentation
 - **Grafana dashboard**: Pre-built dashboard for monitoring LLM and HTTP metrics
@@ -377,34 +485,25 @@ To add new test cases:
 2. **Test immediately** - no registration needed:
 
    ```bash
-   ./run-loadtest.sh new-test      # Test specific case
-   ./run-loadtest.sh               # Test all cases including new one
+   k6 run src/new-test.js           # Test specific case
+   ./run-loadtest.sh                # Test all cases including new one
    ```
 
 3. **Update the workflow file** to include the new option in the dropdown
 
-**Environment variables** are shared across all test cases, so new tests can use the same `.env` configuration.
+**Environment variables** are shared across all test cases, so new tests can use the same configuration.
 
 **File structure:**
 
 ```text
 tests/
-├── src/                    # Test scripts directory
-│   ├── chat-completion.js  # Auto-detected test
-│   └── your-test.js        # Your new test (auto-detected)
-├── run-loadtest.sh         # Test runner
-└── .env                    # Shared environment
-```
-
-### Test against local development server
-
-```bash
-BASE=http://localhost:8080 \
-MODEL=jan-v1-4b \
-NONSTREAM_RPS=1 \
-STREAM_RPS=1 \
-DURATION_MIN=1 \
-k6 run chat-completion.js
+├── src/                              # Test scripts directory
+│   ├── test-completion-standard.js   # Standard completion tests
+│   ├── test-completion-conversation.js # Conversation flow tests
+│   ├── test-responses.js             # Response API tests
+│   └── your-test.js                  # Your new test (auto-detected)
+├── run-loadtest.sh                   # Test runner
+└── .env                              # Shared environment
 ```
 
 ## Next steps
