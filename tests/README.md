@@ -55,6 +55,9 @@ k6 run src/test-completion-standard.js
 BASE=https://api-dev.jan.ai
 MODEL=jan-v1-4b
 
+# Cloudflare Configuration (Required)
+LOADTEST_TOKEN=your_cloudflare_token
+
 # Test Configuration
 DEBUG=true
 DURATION_MIN=1
@@ -68,6 +71,7 @@ SINGLE_RUN=true
 |----------|-------------|---------|
 | `BASE` | API base URL | `https://api-dev.jan.ai` |
 | `MODEL` | LLM model to test | `jan-v1-4b` |
+| `LOADTEST_TOKEN` | Cloudflare load test token (required) | - |
 | `DEBUG` | Enable debug logging | `false` |
 | `DURATION_MIN` | Test duration (minutes) | `1` |
 | `NONSTREAM_RPS` | Non-streaming RPS | `2` |
@@ -110,14 +114,14 @@ sudo apt-get update && sudo apt-get install -y k6
 Download from [k6.io/docs/get-started/installation](https://k6.io/docs/get-started/installation)
 
 ### Docker (Alternative)
-```bash
+   ```bash
 docker run --rm -i grafana/k6 run - <src/test-completion-standard.js
-```
+   ```
 
 ## 🏃‍♂️ Running Tests
 
 ### Basic Execution
-```bash
+   ```bash
 # Single test
 k6 run src/test-completion-standard.js
 
@@ -212,7 +216,7 @@ k6 run --verbose src/test-completion-standard.js
 - Metrics show response times, error rates, and custom timing
 
 ### Saving Results
-```bash
+   ```bash
 # JSON output
 k6 run --out json=results/my-test.json src/test-completion-standard.js
 

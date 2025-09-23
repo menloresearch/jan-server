@@ -40,6 +40,43 @@ const streamingTime = new Trend('streaming_time_ms', true);
 const errors = new Counter('completion_errors');
 const successes = new Counter('completion_successes');
 
+// ====== LLM-specific metrics ======
+const ttfb = new Trend('llm_ttfb_ms', true);
+const recvTime = new Trend('llm_receiving_ms', true);
+const totalDur = new Trend('llm_total_ms', true);
+const queueDur = new Trend('llm_queue_ms', true);
+// tokens per second is NOT a time metric; don't mark as time
+const tokRate = new Trend('llm_tokens_per_sec');
+const llmErrors = new Counter('llm_errors');
+
+// ====== Helper functions ======
+// helper: record timings with tags (scenario + status + promptType)
+function recordTimings(res, scenario, promptType) {
+  const status = String(res.status || 0);
+  const tags = { scenario, status, prompt: promptType };
+
+  ttfb.add(res.timings.waiting, tags);
+  recvTime.add(res.timings.receiving, tags);
+  totalDur.add(res.timings.duration, tags);
+
+  // custom: queue time header (ms)
+  const q = res.headers['X-Queue-Time'];
+  if (q) {
+    const val = parseFloat(q);
+    if (!isNaN(val)) queueDur.add(val, tags);
+  }
+
+  // custom: tokens/sec if usage present
+  if (status === '200') {
+    try {
+      const j = res.json();
+      const comp = j.usage?.completion_tokens || 0;
+      if (comp > 0) {
+        tokRate.add(comp / (res.timings.duration / 1000), tags);
+      }
+    } catch {}
+  }
+}
 
 // ====== Options ======
 export const options = {
@@ -307,6 +344,9 @@ function testNonStreamingCompletion() {
   const duration = endTime - startTime;
   completionTime.add(duration);
   
+  // Record LLM-specific timings
+  recordTimings(res, 'completion_nonstream', 'standard');
+  
   const ok = check(res, {
     'completion status 200': (r) => r.status === 200,
     'completion has choices': (r) => {
@@ -376,6 +416,9 @@ function testStreamingCompletion() {
   const endTime = Date.now();
   const duration = endTime - startTime;
   streamingTime.add(duration);
+  
+  // Record LLM-specific timings
+  recordTimings(res, 'completion_stream', 'standard');
   
   const ok = check(res, {
     'streaming status 200': (r) => r.status === 200,

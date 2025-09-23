@@ -77,6 +77,9 @@ Create a `.env` file in the `tests` directory:
 BASE=https://api-dev.jan.ai
 MODEL=jan-v1-4b
 
+# Cloudflare Configuration (Required)
+LOADTEST_TOKEN=your_cloudflare_token
+
 # Test Configuration
 DEBUG=true
 DURATION_MIN=1
@@ -86,7 +89,6 @@ SINGLE_RUN=true
 
 # Optional: API Keys (not required for guest auth)
 # API_KEY=your_api_key
-# LOADTEST_TOKEN=your_token
 ```
 
 ### Test Parameters
@@ -95,6 +97,7 @@ SINGLE_RUN=true
 |----------|-------------|---------|---------|
 | `BASE` | API base URL | `https://api-dev.jan.ai` | `https://api-stag.jan.ai` |
 | `MODEL` | LLM model to test | `jan-v1-4b` | `gpt-oss-20b` |
+| `LOADTEST_TOKEN` | Cloudflare load test token (required) | - | `cf_1234567890abcdef` |
 | `DEBUG` | Enable debug logging | `false` | `true` |
 | `DURATION_MIN` | Test duration in minutes | `1` | `5` |
 | `NONSTREAM_RPS` | Non-streaming requests per second | `2` | `5` |
@@ -122,7 +125,7 @@ const YOUR_PARAM = __ENV.YOUR_TEST_PARAM || 'default';
 ```
 
 **Important Notes:**
-- **No authentication variables needed!** All tests use guest authentication automatically
+- **LOADTEST_TOKEN is required!** This token is necessary for Cloudflare API access
 - Tests handle authentication automatically via guest login
 - Refresh tokens are managed automatically to prevent timeouts
 
@@ -239,6 +242,7 @@ k6 run --out experimental-prometheus-rw src/test-completion-standard.js
 
 **2. "Authentication failed"**
 - Tests use guest authentication (no API key required)
+- **Check LOADTEST_TOKEN**: Ensure it's set correctly for Cloudflare access
 - Check if the API server supports guest login
 - Verify the API endpoint is accessible
 

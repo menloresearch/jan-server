@@ -30,6 +30,9 @@ export STREAM_RPS="${STREAM_RPS:-$DEFAULT_STREAM_RPS}"
 export DEBUG="${DEBUG:-false}"
 export SINGLE_RUN="${SINGLE_RUN:-false}"
 
+# Cloudflare load test token (required for API access)
+export LOADTEST_TOKEN="${LOADTEST_TOKEN:-}"
+
 # Guest authentication - no API keys needed
 # Tests automatically use guest login
 
@@ -79,6 +82,14 @@ validate_env() {
     if [[ -z "$BASE" ]]; then
         log_error "BASE URL is required"
         exit 1
+    fi
+    
+    # Check for Cloudflare load test token
+    if [[ -z "$LOADTEST_TOKEN" ]]; then
+        log_warning "LOADTEST_TOKEN is not set - this may be required for Cloudflare API access"
+        log_info "Set LOADTEST_TOKEN environment variable or add it to .env file"
+    else
+        log_info "Cloudflare load test token configured: [CONFIGURED]"
     fi
     
     # Guest authentication - no API keys needed
@@ -190,6 +201,11 @@ run_single_test_case() {
     log_info "  Stream RPS: $STREAM_RPS"
     log_info "  Debug Mode: $DEBUG"
     log_info "  Single Run: $SINGLE_RUN"
+    if [[ -n "$LOADTEST_TOKEN" ]]; then
+        log_info "  Load Test Token: [CONFIGURED]"
+    else
+        log_info "  Load Test Token: [NOT SET]"
+    fi
     log_info "  Output: $output_file"
     
     # Generate unique test ID for metrics segmentation

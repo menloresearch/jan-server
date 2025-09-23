@@ -41,8 +41,43 @@ const responseStreamTimeWithTools = new Trend('response_stream_time_with_tools_m
 const errors = new Counter('response_errors');
 const successes = new Counter('response_successes');
 
+// ====== LLM-specific metrics ======
+const ttfb = new Trend('llm_ttfb_ms', true);
+const recvTime = new Trend('llm_receiving_ms', true);
+const totalDur = new Trend('llm_total_ms', true);
+const queueDur = new Trend('llm_queue_ms', true);
+// tokens per second is NOT a time metric; don't mark as time
+const tokRate = new Trend('llm_tokens_per_sec');
+const llmErrors = new Counter('llm_errors');
 
-// ====== Options ======
+// ====== Helper functions ======
+// helper: record timings with tags (scenario + status + promptType)
+function recordTimings(res, scenario, promptType) {
+  const status = String(res.status || 0);
+  const tags = { scenario, status, prompt: promptType };
+
+  ttfb.add(res.timings.waiting, tags);
+  recvTime.add(res.timings.receiving, tags);
+  totalDur.add(res.timings.duration, tags);
+
+  // custom: queue time header (ms)
+  const q = res.headers['X-Queue-Time'];
+  if (q) {
+    const val = parseFloat(q);
+    if (!isNaN(val)) queueDur.add(val, tags);
+  }
+
+  // custom: tokens/sec if usage present
+  if (status === '200') {
+    try {
+      const j = res.json();
+      const comp = j.usage?.completion_tokens || 0;
+      if (comp > 0) {
+        tokRate.add(comp / (res.timings.duration / 1000), tags);
+      }
+    } catch {}
+  }
+}
 export const options = {
   iterations: 1,
   vus: 1,
@@ -255,6 +290,9 @@ function testResponseApiNonStreamWithoutTools() {
   const duration = endTime - startTime;
   responseTime.add(duration);
   
+  // Record LLM-specific timings
+  recordTimings(res, 'response_nonstream', 'no_tools');
+  
   const ok = check(res, {
     'response non-stream status 200': (r) => r.status === 200,
     'response non-stream has content': (r) => r.body && r.body.length > 0
@@ -352,6 +390,9 @@ function testResponseApiNonStreamWithTools() {
   const duration = endTime - startTime;
   responseTimeWithTools.add(duration);
   
+  // Record LLM-specific timings
+  recordTimings(res, 'response_nonstream', 'with_tools');
+  
   const ok = check(res, {
     'response tools status 200': (r) => r.status === 200,
     'response tools has content': (r) => r.body && r.body.length > 0
@@ -417,6 +458,9 @@ function testResponseApiStreamWithoutTools() {
   const endTime = Date.now();
   const duration = endTime - startTime;
   responseStreamTime.add(duration);
+  
+  // Record LLM-specific timings
+  recordTimings(res, 'response_stream', 'no_tools');
   
   const ok = check(res, {
     'response stream status 200': (r) => r.status === 200,
@@ -526,6 +570,9 @@ function testResponseApiStreamWithTools() {
   const endTime = Date.now();
   const duration = endTime - startTime;
   responseStreamTimeWithTools.add(duration);
+  
+  // Record LLM-specific timings
+  recordTimings(res, 'response_stream', 'with_tools');
   
   const ok = check(res, {
     'response stream tools status 200': (r) => r.status === 200,

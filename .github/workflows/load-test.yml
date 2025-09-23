@@ -49,6 +49,9 @@ env:
   NONSTREAM_RPS: ${{ github.event.inputs.nonstream_rps || '2' }}
   STREAM_RPS: ${{ github.event.inputs.stream_rps || '1' }}
   
+  # Cloudflare load test token (required for API access)
+  LOADTEST_TOKEN: ${{ secrets.LOADTEST_TOKEN }}
+  
   # Guest authentication - no API keys needed
   # Tests automatically use guest login
   
@@ -98,6 +101,15 @@ jobs:
           echo "  Duration: ${{ github.event.inputs.duration_minutes }} minutes"
           echo "  Non-stream RPS: ${{ github.event.inputs.nonstream_rps }}"
           echo "  Stream RPS: ${{ github.event.inputs.stream_rps }}"
+          
+          # Cloudflare load test token validation
+          if [[ -n "$LOADTEST_TOKEN" ]]; then
+            echo "✅ Cloudflare load test token configured: [CONFIGURED]"
+          else
+            echo "❌ ERROR: LOADTEST_TOKEN is required for Cloudflare API access"
+            echo "Please configure LOADTEST_TOKEN secret in GitHub repository settings"
+            exit 1
+          fi
           
           # Guest authentication - no secrets needed
           echo "✅ Using guest authentication (no API keys required)"
