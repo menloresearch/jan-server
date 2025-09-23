@@ -27,6 +27,10 @@ function buildHeaders(extra = {}) {
   return h;
 }
 
+// ====== Test Configuration ======
+const TEST_ID = `test-responses-${Date.now()}`;
+const TEST_CASE = 'responses';
+
 // ====== Custom metrics ======
 const guestLoginTime = new Trend('guest_login_time_ms', true);
 const refreshTokenTime = new Trend('refresh_token_time_ms', true);
@@ -36,6 +40,7 @@ const responseTimeWithTools = new Trend('response_time_with_tools_ms', true);
 const responseStreamTimeWithTools = new Trend('response_stream_time_with_tools_ms', true);
 const errors = new Counter('response_errors');
 const successes = new Counter('response_successes');
+
 
 // ====== Options ======
 export const options = {
@@ -51,6 +56,10 @@ export const options = {
     'response_stream_time_with_tools_ms': ['p(95)<300000'],
   },
   discardResponseBodies: false,
+  tags: {
+    testid: TEST_ID,
+    test_case: TEST_CASE,
+  },
 };
 
 // ====== Debug Functions ======
@@ -85,6 +94,7 @@ function debugResponse(response) {
     console.log(`[DEBUG] =====================`);
   }
 }
+
 
 // ====== Test Functions ======
 function guestLogin() {
@@ -241,7 +251,8 @@ function testResponseApiNonStreamWithoutTools() {
   
   debugResponse(res);
   
-  const duration = Date.now() - startTime;
+  const endTime = Date.now();
+  const duration = endTime - startTime;
   responseTime.add(duration);
   
   const ok = check(res, {
@@ -337,7 +348,8 @@ function testResponseApiNonStreamWithTools() {
   
   debugResponse(res);
   
-  const duration = Date.now() - startTime;
+  const endTime = Date.now();
+  const duration = endTime - startTime;
   responseTimeWithTools.add(duration);
   
   const ok = check(res, {
@@ -402,7 +414,8 @@ function testResponseApiStreamWithoutTools() {
   
   debugResponse(res);
   
-  const duration = Date.now() - startTime;
+  const endTime = Date.now();
+  const duration = endTime - startTime;
   responseStreamTime.add(duration);
   
   const ok = check(res, {
@@ -510,7 +523,8 @@ function testResponseApiStreamWithTools() {
   
   debugResponse(res);
   
-  const duration = Date.now() - startTime;
+  const endTime = Date.now();
+  const duration = endTime - startTime;
   responseStreamTimeWithTools.add(duration);
   
   const ok = check(res, {

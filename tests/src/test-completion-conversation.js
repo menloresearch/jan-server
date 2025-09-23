@@ -28,6 +28,10 @@ function buildHeaders(extra = {}) {
   return h;
 }
 
+// ====== Test Configuration ======
+const TEST_ID = `test-completion-conversation-${Date.now()}`;
+const TEST_CASE = 'completion-conversation';
+
 // ====== Custom metrics ======
 const guestLoginTime = new Trend('guest_login_time_ms', true);
 const refreshTokenTime = new Trend('refresh_token_time_ms', true);
@@ -37,6 +41,7 @@ const listConversationsTime = new Trend('list_conversations_time_ms', true);
 const conversationItemsTime = new Trend('conversation_items_time_ms', true);
 const errors = new Counter('conversation_errors');
 const successes = new Counter('conversation_successes');
+
 
 // ====== Options ======
 export const options = {
@@ -52,6 +57,10 @@ export const options = {
     'conversation_items_time_ms': ['p(95)<3000'],
   },
   discardResponseBodies: false,
+  tags: {
+    testid: TEST_ID,
+    test_case: TEST_CASE,
+  },
 };
 
 // ====== Debug Functions ======
@@ -86,6 +95,7 @@ function debugResponse(response) {
     console.log(`[DEBUG] =====================`);
   }
 }
+
 
 // ====== Test Functions ======
 function guestLogin() {
@@ -298,7 +308,8 @@ function addMessageToConversation(message, isFirstMessage = false) {
   
   debugResponse(res);
   
-  const duration = Date.now() - startTime;
+  const endTime = Date.now();
+  const duration = endTime - startTime;
   completionTime.add(duration);
   
   const ok = check(res, {
@@ -363,7 +374,8 @@ function addStreamingMessageToConversation(message, isFirstMessage = false) {
   
   debugResponse(res);
   
-  const duration = Date.now() - startTime;
+  const endTime = Date.now();
+  const duration = endTime - startTime;
   completionTime.add(duration);
   
   const ok = check(res, {

@@ -27,6 +27,10 @@ function buildHeaders(extra = {}) {
   return h;
 }
 
+// ====== Test Configuration ======
+const TEST_ID = `test-completion-standard-${Date.now()}`;
+const TEST_CASE = 'completion-standard';
+
 // ====== Custom metrics ======
 const guestLoginTime = new Trend('guest_login_time_ms', true);
 const refreshTokenTime = new Trend('refresh_token_time_ms', true);
@@ -35,6 +39,7 @@ const completionTime = new Trend('completion_time_ms', true);
 const streamingTime = new Trend('streaming_time_ms', true);
 const errors = new Counter('completion_errors');
 const successes = new Counter('completion_successes');
+
 
 // ====== Options ======
 export const options = {
@@ -49,6 +54,10 @@ export const options = {
     'streaming_time_ms': ['p(95)<15000'],
   },
   discardResponseBodies: false,
+  tags: {
+    testid: TEST_ID,
+    test_case: TEST_CASE,
+  },
 };
 
 // ====== Debug Functions ======
@@ -83,6 +92,7 @@ function debugResponse(response) {
     console.log(`[DEBUG] =====================`);
   }
 }
+
 
 // ====== Test Functions ======
 function guestLogin() {
@@ -293,7 +303,8 @@ function testNonStreamingCompletion() {
   
   debugResponse(res);
   
-  const duration = Date.now() - startTime;
+  const endTime = Date.now();
+  const duration = endTime - startTime;
   completionTime.add(duration);
   
   const ok = check(res, {
@@ -362,7 +373,8 @@ function testStreamingCompletion() {
   
   debugResponse(res);
   
-  const duration = Date.now() - startTime;
+  const endTime = Date.now();
+  const duration = endTime - startTime;
   streamingTime.add(duration);
   
   const ok = check(res, {
