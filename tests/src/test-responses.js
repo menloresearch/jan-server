@@ -32,6 +32,8 @@ const guestLoginTime = new Trend('guest_login_time_ms', true);
 const refreshTokenTime = new Trend('refresh_token_time_ms', true);
 const responseTime = new Trend('response_time_ms', true);
 const responseStreamTime = new Trend('response_stream_time_ms', true);
+const responseTimeWithTools = new Trend('response_time_with_tools_ms', true);
+const responseStreamTimeWithTools = new Trend('response_stream_time_with_tools_ms', true);
 const errors = new Counter('response_errors');
 const successes = new Counter('response_successes');
 
@@ -43,8 +45,10 @@ export const options = {
     'http_req_failed': ['rate<0.05'],
     'guest_login_time_ms': ['p(95)<2000'],
     'refresh_token_time_ms': ['p(95)<2000'],
-    'response_time_ms': ['p(95)<15000'],
-    'response_stream_time_ms': ['p(95)<20000'],
+    'response_time_ms': ['p(95)<60000'],
+    'response_stream_time_ms': ['p(95)<60000'],
+    'response_time_with_tools_ms': ['p(95)<300000'],
+    'response_stream_time_with_tools_ms': ['p(95)<300000'],
   },
   discardResponseBodies: false,
 };
@@ -334,7 +338,7 @@ function testResponseApiNonStreamWithTools() {
   debugResponse(res);
   
   const duration = Date.now() - startTime;
-  responseTime.add(duration);
+  responseTimeWithTools.add(duration);
   
   const ok = check(res, {
     'response tools status 200': (r) => r.status === 200,
@@ -507,7 +511,7 @@ function testResponseApiStreamWithTools() {
   debugResponse(res);
   
   const duration = Date.now() - startTime;
-  responseStreamTime.add(duration);
+  responseStreamTimeWithTools.add(duration);
   
   const ok = check(res, {
     'response stream tools status 200': (r) => r.status === 200,

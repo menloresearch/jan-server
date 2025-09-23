@@ -40,13 +40,6 @@ if not defined API_KEY set "API_KEY="
 REM Set k6 executable path
 set "K6_EXE=k6"
 
-REM Check if k6 is installed
-if not exist "%K6_EXE%" (
-    echo [ERROR] k6 is not installed. Please install k6 first.
-    echo Download k6 from: https://github.com/grafana/k6/releases
-    exit /b 1
-)
-
 REM Validate environment
 if "%BASE%"=="" (
     echo [ERROR] BASE URL is required

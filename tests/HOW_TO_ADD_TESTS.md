@@ -13,7 +13,7 @@ The framework includes three main test categories:
 
 1. **`test-completion-standard.js`**: Basic completion flows with guest authentication
 2. **`test-completion-conversation.js`**: Conversation management with both non-streaming and streaming messages  
-3. **`test-responses.js`**: Response API testing with tools and streaming support
+3. **`test-responses.js`**: Response API testing with tools and streaming support (extended timeouts for tool calls)
 
 ## Example: Adding a Health Check Test
 
@@ -53,6 +53,9 @@ tests/
 │   ├── health-check.js.example       # Example template
 │   └── your-new-test.js              # Your new test (auto-detected)
 ├── run-loadtest.sh                   # Test runner
+├── Dockerfile                        # Docker container for testing
+├── docker-entrypoint.sh              # Docker entrypoint script
+├── run-docker-test.bat               # Windows Docker test runner
 ├── .env                              # Environment config
 └── results/                          # Test results
 ```
@@ -100,6 +103,21 @@ Your new test can access these via `__ENV.VARIABLE_NAME` in k6.
 8. **Include token refresh**: Refresh tokens before requests to prevent timeouts
 9. **Handle streaming properly**: Wait for `data: [DONE]` signals in streaming tests
 10. **Add debug logging**: Use `DEBUG=true` for detailed request/response information
+11. **Consider tool call timeouts**: Tool calls may take longer - use extended thresholds if needed
+
+## Threshold Guidelines
+
+### Standard Response Times
+- **Guest login**: `p(95)<2000ms` (2 seconds)
+- **Token refresh**: `p(95)<2000ms` (2 seconds)
+- **Regular responses**: `p(95)<60000ms` (1 minute)
+- **Streaming responses**: `p(95)<60000ms` (1 minute)
+
+### Tool Call Response Times
+- **Tool call responses**: `p(95)<300000ms` (5 minutes)
+- **Tool call streaming**: `p(95)<300000ms` (5 minutes)
+
+Tool calls require extended timeouts because they may involve external API calls and complex processing.
 
 ## Example Environment Variables
 
@@ -168,3 +186,47 @@ function refreshAccessToken() {
   }
 }
 ```
+
+## Docker Testing
+
+### Building the Docker Image
+
+```bash
+# From the tests directory
+docker build -t janai/k6-tests:local .
+```
+
+### Running Tests with Docker
+
+```bash
+# Run all tests
+docker run --rm -it -e BASE=https://api-stag.jan.ai -e MODEL=jan-v1-4b -e DEBUG=true janai/k6-tests:local
+
+# Run specific test
+docker run --rm -it -e BASE=https://api-stag.jan.ai -e MODEL=jan-v1-4b -e DEBUG=true janai/k6-tests:local test-responses
+
+# Run with volume mount (for local development)
+docker run --rm -it -e BASE=https://api-stag.jan.ai -e MODEL=jan-v1-4b -e DEBUG=true -v "${PWD}":/tests janai/k6-tests:local
+```
+
+### Windows PowerShell Commands
+
+```powershell
+# Build
+docker build -t janai/k6-tests:local .
+
+# Run all tests
+docker run --rm -it -e BASE=https://api-stag.jan.ai -e MODEL=jan-v1-4b -e DEBUG=true janai/k6-tests:local
+
+# Run specific test
+docker run --rm -it -e BASE=https://api-stag.jan.ai -e MODEL=jan-v1-4b -e DEBUG=true janai/k6-tests:local test-responses
+```
+
+### Docker Features
+
+- **Alpine Linux base**: Lightweight and secure
+- **Bash support**: Full bash scripting capabilities
+- **jq included**: JSON parsing for metrics
+- **Auto-detection**: Automatically finds and runs test scripts
+- **Volume mounting**: Use local files with `-v` flag
+- **Environment variables**: Full support for all test configuration

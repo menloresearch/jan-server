@@ -19,7 +19,7 @@ fi
 
 # If first arg is a known test file name or empty, use run-loadtest.sh
 if [[ $# -eq 0 ]]; then
-  exec /bin/bash ./run-loadtest.sh
+  exec bash ./run-loadtest.sh
 fi
 
 case "$1" in
@@ -30,7 +30,7 @@ case "$1" in
     ;;
   run|run-all)
     shift || true
-    exec /bin/bash ./run-loadtest.sh "$@"
+    exec bash ./run-loadtest.sh "$@"
     ;;
   *)
     # Pass through to k6 for custom commands

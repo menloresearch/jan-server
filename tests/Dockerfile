@@ -6,9 +6,9 @@
 FROM grafana/k6:latest
 
 USER root
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends bash jq ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk update \
+    && apk add --no-cache bash jq ca-certificates \
+    && rm -rf /var/cache/apk/*
 
 # Baked-in tests (fallback when no volume is mounted)
 WORKDIR /app

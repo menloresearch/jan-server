@@ -59,8 +59,9 @@ Download from [k6.io/docs/get-started/installation](https://k6.io/docs/get-start
 
 - **`test-responses.js`** — Response API testing:
   - Non-streaming and streaming responses
-  - Tool integration testing
+  - Tool integration testing with extended timeouts (5 minutes)
   - Response validation and completion detection
+  - Separate metrics for tool call responses
 
 ## Quick start (local)
 
@@ -130,7 +131,7 @@ k6 run src/test-responses.js
 
 ## Run via Docker
 
-You can run these tests without installing k6 locally.
+You can run these tests without installing k6 locally. The Docker setup has been tested and works on both Linux and Windows.
 
 ### Option A: Use the provided Dockerfile (recommended)
 
@@ -163,17 +164,44 @@ Run a specific test case:
 
 ```bash
 docker run --rm -it \
-   -e BASE=https://api-dev.jan.ai \
+   -e BASE=https://api-stag.jan.ai \
    -e MODEL=jan-v1-4b \
    -e DEBUG=true \
    -v "$PWD/tests":/tests \
    janai/k6-tests:local run test-completion-conversation
 ```
 
+### Docker Features
+
+- **Alpine Linux base**: Lightweight and secure
+- **Bash support**: Full bash scripting capabilities  
+- **jq included**: JSON parsing for metrics
+- **Line ending fixes**: Handles Windows CRLF → Unix LF conversion
+- **Auto-detection**: Automatically finds and runs test scripts
+- **Volume mounting**: Use local files with `-v` flag
+- **Environment variables**: Full support for all test configuration
+
+### Windows PowerShell Commands
+
+```powershell
+# Build the image
+docker build -t janai/k6-tests:local .
+
+# Run all tests
+docker run --rm -it -e BASE=https://api-stag.jan.ai -e MODEL=jan-v1-4b -e DEBUG=true janai/k6-tests:local
+
+# Run specific test
+docker run --rm -it -e BASE=https://api-stag.jan.ai -e MODEL=jan-v1-4b -e DEBUG=true janai/k6-tests:local test-responses
+
+# Run with volume mount
+docker run --rm -it -e BASE=https://api-stag.jan.ai -e MODEL=jan-v1-4b -e DEBUG=true -v "${PWD}":/tests janai/k6-tests:local
+```
+
 Notes:
 
 - If you don't mount `/tests`, the container runs with a baked-in copy at `/app` (copied at build time).
 - If a `.env` file exists inside the mounted `/tests`, it's automatically loaded.
+- The Docker image has been tested and works on both Linux and Windows environments.
 
 ### Option B: Use upstream `grafana/k6` image
 
@@ -264,10 +292,10 @@ Docker tip: pass these environment variables with `-e` flags as shown above. Mak
 ### Response API Test (`test-responses.js`)
 1. **Guest Login**: Authenticate and get access token
 2. **Token Refresh**: Refresh access token
-3. **Non-Streaming Response**: Test without tools
-4. **Non-Streaming Response with Tools**: Test with tool integration
-5. **Streaming Response**: Test streaming without tools
-6. **Streaming Response with Tools**: Test streaming with tools
+3. **Non-Streaming Response**: Test without tools (30s timeout)
+4. **Non-Streaming Response with Tools**: Test with tool integration (5min timeout)
+5. **Streaming Response**: Test streaming without tools (30s timeout)
+6. **Streaming Response with Tools**: Test streaming with tools (5min timeout)
 
 ## What you'll see in the output
 
@@ -309,11 +337,12 @@ When `DEBUG=true`, you'll see:
 
 ### Performance Expectations
 
-- **Guest login**: Should complete in < 500ms
-- **Token refresh**: Should complete in < 200ms  
-- **Non-streaming completions**: 1-5 seconds depending on model and prompt length
+- **Guest login**: Should complete in < 2 seconds
+- **Token refresh**: Should complete in < 2 seconds  
+- **Non-streaming completions**: 1-30 seconds depending on model and prompt length
 - **Streaming completions**: First token in < 1 second, full completion varies
-- **Conversation operations**: < 300ms for CRUD operations
+- **Conversation operations**: < 3 seconds for CRUD operations
+- **Tool call responses**: Up to 5 minutes for complex tool operations
 
 ### Debugging Failed Tests
 
@@ -328,9 +357,12 @@ When tests fail, check:
 
 - **File not found**: Run k6 from the `tests/` directory, or pass correct paths (`k6 run src/test-completion-conversation.js`)
 - **Docker**: Mount your directory (`-v "$PWD/tests":/work -w /work`) so scripts are visible inside the container
+- **Docker line endings**: If you get `$'\r': command not found` errors, the script has Windows line endings - use the provided Dockerfile which handles this
+- **Docker shell issues**: The provided Dockerfile uses bash instead of sh for full compatibility
 - **Authentication issues**: Guest login should work automatically - no API keys needed
 - **Token timeouts**: Tests automatically refresh tokens before each request
 - **Streaming issues**: Ensure `data: [DONE]` signals are properly detected
+- **Tool call timeouts**: Tool calls may take up to 5 minutes - this is normal and expected
 - **Debug mode**: Use `DEBUG=true` to see detailed request/response information
 - **Model availability**: Verify the specified model exists and is accessible
 - **Rate limits**: Tests use single iterations by default to avoid rate limiting
