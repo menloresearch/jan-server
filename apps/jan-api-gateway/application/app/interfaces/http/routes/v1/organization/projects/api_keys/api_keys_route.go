@@ -58,7 +58,7 @@ func (api *ProjectApiKeyRoute) RegisterRouter(router gin.IRouter) {
 // @Router /v1/organization/projects/{project_public_id}/api_keys [get]
 func (api *ProjectApiKeyRoute) ListProjectApiKey(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
-	user, ok := auth.GetUserFromContext(reqCtx)
+	_, ok := auth.GetUserFromContext(reqCtx)
 	if !ok {
 		return
 	}
@@ -66,12 +66,6 @@ func (api *ProjectApiKeyRoute) ListProjectApiKey(reqCtx *gin.Context) {
 	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code: "3d1ab99a-e2d3-4d13-9130-56eb662e5f92",
-		})
-		return
-	}
-	if organizationEntity.OwnerID != user.ID {
-		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code: "6d2d10f9-3bab-4d2d-8076-d573d829e397",
 		})
 		return
 	}
@@ -164,13 +158,6 @@ func (api *ProjectApiKeyRoute) CreateProjectApiKey(reqCtx *gin.Context) {
 	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code: "3d1ab99a-e2d3-4d13-9130-56eb662e5f92",
-		})
-		return
-	}
-	// TODO: Change the verification to users with organization read permission.
-	if organizationEntity.OwnerID != user.ID {
-		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code: "6d2d10f9-3bab-4d2d-8076-d573d829e397",
 		})
 		return
 	}

@@ -13,6 +13,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/invite"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/project"
+	"menlo.ai/jan-api-gateway/app/utils/ptr"
 
 	"menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/requests"
@@ -54,48 +55,57 @@ const (
 	UserContextKeyID     UserContextKey = "UserContextKeyID"
 )
 
-func (s *AuthService) CreateDefaultOrganization(ctx context.Context) error {
-	admin, err := s.userService.FindByEmail(ctx, "admin@jan.ai")
+func (s *AuthService) InitOrganization(ctx context.Context) error {
+	orgEntity, err := s.organizationService.FindOrCreateDefaultOrganization(ctx)
+	if err != nil {
+		return err
+	}
+	// set DEFAULT_ORGANIZATION
+	organization.DEFAULT_ORGANIZATION = orgEntity
+
+	email := environment_variables.EnvironmentVariables.ORGANIZATION_ADMIN_EMAIL
+	admin, err := s.userService.FindByEmail(ctx, email)
 	if err != nil {
 		return err
 	}
 	if admin == nil {
-		s.RegisterUser(ctx, &user.User{})
+		admin, err = s.userService.RegisterUser(ctx, &user.User{
+			Name:    "Admin",
+			Email:   email,
+			IsGuest: false,
+		})
+		if err != nil {
+			return err
+		}
 	}
+	err = s.organizationService.AddMember(ctx, &organization.OrganizationMember{
+		UserID:         admin.ID,
+		OrganizationID: orgEntity.ID,
+		Role:           organization.OrganizationMemberRoleOwner,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *AuthService) RegisterUser(ctx context.Context, user *user.User) (*user.User, error) {
 	_, err := s.userService.RegisterUser(ctx, user)
-	if err != nil {
-		return nil, err
-	}
-	orgEntity, err := s.organizationService.CreateOrganizationWithPublicID(ctx, &organization.Organization{
-		Name:    "Default",
-		Enabled: true,
-		OwnerID: user.ID,
-	})
-	if err != nil {
-		return nil, err
-	}
-	err = s.organizationService.AddMember(ctx, &organization.OrganizationMember{
-		UserID:         user.ID,
-		OrganizationID: orgEntity.ID,
-		Role:           organization.OrganizationMemberRoleOwner,
-		IsPrimary:      true,
-	})
-	if err != nil {
-		return nil, err
-	}
 	projEntity, err := s.projectService.CreateProjectWithPublicID(ctx, &project.Project{
 		Name:           "Default Project",
 		Status:         string(project.ProjectStatusActive),
-		OrganizationID: orgEntity.ID,
+		OrganizationID: organization.DEFAULT_ORGANIZATION.ID,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.projectService.AddMember(ctx, projEntity.ID, user.ID, string(project.ProjectMemberRoleOwner))
+	err = s.projectService.AddMember(ctx, &project.ProjectMember{
+		ProjectID: projEntity.ID,
+		UserID:    user.ID,
+		Role:      string(project.ProjectMemberRoleOwner),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -222,8 +232,10 @@ func (s *AuthService) RegisteredOrganizationMiddleware() gin.HandlerFunc {
 			})
 			return
 		}
-		org, err := s.organizationService.FindOneByFilter(ctx, organization.OrganizationFilter{
-			OwnerID: &user.ID,
+		_, err := s.organizationService.FindOneMemberByFilter(ctx, organization.OrganizationMemberFilter{
+			UserID:         &user.ID,
+			OrganizationID: &organization.DEFAULT_ORGANIZATION.ID,
+			Role:           ptr.ToString(string(organization.OrganizationMemberRoleOwner)),
 		})
 		if err != nil {
 			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
@@ -231,13 +243,7 @@ func (s *AuthService) RegisteredOrganizationMiddleware() gin.HandlerFunc {
 			})
 			return
 		}
-		if org == nil {
-			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-				Code: "cf6ad4c4-efa1-4d9c-97af-8c111cd771fd",
-			})
-			return
-		}
-		SetAdminOrganizationToContext(reqCtx, org)
+		SetAdminOrganizationToContext(reqCtx, organization.DEFAULT_ORGANIZATION)
 		reqCtx.Next()
 	}
 }

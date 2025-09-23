@@ -3,6 +3,7 @@ package projectrepo
 import (
 	"context"
 
+	"gorm.io/gorm/clause"
 	domain "menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/query"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/dbschema"
@@ -22,7 +23,14 @@ var _ domain.ProjectRepository = (*ProjectGormRepository)(nil)
 func (repo *ProjectGormRepository) AddMember(ctx context.Context, m *domain.ProjectMember) error {
 	model := dbschema.NewSchemaProjectMember(m)
 	query := repo.db.GetQuery(ctx)
-	err := query.ProjectMember.Create(model)
+	err := query.ProjectMember.Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: query.ProjectMember.UserID.ColumnName().String()},
+			{Name: query.ProjectMember.ProjectID.ColumnName().String()},
+		},
+		DoNothing: false,
+		UpdateAll: true,
+	}).Create(model)
 	if err != nil {
 		return err
 	}

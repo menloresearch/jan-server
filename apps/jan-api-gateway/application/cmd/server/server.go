@@ -47,8 +47,8 @@ func init() {
 func main() {
 	healthcheckService := healthcheck.NewService(janinference.NewJanInferenceClient(context.Background()))
 	cron := crontab.New()
-	crontabContext := context.Background()
-	healthcheckService.Start(crontabContext, cron)
+	background := context.Background()
+	healthcheckService.Start(background, cron)
 
 	// Expose pprof endpoints for profiling (for Grafana Alloy/Pyroscope Go pull mode)
 	go func() {
@@ -67,9 +67,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	err = dataInitializer.Install()
+	err = dataInitializer.Install(background)
 	if err != nil {
-		logger.GetLogger().Errorf("pprof server failed: %v", err)
+		panic(err)
 	}
 	err = database.Migration()
 	if err != nil {

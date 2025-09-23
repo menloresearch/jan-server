@@ -16,6 +16,7 @@ type Project struct {
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	ArchivedAt     *time.Time
+	IsDefault      bool
 }
 
 type ProjectMember struct {

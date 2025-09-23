@@ -3,6 +3,7 @@ package organizationrepo
 import (
 	"context"
 
+	"gorm.io/gorm/clause"
 	domain "menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/query"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/dbschema"
@@ -25,9 +26,6 @@ func (repo *OrganizationGormRepository) applyFilter(query *gormgen.Query, sql go
 	// If the Enabled filter is not nil, add a WHERE clause.
 	if filter.Enabled != nil {
 		sql = sql.Where(query.Organization.Enabled.Is(*filter.Enabled))
-	}
-	if filter.OwnerID != nil {
-		sql = sql.Where(query.Organization.OwnerID.Eq(*filter.OwnerID))
 	}
 	return sql
 }
@@ -121,7 +119,14 @@ func (repo *OrganizationGormRepository) Count(ctx context.Context, filter domain
 func (repo *OrganizationGormRepository) AddMember(ctx context.Context, m *domain.OrganizationMember) error {
 	model := dbschema.NewSchemaOrganizationMember(m)
 	query := repo.db.GetQuery(ctx)
-	return query.OrganizationMember.WithContext(ctx).Create(model)
+	return query.OrganizationMember.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: query.OrganizationMember.UserID.ColumnName().String()},
+			{Name: query.OrganizationMember.OrganizationID.ColumnName().String()},
+		},
+		DoNothing: false,
+		UpdateAll: true,
+	}).Create(model)
 }
 
 // FindMemberByFilter implements organization.OrganizationRepository.

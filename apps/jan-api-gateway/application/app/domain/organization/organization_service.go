@@ -9,6 +9,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/query"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
+	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
 // OrganizationService provides business logic for managing organizations.
@@ -24,6 +25,8 @@ func NewService(repo OrganizationRepository) *OrganizationService {
 		repo: repo,
 	}
 }
+
+var DEFAULT_ORGANIZATION *Organization
 
 func (s *OrganizationService) createPublicID() (string, error) {
 	return idgen.GenerateSecureID("org", 16)
@@ -115,6 +118,23 @@ func (s *OrganizationService) FindOneMemberByFilter(ctx context.Context, f Organ
 		return nil, fmt.Errorf("no records")
 	}
 	return entities[0], err
+}
+
+func (s *OrganizationService) FindOrCreateDefaultOrganization(ctx context.Context) (*Organization, error) {
+	orgEntity, err := s.FindOneByFilter(ctx, OrganizationFilter{
+		Enabled: ptr.ToBool(true),
+	})
+	if err != nil {
+		return nil, err
+	}
+	if orgEntity != nil {
+		return orgEntity, nil
+	}
+
+	return s.CreateOrganizationWithPublicID(ctx, &Organization{
+		Name:    "Default Organization",
+		Enabled: true,
+	})
 }
 
 type OrganizationContextKey string

@@ -81,6 +81,9 @@ func (s *ProjectService) FindOne(ctx context.Context, filter ProjectFilter) (*Pr
 	if err != nil {
 		return nil, err
 	}
+	if len(projectEntities) == 0 {
+		return nil, nil
+	}
 	if len(projectEntities) != 1 {
 		return nil, err
 	}
@@ -92,10 +95,6 @@ func (s *ProjectService) CountProjects(ctx context.Context, filter ProjectFilter
 	return s.repo.Count(ctx, filter)
 }
 
-func (s *ProjectService) AddMember(ctx context.Context, projectID, userID uint, role string) error {
-	return s.repo.AddMember(ctx, &ProjectMember{
-		UserID:    userID,
-		ProjectID: projectID,
-		Role:      role,
-	})
+func (s *ProjectService) AddMember(ctx context.Context, member *ProjectMember) error {
+	return s.repo.AddMember(ctx, member)
 }
