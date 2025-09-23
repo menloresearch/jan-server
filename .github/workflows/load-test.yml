@@ -11,11 +11,13 @@ on:
         type: choice
         options:
           - ''
-          - chat-completion
+          - test-completion-standard
+          - test-completion-conversation
+          - test-responses
       base_url:
         description: 'Base URL for testing'
         required: true
-        default: 'https://api.jan.ai'
+        default: 'https://api-stag.jan.ai'
         type: string
       model:
         description: 'Model to test'
@@ -41,15 +43,17 @@ on:
 
 env:
   # Test configuration - use inputs for workflow_dispatch, defaults for push
-  BASE: ${{ github.event.inputs.base_url || 'https://api.jan.ai' }}
+  BASE: ${{ github.event.inputs.base_url || 'https://api-stag.jan.ai' }}
   MODEL: ${{ github.event.inputs.model || 'jan-v1-4b' }}
   DURATION_MIN: ${{ github.event.inputs.duration_minutes || '2' }}
   NONSTREAM_RPS: ${{ github.event.inputs.nonstream_rps || '2' }}
   STREAM_RPS: ${{ github.event.inputs.stream_rps || '1' }}
   
-  # Authentication (set these as repository secrets)
-  API_KEY: ${{ secrets.LOADTEST_API_KEY }}
+  # Cloudflare load test token (required for API access)
   LOADTEST_TOKEN: ${{ secrets.LOADTEST_TOKEN }}
+  
+  # Guest authentication - no API keys needed
+  # Tests automatically use guest login
   
   # Prometheus remote write configuration (k6 standard env vars)
   K6_PROMETHEUS_RW_SERVER_URL: ${{ secrets.K6_PROMETHEUS_RW_SERVER_URL }}
@@ -98,10 +102,17 @@ jobs:
           echo "  Non-stream RPS: ${{ github.event.inputs.nonstream_rps }}"
           echo "  Stream RPS: ${{ github.event.inputs.stream_rps }}"
           
-          # Validate required secrets
-          if [[ -z "$API_KEY" && -z "$LOADTEST_TOKEN" ]]; then
-            echo "⚠️  Warning: Neither API_KEY nor LOADTEST_TOKEN is configured"
+          # Cloudflare load test token validation
+          if [[ -n "$LOADTEST_TOKEN" ]]; then
+            echo "✅ Cloudflare load test token configured: [CONFIGURED]"
+          else
+            echo "❌ ERROR: LOADTEST_TOKEN is required for Cloudflare API access"
+            echo "Please configure LOADTEST_TOKEN secret in GitHub repository settings"
+            exit 1
           fi
+          
+          # Guest authentication - no secrets needed
+          echo "✅ Using guest authentication (no API keys required)"
           
           echo ""
           echo "Prometheus Configuration:"
@@ -162,10 +173,10 @@ jobs:
               echo "" >> results_summary.txt
               
               # Parse metrics
-              jq -r '.metrics | to_entries[] | select(.key | contains("llm_")) | "\(.key): avg=\(.value.avg // "N/A"), min=\(.value.min // "N/A"), max=\(.value.max // "N/A"), p95=\(.value.p95 // "N/A")"' "$LATEST_FILE" >> results_summary.txt 2>/dev/null || echo "Failed to parse detailed metrics" >> results_summary.txt
+              jq -r '.metrics | to_entries[] | select(.key | contains("completion_") or contains("conversation_") or contains("response_") or contains("guest_") or contains("refresh_")) | "\(.key): avg=\(.value.avg // "N/A"), min=\(.value.min // "N/A"), max=\(.value.max // "N/A"), p95=\(.value.p95 // "N/A")"' "$LATEST_FILE" >> results_summary.txt 2>/dev/null || echo "Failed to parse detailed metrics" >> results_summary.txt
               
               # Check for errors
-              ERROR_COUNT=$(jq -r '.metrics.llm_errors.count // 0' "$LATEST_FILE" 2>/dev/null || echo "0")
+              ERROR_COUNT=$(jq -r '.metrics.completion_errors.count // .metrics.conversation_errors.count // .metrics.response_errors.count // 0' "$LATEST_FILE" 2>/dev/null || echo "0")
               echo "" >> results_summary.txt
               echo "Error Count: $ERROR_COUNT" >> results_summary.txt
               

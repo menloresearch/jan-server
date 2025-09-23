@@ -15,7 +15,7 @@ if [[ -f "$SCRIPT_DIR/.env" ]]; then
 fi
 
 # Default configuration
-DEFAULT_BASE_URL="https://api-dev.jan.ai"
+DEFAULT_BASE_URL="https://api-stag.jan.ai"
 DEFAULT_MODEL="jan-v1-4b"
 DEFAULT_DURATION_MIN=5
 DEFAULT_NONSTREAM_RPS=2
@@ -27,8 +27,14 @@ export MODEL="${MODEL:-$DEFAULT_MODEL}"
 export DURATION_MIN="${DURATION_MIN:-$DEFAULT_DURATION_MIN}"
 export NONSTREAM_RPS="${NONSTREAM_RPS:-$DEFAULT_NONSTREAM_RPS}"
 export STREAM_RPS="${STREAM_RPS:-$DEFAULT_STREAM_RPS}"
+export DEBUG="${DEBUG:-false}"
+export SINGLE_RUN="${SINGLE_RUN:-false}"
+
+# Cloudflare load test token (required for API access)
 export LOADTEST_TOKEN="${LOADTEST_TOKEN:-}"
-export API_KEY="${API_KEY:-}"
+
+# Guest authentication - no API keys needed
+# Tests automatically use guest login
 
 # Prometheus remote write configuration (following k6 docs)
 export K6_PROMETHEUS_RW_SERVER_URL="${K6_PROMETHEUS_RW_SERVER_URL:-}"
@@ -78,9 +84,16 @@ validate_env() {
         exit 1
     fi
     
-    if [[ -z "$API_KEY" && -z "$LOADTEST_TOKEN" ]]; then
-        log_warning "Neither API_KEY nor LOADTEST_TOKEN is set. Test might fail."
+    # Check for Cloudflare load test token
+    if [[ -z "$LOADTEST_TOKEN" ]]; then
+        log_warning "LOADTEST_TOKEN is not set - this may be required for Cloudflare API access"
+        log_info "Set LOADTEST_TOKEN environment variable or add it to .env file"
+    else
+        log_info "Cloudflare load test token configured: [CONFIGURED]"
     fi
+    
+    # Guest authentication - no API keys needed
+    log_info "Using guest authentication (no API keys required)"
     
     # Validate Prometheus endpoint format if provided
     if [[ -n "$K6_PROMETHEUS_RW_SERVER_URL" ]]; then
@@ -186,6 +199,13 @@ run_single_test_case() {
     log_info "  Duration: ${DURATION_MIN} minutes"
     log_info "  Non-stream RPS: $NONSTREAM_RPS"
     log_info "  Stream RPS: $STREAM_RPS"
+    log_info "  Debug Mode: $DEBUG"
+    log_info "  Single Run: $SINGLE_RUN"
+    if [[ -n "$LOADTEST_TOKEN" ]]; then
+        log_info "  Load Test Token: [CONFIGURED]"
+    else
+        log_info "  Load Test Token: [NOT SET]"
+    fi
     log_info "  Output: $output_file"
     
     # Generate unique test ID for metrics segmentation
@@ -249,7 +269,7 @@ run_single_test_case() {
             # Parse JSON output for key metrics (requires jq)
             if command -v jq &> /dev/null; then
                 echo "==================== METRICS SUMMARY ===================="
-                jq -r '.metrics | to_entries[] | select(.key | contains("llm_")) | "\(.key): \(.value.avg // .value.count)"' "$output_file" 2>/dev/null || true
+                jq -r '.metrics | to_entries[] | select(.key | contains("completion_") or contains("conversation_") or contains("response_") or contains("guest_") or contains("refresh_")) | "\(.key): \(.value.avg // .value.count)"' "$output_file" 2>/dev/null || true
                 echo "=========================================================="
             fi
             
@@ -289,9 +309,11 @@ list_test_cases() {
     log_info "  $0 [test_case_name]   # Run specific test case"
     log_info ""
     log_info "Examples:"
-    log_info "  $0                    # Run all tests"
-    log_info "  $0 chat-completion    # Run only chat-completion test"
-    log_info "  $0 --list             # Show this help"
+    log_info "  $0                                    # Run all tests"
+    log_info "  $0 test-completion-standard          # Run only standard completion test"
+    log_info "  $0 test-completion-conversation      # Run only conversation test"
+    log_info "  $0 test-responses                     # Run only response API test"
+    log_info "  $0 --list                             # Show this help"
 }
 
 # Main execution
