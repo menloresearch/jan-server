@@ -5,7 +5,7 @@ on:
       - dev
     paths:
       - "apps/jan-api-gateway/**"
-      - .github/workflows/dev-jan-api-gateway
+      - .github/workflows/dev.yml
       - .github/workflows/template-docker.yml
   pull_request:
     branches:

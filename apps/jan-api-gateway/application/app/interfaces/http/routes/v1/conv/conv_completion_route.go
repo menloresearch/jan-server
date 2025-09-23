@@ -1,19 +1,24 @@
 package conv
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	mcpserver "github.com/mark3labs/mcp-go/server"
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/common"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
+	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
 	userdomain "menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
+	mcpimpl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
 	"menlo.ai/jan-api-gateway/app/utils/logger"
 )
@@ -28,19 +33,97 @@ type ConvCompletionAPI struct {
 	completionStreamHandler    *CompletionStreamHandler
 	conversationService        *conversation.ConversationService
 	authService                *auth.AuthService
+	serperMCP                  *mcpimpl.SerperMCP
+	mcpServer                  *mcpserver.MCPServer
 }
 
-func NewConvCompletionAPI(completionNonStreamHandler *CompletionNonStreamHandler, completionStreamHandler *CompletionStreamHandler, conversationService *conversation.ConversationService, authService *auth.AuthService) *ConvCompletionAPI {
+func NewConvCompletionAPI(completionNonStreamHandler *CompletionNonStreamHandler, completionStreamHandler *CompletionStreamHandler, conversationService *conversation.ConversationService, authService *auth.AuthService, serperMCP *mcpimpl.SerperMCP) *ConvCompletionAPI {
+	mcpSrv := mcpserver.NewMCPServer("conv-demo", "0.1.0",
+		mcpserver.WithToolCapabilities(true),
+		mcpserver.WithRecovery(),
+	)
 	return &ConvCompletionAPI{
 		completionNonStreamHandler: completionNonStreamHandler,
 		completionStreamHandler:    completionStreamHandler,
 		conversationService:        conversationService,
 		authService:                authService,
+		serperMCP:                  serperMCP,
+		mcpServer:                  mcpSrv,
 	}
 }
 
+// ConvMCP
+// @Summary MCP streamable endpoint for conversation-aware chat
+// @Description Handles Model Context Protocol (MCP) requests over an HTTP stream for conversation-aware chat functionality. The response is sent as a continuous stream of data with conversation context.
+// @Tags Conversation-aware Chat API
+// @Security BearerAuth
+// @Accept json
+// @Produce text/event-stream
+// @Param request body any true "MCP request payload"
+// @Success 200 {string} string "Streamed response (SSE or chunked transfer)"
+// @Router /v1/conv/mcp [post]
 func (completionAPI *ConvCompletionAPI) RegisterRouter(router *gin.RouterGroup) {
-	router.POST("/completions", completionAPI.PostCompletion)
+	// Register chat completions under /chat subroute
+	chatRouter := router.Group("/chat")
+	chatRouter.POST("/completions", completionAPI.PostCompletion)
+
+	// Register other endpoints at root level
+	router.GET("/models", completionAPI.GetModels)
+
+	// Register MCP endpoint
+	completionAPI.serperMCP.RegisterTool(completionAPI.mcpServer)
+	mcpHttpHandler := mcpserver.NewStreamableHTTPServer(completionAPI.mcpServer)
+	router.Any(
+		"/mcp",
+		completionAPI.authService.AppUserAuthMiddleware(),
+		MCPMethodGuard(map[string]bool{
+			// Initialization / handshake
+			"initialize":                true,
+			"notifications/initialized": true,
+			"ping":                      true,
+
+			// Tools
+			"tools/call": true,
+
+			// Prompts
+			"prompts/list": true,
+			"prompts/call": true,
+
+			// Resources
+			"resources/list":           true,
+			"resources/templates/list": true,
+			"resources/read":           true,
+
+			// If you support subscription:
+			"resources/subscribe": true,
+		}),
+		gin.WrapH(mcpHttpHandler))
+}
+
+// MCPMethodGuard is a middleware that guards MCP methods
+func MCPMethodGuard(allowedMethods map[string]bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		bodyBytes, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			c.Abort()
+			return
+		}
+		c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		var req struct {
+			Method string `json:"method"`
+		}
+
+		if err := json.Unmarshal(bodyBytes, &req); err != nil {
+			c.Abort()
+			return
+		}
+
+		if !allowedMethods[req.Method] {
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
 }
 
 // ExtendedChatCompletionRequest extends OpenAI's request with conversation field and store and store_reasoning fields
@@ -68,6 +151,20 @@ type ExtendedCompletionResponse struct {
 	Metadata *ResponseMetadata `json:"metadata,omitempty"`
 }
 
+// Model represents a model in the response
+type Model struct {
+	ID      string `json:"id"`
+	Object  string `json:"object"`
+	Created int    `json:"created"`
+	OwnedBy string `json:"owned_by"`
+}
+
+// ModelsResponse represents the response for listing models
+type ModelsResponse struct {
+	Object string  `json:"object"`
+	Data   []Model `json:"data"`
+}
+
 // PostCompletion
 // @Summary Create a conversation-aware chat completion
 // @Description Generates a model response for the given chat conversation with conversation persistence and management. This is the conversation-aware version of the chat completion API that supports both streaming and non-streaming modes with conversation management and storage options.
@@ -92,7 +189,7 @@ type ExtendedCompletionResponse struct {
 // @Description - Extended request format with conversation and storage options
 // @Description - User authentication required
 // @Description - Automatic conversation creation and management
-// @Tags Conversations
+// @Tags Conversation-aware Chat API
 // @Security BearerAuth
 // @Accept json
 // @Produce json
@@ -170,6 +267,38 @@ func (api *ConvCompletionAPI) PostCompletion(reqCtx *gin.Context) {
 	if !request.Stream && modifiedResponse != nil {
 		reqCtx.JSON(http.StatusOK, modifiedResponse)
 	}
+}
+
+// GetModels
+// @Summary List available models for conversation-aware chat
+// @Description Retrieves a list of available models that can be used for conversation-aware chat completions. This endpoint provides the same model list as the standard /v1/models endpoint but is specifically designed for conversation-aware chat functionality.
+// @Tags Conversation-aware Chat API
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Success 200 {object} ModelsResponse "Successful response"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized - missing or invalid authentication"
+// @Router /v1/conv/models [get]
+func (api *ConvCompletionAPI) GetModels(reqCtx *gin.Context) {
+	// Import the necessary packages at the top of the file
+	registry := inferencemodelregistry.GetInstance()
+	models := registry.ListModels()
+
+	// Convert to response format
+	responseData := make([]Model, len(models))
+	for i, model := range models {
+		responseData[i] = Model{
+			ID:      model.ID,
+			Object:  model.Object,
+			Created: model.Created,
+			OwnedBy: model.OwnedBy,
+		}
+	}
+
+	reqCtx.JSON(http.StatusOK, ModelsResponse{
+		Object: "list",
+		Data:   responseData,
+	})
 }
 
 // processCompletionResponse handles the common response processing logic for both streaming and non-streaming

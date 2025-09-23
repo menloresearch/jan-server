@@ -63,7 +63,7 @@ func (inviteRoute *InvitesRoute) RegisterRouter(router gin.IRouter) {
 // ListInvites godoc
 // @Summary List Organization Invites
 // @Description Retrieves a paginated list of invites for the current organization.
-// @Tags Organizations
+// @Tags Administration API
 // @Security BearerAuth
 // @Param after query string false "Cursor pointing to a record after which to fetch results"
 // @Param limit query int false "Maximum number of results to return"
@@ -156,7 +156,7 @@ type CreateInviteUserRequest struct {
 // CreateInvite godoc
 // @Summary Create Invite
 // @Description Creates a new invite for a user to join the organization.
-// @Tags Organizations
+// @Tags Administration API
 // @Security BearerAuth
 // @Accept json
 // @Produce json
@@ -276,7 +276,7 @@ func (api *InvitesRoute) CreateInvite(reqCtx *gin.Context) {
 // RetrieveInvite godoc
 // @Summary Retrieve Invite
 // @Description Retrieves a specific invite by its ID.
-// @Tags Organizations
+// @Tags Administration API
 // @Security BearerAuth
 // @Param invite_id path string true "Public ID of the invite"
 // @Success 200 {object} InviteResponse "Successfully retrieved invite"
@@ -294,7 +294,7 @@ func (api *InvitesRoute) RetrieveInvite(reqCtx *gin.Context) {
 // DeleteInvite godoc
 // @Summary Delete Invite
 // @Description Deletes a specific invite by its ID. Only organization owners can delete invites.
-// @Tags Organizations
+// @Tags Administration API
 // @Security BearerAuth
 // @Param invite_id path string true "Public ID of the invite"
 // @Success 200 {object} openai.DeleteResponse "Successfully deleted invite"

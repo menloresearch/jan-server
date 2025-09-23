@@ -25,7 +25,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Authentication"
+                    "Authentication API"
                 ],
                 "summary": "Google OAuth2 Callback",
                 "parameters": [
@@ -71,7 +71,7 @@ const docTemplate = `{
             "get": {
                 "description": "Redirects the user to the Google OAuth2 authorization page to initiate the login process.",
                 "tags": [
-                    "Authentication"
+                    "Authentication API"
                 ],
                 "summary": "Google OAuth2 Login",
                 "responses": {
@@ -97,7 +97,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Authentication"
+                    "Authentication API"
                 ],
                 "summary": "Guest Login",
                 "responses": {
@@ -132,7 +132,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Authentication"
+                    "Authentication API"
                 ],
                 "summary": "Refresh an access token",
                 "responses": {
@@ -166,7 +166,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Authentication"
+                    "Authentication API"
                 ],
                 "summary": "Get user profile",
                 "responses": {
@@ -195,7 +195,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Authentication"
+                    "Authentication API"
                 ],
                 "summary": "Refresh an access token",
                 "responses": {
@@ -236,7 +236,7 @@ const docTemplate = `{
                     "text/event-stream"
                 ],
                 "tags": [
-                    "Chat"
+                    "Chat Completions API"
                 ],
                 "summary": "Create a chat completion",
                 "parameters": [
@@ -294,7 +294,7 @@ const docTemplate = `{
                     "text/event-stream"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Conversation-aware Chat API"
                 ],
                 "summary": "Create a conversation-aware chat completion",
                 "parameters": [
@@ -342,6 +342,77 @@ const docTemplate = `{
                 }
             }
         },
+        "/v1/conv/mcp": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Handles Model Context Protocol (MCP) requests over an HTTP stream for conversation-aware chat functionality. The response is sent as a continuous stream of data with conversation context.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "Conversation-aware Chat API"
+                ],
+                "summary": "MCP streamable endpoint for conversation-aware chat",
+                "parameters": [
+                    {
+                        "description": "MCP request payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {}
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Streamed response (SSE or chunked transfer)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/conv/models": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieves a list of available models that can be used for conversation-aware chat completions. This endpoint provides the same model list as the standard /v1/models endpoint but is specifically designed for conversation-aware chat functionality.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Conversation-aware Chat API"
+                ],
+                "summary": "List available models for conversation-aware chat",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conv.ModelsResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - missing or invalid authentication",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/conversations": {
             "get": {
                 "security": [
@@ -351,7 +422,7 @@ const docTemplate = `{
                 ],
                 "description": "Retrieves a paginated list of conversations for the authenticated user with OpenAI-compatible response format.",
                 "tags": [
-                    "Conversations"
+                    "Conversations API"
                 ],
                 "summary": "List Conversations",
                 "parameters": [
@@ -416,7 +487,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Conversations API"
                 ],
                 "summary": "Create a conversation",
                 "parameters": [
@@ -470,7 +541,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Conversations API"
                 ],
                 "summary": "Get a conversation",
                 "parameters": [
@@ -526,7 +597,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Conversations API"
                 ],
                 "summary": "Delete a conversation",
                 "parameters": [
@@ -585,7 +656,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Conversations API"
                 ],
                 "summary": "Update a conversation",
                 "parameters": [
@@ -658,7 +729,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Conversations API"
                 ],
                 "summary": "List items in a conversation",
                 "parameters": [
@@ -741,7 +812,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Conversations API"
                 ],
                 "summary": "Create items in a conversation",
                 "parameters": [
@@ -814,7 +885,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Conversations API"
                 ],
                 "summary": "Get an item from a conversation",
                 "parameters": [
@@ -877,7 +948,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Conversations"
+                    "Conversations API"
                 ],
                 "summary": "Delete an item from a conversation",
                 "parameters": [
@@ -951,7 +1022,7 @@ const docTemplate = `{
                     "text/event-stream"
                 ],
                 "tags": [
-                    "MCP"
+                    "Chat Completions API"
                 ],
                 "summary": "MCP streamable endpoint",
                 "parameters": [
@@ -988,7 +1059,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Models"
+                    "Chat Completions API"
                 ],
                 "summary": "List available models",
                 "responses": {
@@ -1010,7 +1081,7 @@ const docTemplate = `{
                 ],
                 "description": "Retrieves a paginated list of all admin API keys for the authenticated organization.",
                 "tags": [
-                    "Organizations"
+                    "Administration API"
                 ],
                 "summary": "List Admin API Keys",
                 "parameters": [
@@ -1063,7 +1134,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Organizations"
+                    "Administration API"
                 ],
                 "summary": "Create Admin API Key",
                 "parameters": [
@@ -1108,7 +1179,7 @@ const docTemplate = `{
                 ],
                 "description": "Retrieves a specific admin API key by its ID.",
                 "tags": [
-                    "Organizations"
+                    "Administration API"
                 ],
                 "summary": "Get Admin API Key",
                 "parameters": [
@@ -1149,7 +1220,7 @@ const docTemplate = `{
                 ],
                 "description": "Deletes an admin API key by its ID.",
                 "tags": [
-                    "Organizations"
+                    "Administration API"
                 ],
                 "summary": "Delete Admin API Key",
                 "parameters": [
@@ -1192,7 +1263,7 @@ const docTemplate = `{
                 ],
                 "description": "Retrieves a paginated list of invites for the current organization.",
                 "tags": [
-                    "Organizations"
+                    "Administration API"
                 ],
                 "summary": "List Organization Invites",
                 "parameters": [
@@ -1250,7 +1321,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Organizations"
+                    "Administration API"
                 ],
                 "summary": "Create Invite",
                 "parameters": [
@@ -1301,7 +1372,7 @@ const docTemplate = `{
                 ],
                 "description": "Retrieves a specific invite by its ID.",
                 "tags": [
-                    "Organizations"
+                    "Administration API"
                 ],
                 "summary": "Retrieve Invite",
                 "parameters": [
@@ -1342,7 +1413,7 @@ const docTemplate = `{
                 ],
                 "description": "Deletes a specific invite by its ID. Only organization owners can delete invites.",
                 "tags": [
-                    "Organizations"
+                    "Administration API"
                 ],
                 "summary": "Delete Invite",
                 "parameters": [
@@ -1391,7 +1462,7 @@ const docTemplate = `{
                 ],
                 "description": "Retrieves a paginated list of all projects for the authenticated organization.",
                 "tags": [
-                    "Organizations"
+                    "Administration API"
                 ],
                 "summary": "List Projects",
                 "parameters": [
@@ -1450,7 +1521,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Organizations"
+                    "Administration API"
                 ],
                 "summary": "Create Project",
                 "parameters": [
@@ -1501,7 +1572,7 @@ const docTemplate = `{
                 ],
                 "description": "Retrieves a specific project by its ID.",
                 "tags": [
-                    "Organizations"
+                    "Administration API"
                 ],
                 "summary": "Get Project",
                 "parameters": [
@@ -1548,7 +1619,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Organizations"
+                    "Administration API"
                 ],
                 "summary": "Update Project",
                 "parameters": [
@@ -1606,7 +1677,7 @@ const docTemplate = `{
                 ],
                 "description": "Archives a specific project by its ID, making it inactive.",
                 "tags": [
-                    "Organizations"
+                    "Administration API"
                 ],
                 "summary": "Archive Project",
                 "parameters": [
@@ -1655,7 +1726,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Organizations"
+                    "Administration API"
                 ],
                 "summary": "List new project API key",
                 "parameters": [
@@ -1714,7 +1785,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Organizations"
+                    "Administration API"
                 ],
                 "summary": "Create a new project API key",
                 "parameters": [
@@ -1784,8 +1855,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Jan",
-                    "Jan-Responses"
+                    "Responses API"
                 ],
                 "summary": "Create a response",
                 "parameters": [
@@ -1860,8 +1930,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Jan",
-                    "Jan-Responses"
+                    "Responses API"
                 ],
                 "summary": "Get a response",
                 "parameters": [
@@ -1926,8 +1995,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Jan",
-                    "Jan-Responses"
+                    "Responses API"
                 ],
                 "summary": "Delete a response",
                 "parameters": [
@@ -1994,8 +2062,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Jan",
-                    "Jan-Responses"
+                    "Responses API"
                 ],
                 "summary": "Cancel a response",
                 "parameters": [
@@ -2062,8 +2129,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Jan",
-                    "Jan-Responses"
+                    "Responses API"
                 ],
                 "summary": "List input items",
                 "parameters": [
@@ -2140,7 +2206,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Jan Server"
+                    "Server API"
                 ],
                 "summary": "Get API build version",
                 "responses": {
@@ -2451,6 +2517,37 @@ const docTemplate = `{
                 },
                 "usage": {
                     "$ref": "#/definitions/openai.Usage"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_conv.Model": {
+            "type": "object",
+            "properties": {
+                "created": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "object": {
+                    "type": "string"
+                },
+                "owned_by": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_conv.ModelsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app_interfaces_http_routes_v1_conv.Model"
+                    }
+                },
+                "object": {
+                    "type": "string"
                 }
             }
         },
