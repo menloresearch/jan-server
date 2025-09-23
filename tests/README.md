@@ -15,11 +15,11 @@ k6 run src/test-completion-standard.js
 
 ### With Monitoring
 ```bash
-# Start Grafana monitoring
-./grafana/setup-monitoring.sh
+# Start Grafana monitoring with Prometheus
+./setup-monitoring.sh
 
-# Run test with metrics
-./grafana/run-test-with-monitoring.sh test-completion-standard
+# Run test with metrics automatically sent to Grafana
+./run-test-with-monitoring.sh test-completion-standard
 ```
 
 ## 📚 Documentation
@@ -77,9 +77,11 @@ SINGLE_RUN=true
 ## 📊 Monitoring
 
 ### Grafana Dashboard
+- **Status**: ✅ **Working with Prometheus integration**
 - **Location**: `grafana/grafana-dashboard.json`
-- **Setup**: `grafana/setup-monitoring.sh`
+- **Setup**: `./setup-monitoring.sh`
 - **Access**: http://localhost:3000 (admin/admin)
+- **Metrics**: Automatically sent to Prometheus and displayed in Grafana
 
 ### Available Metrics
 - HTTP performance metrics (response time, throughput, error rates)
@@ -172,10 +174,14 @@ tests/
 │   ├── README.md                           # Grafana documentation
 │   ├── docker-compose.yml                  # Monitoring stack
 │   ├── grafana-dashboard.json              # Pre-built dashboard
-│   └── setup-monitoring.sh                 # Monitoring setup
+│   └── prometheus.yml                      # Prometheus config
 ├── results/                                # Test results
 ├── HOW_TO_RUN_TESTS_LOCALLY.md             # Local testing guide
 ├── HOW_TO_CREATE_NEW_TEST_SCENARIOS.md     # New test creation guide
+├── setup-monitoring.sh                     # Monitoring setup script
+├── setup-monitoring.bat                    # Windows monitoring setup
+├── run-test-with-monitoring.sh             # Test runner with metrics
+├── run-test-with-monitoring.bat            # Windows test runner with metrics
 ├── run-loadtest.sh                         # Test runner script
 └── README.md                               # This file
 ```

@@ -209,6 +209,20 @@ k6 run --out json=results/test-results.json src/test-completion-standard.js
 k6 run src/test-completion-standard.js
 ```
 
+### With Grafana Monitoring
+
+```bash
+# Start Grafana monitoring with Prometheus
+./setup-monitoring.sh
+
+# Run test with metrics automatically sent to Grafana
+./run-test-with-monitoring.sh test-completion-standard
+```
+
+**Access Dashboards:**
+- **Grafana**: http://localhost:3000 (admin/admin)
+- **Prometheus**: http://localhost:9090
+
 ### Custom Metrics
 ```bash
 k6 run --out experimental-prometheus-rw src/test-completion-standard.js

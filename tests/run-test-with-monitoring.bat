@@ -11,7 +11,7 @@ REM Check if monitoring stack is running
 curl -s http://localhost:9090/api/v1/query?query=up >nul 2>&1
 if %errorlevel% neq 0 (
     echo ❌ Prometheus is not running. Please start the monitoring stack first:
-    echo    .\grafana\setup-monitoring.bat
+    echo    .\setup-monitoring.bat
     echo    or
     echo    docker-compose -f grafana\docker-compose.yml up -d
     pause
@@ -40,13 +40,11 @@ echo 🧪 Running test: %TEST_CASE%
 echo.
 
 REM Run the test
-if exist "..\run-loadtest.bat" (
-    cd ..
+if exist ".\run-loadtest.bat" (
     .\run-loadtest.bat %TEST_CASE%
-    cd grafana
 ) else (
     echo ❌ run-loadtest.bat not found. Running k6 directly...
-    k6 run --out experimental-prometheus-rw "..\src\%TEST_CASE%.js"
+    k6 run --out experimental-prometheus-rw "src\%TEST_CASE%.js"
 )
 
 echo.

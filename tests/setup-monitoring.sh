@@ -27,14 +27,14 @@ echo
 
 # Start the monitoring stack
 echo "🚀 Starting Grafana and Prometheus..."
-docker-compose up -d
+docker-compose -f grafana/docker-compose.yml up -d
 
 echo
 echo "⏳ Waiting for services to start..."
 sleep 10
 
 # Check if services are running
-if docker-compose ps | grep -q "Up"; then
+if docker-compose -f grafana/docker-compose.yml ps | grep -q "Up"; then
     echo "✅ Services started successfully!"
     echo
     echo "📊 Access your monitoring dashboard:"
@@ -48,11 +48,13 @@ if docker-compose ps | grep -q "Up"; then
     echo "🧪 To run tests with metrics:"
     echo "   export K6_PROMETHEUS_RW_SERVER_URL=\"http://localhost:9090/api/v1/write\""
     echo "   ./run-loadtest.sh test-completion-standard"
+    echo "   or"
+    echo "   ./run-test-with-monitoring.sh test-completion-standard"
     echo
     echo "📈 The K6 dashboard will be automatically loaded in Grafana"
     echo
 else
     echo "❌ Failed to start services. Check the logs:"
-    echo "   docker-compose logs"
+    echo "   docker-compose -f grafana/docker-compose.yml logs"
     exit 1
 fi

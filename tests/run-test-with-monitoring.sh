@@ -13,7 +13,7 @@ echo
 # Check if monitoring stack is running
 if ! curl -s http://localhost:9090/api/v1/query?query=up >/dev/null 2>&1; then
     echo "❌ Prometheus is not running. Please start the monitoring stack first:"
-    echo "   ./grafana/setup-monitoring.sh"
+    echo "   ./setup-monitoring.sh"
     echo "   or"
     echo "   docker-compose -f grafana/docker-compose.yml up -d"
     exit 1
@@ -37,13 +37,11 @@ echo "🧪 Running test: $TEST_CASE"
 echo
 
 # Run the test
-if [ -f "../run-loadtest.sh" ]; then
-    cd ..
+if [ -f "./run-loadtest.sh" ]; then
     ./run-loadtest.sh "$TEST_CASE"
-    cd grafana
 else
     echo "❌ run-loadtest.sh not found. Running k6 directly..."
-    k6 run --out experimental-prometheus-rw "../src/$TEST_CASE.js"
+    k6 run --out experimental-prometheus-rw "src/$TEST_CASE.js"
 fi
 
 echo

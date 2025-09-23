@@ -10,11 +10,13 @@ grafana/
 ├── docker-compose.yml                  # Docker Compose for Grafana + Prometheus
 ├── grafana-dashboard.json              # Pre-built K6 dashboard
 ├── prometheus.yml                      # Prometheus configuration
-├── grafana-provisioning/               # Grafana auto-provisioning
-│   ├── dashboards/
-│   │   └── dashboard.yml              # Dashboard provisioning config
-│   └── datasources/
-│       └── prometheus.yml              # Prometheus datasource config
+└── grafana-provisioning/               # Grafana auto-provisioning
+    ├── dashboards/
+    │   └── dashboard.yml              # Dashboard provisioning config
+    └── datasources/
+        └── prometheus.yml              # Prometheus datasource config
+
+../ (parent directory)
 ├── setup-monitoring.sh                 # Linux/Mac setup script
 ├── setup-monitoring.bat                # Windows setup script
 ├── run-test-with-monitoring.sh         # Linux/Mac test runner with metrics
@@ -27,24 +29,24 @@ grafana/
 
 **Linux/Mac:**
 ```bash
-./setup-monitoring.sh
+../setup-monitoring.sh
 ```
 
 **Windows:**
 ```cmd
-.\setup-monitoring.bat
+..\setup-monitoring.bat
 ```
 
 ### 2. Run Tests with Metrics
 
 **Linux/Mac:**
 ```bash
-./run-test-with-monitoring.sh test-completion-standard
+../run-test-with-monitoring.sh test-completion-standard
 ```
 
 **Windows:**
 ```cmd
-.\run-test-with-monitoring.bat test-completion-standard
+..\run-test-with-monitoring.bat test-completion-standard
 ```
 
 ### 3. View Results
