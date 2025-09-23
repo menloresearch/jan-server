@@ -63,15 +63,15 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	err = database.Migration()
+	if err != nil {
+		panic(err)
+	}
 	dataInitializer, err := CreateDataInitializer()
 	if err != nil {
 		panic(err)
 	}
 	err = dataInitializer.Install(background)
-	if err != nil {
-		panic(err)
-	}
-	err = database.Migration()
 	if err != nil {
 		panic(err)
 	}

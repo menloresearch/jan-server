@@ -52,12 +52,30 @@ type InviteResponse struct {
 }
 
 func (inviteRoute *InvitesRoute) RegisterRouter(router gin.IRouter) {
-	inviteRouter := router.Group("/invites")
-	inviteRouter.POST("", inviteRoute.CreateInvite)
-	inviteRouter.GET("", inviteRoute.ListInvites)
+	permissionAll := inviteRoute.authService.OrganizationMemberRoleMiddleware(auth.OrganizationMemberRuleAll)
+	permissionOwnerOnly := inviteRoute.authService.OrganizationMemberRoleMiddleware(auth.OrganizationMemberRuleOwnerOnly)
+	inviteRouter := router.Group(
+		"/invites",
+		inviteRoute.authService.AdminUserAuthMiddleware(),
+		inviteRoute.authService.RegisteredUserMiddleware(),
+	)
+	inviteRouter.POST("",
+		permissionOwnerOnly,
+		inviteRoute.CreateInvite,
+	)
+	inviteRouter.GET(
+		"",
+		permissionAll,
+		inviteRoute.ListInvites,
+	)
 	inviteIdRoute := inviteRouter.Group(fmt.Sprintf("/:%s", auth.InviteContextKeyPublicID), inviteRoute.authService.AdminInviteMiddleware())
-	inviteIdRoute.GET("", inviteRoute.RetrieveInvite)
-	inviteIdRoute.DELETE("", inviteRoute.authService.RegisteredOrganizationMiddleware(), inviteRoute.DeleteInvite)
+	inviteIdRoute.GET("",
+		permissionAll,
+		inviteRoute.RetrieveInvite)
+	inviteIdRoute.DELETE("",
+		permissionOwnerOnly,
+		inviteRoute.DeleteInvite,
+	)
 }
 
 // ListInvites godoc

@@ -32,6 +32,7 @@ type ProjectFilter struct {
 	OrganizationID *uint
 	Archived       *bool
 	PublicIDs      *[]string
+	MemberID       *uint
 }
 
 type ProjectStatus string

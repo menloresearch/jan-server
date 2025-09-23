@@ -70,6 +70,11 @@ func (repo *ProjectGormRepository) applyFilter(query *gormgen.Query, sql gormgen
 	if filter.PublicIDs != nil {
 		sql = sql.Where(query.Project.PublicID.In(*filter.PublicIDs...))
 	}
+	if filter.MemberID != nil {
+		sql = sql.
+			Join(query.ProjectMember, query.ProjectMember.ProjectID.EqCol(query.Project.ID)).
+			Where(query.ProjectMember.UserID.Eq(*filter.MemberID))
+	}
 	return sql
 }
 

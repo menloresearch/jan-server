@@ -62,13 +62,7 @@ func (api *ProjectApiKeyRoute) ListProjectApiKey(reqCtx *gin.Context) {
 	if !ok {
 		return
 	}
-	organizationEntity, ok := api.organizationService.GetOrganizationFromContext(reqCtx)
-	if !ok {
-		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code: "3d1ab99a-e2d3-4d13-9130-56eb662e5f92",
-		})
-		return
-	}
+	organizationEntity := organization.DEFAULT_ORGANIZATION
 
 	project, ok := auth.GetProjectFromContext(reqCtx)
 	if !ok {
@@ -154,10 +148,10 @@ func (api *ProjectApiKeyRoute) CreateProjectApiKey(reqCtx *gin.Context) {
 		return
 	}
 
-	organizationEntity, ok := api.organizationService.GetOrganizationFromContext(reqCtx)
+	organizationEntity, ok := auth.GetAdminOrganizationFromContext(reqCtx)
 	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code: "3d1ab99a-e2d3-4d13-9130-56eb662e5f92",
+			Code: "fc306f46-7125-4724-8fda-468402606ac7",
 		})
 		return
 	}
