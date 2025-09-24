@@ -2,8 +2,14 @@ dependencies:
 - name: jan-api-gateway
   repository: file://../apps-charts/jan-api-gateway
   version: 0.1.0
+- name: jan-inference-model
+  repository: file://../apps-charts/jan-inference-model
+  version: 0.1.0
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
   version: 16.7.27
-digest: sha256:1f2e9d25dd023ad91a182d713d38081c7257b7e81d145d37913788841c0ca2a5
-generated: "2025-09-03T12:20:17.067104+08:00"
+- name: redis
+  repository: https://charts.bitnami.com/bitnami
+  version: 22.0.7
+digest: sha256:264353ce28ea179c91275410c543ba3e2891466b303b789214fb83666970d421
+generated: "2025-09-24T20:43:11.2408544+07:00"

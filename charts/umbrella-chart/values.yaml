@@ -42,6 +42,7 @@ jan-inference-model:
   service:
     type: ClusterIP
     port: 8101
+  resources: {}
 
 postgresql:
   auth:
