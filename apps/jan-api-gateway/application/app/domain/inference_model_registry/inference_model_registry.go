@@ -26,7 +26,7 @@ func NewInferenceModelRegistry(cacheService *cache.RedisCacheService) *Inference
 		modelsDetail:     make(map[string]inferencemodel.Model),
 		models:           make([]inferencemodel.Model, 0),
 		cache:            cacheService,
-		cacheExpiry:      10 * time.Minute, // Cache registry data for 10 minutes
+		cacheExpiry:      1 * time.Minute, // Cache registry data for 1 minute
 	}
 }
 
@@ -73,7 +73,7 @@ func (r *InferenceModelRegistry) GetEndpointToModels(ctx context.Context, servic
 
 	err := r.cache.GetWithFallback(ctx, cacheKey, &models, func() (any, error) {
 		// Cache miss, return from memory
-		models, _ := r.endpointToModels[serviceName]
+		models := r.endpointToModels[serviceName]
 		return models, nil
 	}, r.cacheExpiry)
 
