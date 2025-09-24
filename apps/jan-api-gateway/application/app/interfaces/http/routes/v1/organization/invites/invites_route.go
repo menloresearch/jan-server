@@ -291,6 +291,36 @@ func (api *InvitesRoute) CreateInvite(reqCtx *gin.Context) {
 	reqCtx.JSON(http.StatusOK, convertInviteEntityToResponse(inviteEntity))
 }
 
+// @Router /v1/organization/invites/verification [get]
+func (api *InvitesRoute) VerifyInvites(reqCtx *gin.Context) {
+	code := reqCtx.Query("code")
+	if code == "" {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code: "2633626f-6643-4288-bf34-468a8b670a79",
+		})
+		return
+	}
+	ctx := reqCtx.Request.Context()
+	inviteEntity, err := api.inviteService.FindOne(ctx, invite.InvitesFilter{
+		Secrets: &code,
+	})
+	if err != nil || inviteEntity == nil {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code: "dc9e8394-2c28-40c9-93e1-7878f67992c4",
+		})
+		return
+	}
+	if inviteEntity.IsExpired() {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code: "eb940d50-60bc-498e-9512-93f741a80d7b",
+		})
+		return
+	}
+	api.authService
+	inviteEntity.GetProjects()
+	
+}
+
 // RetrieveInvite godoc
 // @Summary Retrieve Invite
 // @Description Retrieves a specific invite by its ID.

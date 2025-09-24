@@ -32,6 +32,10 @@ func (i *Invite) GetProjects() ([]InviteProject, error) {
 	return projects, nil
 }
 
+func (i *Invite) IsExpired() bool {
+	return time.Now().After(i.ExpiresAt)
+}
+
 type InviteStatus string
 
 const (
@@ -55,6 +59,7 @@ type InviteProject struct {
 type InvitesFilter struct {
 	PublicID       *string
 	OrganizationID *uint
+	Secrets        *string
 }
 
 type InviteRepository interface {
