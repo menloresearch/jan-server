@@ -11,16 +11,19 @@ import (
 type ConvChatRoute struct {
 	authService       *auth.AuthService
 	convCompletionAPI *ConvCompletionAPI
+	convMCPAPI        *ConvMCPAPI
 }
 
 // NewConvChatRoute creates a new conversation-aware chat route handler
 func NewConvChatRoute(
 	authService *auth.AuthService,
 	convCompletionAPI *ConvCompletionAPI,
+	convMCPAPI *ConvMCPAPI,
 ) *ConvChatRoute {
 	return &ConvChatRoute{
 		authService:       authService,
 		convCompletionAPI: convCompletionAPI,
+		convMCPAPI:        convMCPAPI,
 	}
 }
 
@@ -33,4 +36,7 @@ func (convChatRoute *ConvChatRoute) RegisterRouter(router gin.IRouter) {
 		convChatRoute.authService.RegisteredUserMiddleware(),
 	)
 	convChatRoute.convCompletionAPI.RegisterRouter(convChatRouter)
+
+	// Register MCP routes separately (without RegisteredUserMiddleware to avoid content type conflicts)
+	convChatRoute.convMCPAPI.RegisterRouter(convChatRouter)
 }
