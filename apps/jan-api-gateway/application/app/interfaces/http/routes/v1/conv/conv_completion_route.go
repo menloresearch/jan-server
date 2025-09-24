@@ -1,16 +1,13 @@
 package conv
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	mcpserver "github.com/mark3labs/mcp-go/server"
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/common"
@@ -18,7 +15,6 @@ import (
 	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
 	userdomain "menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
-	mcpimpl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
 	"menlo.ai/jan-api-gateway/app/utils/logger"
 )
@@ -33,35 +29,17 @@ type ConvCompletionAPI struct {
 	completionStreamHandler    *CompletionStreamHandler
 	conversationService        *conversation.ConversationService
 	authService                *auth.AuthService
-	serperMCP                  *mcpimpl.SerperMCP
-	mcpServer                  *mcpserver.MCPServer
 }
 
-func NewConvCompletionAPI(completionNonStreamHandler *CompletionNonStreamHandler, completionStreamHandler *CompletionStreamHandler, conversationService *conversation.ConversationService, authService *auth.AuthService, serperMCP *mcpimpl.SerperMCP) *ConvCompletionAPI {
-	mcpSrv := mcpserver.NewMCPServer("conv-demo", "0.1.0",
-		mcpserver.WithToolCapabilities(true),
-		mcpserver.WithRecovery(),
-	)
+func NewConvCompletionAPI(completionNonStreamHandler *CompletionNonStreamHandler, completionStreamHandler *CompletionStreamHandler, conversationService *conversation.ConversationService, authService *auth.AuthService) *ConvCompletionAPI {
 	return &ConvCompletionAPI{
 		completionNonStreamHandler: completionNonStreamHandler,
 		completionStreamHandler:    completionStreamHandler,
 		conversationService:        conversationService,
 		authService:                authService,
-		serperMCP:                  serperMCP,
-		mcpServer:                  mcpSrv,
 	}
 }
 
-// ConvMCP
-// @Summary MCP streamable endpoint for conversation-aware chat
-// @Description Handles Model Context Protocol (MCP) requests over an HTTP stream for conversation-aware chat functionality. The response is sent as a continuous stream of data with conversation context.
-// @Tags Conversation-aware Chat API
-// @Security BearerAuth
-// @Accept json
-// @Produce text/event-stream
-// @Param request body any true "MCP request payload"
-// @Success 200 {string} string "Streamed response (SSE or chunked transfer)"
-// @Router /v1/conv/mcp [post]
 func (completionAPI *ConvCompletionAPI) RegisterRouter(router *gin.RouterGroup) {
 	// Register chat completions under /chat subroute
 	chatRouter := router.Group("/chat")
@@ -69,61 +47,6 @@ func (completionAPI *ConvCompletionAPI) RegisterRouter(router *gin.RouterGroup) 
 
 	// Register other endpoints at root level
 	router.GET("/models", completionAPI.GetModels)
-
-	// Register MCP endpoint
-	completionAPI.serperMCP.RegisterTool(completionAPI.mcpServer)
-	mcpHttpHandler := mcpserver.NewStreamableHTTPServer(completionAPI.mcpServer)
-	router.Any(
-		"/mcp",
-		completionAPI.authService.AppUserAuthMiddleware(),
-		MCPMethodGuard(map[string]bool{
-			// Initialization / handshake
-			"initialize":                true,
-			"notifications/initialized": true,
-			"ping":                      true,
-
-			// Tools
-			"tools/call": true,
-
-			// Prompts
-			"prompts/list": true,
-			"prompts/call": true,
-
-			// Resources
-			"resources/list":           true,
-			"resources/templates/list": true,
-			"resources/read":           true,
-
-			// If you support subscription:
-			"resources/subscribe": true,
-		}),
-		gin.WrapH(mcpHttpHandler))
-}
-
-// MCPMethodGuard is a middleware that guards MCP methods
-func MCPMethodGuard(allowedMethods map[string]bool) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		bodyBytes, err := io.ReadAll(c.Request.Body)
-		if err != nil {
-			c.Abort()
-			return
-		}
-		c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-		var req struct {
-			Method string `json:"method"`
-		}
-
-		if err := json.Unmarshal(bodyBytes, &req); err != nil {
-			c.Abort()
-			return
-		}
-
-		if !allowedMethods[req.Method] {
-			c.Abort()
-			return
-		}
-		c.Next()
-	}
 }
 
 // ExtendedChatCompletionRequest extends OpenAI's request with conversation field and store and store_reasoning fields
