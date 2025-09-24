@@ -60,7 +60,7 @@ func (s *AuthService) InitOrganization(ctx context.Context) error {
 		return err
 	}
 	// set DEFAULT_ORGANIZATION
-	organization.DEFAULT_ORGANIZATION = orgEntity
+	organization.UpdateDefaultOrganization(orgEntity)
 
 	email := environment_variables.EnvironmentVariables.ORGANIZATION_ADMIN_EMAIL
 	admin, err := s.userService.FindByEmail(ctx, email)
@@ -233,7 +233,7 @@ var OrganizationMemberRuleAll = map[string]bool{
 	string(organization.OrganizationMemberRoleReader): true,
 }
 
-func (s *AuthService) getOrganizationMember(reqCtx *gin.Context) (*organization.OrganizationMember, bool) {
+func (s *AuthService) getDefaultOrganizationMember(reqCtx *gin.Context) (*organization.OrganizationMember, bool) {
 	ctx := reqCtx.Request.Context()
 	member, ok := GetAdminOrganizationMemberFromContext(reqCtx)
 	if ok {
@@ -253,10 +253,10 @@ func (s *AuthService) getOrganizationMember(reqCtx *gin.Context) (*organization.
 	return membership, true
 }
 
-func (s *AuthService) OrganizationMemberOptionalMiddleware() gin.HandlerFunc {
+func (s *AuthService) DefaultOrganizationMemberOptionalMiddleware() gin.HandlerFunc {
 	return func(reqCtx *gin.Context) {
 		SetAdminOrganizationToContext(reqCtx, organization.DEFAULT_ORGANIZATION)
-		membership, ok := s.getOrganizationMember(reqCtx)
+		membership, ok := s.getDefaultOrganizationMember(reqCtx)
 		if ok {
 			SetAdminOrganizationMemberToContext(reqCtx, membership)
 		}
@@ -267,7 +267,7 @@ func (s *AuthService) OrganizationMemberOptionalMiddleware() gin.HandlerFunc {
 func (s *AuthService) OrganizationMemberRoleMiddleware(rolesAllowed map[string]bool) gin.HandlerFunc {
 	return func(reqCtx *gin.Context) {
 		SetAdminOrganizationToContext(reqCtx, organization.DEFAULT_ORGANIZATION)
-		membership, ok := s.getOrganizationMember(reqCtx)
+		membership, ok := s.getDefaultOrganizationMember(reqCtx)
 		if !ok {
 			reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
 				Code: "983a8764-6888-450d-a5d5-7442c3904637",

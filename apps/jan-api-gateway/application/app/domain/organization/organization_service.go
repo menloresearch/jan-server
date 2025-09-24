@@ -3,6 +3,7 @@ package organization
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"menlo.ai/jan-api-gateway/app/domain/query"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
@@ -23,7 +24,14 @@ func NewService(repo OrganizationRepository) *OrganizationService {
 	}
 }
 
+var DEFAULT_ORGANIZATION_ONCE sync.Once
 var DEFAULT_ORGANIZATION *Organization
+
+func UpdateDefaultOrganization(o *Organization) {
+	DEFAULT_ORGANIZATION_ONCE.Do(func() {
+		DEFAULT_ORGANIZATION = o
+	})
+}
 
 func (s *OrganizationService) createPublicID() (string, error) {
 	return idgen.GenerateSecureID("org", 16)

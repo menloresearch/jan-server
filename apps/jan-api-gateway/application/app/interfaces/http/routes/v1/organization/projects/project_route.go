@@ -41,7 +41,7 @@ func NewProjectsRoute(
 }
 
 func (projectsRoute *ProjectsRoute) RegisterRouter(router gin.IRouter) {
-	permissionOptional := projectsRoute.authService.OrganizationMemberOptionalMiddleware()
+	permissionOptional := projectsRoute.authService.DefaultOrganizationMemberOptionalMiddleware()
 	permissionOwnerOnly := projectsRoute.authService.OrganizationMemberRoleMiddleware(auth.OrganizationMemberRuleOwnerOnly)
 	projectsRouter := router.Group(
 		"/projects",
