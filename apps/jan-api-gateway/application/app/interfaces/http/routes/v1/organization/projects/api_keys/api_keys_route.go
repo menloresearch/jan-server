@@ -130,7 +130,6 @@ type CreateApiKeyRequest struct {
 func (api *ProjectApiKeyRoute) CreateProjectApiKey(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
 	var req CreateApiKeyRequest
-
 	// Bind the JSON payload to the struct
 	if err := reqCtx.BindJSON(&req); err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
@@ -156,13 +155,17 @@ func (api *ProjectApiKeyRoute) CreateProjectApiKey(reqCtx *gin.Context) {
 		return
 	}
 
-	project, ok := auth.GetProjectFromContext(reqCtx)
+	projectEntity, ok := auth.GetProjectFromContext(reqCtx)
 	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code: "e50b3d93-f508-401a-b55e-50ffec69e087",
 		})
 		return
 	}
+
+	api.projectService.FindOneMemberByFilter(ctx, project.ProjectMemberFilter{
+		
+	})
 
 	key, hash, err := api.apikeyService.GenerateKeyAndHash(ctx, apikey.ApikeyTypeProject)
 	if err != nil {
@@ -180,7 +183,7 @@ func (api *ProjectApiKeyRoute) CreateProjectApiKey(reqCtx *gin.Context) {
 		Enabled:        true,
 		ApikeyType:     string(apikey.ApikeyTypeProject),
 		OwnerPublicID:  user.PublicID,
-		ProjectID:      &project.ID,
+		ProjectID:      &projectEntity.ID,
 		OrganizationID: &organizationEntity.ID,
 		Permissions:    "{}",
 		ExpiresAt:      req.ExpiresAt,

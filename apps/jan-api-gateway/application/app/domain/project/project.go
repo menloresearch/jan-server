@@ -35,6 +35,12 @@ type ProjectFilter struct {
 	MemberID       *uint
 }
 
+type ProjectMemberFilter struct {
+	UserID    *uint
+	ProjectID *uint
+	Role      *string
+}
+
 type ProjectStatus string
 
 const (
@@ -61,6 +67,6 @@ type ProjectRepository interface {
 
 	AddMember(ctx context.Context, m *ProjectMember) error
 	RemoveMember(ctx context.Context, projectID, userID uint) error
-	ListMembers(ctx context.Context, projectID uint) ([]*ProjectMember, error)
+	FindMembersByFilter(ctx context.Context, filter ProjectMemberFilter, p *query.Pagination) ([]*ProjectMember, error)
 	UpdateMemberRole(ctx context.Context, projectID, userID uint, role string) error
 }

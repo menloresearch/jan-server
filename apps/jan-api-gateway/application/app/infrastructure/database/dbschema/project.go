@@ -36,6 +36,15 @@ type ProjectMember struct {
 	Role      string `gorm:"type:varchar(20);not null"`
 }
 
+func (p *ProjectMember) EtoD() *project.ProjectMember {
+	return &project.ProjectMember{
+		ID:        p.ID,
+		UserID:    p.UserID,
+		ProjectID: p.ProjectID,
+		Role:      p.Role,
+	}
+}
+
 func NewSchemaProject(p *project.Project) *Project {
 	return &Project{
 		BaseModel: BaseModel{

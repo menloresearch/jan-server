@@ -90,6 +90,20 @@ func (s *ProjectService) FindOne(ctx context.Context, filter ProjectFilter) (*Pr
 	return projectEntities[0], nil
 }
 
+func (s *ProjectService) FindOneMemberByFilter(ctx context.Context, filter ProjectMemberFilter) (*ProjectMember, error) {
+	memberEntities, err := s.repo.FindMembersByFilter(ctx, filter, nil)
+	if err != nil {
+		return nil, err
+	}
+	if len(memberEntities) == 0 {
+		return nil, nil
+	}
+	if len(memberEntities) != 1 {
+		return nil, err
+	}
+	return memberEntities[0], nil
+}
+
 // CountProjects counts the number of projects matching a given filter.
 func (s *ProjectService) CountProjects(ctx context.Context, filter ProjectFilter) (int64, error) {
 	return s.repo.Count(ctx, filter)
