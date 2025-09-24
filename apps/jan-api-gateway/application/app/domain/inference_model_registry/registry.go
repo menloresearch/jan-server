@@ -1,9 +1,11 @@
 package inferencemodelregistry
 
 import (
-	"sync"
+	"context"
+	"time"
 
 	inferencemodel "menlo.ai/jan-api-gateway/app/domain/inference_model"
+	"menlo.ai/jan-api-gateway/app/infrastructure/cache"
 	"menlo.ai/jan-api-gateway/app/utils/functional"
 )
 
@@ -12,57 +14,93 @@ type InferenceModelRegistry struct {
 	modelToEndpoints map[string][]string
 	modelsDetail     map[string]inferencemodel.Model
 	models           []inferencemodel.Model
-	mu               sync.RWMutex
+	cache            *cache.RedisCacheService
+	cacheExpiry      time.Duration
 }
 
-var (
-	once             sync.Once
-	registryInstance *InferenceModelRegistry
-)
-
-func GetInstance() *InferenceModelRegistry {
-	once.Do(func() {
-		registryInstance = &InferenceModelRegistry{
-			endpointToModels: make(map[string][]string),
-			modelToEndpoints: make(map[string][]string),
-			modelsDetail:     make(map[string]inferencemodel.Model),
-			models:           make([]inferencemodel.Model, 0),
-		}
-	})
-	return registryInstance
+// NewInferenceModelRegistry creates a new registry instance with Redis caching
+func NewInferenceModelRegistry(cacheService *cache.RedisCacheService) *InferenceModelRegistry {
+	return &InferenceModelRegistry{
+		endpointToModels: make(map[string][]string),
+		modelToEndpoints: make(map[string][]string),
+		modelsDetail:     make(map[string]inferencemodel.Model),
+		models:           make([]inferencemodel.Model, 0),
+		cache:            cacheService,
+		cacheExpiry:      10 * time.Minute, // Cache registry data for 10 minutes
+	}
 }
 
-func (r *InferenceModelRegistry) ListModels() []inferencemodel.Model {
-	return r.models
+func (r *InferenceModelRegistry) ListModels(ctx context.Context) []inferencemodel.Model {
+	var models []inferencemodel.Model
+
+	// Try to get from cache first
+	err := r.cache.GetWithFallback(ctx, cache.RegistryCacheKey, &models, func() (any, error) {
+		// Cache miss, return current models
+		return r.models, nil
+	}, r.cacheExpiry)
+
+	if err != nil {
+		// If cache fails, return current models
+		return r.models
+	}
+
+	return models
 }
 
-func (r *InferenceModelRegistry) AddModels(serviceName string, models []inferencemodel.Model) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+func (r *InferenceModelRegistry) AddModels(ctx context.Context, serviceName string, models []inferencemodel.Model) {
 	r.endpointToModels[serviceName] = functional.Map(models, func(model inferencemodel.Model) string {
 		r.modelsDetail[model.ID] = model
 		return model.ID
 	})
 	r.rebuild()
+
+	// Invalidate cache after adding models
+	r.invalidateCache(ctx)
 }
 
-func (r *InferenceModelRegistry) RemoveServiceModels(serviceName string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+func (r *InferenceModelRegistry) RemoveServiceModels(ctx context.Context, serviceName string) {
 	delete(r.endpointToModels, serviceName)
 	r.rebuild()
+
+	// Invalidate cache after removing models
+	r.invalidateCache(ctx)
 }
 
-func (r *InferenceModelRegistry) GetEndpointToModels(serviceName string) ([]string, bool) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+func (r *InferenceModelRegistry) GetEndpointToModels(ctx context.Context, serviceName string) ([]string, bool) {
+	// Try to get from cache first
+	var models []string
+	cacheKey := cache.RegistryEndpointModelsKey + ":" + serviceName
+
+	err := r.cache.GetWithFallback(ctx, cacheKey, &models, func() (any, error) {
+		// Cache miss, return from memory
+		models, _ := r.endpointToModels[serviceName]
+		return models, nil
+	}, r.cacheExpiry)
+
+	if err != nil {
+		// If cache fails, return from memory
+		models, ok := r.endpointToModels[serviceName]
+		return models, ok
+	}
+
 	models, ok := r.endpointToModels[serviceName]
 	return models, ok
 }
 
-func (r *InferenceModelRegistry) GetModelToEndpoints() map[string][]string {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+func (r *InferenceModelRegistry) GetModelToEndpoints(ctx context.Context) map[string][]string {
+	// Try to get from cache first
+	var modelToEndpoints map[string][]string
+
+	err := r.cache.GetWithFallback(ctx, cache.RegistryModelEndpointsKey, &modelToEndpoints, func() (any, error) {
+		// Cache miss, return from memory
+		return r.modelToEndpoints, nil
+	}, r.cacheExpiry)
+
+	if err != nil {
+		// If cache fails, return from memory
+		return r.modelToEndpoints
+	}
+
 	return r.modelToEndpoints
 }
 
@@ -80,4 +118,22 @@ func (r *InferenceModelRegistry) rebuild() {
 		newModels = append(newModels, r.modelsDetail[key])
 	}
 	r.models = newModels
+}
+
+// invalidateCache clears all registry-related cache entries
+func (r *InferenceModelRegistry) invalidateCache(ctx context.Context) {
+	// Clear main registry cache
+	r.cache.Delete(ctx, cache.RegistryCacheKey)
+
+	// Clear endpoint models cache
+	r.cache.DeletePattern(ctx, cache.RegistryEndpointModelsKey+":*")
+
+	// Clear model endpoints cache
+	r.cache.Delete(ctx, cache.RegistryModelEndpointsKey)
+}
+
+// ClearAllCache clears all registry cache entries (public method)
+func (r *InferenceModelRegistry) ClearAllCache(ctx context.Context) error {
+	r.invalidateCache(ctx)
+	return nil
 }

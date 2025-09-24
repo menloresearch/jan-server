@@ -18,10 +18,17 @@ import (
 )
 
 type Application struct {
-	HttpServer *apphttp.HttpServer
+	HttpServer         *apphttp.HttpServer
+	HealthcheckService *healthcheck.HealthcheckCrontabService
 }
 
 func (application *Application) Start() {
+	// Start healthcheck service
+	cron := crontab.New()
+	background := context.Background()
+	application.HealthcheckService.Start(background, cron)
+
+	// Start HTTP server
 	if err := application.HttpServer.Run(); err != nil {
 		panic(err)
 	}
@@ -45,10 +52,7 @@ func init() {
 // @name Authorization
 // @description Type "Bearer" followed by a space and JWT token.
 func main() {
-	healthcheckService := healthcheck.NewService(janinference.NewJanInferenceClient(context.Background()))
-	cron := crontab.New()
 	background := context.Background()
-	healthcheckService.Start(background, cron)
 
 	// Expose pprof endpoints for profiling (for Grafana Alloy/Pyroscope Go pull mode)
 	go func() {

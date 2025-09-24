@@ -21,5 +21,70 @@ services:
       retries: 5
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    container_name: jan-api-gateway-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  jan-api-gateway:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: jan-api-gateway-app
+    ports:
+      - "8080:8080"
+    environment:
+      # Database configuration
+      DB_POSTGRESQL_WRITE_DSN: postgres://jan_user:jan_password@postgres:5432/jan_api_gateway?sslmode=disable
+      DB_POSTGRESQL_READ1_DSN: postgres://jan_user:jan_password@postgres:5432/jan_api_gateway?sslmode=disable
+      
+      # Redis configuration
+      REDIS_URL: redis://redis:6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: "0"
+      
+      # JWT and API Key secrets
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      APIKEY_SECRET: your-api-key-secret-change-in-production
+      
+      # Jan Inference service (update with your actual URL)
+      JAN_INFERENCE_MODEL_URL: http://localhost:8000
+      
+      # Serper API (update with your actual key)
+      SERPER_API_KEY: your-serper-api-key
+      
+      # Google OAuth2 (update with your actual credentials)
+      OAUTH2_GOOGLE_CLIENT_ID: your-google-client-id
+      OAUTH2_GOOGLE_CLIENT_SECRET: your-google-client-secret
+      OAUTH2_GOOGLE_REDIRECT_URL: http://localhost:8080/v1/auth/google/callback
+      
+      # CORS configuration
+      ALLOWED_CORS_HOSTS: http://localhost:8080,http://localhost:3000
+      
+      # SMTP configuration (optional)
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USERNAME: your-smtp-username
+      SMTP_PASSWORD: your-smtp-password
+      SMTP_SENDER_EMAIL: noreply@yourdomain.com
+      INVITE_REDIRECT_URL: http://localhost:8080/invite/accept
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  redis_data:

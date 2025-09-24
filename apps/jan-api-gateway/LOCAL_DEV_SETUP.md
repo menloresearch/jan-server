@@ -18,7 +18,7 @@ jan-api-gateway/
 │   ├── launch.json                 # Debug and launch configurations
 │   └── tasks.json                  # Automated tasks (database management)
 ├── docker/                         # Docker configuration
-│   ├── docker-compose.yml         # PostgreSQL service configuration
+│   ├── docker-compose.yml         # PostgreSQL and Redis service configuration
 │   └── init.sql                   # Database initialization script
 ├── application/                    # Go application code
 │   ├── cmd/server/                # Main server entry point
@@ -41,7 +41,8 @@ jan-api-gateway/
 1. **Press `F5`** or **Run → Start Debugging**
 2. **Select "Launch Jan API Gateway (Debug)"** from the dropdown
 3. **Wait for automatic setup:**
-   - Database starts automatically
+   - PostgreSQL database starts automatically
+   - Redis cache service starts automatically
    - Environment variables are set
    - Application launches with debugger attached
 
@@ -52,7 +53,7 @@ That's it! Your development environment is ready. 🎉
 ### 1. **Launch Jan API Gateway (Debug)** ⭐ *Recommended*
 - **Purpose**: Full development environment with debugging
 - **What it does**:
-  - Automatically starts PostgreSQL database
+  - Automatically starts PostgreSQL database and Redis cache
   - Sets all required environment variables
   - Launches the application with debugger attached
   - Opens integrated terminal for logs
@@ -68,7 +69,7 @@ That's it! Your development environment is ready. 🎉
 ### 3. **Launch Tests**
 - **Purpose**: Debug unit tests
 - **What it does**:
-  - Starts database for testing
+  - Starts database and Redis for testing
   - Runs tests with debugging enabled
   - Allows setting breakpoints in test code
 - **When to use**: Debugging test failures or test logic
@@ -112,29 +113,34 @@ While the launch configurations handle the database automatically, you can also 
 1. **Press `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (macOS)**
 2. **Type "Tasks: Run Task"**
 3. **Select one of:**
-   - **Start Database** - Start PostgreSQL
-   - **Stop Database** - Stop PostgreSQL
+   - **Start Database** - Start PostgreSQL and Redis
+   - **Stop Database** - Stop PostgreSQL and Redis
    - **Wait for Database** - Check if database is ready
+   - **Wait for Redis** - Check if Redis is ready
    - **Build Application** - Build the Go application
    - **Run Tests** - Run all tests
 
 ### Using Terminal
 ```bash
-# Start database
-docker-compose -f docker/docker-compose.yml up -d postgres
+# Start database and Redis
+docker-compose -f docker/docker-compose.yml up -d postgres redis
 
-# Stop database
+# Stop all services
 docker-compose -f docker/docker-compose.yml down
 
-# Reset database (removes all data)
+# Reset database and Redis (removes all data)
 docker-compose -f docker/docker-compose.yml down -v
-docker-compose -f docker/docker-compose.yml up -d postgres
+docker-compose -f docker/docker-compose.yml up -d postgres redis
 
 # View logs
 docker-compose -f docker/docker-compose.yml logs postgres
+docker-compose -f docker/docker-compose.yml logs redis
 
 # Connect to database
 docker-compose -f docker/docker-compose.yml exec postgres psql -U jan_user -d jan_api_gateway
+
+# Connect to Redis
+docker-compose -f docker/docker-compose.yml exec redis redis-cli
 ```
 
 ## ⚙️ Environment Variables
@@ -153,6 +159,9 @@ The following environment variables are **automatically configured** in the laun
 | `OAUTH2_GOOGLE_CLIENT_ID` | Google OAuth2 client ID | `your-google-client-id` |
 | `OAUTH2_GOOGLE_CLIENT_SECRET` | Google OAuth2 client secret | `your-google-client-secret` |
 | `OAUTH2_GOOGLE_REDIRECT_URL` | Google OAuth2 redirect URL | `http://localhost:8080/auth/google/callback` |
+| `REDIS_URL` | Redis connection URL | `redis://localhost:6379` |
+| `REDIS_PASSWORD` | Redis authentication password | `` (empty for dev) |
+| `REDIS_DB` | Redis database number | `0` |
 
 **Note**: You can modify these values in `.vscode/launch.json` if needed for your environment.
 
@@ -160,9 +169,10 @@ The following environment variables are **automatically configured** in the laun
 
 ### Database Connection Issues
 1. **Check Docker**: Ensure Docker Desktop is running
-2. **Check Port**: Make sure port 5432 is available
+2. **Check Ports**: Make sure ports 5432 (PostgreSQL) and 6379 (Redis) are available
 3. **View Database Status**: Use Command Palette → "Tasks: Run Task" → "Wait for Database"
-4. **View Logs**: Check the integrated terminal for database startup logs
+4. **View Redis Status**: Use Command Palette → "Tasks: Run Task" → "Wait for Redis"
+5. **View Logs**: Check the integrated terminal for database and Redis startup logs
 
 ### Go Extension Issues
 1. **Install Go Extension**: VS Code/Cursor should prompt you automatically

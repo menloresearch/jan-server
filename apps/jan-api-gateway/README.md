@@ -11,6 +11,7 @@ A comprehensive API gateway for Jan Server that provides OpenAI-compatible endpo
 - **Authentication & Authorization**: JWT-based auth with Google OAuth2 integration and role-based access control
 - **API Key Management**: Secure API key generation and management at organization and project levels with multiple key types (admin, project, organization, service, ephemeral)
 - **Model Registry**: Dynamic model endpoint management with automatic health checking and service discovery
+- **Redis Caching**: High-performance caching for inference models to reduce load times and improve response performance
 - **Streaming Support**: Real-time streaming responses with Server-Sent Events (SSE) and chunked transfer encoding
 - **MCP Integration**: Model Context Protocol support for external tools and resources with JSON-RPC 2.0
 - **Web Search**: Serper API integration for web search capabilities via MCP with webpage fetching
@@ -78,6 +79,7 @@ A comprehensive API gateway for Jan Server that provides OpenAI-compatible endpo
   - Automatic migrations with Atlas
   - Generated query interfaces with GORM Gen
 - **Authentication**: JWT v5.3.0 + Google OAuth2 v3.15.0
+- **Caching**: Redis v9.5.1 for high-performance model caching
 - **API Documentation**: Swagger/OpenAPI v1.16.6
 - **Streaming**: Server-Sent Events (SSE) with chunked transfer
 - **Dependency Injection**: Google Wire v0.6.0
@@ -228,6 +230,48 @@ A comprehensive API gateway for Jan Server that provides OpenAI-compatible endpo
 | `SMTP_PASSWORD` | SMTP password | `your-smtp-password` |
 | `SMTP_SENDER_EMAIL` | Default sender email address | `noreply@yourdomain.com` |
 | `INVITE_REDIRECT_URL` | Redirect URL for invitation acceptance | `http://localhost:8080/invite/accept` |
+| `REDIS_URL` | Redis connection URL | `redis://localhost:6379` |
+| `REDIS_PASSWORD` | Redis authentication password | `` (empty for dev) |
+| `REDIS_DB` | Redis database number | `0` |
+
+## 🚀 Redis Caching
+
+The Jan API Gateway includes Redis caching for inference models to significantly improve performance by avoiding repeated model loading and caching identical requests.
+
+### Features
+- **Model List Caching**: Cache model discovery for 10 minutes
+- **Transparent Integration**: No code changes needed in existing handlers
+- **Fallback Support**: Graceful degradation when Redis is unavailable
+- **Centralized Constants**: Redis cache keys defined as constants
+
+### Quick Setup
+
+1. **Deploy Redis Infrastructure**:
+   ```bash
+   helm dependency update charts/umbrella-chart/
+   helm install jan-server charts/umbrella-chart/
+   ```
+
+2. **Environment Variables**:
+   ```bash
+   REDIS_URL=redis://jan-server-redis-master:6379
+   REDIS_PASSWORD=""  # Empty for dev
+   REDIS_DB=0
+   ```
+
+3. **Verify Setup**:
+   ```bash
+   # Check Redis connectivity in logs
+   kubectl logs deployment/jan-server-jan-api-gateway | grep "Successfully connected to Redis"
+   ```
+
+### Performance Benefits
+- **Reduced latency** for model discovery calls
+- **Reduced CPU usage** by avoiding repeated model loading
+- **Better scalability** with reduced backend load
+- **Improved user experience** with faster response times
+
+For detailed setup instructions, see [REDIS_SETUP.md](REDIS_SETUP.md).
 
 ## 📚 API Usage Examples
 

@@ -12,6 +12,22 @@ import (
 	"resty.dev/v3"
 )
 
+func ConvertToMap[T, V comparable](slice []T, f func(T) V) map[V]T {
+	result := make(map[V]T, len(slice))
+	for _, v := range slice {
+		key := f(v)
+		result[key] = v
+	}
+	return result
+}
+func GetMapKeys[K comparable, V any](m map[K]V) []K {
+	keys := make([]K, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 // consider using "github.com/sashabaranov/go-openai"
 var JanInferenceRestyClient *resty.Client
 

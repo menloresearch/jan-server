@@ -8,11 +8,13 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	mcpserver "github.com/mark3labs/mcp-go/server"
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/common"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
+	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
 	userdomain "menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
@@ -29,14 +31,24 @@ type ConvCompletionAPI struct {
 	completionStreamHandler    *CompletionStreamHandler
 	conversationService        *conversation.ConversationService
 	authService                *auth.AuthService
+	serperMCP                  *serpermcp.SerperService
+	mcpServer                  *mcpserver.MCPServer
+	registry                   *inferencemodelregistry.InferenceModelRegistry
 }
 
-func NewConvCompletionAPI(completionNonStreamHandler *CompletionNonStreamHandler, completionStreamHandler *CompletionStreamHandler, conversationService *conversation.ConversationService, authService *auth.AuthService) *ConvCompletionAPI {
+func NewConvCompletionAPI(completionNonStreamHandler *CompletionNonStreamHandler, completionStreamHandler *CompletionStreamHandler, conversationService *conversation.ConversationService, authService *auth.AuthService, serperMCP *serpermcp.SerperService, registry *inferencemodelregistry.InferenceModelRegistry) *ConvCompletionAPI {
+	mcpSrv := mcpserver.NewMCPServer("conv-demo", "0.1.0",
+		mcpserver.WithToolCapabilities(true),
+		mcpserver.WithRecovery(),
+	)
 	return &ConvCompletionAPI{
 		completionNonStreamHandler: completionNonStreamHandler,
 		completionStreamHandler:    completionStreamHandler,
 		conversationService:        conversationService,
 		authService:                authService,
+		serperMCP:                  serperMCP,
+		mcpServer:                  mcpSrv,
+		registry:                   registry,
 	}
 }
 
@@ -203,9 +215,8 @@ func (api *ConvCompletionAPI) PostCompletion(reqCtx *gin.Context) {
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - missing or invalid authentication"
 // @Router /v1/conv/models [get]
 func (api *ConvCompletionAPI) GetModels(reqCtx *gin.Context) {
-	// Import the necessary packages at the top of the file
-	registry := inferencemodelregistry.GetInstance()
-	models := registry.ListModels()
+	ctx := reqCtx.Request.Context()
+	models := api.registry.ListModels(ctx)
 
 	// Convert to response format
 	responseData := make([]Model, len(models))

@@ -27,6 +27,12 @@ jan-api-gateway:
       value: fhWMCXu29gKRcs6//I0HwaQgvTgv0uMdLRshU5cyC+4=
     - name: ALLOWED_CORS_HOSTS
       value: http://localhost:8080
+    - name: REDIS_URL
+      value: redis://jan-server-redis-master:6379
+    - name: REDIS_PASSWORD
+      value: ""
+    - name: REDIS_DB
+      value: "0"
 
 jan-inference-model:
   replicaCount: 1
@@ -42,3 +48,30 @@ postgresql:
     database: jan
     username: jan-user
     password: jan-password
+
+redis:
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: true
+      size: 8Gi
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+  replica:
+    replicaCount: 1
+    persistence:
+      enabled: true
+      size: 8Gi
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"

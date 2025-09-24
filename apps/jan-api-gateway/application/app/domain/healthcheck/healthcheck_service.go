@@ -15,16 +15,17 @@ type HealthcheckCrontabService struct {
 	InferenceModelRegistry *inference_model_registry.InferenceModelRegistry
 }
 
-func NewService(janInferenceClient *janinference.JanInferenceClient) *HealthcheckCrontabService {
+func NewService(janInferenceClient *janinference.JanInferenceClient, registry *inference_model_registry.InferenceModelRegistry) *HealthcheckCrontabService {
 	return &HealthcheckCrontabService{
 		JanInferenceClient:     janInferenceClient,
-		InferenceModelRegistry: inference_model_registry.GetInstance(),
+		InferenceModelRegistry: registry,
 	}
 }
 
 func (hs *HealthcheckCrontabService) Start(ctx context.Context, ctab *crontab.Crontab) {
 	hs.CheckInferenceModels(ctx)
-	ctab.AddJob("* * * * *", func() {
+	// Check every 2 minutes instead of every minute
+	ctab.AddJob("*/2 * * * *", func() {
 		hs.CheckInferenceModels(ctx)
 		environment_variables.EnvironmentVariables.LoadFromEnv()
 	})
@@ -33,7 +34,7 @@ func (hs *HealthcheckCrontabService) Start(ctx context.Context, ctab *crontab.Cr
 func (hs *HealthcheckCrontabService) CheckInferenceModels(ctx context.Context) {
 	janModelResp, err := hs.JanInferenceClient.GetModels(ctx)
 	if err != nil {
-		hs.InferenceModelRegistry.RemoveServiceModels(hs.JanInferenceClient.BaseURL)
+		hs.InferenceModelRegistry.RemoveServiceModels(ctx, hs.JanInferenceClient.BaseURL)
 	} else {
 		models := make([]inferencemodel.Model, 0)
 		for _, model := range janModelResp.Data {
@@ -44,6 +45,6 @@ func (hs *HealthcheckCrontabService) CheckInferenceModels(ctx context.Context) {
 				OwnedBy: model.OwnedBy,
 			})
 		}
-		hs.InferenceModelRegistry.AddModels(hs.JanInferenceClient.BaseURL, models)
+		hs.InferenceModelRegistry.AddModels(ctx, hs.JanInferenceClient.BaseURL, models)
 	}
 }
