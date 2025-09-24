@@ -24,11 +24,7 @@ func NewOrganizationRoute(adminApiKeyAPI *AdminApiKeyAPI, projectsRoute *project
 }
 
 func (organizationRoute *OrganizationRoute) RegisterRouter(router gin.IRouter) {
-	organizationRouter := router.Group("/organization",
-		organizationRoute.authService.AdminUserAuthMiddleware(),
-		organizationRoute.authService.RegisteredUserMiddleware(),
-		organizationRoute.authService.RegisteredOrganizationMiddleware(),
-	)
+	organizationRouter := router.Group("/organization")
 	organizationRoute.adminApiKeyAPI.RegisterRouter(organizationRouter)
 	organizationRoute.projectsRoute.RegisterRouter(organizationRouter)
 	organizationRoute.inviteRoute.RegisterRouter(organizationRouter)

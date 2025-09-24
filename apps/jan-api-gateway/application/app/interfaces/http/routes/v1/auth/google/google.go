@@ -160,6 +160,17 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 		})
 		return
 	}
+	if exists != nil {
+		exists.Name = claims.Name
+		_, err := googleAuthAPI.userService.UpdateUser(ctx, exists)
+		if err != nil {
+			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+				Code:  "f5afc09d-32be-461a-a0af-7b0f2c1dc221",
+				Error: err.Error(),
+			})
+			return
+		}
+	}
 	if exists == nil {
 		exists, err = func() (*user.User, error) {
 			userClaim, ok := auth.GetUserClaimFromRefreshToken(reqCtx)

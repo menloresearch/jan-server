@@ -58,23 +58,11 @@ func (api *ProjectApiKeyRoute) RegisterRouter(router gin.IRouter) {
 // @Router /v1/organization/projects/{project_public_id}/api_keys [get]
 func (api *ProjectApiKeyRoute) ListProjectApiKey(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
-	user, ok := auth.GetUserFromContext(reqCtx)
+	_, ok := auth.GetUserFromContext(reqCtx)
 	if !ok {
 		return
 	}
-	organizationEntity, ok := api.organizationService.GetOrganizationFromContext(reqCtx)
-	if !ok {
-		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code: "3d1ab99a-e2d3-4d13-9130-56eb662e5f92",
-		})
-		return
-	}
-	if organizationEntity.OwnerID != user.ID {
-		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code: "6d2d10f9-3bab-4d2d-8076-d573d829e397",
-		})
-		return
-	}
+	organizationEntity := organization.DEFAULT_ORGANIZATION
 
 	project, ok := auth.GetProjectFromContext(reqCtx)
 	if !ok {
@@ -142,7 +130,6 @@ type CreateApiKeyRequest struct {
 func (api *ProjectApiKeyRoute) CreateProjectApiKey(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
 	var req CreateApiKeyRequest
-
 	// Bind the JSON payload to the struct
 	if err := reqCtx.BindJSON(&req); err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
@@ -160,28 +147,25 @@ func (api *ProjectApiKeyRoute) CreateProjectApiKey(reqCtx *gin.Context) {
 		return
 	}
 
-	organizationEntity, ok := api.organizationService.GetOrganizationFromContext(reqCtx)
+	organizationEntity, ok := auth.GetAdminOrganizationFromContext(reqCtx)
 	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code: "3d1ab99a-e2d3-4d13-9130-56eb662e5f92",
-		})
-		return
-	}
-	// TODO: Change the verification to users with organization read permission.
-	if organizationEntity.OwnerID != user.ID {
-		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code: "6d2d10f9-3bab-4d2d-8076-d573d829e397",
+			Code: "fc306f46-7125-4724-8fda-468402606ac7",
 		})
 		return
 	}
 
-	project, ok := auth.GetProjectFromContext(reqCtx)
+	projectEntity, ok := auth.GetProjectFromContext(reqCtx)
 	if !ok {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code: "e50b3d93-f508-401a-b55e-50ffec69e087",
 		})
 		return
 	}
+
+	api.projectService.FindOneMemberByFilter(ctx, project.ProjectMemberFilter{
+		
+	})
 
 	key, hash, err := api.apikeyService.GenerateKeyAndHash(ctx, apikey.ApikeyTypeProject)
 	if err != nil {
@@ -199,7 +183,7 @@ func (api *ProjectApiKeyRoute) CreateProjectApiKey(reqCtx *gin.Context) {
 		Enabled:        true,
 		ApikeyType:     string(apikey.ApikeyTypeProject),
 		OwnerPublicID:  user.PublicID,
-		ProjectID:      &project.ID,
+		ProjectID:      &projectEntity.ID,
 		OrganizationID: &organizationEntity.ID,
 		Permissions:    "{}",
 		ExpiresAt:      req.ExpiresAt,

@@ -22,11 +22,27 @@ type Project struct {
 	Members        []ProjectMember `gorm:"foreignKey:ProjectID"`
 }
 
+type ProjectMemberRole string
+
+const (
+	ProjectMemberRoleOwner  ProjectMemberRole = "owner"
+	ProjectMemberRoleMember ProjectMemberRole = "member"
+)
+
 type ProjectMember struct {
 	BaseModel
-	UserID    uint   `gorm:"primaryKey"`
-	ProjectID uint   `gorm:"primaryKey"`
+	UserID    uint   `gorm:"not null;index:idx_user_proj,unique"`
+	ProjectID uint   `gorm:"not null;index:idx_user_proj,unique"`
 	Role      string `gorm:"type:varchar(20);not null"`
+}
+
+func (p *ProjectMember) EtoD() *project.ProjectMember {
+	return &project.ProjectMember{
+		ID:        p.ID,
+		UserID:    p.UserID,
+		ProjectID: p.ProjectID,
+		Role:      p.Role,
+	}
 }
 
 func NewSchemaProject(p *project.Project) *Project {

@@ -8,6 +8,7 @@ package main
 
 import (
 	"context"
+	"gorm.io/gorm"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
@@ -108,7 +109,31 @@ func CreateApplication() (*Application, error) {
 	return application, nil
 }
 
+func CreateDataInitializer() (*DataInitializer, error) {
+	db := ProvideDatabase()
+	transactionDatabase := transaction.NewDatabase(db)
+	userRepository := userrepo.NewUserGormRepository(transactionDatabase)
+	userService := user.NewService(userRepository)
+	apiKeyRepository := apikeyrepo.NewApiKeyGormRepository(transactionDatabase)
+	organizationRepository := organizationrepo.NewOrganizationGormRepository(transactionDatabase)
+	organizationService := organization.NewService(organizationRepository)
+	apiKeyService := apikey.NewService(apiKeyRepository, organizationService)
+	projectRepository := projectrepo.NewProjectGormRepository(transactionDatabase)
+	projectService := project.NewService(projectRepository)
+	inviteRepository := inviterepo.NewInviteGormRepository(transactionDatabase)
+	inviteService := invite.NewInviteService(inviteRepository)
+	authService := auth.NewAuthService(userService, apiKeyService, organizationService, projectService, inviteService)
+	dataInitializer := &DataInitializer{
+		authService: authService,
+	}
+	return dataInitializer, nil
+}
+
 // wire.go:
+
+func ProvideDatabase() *gorm.DB {
+	return database.DB
+}
 
 func provideContext() context.Context {
 	return context.Background()

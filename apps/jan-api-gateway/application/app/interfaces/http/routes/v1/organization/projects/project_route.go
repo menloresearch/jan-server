@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
+	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/query"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
@@ -40,17 +41,37 @@ func NewProjectsRoute(
 }
 
 func (projectsRoute *ProjectsRoute) RegisterRouter(router gin.IRouter) {
-	projectsRouter := router.Group("/projects")
-	projectsRouter.GET("", projectsRoute.GetProjects)
-	projectsRouter.POST("", projectsRoute.CreateProject)
+	permissionOptional := projectsRoute.authService.DefaultOrganizationMemberOptionalMiddleware()
+	permissionOwnerOnly := projectsRoute.authService.OrganizationMemberRoleMiddleware(auth.OrganizationMemberRuleOwnerOnly)
+	projectsRouter := router.Group(
+		"/projects",
+		projectsRoute.authService.AdminUserAuthMiddleware(),
+		projectsRoute.authService.RegisteredUserMiddleware(),
+	)
+	projectsRouter.GET("",
+		permissionOptional,
+		projectsRoute.GetProjects,
+	)
+	projectsRouter.POST("",
+		permissionOwnerOnly,
+		projectsRoute.CreateProject,
+	)
 
 	projectIdRouter := projectsRouter.Group(
 		fmt.Sprintf("/:%s", auth.ProjectContextKeyPublicID),
+		permissionOptional,
 		projectsRoute.authService.AdminProjectMiddleware(),
 	)
-	projectIdRouter.GET("", projectsRoute.GetProject)
-	projectIdRouter.POST("", projectsRoute.UpdateProject)
-	projectIdRouter.POST("/archive", projectsRoute.ArchiveProject)
+	projectIdRouter.GET("",
+		projectsRoute.GetProject)
+	projectIdRouter.POST("",
+		permissionOwnerOnly,
+		projectsRoute.UpdateProject,
+	)
+	projectIdRouter.POST("/archive",
+		permissionOwnerOnly,
+		projectsRoute.ArchiveProject,
+	)
 	projectsRoute.projectApiKeyRoute.RegisterRouter(projectIdRouter)
 }
 
@@ -68,6 +89,10 @@ func (projectsRoute *ProjectsRoute) RegisterRouter(router gin.IRouter) {
 // @Router /v1/organization/projects [get]
 func (api *ProjectsRoute) GetProjects(reqCtx *gin.Context) {
 	orgEntity, ok := auth.GetAdminOrganizationFromContext(reqCtx)
+	if !ok {
+		return
+	}
+	user, ok := auth.GetUserFromContext(reqCtx)
 	if !ok {
 		return
 	}
@@ -98,9 +123,12 @@ func (api *ProjectsRoute) GetProjects(reqCtx *gin.Context) {
 		})
 		return
 	}
-
 	projectFilter := project.ProjectFilter{
 		OrganizationID: &orgEntity.ID,
+	}
+	_, ok = auth.GetAdminOrganizationMemberFromContext(reqCtx)
+	if !ok {
+		projectFilter.MemberID = &user.ID
 	}
 	if !includeArchived {
 		projectFilter.Archived = ptr.ToBool(false)
@@ -172,7 +200,6 @@ func (api *ProjectsRoute) CreateProject(reqCtx *gin.Context) {
 	if !ok {
 		return
 	}
-
 	var requestPayload CreateProjectRequest
 	if err := reqCtx.ShouldBindJSON(&requestPayload); err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
@@ -195,6 +222,19 @@ func (api *ProjectsRoute) CreateProject(reqCtx *gin.Context) {
 		return
 	}
 
+	orgMember, _ := auth.GetAdminOrganizationMemberFromContext(reqCtx)
+	err = projectService.AddMember(ctx, &project.ProjectMember{
+		UserID:    orgMember.UserID,
+		ProjectID: projectEntity.ID,
+		Role:      string(project.ProjectMemberRoleOwner),
+	})
+	if err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code:          "e29ddee3-77ea-4ac5-b474-00e2311b68ab",
+			ErrorInstance: err,
+		})
+		return
+	}
 	response := domainToProjectResponse(projectEntity)
 	reqCtx.JSON(http.StatusOK, response)
 }
@@ -236,14 +276,20 @@ func (api *ProjectsRoute) GetProject(reqCtx *gin.Context) {
 // @Failure 404 {object} responses.ErrorResponse "Not Found - project with the given ID does not exist"
 // @Router /v1/organization/projects/{project_id} [post]
 func (api *ProjectsRoute) UpdateProject(reqCtx *gin.Context) {
+	orgMember, ok := auth.GetAdminOrganizationMemberFromContext(reqCtx)
+	if !ok || orgMember.Role != organization.OrganizationMemberRoleOwner {
+		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
+			Code: "2e531704-2e55-4d55-9ca3-d60e245f75b4",
+		})
+		return
+	}
 	projectService := api.projectService
 	ctx := reqCtx.Request.Context()
-
 	var requestPayload UpdateProjectRequest
 	if err := reqCtx.ShouldBindJSON(&requestPayload); err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code:  "b6cb35be-8a53-478d-95d1-5e1f64f35c09",
-			Error: err.Error(),
+			Code:          "b6cb35be-8a53-478d-95d1-5e1f64f35c09",
+			ErrorInstance: err,
 		})
 		return
 	}

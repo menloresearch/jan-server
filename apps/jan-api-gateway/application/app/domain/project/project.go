@@ -16,6 +16,7 @@ type Project struct {
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	ArchivedAt     *time.Time
+	IsDefault      bool
 }
 
 type ProjectMember struct {
@@ -31,6 +32,13 @@ type ProjectFilter struct {
 	OrganizationID *uint
 	Archived       *bool
 	PublicIDs      *[]string
+	MemberID       *uint
+}
+
+type ProjectMemberFilter struct {
+	UserID    *uint
+	ProjectID *uint
+	Role      *string
 }
 
 type ProjectStatus string
@@ -59,6 +67,6 @@ type ProjectRepository interface {
 
 	AddMember(ctx context.Context, m *ProjectMember) error
 	RemoveMember(ctx context.Context, projectID, userID uint) error
-	ListMembers(ctx context.Context, projectID uint) ([]*ProjectMember, error)
+	FindMembersByFilter(ctx context.Context, filter ProjectMemberFilter, p *query.Pagination) ([]*ProjectMember, error)
 	UpdateMemberRole(ctx context.Context, projectID, userID uint, role string) error
 }

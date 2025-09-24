@@ -35,7 +35,6 @@ func newOrganizationMember(db *gorm.DB, opts ...gen.DOOption) organizationMember
 	_organizationMember.UserID = field.NewUint(tableName, "user_id")
 	_organizationMember.OrganizationID = field.NewUint(tableName, "organization_id")
 	_organizationMember.Role = field.NewString(tableName, "role")
-	_organizationMember.IsPrimary = field.NewBool(tableName, "is_primary")
 
 	_organizationMember.fillFieldMap()
 
@@ -53,7 +52,6 @@ type organizationMember struct {
 	UserID         field.Uint
 	OrganizationID field.Uint
 	Role           field.String
-	IsPrimary      field.Bool
 
 	fieldMap map[string]field.Expr
 }
@@ -77,7 +75,6 @@ func (o *organizationMember) updateTableName(table string) *organizationMember {
 	o.UserID = field.NewUint(table, "user_id")
 	o.OrganizationID = field.NewUint(table, "organization_id")
 	o.Role = field.NewString(table, "role")
-	o.IsPrimary = field.NewBool(table, "is_primary")
 
 	o.fillFieldMap()
 
@@ -94,7 +91,7 @@ func (o *organizationMember) GetFieldByName(fieldName string) (field.OrderExpr, 
 }
 
 func (o *organizationMember) fillFieldMap() {
-	o.fieldMap = make(map[string]field.Expr, 8)
+	o.fieldMap = make(map[string]field.Expr, 7)
 	o.fieldMap["id"] = o.ID
 	o.fieldMap["created_at"] = o.CreatedAt
 	o.fieldMap["updated_at"] = o.UpdatedAt
@@ -102,7 +99,6 @@ func (o *organizationMember) fillFieldMap() {
 	o.fieldMap["user_id"] = o.UserID
 	o.fieldMap["organization_id"] = o.OrganizationID
 	o.fieldMap["role"] = o.Role
-	o.fieldMap["is_primary"] = o.IsPrimary
 }
 
 func (o organizationMember) clone(db *gorm.DB) organizationMember {

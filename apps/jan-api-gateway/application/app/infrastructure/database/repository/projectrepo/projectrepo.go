@@ -3,6 +3,7 @@ package projectrepo
 import (
 	"context"
 
+	"gorm.io/gorm/clause"
 	domain "menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/query"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/dbschema"
@@ -22,7 +23,14 @@ var _ domain.ProjectRepository = (*ProjectGormRepository)(nil)
 func (repo *ProjectGormRepository) AddMember(ctx context.Context, m *domain.ProjectMember) error {
 	model := dbschema.NewSchemaProjectMember(m)
 	query := repo.db.GetQuery(ctx)
-	err := query.ProjectMember.Create(model)
+	err := query.ProjectMember.Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: query.ProjectMember.UserID.ColumnName().String()},
+			{Name: query.ProjectMember.ProjectID.ColumnName().String()},
+		},
+		DoNothing: false,
+		UpdateAll: true,
+	}).Create(model)
 	if err != nil {
 		return err
 	}
@@ -31,8 +39,35 @@ func (repo *ProjectGormRepository) AddMember(ctx context.Context, m *domain.Proj
 }
 
 // ListMembers implements project.ProjectRepository.
-func (repo *ProjectGormRepository) ListMembers(ctx context.Context, projectID uint) ([]*domain.ProjectMember, error) {
-	panic("unimplemented")
+func (repo *ProjectGormRepository) FindMembersByFilter(ctx context.Context, filter domain.ProjectMemberFilter, p *query.Pagination) ([]*domain.ProjectMember, error) {
+	query := repo.db.GetQuery(ctx)
+	sql := query.ProjectMember.WithContext(ctx)
+	sql = repo.applyMemberFilter(query, sql, filter)
+	if p != nil {
+		if p.Limit != nil && *p.Limit > 0 {
+			sql = sql.Limit(*p.Limit)
+		}
+		if p.After != nil {
+			if p.Order == "desc" {
+				sql = sql.Where(query.Project.ID.Lt(*p.After))
+			} else {
+				sql = sql.Where(query.Project.ID.Gt(*p.After))
+			}
+		}
+		if p.Order == "desc" {
+			sql = sql.Order(query.Project.ID.Desc())
+		} else {
+			sql = sql.Order(query.Project.ID.Asc())
+		}
+	}
+	rows, err := sql.Find()
+	if err != nil {
+		return nil, err
+	}
+	result := functional.Map(rows, func(item *dbschema.ProjectMember) *domain.ProjectMember {
+		return item.EtoD()
+	})
+	return result, nil
 }
 
 // RemoveMember implements project.ProjectRepository.
@@ -61,6 +96,25 @@ func (repo *ProjectGormRepository) applyFilter(query *gormgen.Query, sql gormgen
 	}
 	if filter.PublicIDs != nil {
 		sql = sql.Where(query.Project.PublicID.In(*filter.PublicIDs...))
+	}
+	if filter.MemberID != nil {
+		sql = sql.
+			Join(query.ProjectMember, query.ProjectMember.ProjectID.EqCol(query.Project.ID)).
+			Where(query.ProjectMember.UserID.Eq(*filter.MemberID))
+	}
+	return sql
+}
+
+// applyMemberFilter applies conditions dynamically to the query.
+func (repo *ProjectGormRepository) applyMemberFilter(query *gormgen.Query, sql gormgen.IProjectMemberDo, filter domain.ProjectMemberFilter) gormgen.IProjectMemberDo {
+	if filter.ProjectID != nil {
+		sql = sql.Where(query.ProjectMember.ProjectID.Eq(*filter.ProjectID))
+	}
+	if filter.UserID != nil {
+		sql = sql.Where(query.ProjectMember.UserID.Eq(*filter.UserID))
+	}
+	if filter.Role != nil {
+		sql = sql.Where(query.ProjectMember.Role.Eq(*filter.Role))
 	}
 	return sql
 }

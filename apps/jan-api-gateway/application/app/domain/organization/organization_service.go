@@ -3,12 +3,11 @@ package organization
 import (
 	"context"
 	"fmt"
-	"net/http"
+	"sync"
 
-	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/query"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
+	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
 // OrganizationService provides business logic for managing organizations.
@@ -23,6 +22,15 @@ func NewService(repo OrganizationRepository) *OrganizationService {
 	return &OrganizationService{
 		repo: repo,
 	}
+}
+
+var DEFAULT_ORGANIZATION_ONCE sync.Once
+var DEFAULT_ORGANIZATION *Organization
+
+func UpdateDefaultOrganization(o *Organization) {
+	DEFAULT_ORGANIZATION_ONCE.Do(func() {
+		DEFAULT_ORGANIZATION = o
+	})
 }
 
 func (s *OrganizationService) createPublicID() (string, error) {
@@ -111,49 +119,28 @@ func (s *OrganizationService) FindOneMemberByFilter(ctx context.Context, f Organ
 	if err != nil {
 		return nil, err
 	}
+	if len(entities) == 0 {
+		return nil, nil
+	}
 	if len(entities) != 1 {
 		return nil, fmt.Errorf("no records")
 	}
 	return entities[0], err
 }
 
-type OrganizationContextKey string
-
-const (
-	OrganizationContextKeyPublicID OrganizationContextKey = "org_public_id"
-	OrganizationContextKeyEntity   OrganizationContextKey = "OrganizationContextKeyEntity"
-)
-
-func (s *OrganizationService) OrganizationMiddleware() gin.HandlerFunc {
-	return func(reqCtx *gin.Context) {
-		ctx := reqCtx.Request.Context()
-		orgPublicID := reqCtx.Param(string(OrganizationContextKeyPublicID))
-
-		if orgPublicID == "" {
-			reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-				Code:  "ada5a8f9-d5e1-4761-9af1-a176473ff7eb",
-				Error: "missing organization public ID",
-			})
-			return
-		}
-
-		org, err := s.FindOrganizationByPublicID(ctx, orgPublicID)
-		if err != nil || org == nil {
-			reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-				Code:  "67a03e01-2797-4a5e-b2cd-f2893d4a14b2",
-				Error: "organization not found",
-			})
-			return
-		}
-		reqCtx.Set(string(OrganizationContextKeyEntity), org)
-		reqCtx.Next()
+func (s *OrganizationService) FindOrCreateDefaultOrganization(ctx context.Context) (*Organization, error) {
+	orgEntity, err := s.FindOneByFilter(ctx, OrganizationFilter{
+		Enabled: ptr.ToBool(true),
+	})
+	if err != nil {
+		return nil, err
 	}
-}
-
-func (s *OrganizationService) GetOrganizationFromContext(reqCtx *gin.Context) (*Organization, bool) {
-	org, ok := reqCtx.Get(string(OrganizationContextKeyEntity))
-	if !ok {
-		return nil, false
+	if orgEntity != nil {
+		return orgEntity, nil
 	}
-	return org.(*Organization), true
+
+	return s.CreateOrganizationWithPublicID(ctx, &Organization{
+		Name:    "Default Organization",
+		Enabled: true,
+	})
 }

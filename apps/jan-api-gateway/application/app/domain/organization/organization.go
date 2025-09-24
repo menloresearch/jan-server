@@ -14,7 +14,6 @@ type Organization struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	Enabled   bool
-	OwnerID   uint
 }
 
 type OrganizationMemberRole string
@@ -29,14 +28,12 @@ type OrganizationMember struct {
 	UserID         uint
 	OrganizationID uint
 	Role           OrganizationMemberRole
-	IsPrimary      bool
 	CreatedAt      time.Time
 }
 
 type OrganizationFilter struct {
 	PublicID *string
 	Enabled  *bool
-	OwnerID  *uint
 }
 
 type OrganizationMemberFilter struct {

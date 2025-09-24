@@ -38,14 +38,31 @@ func NewAdminApiKeyAPI(
 }
 
 func (adminApiKeyAPI *AdminApiKeyAPI) RegisterRouter(router *gin.RouterGroup) {
-	adminApiKeyRouter := router.Group("/admin_api_keys")
-	adminApiKeyRouter.GET("", adminApiKeyAPI.GetAdminApiKeys)
-	adminApiKeyRouter.POST("", adminApiKeyAPI.CreateAdminApiKey)
+	permissionAll := adminApiKeyAPI.authService.OrganizationMemberRoleMiddleware(auth.OrganizationMemberRuleAll)
+	permissionOwnerOnly := adminApiKeyAPI.authService.OrganizationMemberRoleMiddleware(auth.OrganizationMemberRuleOwnerOnly)
+	adminApiKeyRouter := router.Group("/admin_api_keys",
+		adminApiKeyAPI.authService.AdminUserAuthMiddleware(),
+		adminApiKeyAPI.authService.RegisteredUserMiddleware(),
+	)
+	adminApiKeyRouter.GET("",
+		permissionAll,
+		adminApiKeyAPI.GetAdminApiKeys,
+	)
+	adminApiKeyRouter.POST("",
+		permissionOwnerOnly,
+		adminApiKeyAPI.CreateAdminApiKey,
+	)
 
 	adminKeyPath := fmt.Sprintf("/:%s", auth.ApikeyContextKeyPublicID)
 	adminApiKeyIdRoute := adminApiKeyRouter.Group(adminKeyPath, adminApiKeyAPI.authService.GetAdminApiKeyFromQuery())
-	adminApiKeyIdRoute.GET("", adminApiKeyAPI.GetAdminApiKey)
-	adminApiKeyIdRoute.DELETE("", adminApiKeyAPI.DeleteAdminApiKey)
+	adminApiKeyIdRoute.GET("",
+		permissionAll,
+		adminApiKeyAPI.GetAdminApiKey,
+	)
+	adminApiKeyIdRoute.DELETE("",
+		permissionOwnerOnly,
+		adminApiKeyAPI.DeleteAdminApiKey,
+	)
 }
 
 // GetAdminApiKey godoc

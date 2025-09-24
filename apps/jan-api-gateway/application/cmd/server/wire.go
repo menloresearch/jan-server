@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/google/wire"
+	"gorm.io/gorm"
 	"menlo.ai/jan-api-gateway/app/domain"
 	"menlo.ai/jan-api-gateway/app/infrastructure"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database"
@@ -24,6 +25,20 @@ func CreateApplication() (*Application, error) {
 		http.NewHttpServer,
 		wire.Struct(new(Application), "*"),
 		provideContext,
+	)
+	return nil, nil
+}
+
+func ProvideDatabase() *gorm.DB {
+	return database.DB
+}
+
+func CreateDataInitializer() (*DataInitializer, error) {
+	wire.Build(
+		ProvideDatabase,
+		repository.RepositoryProvider,
+		domain.ServiceProvider,
+		wire.Struct(new(DataInitializer), "*"),
 	)
 	return nil, nil
 }

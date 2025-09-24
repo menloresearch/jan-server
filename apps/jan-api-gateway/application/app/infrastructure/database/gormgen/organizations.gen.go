@@ -35,27 +35,10 @@ func newOrganization(db *gorm.DB, opts ...gen.DOOption) organization {
 	_organization.Name = field.NewString(tableName, "name")
 	_organization.PublicID = field.NewString(tableName, "public_id")
 	_organization.Enabled = field.NewBool(tableName, "enabled")
-	_organization.OwnerID = field.NewUint(tableName, "owner_id")
 	_organization.Members = organizationHasManyMembers{
 		db: db.Session(&gorm.Session{}),
 
 		RelationField: field.NewRelation("Members", "dbschema.OrganizationMember"),
-	}
-
-	_organization.Owner = organizationBelongsToOwner{
-		db: db.Session(&gorm.Session{}),
-
-		RelationField: field.NewRelation("Owner", "dbschema.User"),
-		Organizations: struct {
-			field.RelationField
-		}{
-			RelationField: field.NewRelation("Owner.Organizations", "dbschema.OrganizationMember"),
-		},
-		Projects: struct {
-			field.RelationField
-		}{
-			RelationField: field.NewRelation("Owner.Projects", "dbschema.ProjectMember"),
-		},
 	}
 
 	_organization.fillFieldMap()
@@ -74,10 +57,7 @@ type organization struct {
 	Name      field.String
 	PublicID  field.String
 	Enabled   field.Bool
-	OwnerID   field.Uint
 	Members   organizationHasManyMembers
-
-	Owner organizationBelongsToOwner
 
 	fieldMap map[string]field.Expr
 }
@@ -101,7 +81,6 @@ func (o *organization) updateTableName(table string) *organization {
 	o.Name = field.NewString(table, "name")
 	o.PublicID = field.NewString(table, "public_id")
 	o.Enabled = field.NewBool(table, "enabled")
-	o.OwnerID = field.NewUint(table, "owner_id")
 
 	o.fillFieldMap()
 
@@ -118,7 +97,7 @@ func (o *organization) GetFieldByName(fieldName string) (field.OrderExpr, bool) 
 }
 
 func (o *organization) fillFieldMap() {
-	o.fieldMap = make(map[string]field.Expr, 10)
+	o.fieldMap = make(map[string]field.Expr, 8)
 	o.fieldMap["id"] = o.ID
 	o.fieldMap["created_at"] = o.CreatedAt
 	o.fieldMap["updated_at"] = o.UpdatedAt
@@ -126,7 +105,6 @@ func (o *organization) fillFieldMap() {
 	o.fieldMap["name"] = o.Name
 	o.fieldMap["public_id"] = o.PublicID
 	o.fieldMap["enabled"] = o.Enabled
-	o.fieldMap["owner_id"] = o.OwnerID
 
 }
 
@@ -134,15 +112,12 @@ func (o organization) clone(db *gorm.DB) organization {
 	o.organizationDo.ReplaceConnPool(db.Statement.ConnPool)
 	o.Members.db = db.Session(&gorm.Session{Initialized: true})
 	o.Members.db.Statement.ConnPool = db.Statement.ConnPool
-	o.Owner.db = db.Session(&gorm.Session{Initialized: true})
-	o.Owner.db.Statement.ConnPool = db.Statement.ConnPool
 	return o
 }
 
 func (o organization) replaceDB(db *gorm.DB) organization {
 	o.organizationDo.ReplaceDB(db)
 	o.Members.db = db.Session(&gorm.Session{})
-	o.Owner.db = db.Session(&gorm.Session{})
 	return o
 }
 
@@ -223,94 +198,6 @@ func (a organizationHasManyMembersTx) Count() int64 {
 }
 
 func (a organizationHasManyMembersTx) Unscoped() *organizationHasManyMembersTx {
-	a.tx = a.tx.Unscoped()
-	return &a
-}
-
-type organizationBelongsToOwner struct {
-	db *gorm.DB
-
-	field.RelationField
-
-	Organizations struct {
-		field.RelationField
-	}
-	Projects struct {
-		field.RelationField
-	}
-}
-
-func (a organizationBelongsToOwner) Where(conds ...field.Expr) *organizationBelongsToOwner {
-	if len(conds) == 0 {
-		return &a
-	}
-
-	exprs := make([]clause.Expression, 0, len(conds))
-	for _, cond := range conds {
-		exprs = append(exprs, cond.BeCond().(clause.Expression))
-	}
-	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
-	return &a
-}
-
-func (a organizationBelongsToOwner) WithContext(ctx context.Context) *organizationBelongsToOwner {
-	a.db = a.db.WithContext(ctx)
-	return &a
-}
-
-func (a organizationBelongsToOwner) Session(session *gorm.Session) *organizationBelongsToOwner {
-	a.db = a.db.Session(session)
-	return &a
-}
-
-func (a organizationBelongsToOwner) Model(m *dbschema.Organization) *organizationBelongsToOwnerTx {
-	return &organizationBelongsToOwnerTx{a.db.Model(m).Association(a.Name())}
-}
-
-func (a organizationBelongsToOwner) Unscoped() *organizationBelongsToOwner {
-	a.db = a.db.Unscoped()
-	return &a
-}
-
-type organizationBelongsToOwnerTx struct{ tx *gorm.Association }
-
-func (a organizationBelongsToOwnerTx) Find() (result *dbschema.User, err error) {
-	return result, a.tx.Find(&result)
-}
-
-func (a organizationBelongsToOwnerTx) Append(values ...*dbschema.User) (err error) {
-	targetValues := make([]interface{}, len(values))
-	for i, v := range values {
-		targetValues[i] = v
-	}
-	return a.tx.Append(targetValues...)
-}
-
-func (a organizationBelongsToOwnerTx) Replace(values ...*dbschema.User) (err error) {
-	targetValues := make([]interface{}, len(values))
-	for i, v := range values {
-		targetValues[i] = v
-	}
-	return a.tx.Replace(targetValues...)
-}
-
-func (a organizationBelongsToOwnerTx) Delete(values ...*dbschema.User) (err error) {
-	targetValues := make([]interface{}, len(values))
-	for i, v := range values {
-		targetValues[i] = v
-	}
-	return a.tx.Delete(targetValues...)
-}
-
-func (a organizationBelongsToOwnerTx) Clear() error {
-	return a.tx.Clear()
-}
-
-func (a organizationBelongsToOwnerTx) Count() int64 {
-	return a.tx.Count()
-}
-
-func (a organizationBelongsToOwnerTx) Unscoped() *organizationBelongsToOwnerTx {
 	a.tx = a.tx.Unscoped()
 	return &a
 }

@@ -28,6 +28,7 @@ type EnvironmentVariable struct {
 	SMTP_PASSWORD               string
 	SMTP_SENDER_EMAIL           string
 	INVITE_REDIRECT_URL         string
+	ORGANIZATION_ADMIN_EMAIL    string
 }
 
 func (ev *EnvironmentVariable) LoadFromEnv() {
