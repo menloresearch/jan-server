@@ -120,7 +120,6 @@ func (s *AuthService) FindOrRegisterUser(ctx context.Context, user *user.User) (
 		return nil, err
 	}
 	if userEntity != nil {
-		user = userEntity
 		return userEntity, nil
 	}
 	return s.RegisterUser(ctx, user)

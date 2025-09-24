@@ -341,6 +341,7 @@ func (api *InvitesRoute) VerifyInvites(reqCtx *gin.Context) {
 		api.inviteService.UpdateInvite(ctx, inviteEntity)
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code: "eb940d50-60bc-498e-9512-93f741a80d7b",
+			Error: "Code Expired.",
 		})
 		return
 	}
