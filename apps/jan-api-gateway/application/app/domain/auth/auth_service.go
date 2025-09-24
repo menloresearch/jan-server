@@ -72,6 +72,7 @@ func (s *AuthService) InitOrganization(ctx context.Context) error {
 			Name:    "Admin",
 			Email:   email,
 			IsGuest: false,
+			Enabled: true,
 		})
 		if err != nil {
 			return err

@@ -200,14 +200,6 @@ func (api *ProjectsRoute) CreateProject(reqCtx *gin.Context) {
 	if !ok {
 		return
 	}
-	orgMember, ok := auth.GetAdminOrganizationMemberFromContext(reqCtx)
-	if !ok || orgMember.Role != organization.OrganizationMemberRoleOwner {
-		reqCtx.AbortWithStatusJSON(http.StatusUnauthorized, responses.ErrorResponse{
-			Code: "6054bc14-ea67-4f27-b649-0d03050cc25f",
-		})
-		return
-	}
-
 	var requestPayload CreateProjectRequest
 	if err := reqCtx.ShouldBindJSON(&requestPayload); err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
@@ -229,6 +221,8 @@ func (api *ProjectsRoute) CreateProject(reqCtx *gin.Context) {
 		})
 		return
 	}
+
+	orgMember, _ := auth.GetAdminOrganizationMemberFromContext(reqCtx)
 	err = projectService.AddMember(ctx, &project.ProjectMember{
 		UserID:    orgMember.UserID,
 		ProjectID: projectEntity.ID,
