@@ -11,6 +11,7 @@ import (
 
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/invite"
+	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/query"
 	"menlo.ai/jan-api-gateway/app/domain/user"
@@ -23,19 +24,22 @@ import (
 )
 
 type InvitesRoute struct {
-	inviteService  *invite.InviteService
-	projectService *project.ProjectService
-	authService    *auth.AuthService
+	inviteService       *invite.InviteService
+	projectService      *project.ProjectService
+	organizationService *organization.OrganizationService
+	authService         *auth.AuthService
 }
 
 func NewInvitesRoute(
 	inviteService *invite.InviteService,
 	projectService *project.ProjectService,
+	organizationService *organization.OrganizationService,
 	authService *auth.AuthService,
 ) *InvitesRoute {
 	return &InvitesRoute{
 		inviteService,
 		projectService,
+		organizationService,
 		authService,
 	}
 }
@@ -320,6 +324,7 @@ func (api *InvitesRoute) VerifyInvites(reqCtx *gin.Context) {
 		})
 		return
 	}
+
 	ctx := reqCtx.Request.Context()
 	inviteEntity, err := api.inviteService.FindOne(ctx, invite.InvitesFilter{
 		Secrets: &requestPayload.Code,
@@ -332,7 +337,8 @@ func (api *InvitesRoute) VerifyInvites(reqCtx *gin.Context) {
 	}
 	if inviteEntity.Status != string(invite.InviteStatusPending) {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code: "54fc9401-a79f-4338-93d2-3d3547ce21a9",
+			Code:  "54fc9401-a79f-4338-93d2-3d3547ce21a9",
+			Error: "Invalid Status",
 		})
 		return
 	}
@@ -340,7 +346,7 @@ func (api *InvitesRoute) VerifyInvites(reqCtx *gin.Context) {
 		inviteEntity.Status = string(invite.InviteStatusExpired)
 		api.inviteService.UpdateInvite(ctx, inviteEntity)
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code: "eb940d50-60bc-498e-9512-93f741a80d7b",
+			Code:  "eb940d50-60bc-498e-9512-93f741a80d7b",
 			Error: "Code Expired.",
 		})
 		return
@@ -358,6 +364,19 @@ func (api *InvitesRoute) VerifyInvites(reqCtx *gin.Context) {
 		})
 		return
 	}
+
+	err = api.organizationService.AddMember(ctx, &organization.OrganizationMember{
+		OrganizationID: inviteEntity.OrganizationID,
+		UserID:         owner.ID,
+		Role:           organization.OrganizationMemberRole(inviteEntity.Role),
+	})
+	if err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code: "049ad2f3-99ed-44f2-8439-f3848bc20639",
+		})
+		return
+	}
+
 	inviteProjects, err := inviteEntity.GetProjects()
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
