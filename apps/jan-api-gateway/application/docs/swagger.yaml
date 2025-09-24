@@ -553,6 +553,11 @@ definitions:
       status:
         type: string
     type: object
+  app_interfaces_http_routes_v1_organization_invites.VerifyInviteUserRequest:
+    properties:
+      code:
+        type: string
+    type: object
   app_interfaces_http_routes_v1_organization_projects.CreateProjectRequest:
     properties:
       name:
@@ -2768,6 +2773,43 @@ paths:
       security:
       - BearerAuth: []
       summary: Retrieve Invite
+      tags:
+      - Administration API
+  /v1/organization/invites/verification:
+    post:
+      consumes:
+      - application/json
+      description: Verifies an invitation code, checks expiration, registers the user
+        if necessary, and assigns project memberships.
+      parameters:
+      - description: Verification request payload
+        in: body
+        name: verification
+        required: true
+        schema:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_invites.VerifyInviteUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully verified invite
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_invites.InviteResponse'
+        "400":
+          description: Invalid or expired invite code
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Verify Invite
       tags:
       - Administration API
   /v1/organization/projects:

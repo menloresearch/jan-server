@@ -115,12 +115,13 @@ func (s *AuthService) RegisterUser(ctx context.Context, user *user.User) (*user.
 }
 
 func (s *AuthService) FindOrRegisterUser(ctx context.Context, user *user.User) (*user.User, error) {
-	user, err := s.userService.FindByEmail(ctx, user.Email)
+	userEntity, err := s.userService.FindByEmail(ctx, user.Email)
 	if err != nil {
 		return nil, err
 	}
-	if user != nil {
-		return user, nil
+	if userEntity != nil {
+		user = userEntity
+		return userEntity, nil
 	}
 	return s.RegisterUser(ctx, user)
 }

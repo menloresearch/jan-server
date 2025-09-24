@@ -1356,6 +1356,63 @@
                 }
             }
         },
+        "/v1/organization/invites/verification": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Verifies an invitation code, checks expiration, registers the user if necessary, and assigns project memberships.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Administration API"
+                ],
+                "summary": "Verify Invite",
+                "parameters": [
+                    {
+                        "description": "Verification request payload",
+                        "name": "verification",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_invites.VerifyInviteUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully verified invite",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_invites.InviteResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid or expired invite code",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - invalid or missing API key",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/organization/invites/{invite_id}": {
             "get": {
                 "security": [
@@ -3001,6 +3058,14 @@
                     "type": "string"
                 },
                 "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization_invites.VerifyInviteUserRequest": {
+            "type": "object",
+            "properties": {
+                "code": {
                     "type": "string"
                 }
             }

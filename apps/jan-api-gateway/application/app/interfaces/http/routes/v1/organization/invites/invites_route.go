@@ -13,6 +13,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/invite"
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/query"
+	"menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
@@ -52,6 +53,9 @@ type InviteResponse struct {
 }
 
 func (inviteRoute *InvitesRoute) RegisterRouter(router gin.IRouter) {
+	// public router
+	router.POST("/invites/verification", inviteRoute.VerifyInvites)
+
 	permissionAll := inviteRoute.authService.OrganizationMemberRoleMiddleware(auth.OrganizationMemberRuleAll)
 	permissionOwnerOnly := inviteRoute.authService.OrganizationMemberRoleMiddleware(auth.OrganizationMemberRuleOwnerOnly)
 	inviteRouter := router.Group(
@@ -291,18 +295,34 @@ func (api *InvitesRoute) CreateInvite(reqCtx *gin.Context) {
 	reqCtx.JSON(http.StatusOK, convertInviteEntityToResponse(inviteEntity))
 }
 
-// @Router /v1/organization/invites/verification [get]
+type VerifyInviteUserRequest struct {
+	Code string `json:"code"`
+}
+
+// VerifyInvites godoc
+// @Summary Verify Invite
+// @Description Verifies an invitation code, checks expiration, registers the user if necessary, and assigns project memberships.
+// @Tags Administration API
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param verification body VerifyInviteUserRequest true "Verification request payload"
+// @Success 200 {object} InviteResponse "Successfully verified invite"
+// @Failure 400 {object} responses.ErrorResponse "Invalid or expired invite code"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized - invalid or missing API key"
+// @Failure 500 {object} responses.ErrorResponse "Internal server error"
+// @Router /v1/organization/invites/verification [post]
 func (api *InvitesRoute) VerifyInvites(reqCtx *gin.Context) {
-	code := reqCtx.Query("code")
-	if code == "" {
+	var requestPayload VerifyInviteUserRequest
+	if err := reqCtx.ShouldBindJSON(&requestPayload); err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
-			Code: "2633626f-6643-4288-bf34-468a8b670a79",
+			Code: "3eec938c-5b05-407a-ae4e-24ce874710fa",
 		})
 		return
 	}
 	ctx := reqCtx.Request.Context()
 	inviteEntity, err := api.inviteService.FindOne(ctx, invite.InvitesFilter{
-		Secrets: &code,
+		Secrets: &requestPayload.Code,
 	})
 	if err != nil || inviteEntity == nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
@@ -310,15 +330,81 @@ func (api *InvitesRoute) VerifyInvites(reqCtx *gin.Context) {
 		})
 		return
 	}
+	if inviteEntity.Status != string(invite.InviteStatusPending) {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code: "54fc9401-a79f-4338-93d2-3d3547ce21a9",
+		})
+		return
+	}
 	if inviteEntity.IsExpired() {
+		inviteEntity.Status = string(invite.InviteStatusExpired)
+		api.inviteService.UpdateInvite(ctx, inviteEntity)
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code: "eb940d50-60bc-498e-9512-93f741a80d7b",
 		})
 		return
 	}
-	api.authService
-	inviteEntity.GetProjects()
-	
+
+	owner, err := api.authService.FindOrRegisterUser(ctx, &user.User{
+		Name:    "Admin",
+		Email:   inviteEntity.Email,
+		Enabled: true,
+		IsGuest: false,
+	})
+	if err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code: "049ad2f3-99ed-44f2-8439-f3848bc20639",
+		})
+		return
+	}
+	inviteProjects, err := inviteEntity.GetProjects()
+	if err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code: "61aec0a5-cc63-4f6a-9e50-d4c0feb1984f",
+		})
+		return
+	}
+	if len(inviteProjects) > 0 {
+		projectLookup := functional.ConvertToMap(inviteProjects, func(i invite.InviteProject) string {
+			return i.ID
+		})
+		projectPublicIDs := functional.GetMapKeys(projectLookup)
+		projects, err := api.projectService.Find(ctx, project.ProjectFilter{
+			PublicIDs: &projectPublicIDs,
+		}, nil)
+		if err != nil {
+			reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+				Code: "efa97376-0f19-4c5f-a10a-1d21304c29f2",
+			})
+			return
+		}
+		for _, projectEntity := range projects {
+			inviteProject, ok := projectLookup[projectEntity.PublicID]
+			if !ok {
+				continue
+			}
+			err := api.projectService.AddMember(ctx, &project.ProjectMember{
+				UserID:    owner.ID,
+				ProjectID: projectEntity.ID,
+				Role:      inviteProject.Role,
+			})
+			if err != nil {
+				reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+					Code: "2b0849bd-1fbf-49ae-b74e-a7cad577cc71",
+				})
+				return
+			}
+		}
+	}
+	inviteEntity.Status = string(invite.InviteStatusAccepted)
+	_, err = api.inviteService.UpdateInvite(ctx, inviteEntity)
+	if err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code: "dd55db1c-95c9-431c-b435-c00aeb3c4a74",
+		})
+		return
+	}
+	reqCtx.JSON(http.StatusOK, convertInviteEntityToResponse(inviteEntity))
 }
 
 // RetrieveInvite godoc
