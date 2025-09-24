@@ -73,7 +73,7 @@ func CreateApplication() (*Application, error) {
 	adminApiKeyAPI := organization2.NewAdminApiKeyAPI(organizationService, authService, apiKeyService, userService)
 	projectApiKeyRoute := apikeys.NewProjectApiKeyRoute(organizationService, projectService, apiKeyService, userService)
 	projectsRoute := projects.NewProjectsRoute(projectService, apiKeyService, authService, projectApiKeyRoute)
-	invitesRoute := invites.NewInvitesRoute(inviteService, projectService, authService)
+	invitesRoute := invites.NewInvitesRoute(inviteService, projectService, organizationService, authService)
 	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI, projectsRoute, invitesRoute, authService)
 	context := provideContext()
 	janInferenceClient := janinference.NewJanInferenceClient(context)
