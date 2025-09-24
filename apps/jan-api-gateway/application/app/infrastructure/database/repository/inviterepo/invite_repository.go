@@ -24,6 +24,9 @@ func (repo *InviteGormRepository) applyFilter(query *gormgen.Query, sql gormgen.
 	if filter.OrganizationID != nil {
 		sql = sql.Where(query.Invite.OrganizationID.Eq(*filter.OrganizationID))
 	}
+	if filter.Secrets != nil {
+		sql = sql.Where(query.Invite.Secrets.Eq(*filter.Secrets))
+	}
 	return sql
 }
 
