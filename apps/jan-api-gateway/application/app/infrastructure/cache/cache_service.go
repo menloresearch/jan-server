@@ -3,6 +3,8 @@ package cache
 import (
 	"context"
 	"time"
+
+	"github.com/go-redsync/redsync/v4"
 )
 
 // CacheService defines the interface for cache operations
@@ -30,4 +32,10 @@ type CacheService interface {
 
 	// Close closes the cache connection
 	Close() error
+
+	// HealthCheck verifies cache connectivity
+	HealthCheck(ctx context.Context) error
+
+	// Redlock distributed locking functions
+	NewMutex(name string, options ...redsync.Option) *redsync.Mutex
 }

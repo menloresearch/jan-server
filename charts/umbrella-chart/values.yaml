@@ -27,14 +27,12 @@ jan-api-gateway:
       value: fhWMCXu29gKRcs6//I0HwaQgvTgv0uMdLRshU5cyC+4=
     - name: ALLOWED_CORS_HOSTS
       value: http://localhost:8080
-    - name: CACHE_URL
-      value: valkey://jan-server-valkey-master:6379
-    - name: CACHE_PASSWORD
+    - name: REDIS_URL
+      value: redis://jan-server-redis-master:6379
+    - name: REDIS_PASSWORD
       value: ""
-    - name: CACHE_DB
+    - name: REDIS_DB
       value: "0"
-    - name: CACHE_TYPE
-      value: "valkey"
 
 jan-inference-model:
   replicaCount: 1

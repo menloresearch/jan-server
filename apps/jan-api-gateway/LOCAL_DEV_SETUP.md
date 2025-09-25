@@ -164,9 +164,9 @@ The following environment variables are **automatically configured** in the laun
 | `CACHE_DB` | Cache database number | `0` |
 | `CACHE_TYPE` | Cache service type (`valkey` or `redis`) | `valkey` |
 
-**📝 Cache Service Notes:**
-- **Valkey** is the primary cache service (Redis-compatible, better licensing)
-- **Redis** is available as an alternative cache service for compatibility
+**📝 Redis Cache Notes:**
+- **Redis** is used for caching inference models and improving performance
+- Cache keys are automatically managed by the application
 - The application automatically selects the cache service based on `CACHE_TYPE`
 - If cache connection fails, the application gracefully degrades to NoOp cache
 
@@ -174,13 +174,13 @@ The following environment variables are **automatically configured** in the laun
 
 ## 🐛 Troubleshooting
 
-### Database & Cache Connection Issues
+### Database & Redis Connection Issues
 1. **Check Docker**: Ensure Docker Desktop is running
-2. **Check Ports**: Make sure ports 5432 (PostgreSQL) and 6379 (Valkey) are available
+2. **Check Ports**: Make sure ports 5432 (PostgreSQL) and 6379 (Redis) are available
 3. **View Database Status**: Use Command Palette → "Tasks: Run Task" → "Wait for Database"
-4. **View Cache Status**: Use Command Palette → "Tasks: Run Task" → "Wait for Cache"
-5. **View Logs**: Check the integrated terminal for database and Valkey cache startup logs
-6. **Cache Fallback**: If Valkey fails, the application will fallback to NoOp cache gracefully
+4. **View Redis Status**: Use Command Palette → "Tasks: Run Task" → "Wait for Redis"
+5. **View Logs**: Check the integrated terminal for database and Redis startup logs
+6. **Cache Fallback**: If Redis fails, the application will fallback to NoOp cache gracefully
 
 ### Go Extension Issues
 1. **Install Go Extension**: VS Code/Cursor should prompt you automatically

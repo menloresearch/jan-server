@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/go-redsync/redsync/v4"
 )
 
 // NoOpCacheService provides a no-operation cache service for graceful degradation
@@ -59,4 +61,15 @@ func (n *NoOpCacheService) Exists(ctx context.Context, key string) (bool, error)
 // Close is a no-op implementation
 func (n *NoOpCacheService) Close() error {
 	return nil
+}
+
+// HealthCheck always returns nil (healthy)
+func (n *NoOpCacheService) HealthCheck(ctx context.Context) error {
+	return nil
+}
+
+// NewMutex is a no-op implementation (always succeeds)
+func (n *NoOpCacheService) NewMutex(name string, options ...redsync.Option) *redsync.Mutex {
+	// Return a no-op mutex that always succeeds
+	return &redsync.Mutex{}
 }

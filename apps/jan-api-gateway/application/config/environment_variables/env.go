@@ -29,11 +29,10 @@ type EnvironmentVariable struct {
 	SMTP_SENDER_EMAIL           string
 	INVITE_REDIRECT_URL         string
 	ORGANIZATION_ADMIN_EMAIL    string
-	// Cache configuration (Valkey primary)
-	CACHE_URL      string
-	CACHE_PASSWORD string
-	CACHE_DB       string
-	CACHE_TYPE     string // "valkey" (primary) or "redis" (alternative)
+	// Redis configuration
+	REDIS_URL      string
+	REDIS_PASSWORD string
+	REDIS_DB       string
 }
 
 func (ev *EnvironmentVariable) LoadFromEnv() {

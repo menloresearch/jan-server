@@ -34,20 +34,47 @@ func (s *UserService) RegisterUser(ctx context.Context, user *User) (*User, erro
 }
 
 func (s *UserService) UpdateUser(ctx context.Context, user *User) (*User, error) {
-	if err := s.userrepo.Update(ctx, user); err != nil {
-		return nil, err
-	}
+	// Use distributed lock to prevent race conditions
+	lockKey := fmt.Sprintf(cache.UserLockKey, user.PublicID)
 
-	// Invalidate cache for this user
-	if user.PublicID != "" {
-		cacheKey := fmt.Sprintf(cache.UserByPublicIDKey, user.PublicID)
-		if cacheErr := s.cache.Unlink(ctx, cacheKey); cacheErr != nil {
-			// Log cache error but don't fail the request
-			logger.GetLogger().Errorf("failed to invalidate cache for user %s: %v", user.PublicID, cacheErr)
+	var result *User
+	var updateErr error
+
+	// Execute with lock using go-redsync
+	err := cache.WithLock(s.cache, lockKey, func() error {
+		// Update database
+		if err := s.userrepo.Update(ctx, user); err != nil {
+			updateErr = err
+			return err
 		}
+
+		// Invalidate cache for this user
+		if user.PublicID != "" {
+			cacheKey := fmt.Sprintf(cache.UserByPublicIDKey, user.PublicID)
+			if cacheErr := s.cache.Unlink(ctx, cacheKey); cacheErr != nil {
+				// Log cache error but don't fail the request
+				logger.GetLogger().Errorf("failed to invalidate cache for user %s: %v", user.PublicID, cacheErr)
+			}
+		}
+
+		result = user
+		return nil
+	}, cache.UserLockTTL)
+
+	if err != nil {
+		logger.GetLogger().Warnf("Failed to acquire lock for user %s update: %v", user.PublicID, err)
+		// Still update the database even if we can't acquire lock
+		if err := s.userrepo.Update(ctx, user); err != nil {
+			return nil, err
+		}
+		return user, nil
 	}
 
-	return user, nil
+	if updateErr != nil {
+		return nil, updateErr
+	}
+
+	return result, nil
 }
 
 func (s *UserService) FindByEmail(ctx context.Context, email string) (*User, error) {

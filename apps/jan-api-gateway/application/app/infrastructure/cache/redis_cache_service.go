@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-redsync/redsync/v4"
+	"github.com/go-redsync/redsync/v4/redis/goredis/v9"
 	"github.com/redis/go-redis/v9"
 	"menlo.ai/jan-api-gateway/app/utils/logger"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
@@ -15,12 +17,13 @@ import (
 // RedisCacheService provides caching functionality using Redis
 type RedisCacheService struct {
 	client *redis.Client
+	rs     *redsync.Redsync
 }
 
 // NewRedisCacheService creates a new Redis cache service
 func NewRedisCacheService() CacheService {
 	// Parse Redis URL and options
-	redisURL := environment_variables.EnvironmentVariables.CACHE_URL
+	redisURL := environment_variables.EnvironmentVariables.REDIS_URL
 	if redisURL == "" {
 		redisURL = "redis://localhost:6379"
 	}
@@ -37,11 +40,11 @@ func NewRedisCacheService() CacheService {
 	}
 
 	// Override with environment variables if provided
-	if environment_variables.EnvironmentVariables.CACHE_PASSWORD != "" {
-		opts.Password = environment_variables.EnvironmentVariables.CACHE_PASSWORD
+	if environment_variables.EnvironmentVariables.REDIS_PASSWORD != "" {
+		opts.Password = environment_variables.EnvironmentVariables.REDIS_PASSWORD
 	}
-	if environment_variables.EnvironmentVariables.CACHE_DB != "" {
-		if db, err := strconv.Atoi(environment_variables.EnvironmentVariables.CACHE_DB); err == nil {
+	if environment_variables.EnvironmentVariables.REDIS_DB != "" {
+		if db, err := strconv.Atoi(environment_variables.EnvironmentVariables.REDIS_DB); err == nil {
 			opts.DB = db
 		}
 	}
@@ -54,12 +57,19 @@ func NewRedisCacheService() CacheService {
 
 	if err := client.Ping(ctx).Err(); err != nil {
 		logger.GetLogger().Error(fmt.Sprintf("Failed to connect to Redis: %v", err))
+		// Return a no-op implementation for graceful degradation
+		return &NoOpCacheService{}
 	} else {
 		logger.GetLogger().Info("Successfully connected to Redis")
 	}
 
+	// Create redsync instance
+	pool := goredis.NewPool(client)
+	rs := redsync.New(pool)
+
 	return &RedisCacheService{
 		client: client,
+		rs:     rs,
 	}
 }
 
@@ -162,4 +172,34 @@ func (r *RedisCacheService) Exists(ctx context.Context, key string) (bool, error
 // Close closes the Redis connection
 func (r *RedisCacheService) Close() error {
 	return r.client.Close()
+}
+
+// HealthCheck verifies Redis connectivity
+func (r *RedisCacheService) HealthCheck(ctx context.Context) error {
+	return r.client.Ping(ctx).Err()
+}
+
+// NewMutex creates a new distributed mutex using go-redsync
+func (r *RedisCacheService) NewMutex(name string, options ...redsync.Option) *redsync.Mutex {
+	return r.rs.NewMutex(name, options...)
+}
+
+// WithLock executes a function with a distributed lock using go-redsync
+func WithLock(cache CacheService, lockName string, fn func() error, ttl time.Duration) error {
+	mutex := cache.NewMutex(lockName, redsync.WithExpiry(ttl))
+
+	// Acquire lock
+	if err := mutex.Lock(); err != nil {
+		return err
+	}
+
+	// Ensure lock is released
+	defer func() {
+		if _, err := mutex.Unlock(); err != nil {
+			// swallow unlock error
+		}
+	}()
+
+	// Execute the function
+	return fn()
 }
