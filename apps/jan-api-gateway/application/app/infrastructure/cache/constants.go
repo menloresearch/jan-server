@@ -15,10 +15,16 @@ const (
 
 	// RegistryModelEndpointsKey is the cache key for model to endpoints mapping
 	RegistryModelEndpointsKey = CacheVersion + ":registry:model_endpoints"
+
+	// UserByPublicIDKey is the cache key template for user lookups by public ID
+	UserByPublicIDKey = CacheVersion + ":user:public_id:%s"
 )
 
 // Cache TTL constants
 const (
 	// ModelsCacheTTL is the TTL for cached models list
 	ModelsCacheTTL = 10 * time.Minute
+
+	// UserCacheTTL is the TTL for cached user lookups
+	UserCacheTTL = 15 * time.Minute
 )

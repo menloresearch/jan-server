@@ -8,13 +8,12 @@ package main
 
 import (
 	"context"
-
 	"gorm.io/gorm"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/cron"
-	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
+	"menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
 	"menlo.ai/jan-api-gateway/app/domain/invite"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
@@ -34,23 +33,24 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/inference"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
-	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	auth2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth/google"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conv"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
-	mcpimpl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	organization2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/invites"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
-	apikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects/api_keys"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects/api_keys"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/responses"
-	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
+	"menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
+)
 
+import (
 	_ "github.com/grafana/pyroscope-go/godeltaprof/http/pprof"
-
 	_ "net/http/pprof"
 )
 
@@ -65,7 +65,8 @@ func CreateApplication() (*Application, error) {
 	organizationRepository := organizationrepo.NewOrganizationGormRepository(transactionDatabase)
 	organizationService := organization.NewService(organizationRepository)
 	userRepository := userrepo.NewUserGormRepository(transactionDatabase)
-	userService := user.NewService(userRepository)
+	cacheService := cache.NewCacheService()
+	userService := user.NewService(userRepository, cacheService)
 	apiKeyRepository := apikeyrepo.NewApiKeyGormRepository(transactionDatabase)
 	apiKeyService := apikey.NewService(apiKeyRepository, organizationService)
 	projectRepository := projectrepo.NewProjectGormRepository(transactionDatabase)
@@ -80,7 +81,6 @@ func CreateApplication() (*Application, error) {
 	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI, projectsRoute, invitesRoute, authService)
 	context := provideContext()
 	janInferenceClient := janinference.NewJanInferenceClient(context)
-	cacheService := cache.NewCacheService()
 	inferenceProvider := inference.NewJanInferenceProvider(janInferenceClient, cacheService)
 	completionAPI := chat.NewCompletionAPI(inferenceProvider, authService)
 	chatRoute := chat.NewChatRoute(authService, completionAPI)
@@ -89,9 +89,9 @@ func CreateApplication() (*Application, error) {
 	conversationService := conversation.NewService(conversationRepository, itemRepository)
 	completionNonStreamHandler := conv.NewCompletionNonStreamHandler(inferenceProvider, conversationService)
 	completionStreamHandler := conv.NewCompletionStreamHandler(inferenceProvider, conversationService)
-	serperService := serpermcp.NewSerperService()
 	inferenceModelRegistry := inferencemodelregistry.NewInferenceModelRegistry(cacheService)
 	convCompletionAPI := conv.NewConvCompletionAPI(completionNonStreamHandler, completionStreamHandler, conversationService, authService, inferenceModelRegistry)
+	serperService := serpermcp.NewSerperService()
 	serperMCP := mcpimpl.NewSerperMCP(serperService)
 	convMCPAPI := conv.NewConvMCPAPI(authService, serperMCP)
 	convChatRoute := conv.NewConvChatRoute(authService, convCompletionAPI, convMCPAPI)
@@ -120,7 +120,8 @@ func CreateDataInitializer() (*DataInitializer, error) {
 	db := ProvideDatabase()
 	transactionDatabase := transaction.NewDatabase(db)
 	userRepository := userrepo.NewUserGormRepository(transactionDatabase)
-	userService := user.NewService(userRepository)
+	cacheService := cache.NewCacheService()
+	userService := user.NewService(userRepository, cacheService)
 	apiKeyRepository := apikeyrepo.NewApiKeyGormRepository(transactionDatabase)
 	organizationRepository := organizationrepo.NewOrganizationGormRepository(transactionDatabase)
 	organizationService := organization.NewService(organizationRepository)
