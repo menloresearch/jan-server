@@ -1,0 +1,21 @@
+dependencies:
+- name: postgresql
+  repository: https://charts.bitnami.com/bitnami
+  version: 16.7.27
+- name: valkey-cluster
+  repository: oci://registry-1.docker.io/bitnamicharts
+  version: 3.0.24
+- name: gpu-operator
+  repository: https://helm.ngc.nvidia.com/nvidia
+  version: v25.3.2
+- name: kuberay-operator
+  repository: https://ray-project.github.io/kuberay-helm/
+  version: 1.2.1
+- name: gateway-helm
+  repository: oci://docker.io/envoyproxy
+  version: v1.5.1
+- name: aibrix
+  repository: https://danchev.github.io/helm-charts
+  version: 0.4.1
+digest: sha256:8a2165e8245beae7d4cc7f317e75b30ee15bbe3da88a7db9f69639e07ba315db
+generated: "2025-09-25T23:50:13.8091099+07:00"

@@ -1,0 +1,19 @@
+{{- if .Values.janApiGateway.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "jan-api-gateway.fullname" . }}
+  labels:
+    {{- include "jan-api-gateway.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.janApiGateway.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.janApiGateway.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.janApiGateway.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.janApiGateway.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "jan-api-gateway.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

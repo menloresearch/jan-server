@@ -5,12 +5,12 @@ metadata:
   labels:
     {{- include "jan-api-gateway.labels" . | nindent 4 }}
 spec:
-  type: {{ .Values.service.type }}
+  type: {{ .Values.janApiGateway.service.type }}
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort: {{ .Values.service.port }}
-      {{- if eq .Values.service.type "NodePort" }}
-      nodePort: {{ .Values.service.nodePort }}
+    - port: {{ .Values.janApiGateway.service.port }}
+      targetPort: {{ .Values.janApiGateway.service.port }}
+      {{- if eq .Values.janApiGateway.service.type "NodePort" }}
+      nodePort: {{ .Values.janApiGateway.service.nodePort }}
       {{- end }}
   selector:
     app.kubernetes.io/name: {{ include "jan-api-gateway.name" . }}

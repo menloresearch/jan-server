@@ -26,3 +26,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/version: {{ .Chart.AppVersion }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
+
+{{/*
+Create the name of the service account to use
+*/}}
+{{- define "jan-api-gateway.serviceAccountName" -}}
+{{- if .Values.janApiGateway.serviceAccount.create }}
+{{- default (include "jan-api-gateway.fullname" .) .Values.janApiGateway.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.janApiGateway.serviceAccount.name }}
+{{- end }}
+{{- end }}
