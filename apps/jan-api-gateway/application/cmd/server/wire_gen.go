@@ -12,7 +12,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
-	"menlo.ai/jan-api-gateway/app/domain/healthcheck"
+	"menlo.ai/jan-api-gateway/app/domain/cron"
 	"menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
 	"menlo.ai/jan-api-gateway/app/domain/invite"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
@@ -108,10 +108,10 @@ func CreateApplication() (*Application, error) {
 	responseRoute := responses.NewResponseRoute(responseModelService, authService, responseService, streamModelService, nonStreamModelService)
 	v1Route := v1.NewV1Route(organizationRoute, chatRoute, convChatRoute, conversationAPI, modelAPI, mcpapi, authRoute, responseRoute)
 	httpServer := http.NewHttpServer(v1Route)
-	healthcheckCrontabService := healthcheck.NewService(janInferenceClient, inferenceModelRegistry)
+	cronService := cron.NewService(janInferenceClient, inferenceModelRegistry)
 	application := &Application{
-		HttpServer:         httpServer,
-		HealthcheckService: healthcheckCrontabService,
+		HttpServer:  httpServer,
+		CronService: cronService,
 	}
 	return application, nil
 }

@@ -22,9 +22,6 @@ func NewRedisCacheService() CacheService {
 	// Parse Redis URL and options
 	redisURL := environment_variables.EnvironmentVariables.CACHE_URL
 	if redisURL == "" {
-		redisURL = environment_variables.EnvironmentVariables.REDIS_URL
-	}
-	if redisURL == "" {
 		redisURL = "redis://localhost:6379"
 	}
 
@@ -42,15 +39,9 @@ func NewRedisCacheService() CacheService {
 	// Override with environment variables if provided
 	if environment_variables.EnvironmentVariables.CACHE_PASSWORD != "" {
 		opts.Password = environment_variables.EnvironmentVariables.CACHE_PASSWORD
-	} else if environment_variables.EnvironmentVariables.REDIS_PASSWORD != "" {
-		opts.Password = environment_variables.EnvironmentVariables.REDIS_PASSWORD
 	}
 	if environment_variables.EnvironmentVariables.CACHE_DB != "" {
 		if db, err := strconv.Atoi(environment_variables.EnvironmentVariables.CACHE_DB); err == nil {
-			opts.DB = db
-		}
-	} else if environment_variables.EnvironmentVariables.REDIS_DB != "" {
-		if db, err := strconv.Atoi(environment_variables.EnvironmentVariables.REDIS_DB); err == nil {
 			opts.DB = db
 		}
 	}
@@ -124,9 +115,9 @@ func (r *RedisCacheService) GetWithFallback(ctx context.Context, key string, des
 	return json.Unmarshal(jsonValue, dest)
 }
 
-// Delete removes a key from Redis
+// Delete removes a key from Redis synchronously (blocking)
 func (r *RedisCacheService) Delete(ctx context.Context, key string) error {
-	return r.client.Unlink(ctx, key).Err()
+	return r.client.Del(ctx, key).Err()
 }
 
 // Unlink removes a key from Redis asynchronously (non-blocking)
@@ -171,9 +162,4 @@ func (r *RedisCacheService) Exists(ctx context.Context, key string) (bool, error
 // Close closes the Redis connection
 func (r *RedisCacheService) Close() error {
 	return r.client.Close()
-}
-
-// HealthCheck verifies Redis connectivity
-func (r *RedisCacheService) HealthCheck(ctx context.Context) error {
-	return r.client.Ping(ctx).Err()
 }

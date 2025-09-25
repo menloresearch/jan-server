@@ -16,7 +16,7 @@ type CacheService interface {
 	// GetWithFallback retrieves a value from cache, or executes fallback function if not found
 	GetWithFallback(ctx context.Context, key string, dest any, fallback func() (any, error), expiration time.Duration) error
 
-	// Delete removes a key from cache
+	// Delete removes a key from cache synchronously (blocking)
 	Delete(ctx context.Context, key string) error
 
 	// Unlink removes a key from cache asynchronously (non-blocking)
@@ -30,7 +30,4 @@ type CacheService interface {
 
 	// Close closes the cache connection
 	Close() error
-
-	// HealthCheck verifies cache connectivity
-	HealthCheck(ctx context.Context) error
 }

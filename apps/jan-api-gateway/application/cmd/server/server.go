@@ -8,7 +8,7 @@ import (
 	_ "github.com/grafana/pyroscope-go/godeltaprof/http/pprof"
 
 	"github.com/mileusna/crontab"
-	"menlo.ai/jan-api-gateway/app/domain/healthcheck"
+	"menlo.ai/jan-api-gateway/app/domain/cron"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database"
 	apphttp "menlo.ai/jan-api-gateway/app/interfaces/http"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
@@ -18,15 +18,15 @@ import (
 )
 
 type Application struct {
-	HttpServer         *apphttp.HttpServer
-	HealthcheckService *healthcheck.HealthcheckCrontabService
+	HttpServer  *apphttp.HttpServer
+	CronService *cron.CronService
 }
 
 func (application *Application) Start() {
-	// Start healthcheck service
-	cron := crontab.New()
+	// Start cron service
+	cronTab := crontab.New()
 	background := context.Background()
-	application.HealthcheckService.Start(background, cron)
+	application.CronService.Start(background, cronTab)
 
 	// Start HTTP server
 	if err := application.HttpServer.Run(); err != nil {

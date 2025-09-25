@@ -234,9 +234,6 @@ A comprehensive API gateway for Jan Server that provides OpenAI-compatible endpo
 | `CACHE_PASSWORD` | Cache service authentication password | `` (empty for dev) |
 | `CACHE_DB` | Cache service database number | `0` |
 | `CACHE_TYPE` | Cache service type (`valkey` or `redis`) | `valkey` |
-| `REDIS_URL` | Legacy Redis connection URL (fallback) | `redis://localhost:6379` |
-| `REDIS_PASSWORD` | Legacy Redis authentication password | `` (empty for dev) |
-| `REDIS_DB` | Legacy Redis database number | `0` |
 
 ## 🚀 Cache Service
 

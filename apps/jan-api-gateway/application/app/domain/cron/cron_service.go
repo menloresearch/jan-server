@@ -1,4 +1,4 @@
-package healthcheck
+package cron
 
 import (
 	"context"
@@ -10,31 +10,33 @@ import (
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
-type HealthcheckCrontabService struct {
+type CronService struct {
 	JanInferenceClient     *janinference.JanInferenceClient
 	InferenceModelRegistry *inference_model_registry.InferenceModelRegistry
 }
 
-func NewService(janInferenceClient *janinference.JanInferenceClient, registry *inference_model_registry.InferenceModelRegistry) *HealthcheckCrontabService {
-	return &HealthcheckCrontabService{
+func NewService(janInferenceClient *janinference.JanInferenceClient, registry *inference_model_registry.InferenceModelRegistry) *CronService {
+	return &CronService{
 		JanInferenceClient:     janInferenceClient,
 		InferenceModelRegistry: registry,
 	}
 }
 
-func (hs *HealthcheckCrontabService) Start(ctx context.Context, ctab *crontab.Crontab) {
-	hs.CheckInferenceModels(ctx)
-	// Check every 2 minutes instead of every minute
-	ctab.AddJob("*/2 * * * *", func() {
-		hs.CheckInferenceModels(ctx)
+func (cs *CronService) Start(ctx context.Context, ctab *crontab.Crontab) {
+	// Run initial check
+	cs.CheckInferenceModels(ctx)
+
+	// Check every 5 minutes instead of every minute
+	ctab.AddJob("*/5 * * * *", func() {
+		cs.CheckInferenceModels(ctx)
 		environment_variables.EnvironmentVariables.LoadFromEnv()
 	})
 }
 
-func (hs *HealthcheckCrontabService) CheckInferenceModels(ctx context.Context) {
-	janModelResp, err := hs.JanInferenceClient.GetModels(ctx)
+func (cs *CronService) CheckInferenceModels(ctx context.Context) {
+	janModelResp, err := cs.JanInferenceClient.GetModels(ctx)
 	if err != nil {
-		hs.InferenceModelRegistry.RemoveServiceModels(ctx, hs.JanInferenceClient.BaseURL)
+		cs.InferenceModelRegistry.RemoveServiceModels(ctx, cs.JanInferenceClient.BaseURL)
 	} else {
 		models := make([]inferencemodel.Model, 0)
 		for _, model := range janModelResp.Data {
@@ -45,6 +47,7 @@ func (hs *HealthcheckCrontabService) CheckInferenceModels(ctx context.Context) {
 				OwnedBy: model.OwnedBy,
 			})
 		}
-		hs.InferenceModelRegistry.AddModels(ctx, hs.JanInferenceClient.BaseURL, models)
+
+		cs.InferenceModelRegistry.AddModels(ctx, cs.JanInferenceClient.BaseURL, models)
 	}
 }

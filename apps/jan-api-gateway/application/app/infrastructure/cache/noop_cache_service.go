@@ -60,8 +60,3 @@ func (n *NoOpCacheService) Exists(ctx context.Context, key string) (bool, error)
 func (n *NoOpCacheService) Close() error {
 	return nil
 }
-
-// HealthCheck always returns nil (healthy)
-func (n *NoOpCacheService) HealthCheck(ctx context.Context) error {
-	return nil
-}

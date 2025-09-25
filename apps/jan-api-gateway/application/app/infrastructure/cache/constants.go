@@ -7,9 +7,6 @@ const (
 	// ModelsCacheKey is the cache key for the models list
 	ModelsCacheKey = "v1:models:list"
 
-	// RegistryCacheKey is the cache key for the registry data
-	RegistryCacheKey = "v1:registry:data"
-
 	// RegistryEndpointModelsKey is the cache key for endpoint to models mapping
 	RegistryEndpointModelsKey = "v1:registry:endpoint_models"
 
@@ -21,7 +18,4 @@ const (
 const (
 	// ModelsCacheTTL is the TTL for cached models list
 	ModelsCacheTTL = 10 * time.Minute
-
-	// RegistryCacheTTL is the TTL for registry data
-	RegistryCacheTTL = 1 * time.Minute
 )
