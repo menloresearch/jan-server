@@ -4,14 +4,17 @@ import "time"
 
 // Cache key constants
 const (
+	// CacheVersion is the API version prefix for cache keys
+	CacheVersion = "v1"
+
 	// ModelsCacheKey is the cache key for the models list
-	ModelsCacheKey = "v1:models:list"
+	ModelsCacheKey = CacheVersion + ":models:list"
 
 	// RegistryEndpointModelsKey is the cache key for endpoint to models mapping
-	RegistryEndpointModelsKey = "v1:registry:endpoint_models"
+	RegistryEndpointModelsKey = CacheVersion + ":registry:endpoint_models"
 
 	// RegistryModelEndpointsKey is the cache key for model to endpoints mapping
-	RegistryModelEndpointsKey = "v1:registry:model_endpoints"
+	RegistryModelEndpointsKey = CacheVersion + ":registry:model_endpoints"
 )
 
 // Cache TTL constants

@@ -8,12 +8,13 @@ package main
 
 import (
 	"context"
+
 	"gorm.io/gorm"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/cron"
-	"menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
+	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
 	"menlo.ai/jan-api-gateway/app/domain/invite"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
@@ -33,24 +34,23 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/inference"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
+	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	auth2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth/google"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conv"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
+	mcpimpl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	organization2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/invites"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
-	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects/api_keys"
+	apikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects/api_keys"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/responses"
-	"menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
-)
+	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
 
-import (
 	_ "github.com/grafana/pyroscope-go/godeltaprof/http/pprof"
+
 	_ "net/http/pprof"
 )
 
@@ -91,7 +91,7 @@ func CreateApplication() (*Application, error) {
 	completionStreamHandler := conv.NewCompletionStreamHandler(inferenceProvider, conversationService)
 	serperService := serpermcp.NewSerperService()
 	inferenceModelRegistry := inferencemodelregistry.NewInferenceModelRegistry(cacheService)
-	convCompletionAPI := conv.NewConvCompletionAPI(completionNonStreamHandler, completionStreamHandler, conversationService, authService, serperService, inferenceModelRegistry)
+	convCompletionAPI := conv.NewConvCompletionAPI(completionNonStreamHandler, completionStreamHandler, conversationService, authService, inferenceModelRegistry)
 	serperMCP := mcpimpl.NewSerperMCP(serperService)
 	convMCPAPI := conv.NewConvMCPAPI(authService, serperMCP)
 	convChatRoute := conv.NewConvChatRoute(authService, convCompletionAPI, convMCPAPI)
