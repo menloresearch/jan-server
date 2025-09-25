@@ -98,7 +98,7 @@ func (r *InferenceModelRegistry) hasModelsChanged(serviceName string, newModels 
 	return !modelsEqual(existingModelObjects, newModels)
 }
 
-func (r *InferenceModelRegistry) AddModels(ctx context.Context, serviceName string, models []inferencemodel.Model) {
+func (r *InferenceModelRegistry) SetModels(ctx context.Context, serviceName string, models []inferencemodel.Model) {
 	// Check if models have actually changed to avoid unnecessary cache operations
 	if !r.hasModelsChanged(serviceName, models) {
 		return // No changes, skip cache update
@@ -110,7 +110,7 @@ func (r *InferenceModelRegistry) AddModels(ctx context.Context, serviceName stri
 	})
 	r.rebuild()
 
-	// Invalidate cache after adding models
+	// Invalidate cache after setting models
 	r.invalidateCache(ctx)
 
 	// Populate cache with new registry data

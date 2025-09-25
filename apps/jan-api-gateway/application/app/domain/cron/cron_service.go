@@ -48,6 +48,6 @@ func (cs *CronService) CheckInferenceModels(ctx context.Context) {
 			})
 		}
 
-		cs.InferenceModelRegistry.AddModels(ctx, cs.JanInferenceClient.BaseURL, models)
+		cs.InferenceModelRegistry.SetModels(ctx, cs.JanInferenceClient.BaseURL, models)
 	}
 }

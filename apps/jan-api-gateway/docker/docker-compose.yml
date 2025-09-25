@@ -36,56 +36,6 @@ services:
     restart: unless-stopped
     command: valkey-server --appendonly yes
 
-  jan-api-gateway:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-    container_name: jan-api-gateway-app
-    ports:
-      - "8080:8080"
-    environment:
-      # Database configuration
-      DB_POSTGRESQL_WRITE_DSN: postgres://jan_user:jan_password@postgres:5432/jan_api_gateway?sslmode=disable
-      DB_POSTGRESQL_READ1_DSN: postgres://jan_user:jan_password@postgres:5432/jan_api_gateway?sslmode=disable
-      
-      # Cache configuration (Valkey by default, can switch to Redis)
-      CACHE_URL: valkey://valkey:6379
-      CACHE_PASSWORD: ""
-      CACHE_DB: "0"
-      CACHE_TYPE: "valkey"
-      
-      # JWT and API Key secrets
-      JWT_SECRET: your-super-secret-jwt-key-change-in-production
-      APIKEY_SECRET: your-api-key-secret-change-in-production
-      
-      # Jan Inference service (update with your actual URL)
-      JAN_INFERENCE_MODEL_URL: http://localhost:8000
-      
-      # Serper API (update with your actual key)
-      SERPER_API_KEY: your-serper-api-key
-      
-      # Google OAuth2 (update with your actual credentials)
-      OAUTH2_GOOGLE_CLIENT_ID: your-google-client-id
-      OAUTH2_GOOGLE_CLIENT_SECRET: your-google-client-secret
-      OAUTH2_GOOGLE_REDIRECT_URL: http://localhost:8080/v1/auth/google/callback
-      
-      # CORS configuration
-      ALLOWED_CORS_HOSTS: http://localhost:8080,http://localhost:3000
-      
-      # SMTP configuration (optional)
-      SMTP_HOST: smtp.gmail.com
-      SMTP_PORT: 587
-      SMTP_USERNAME: your-smtp-username
-      SMTP_PASSWORD: your-smtp-password
-      SMTP_SENDER_EMAIL: noreply@yourdomain.com
-      INVITE_REDIRECT_URL: http://localhost:8080/invite/accept
-    depends_on:
-      postgres:
-        condition: service_healthy
-      valkey:
-        condition: service_healthy
-    restart: unless-stopped
-
 volumes:
   postgres_data:
   valkey_data:
