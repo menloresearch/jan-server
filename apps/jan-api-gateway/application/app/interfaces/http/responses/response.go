@@ -91,7 +91,6 @@ func NewCookieWithSecurity(name string, value string, expires time.Time) *http.C
 			HttpOnly: false,
 			Secure:   false,
 			Path:     "/",
-			SameSite: http.SameSiteNoneMode,
 		}
 	}
 	return &http.Cookie{
