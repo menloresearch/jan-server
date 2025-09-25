@@ -255,15 +255,11 @@ func (googleAuthAPI *GoogleAuthAPI) HandleGoogleCallback(reqCtx *gin.Context) {
 		return
 	}
 
-	http.SetCookie(reqCtx.Writer, &http.Cookie{
-		Name:     auth.RefreshTokenKey,
-		Value:    refreshTokenString,
-		Expires:  refreshTokenExp,
-		HttpOnly: true,
-		Secure:   true,
-		Path:     "/",
-		SameSite: http.SameSiteStrictMode,
-	})
+	http.SetCookie(reqCtx.Writer, responses.NewCookieWithSecurity(
+		auth.RefreshTokenKey,
+		refreshTokenString,
+		refreshTokenExp,
+	))
 
 	reqCtx.JSON(http.StatusOK, &AccessTokenResponse{
 		AccessTokenResponseObjectTypeObject,
@@ -292,8 +288,11 @@ func (googleAuthAPI *GoogleAuthAPI) GetGoogleLoginUrl(reqCtx *gin.Context) {
 		})
 		return
 	}
-
-	reqCtx.SetCookie(auth.OAuthStateKey, state, 300, "/", "", true, true)
+	http.SetCookie(reqCtx.Writer, responses.NewCookieWithSecurity(
+		auth.OAuthStateKey,
+		state,
+		time.Now().Add(300*time.Second),
+	))
 	authURL := googleAuthAPI.oAuth2Config.AuthCodeURL(state, oauth2.AccessTypeOffline)
 	reqCtx.JSON(http.StatusOK, GoogleLoginUrl{
 		Object: "google.login.url",
