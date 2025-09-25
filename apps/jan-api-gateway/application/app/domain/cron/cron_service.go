@@ -26,8 +26,7 @@ func (cs *CronService) Start(ctx context.Context, ctab *crontab.Crontab) {
 	// Run initial check
 	cs.CheckInferenceModels(ctx)
 
-	// Check every 5 minutes instead of every minute
-	ctab.AddJob("*/5 * * * *", func() {
+	ctab.AddJob("* * * * *", func() {
 		cs.CheckInferenceModels(ctx)
 		environment_variables.EnvironmentVariables.LoadFromEnv()
 	})
