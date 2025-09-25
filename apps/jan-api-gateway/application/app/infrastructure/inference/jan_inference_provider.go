@@ -3,7 +3,6 @@ package inference
 import (
 	"context"
 	"io"
-	"time"
 
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/inference"
@@ -14,11 +13,11 @@ import (
 // JanInferenceProvider implements InferenceProvider using Jan Inference service
 type JanInferenceProvider struct {
 	client *janinference.JanInferenceClient
-	cache  *cache.RedisCacheService
+	cache  cache.CacheService
 }
 
 // NewJanInferenceProvider creates a new JanInferenceProvider
-func NewJanInferenceProvider(client *janinference.JanInferenceClient, cacheService *cache.RedisCacheService) inference.InferenceProvider {
+func NewJanInferenceProvider(client *janinference.JanInferenceClient, cacheService cache.CacheService) inference.InferenceProvider {
 	return &JanInferenceProvider{
 		client: client,
 		cache:  cacheService,
@@ -87,7 +86,7 @@ func (p *JanInferenceProvider) GetModels(ctx context.Context) (*inference.Models
 			Object: clientResponse.Object,
 			Data:   models,
 		}, nil
-	}, 10*time.Minute) // Cache models list for 10 minutes
+	}, cache.ModelsCacheTTL)
 
 	if err != nil {
 		return nil, err

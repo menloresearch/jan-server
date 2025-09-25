@@ -8,8 +8,8 @@ dependencies:
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
   version: 16.7.27
-- name: redis
+- name: valkey
   repository: https://charts.bitnami.com/bitnami
-  version: 22.0.7
-digest: sha256:264353ce28ea179c91275410c543ba3e2891466b303b789214fb83666970d421
-generated: "2025-09-24T20:43:11.2408544+07:00"
+  version: 1.0.0
+digest: sha256:ed480e68798b07dcc2bdf1cd12c02cf5bd159e6a262503296ff758bb22580f14
+generated: "2025-09-25T09:27:26.3035533+07:00"

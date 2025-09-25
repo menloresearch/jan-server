@@ -7,8 +7,9 @@ require (
 	github.com/google/wire v0.6.0
 	github.com/grafana/pyroscope-go/godeltaprof v0.1.8
 	github.com/mileusna/crontab v1.2.0
-	github.com/redis/go-redis/v9 v9.5.1
+	github.com/redis/go-redis/v9 v9.14.0
 	github.com/swaggo/swag v1.16.6
+	github.com/valkey-io/valkey-go v1.0.65
 	gorm.io/gen v0.3.27
 	gorm.io/gorm v1.30.1
 	gorm.io/plugin/dbresolver v1.6.2
@@ -19,7 +20,7 @@ require (
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
-	github.com/cespare/xxhash/v2 v2.2.0 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
 	github.com/go-openapi/jsonpointer v0.21.2 // indirect

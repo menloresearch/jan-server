@@ -139,8 +139,8 @@ docker-compose -f docker/docker-compose.yml logs redis
 # Connect to database
 docker-compose -f docker/docker-compose.yml exec postgres psql -U jan_user -d jan_api_gateway
 
-# Connect to Redis
-docker-compose -f docker/docker-compose.yml exec redis redis-cli
+# Connect to Valkey
+docker-compose -f docker/docker-compose.yml exec valkey valkey-cli
 ```
 
 ## ⚙️ Environment Variables
@@ -169,10 +169,10 @@ The following environment variables are **automatically configured** in the laun
 
 ### Database Connection Issues
 1. **Check Docker**: Ensure Docker Desktop is running
-2. **Check Ports**: Make sure ports 5432 (PostgreSQL) and 6379 (Redis) are available
+2. **Check Ports**: Make sure ports 5432 (PostgreSQL) and 6379 (Valkey) are available
 3. **View Database Status**: Use Command Palette → "Tasks: Run Task" → "Wait for Database"
-4. **View Redis Status**: Use Command Palette → "Tasks: Run Task" → "Wait for Redis"
-5. **View Logs**: Check the integrated terminal for database and Redis startup logs
+4. **View Cache Status**: Use Command Palette → "Tasks: Run Task" → "Wait for Cache"
+5. **View Logs**: Check the integrated terminal for database and cache startup logs
 
 ### Go Extension Issues
 1. **Install Go Extension**: VS Code/Cursor should prompt you automatically

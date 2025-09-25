@@ -21,20 +21,20 @@ services:
       retries: 5
     restart: unless-stopped
 
-  redis:
-    image: redis:7-alpine
-    container_name: jan-api-gateway-redis
+  valkey:
+    image: valkey/valkey:7-alpine
+    container_name: jan-api-gateway-valkey
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - valkey_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "valkey-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: valkey-server --appendonly yes
 
   jan-api-gateway:
     build:
@@ -48,10 +48,11 @@ services:
       DB_POSTGRESQL_WRITE_DSN: postgres://jan_user:jan_password@postgres:5432/jan_api_gateway?sslmode=disable
       DB_POSTGRESQL_READ1_DSN: postgres://jan_user:jan_password@postgres:5432/jan_api_gateway?sslmode=disable
       
-      # Redis configuration
-      REDIS_URL: redis://redis:6379
-      REDIS_PASSWORD: ""
-      REDIS_DB: "0"
+      # Cache configuration (Valkey by default, can switch to Redis)
+      CACHE_URL: valkey://valkey:6379
+      CACHE_PASSWORD: ""
+      CACHE_DB: "0"
+      CACHE_TYPE: "valkey"
       
       # JWT and API Key secrets
       JWT_SECRET: your-super-secret-jwt-key-change-in-production
@@ -81,10 +82,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+      valkey:
         condition: service_healthy
     restart: unless-stopped
 
 volumes:
   postgres_data:
-  redis_data:
+  valkey_data:

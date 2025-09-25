@@ -11,6 +11,6 @@ import (
 var InfrastructureProvider = wire.NewSet(
 	janinference.NewJanInferenceClient,
 	inference.NewJanInferenceProvider,
-	cache.NewRedisCacheService,
+	cache.NewCacheService,
 	inferencemodelregistry.NewInferenceModelRegistry,
 )

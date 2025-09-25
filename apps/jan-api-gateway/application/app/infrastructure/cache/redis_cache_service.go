@@ -18,9 +18,12 @@ type RedisCacheService struct {
 }
 
 // NewRedisCacheService creates a new Redis cache service
-func NewRedisCacheService() *RedisCacheService {
+func NewRedisCacheService() CacheService {
 	// Parse Redis URL and options
-	redisURL := environment_variables.EnvironmentVariables.REDIS_URL
+	redisURL := environment_variables.EnvironmentVariables.CACHE_URL
+	if redisURL == "" {
+		redisURL = environment_variables.EnvironmentVariables.REDIS_URL
+	}
 	if redisURL == "" {
 		redisURL = "redis://localhost:6379"
 	}
@@ -37,10 +40,16 @@ func NewRedisCacheService() *RedisCacheService {
 	}
 
 	// Override with environment variables if provided
-	if environment_variables.EnvironmentVariables.REDIS_PASSWORD != "" {
+	if environment_variables.EnvironmentVariables.CACHE_PASSWORD != "" {
+		opts.Password = environment_variables.EnvironmentVariables.CACHE_PASSWORD
+	} else if environment_variables.EnvironmentVariables.REDIS_PASSWORD != "" {
 		opts.Password = environment_variables.EnvironmentVariables.REDIS_PASSWORD
 	}
-	if environment_variables.EnvironmentVariables.REDIS_DB != "" {
+	if environment_variables.EnvironmentVariables.CACHE_DB != "" {
+		if db, err := strconv.Atoi(environment_variables.EnvironmentVariables.CACHE_DB); err == nil {
+			opts.DB = db
+		}
+	} else if environment_variables.EnvironmentVariables.REDIS_DB != "" {
 		if db, err := strconv.Atoi(environment_variables.EnvironmentVariables.REDIS_DB); err == nil {
 			opts.DB = db
 		}
@@ -117,20 +126,36 @@ func (r *RedisCacheService) GetWithFallback(ctx context.Context, key string, des
 
 // Delete removes a key from Redis
 func (r *RedisCacheService) Delete(ctx context.Context, key string) error {
-	return r.client.Del(ctx, key).Err()
+	return r.client.Unlink(ctx, key).Err()
+}
+
+// Unlink removes a key from Redis asynchronously (non-blocking)
+func (r *RedisCacheService) Unlink(ctx context.Context, key string) error {
+	return r.client.Unlink(ctx, key).Err()
 }
 
 // DeletePattern removes all keys matching a pattern
 func (r *RedisCacheService) DeletePattern(ctx context.Context, pattern string) error {
-	keys, err := r.client.Keys(ctx, pattern).Result()
-	if err != nil {
-		return fmt.Errorf("failed to get keys: %w", err)
+	var cursor uint64
+	for {
+		keys, next, err := r.client.Scan(ctx, cursor, pattern, 1000).Result()
+		if err != nil {
+			return fmt.Errorf("failed to scan keys: %w", err)
+		}
+		if len(keys) > 0 {
+			pipe := r.client.Pipeline()
+			for _, k := range keys {
+				pipe.Unlink(ctx, k)
+			}
+			if _, err := pipe.Exec(ctx); err != nil {
+				return fmt.Errorf("failed to unlink keys: %w", err)
+			}
+		}
+		if next == 0 {
+			break
+		}
+		cursor = next
 	}
-
-	if len(keys) > 0 {
-		return r.client.Del(ctx, keys...).Err()
-	}
-
 	return nil
 }
 

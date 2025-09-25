@@ -32,6 +32,11 @@ type EnvironmentVariable struct {
 	REDIS_URL                   string
 	REDIS_PASSWORD              string
 	REDIS_DB                    string
+	// Cache configuration (supports both Valkey and Redis)
+	CACHE_URL      string
+	CACHE_PASSWORD string
+	CACHE_DB       string
+	CACHE_TYPE     string // "valkey" or "redis"
 }
 
 func (ev *EnvironmentVariable) LoadFromEnv() {
