@@ -1,5 +1,12 @@
 package responses
 
+import (
+	"net/http"
+	"time"
+
+	"menlo.ai/jan-api-gateway/config"
+)
+
 type ErrorResponse struct {
 	Code          string `json:"code"`
 	Error         string `json:"error"`
@@ -73,4 +80,27 @@ func BuildCursorPage[T any](
 	}
 	cursorPage.Total = count
 	return cursorPage, nil
+}
+
+func NewCookieWithSecurity(name string, value string, expires time.Time) *http.Cookie {
+	if config.IsDev() {
+		return &http.Cookie{
+			Name:     name,
+			Value:    value,
+			Expires:  expires,
+			HttpOnly: false,
+			Secure:   false,
+			Path:     "/",
+			SameSite: http.SameSiteNoneMode,
+		}
+	}
+	return &http.Cookie{
+		Name:     name,
+		Value:    value,
+		Expires:  expires,
+		HttpOnly: true,
+		Secure:   true,
+		Path:     "/",
+		SameSite: http.SameSiteStrictMode,
+	}
 }

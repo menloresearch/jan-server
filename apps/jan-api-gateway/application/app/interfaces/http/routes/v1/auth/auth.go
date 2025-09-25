@@ -91,16 +91,11 @@ func (authRoute *AuthRoute) GetMe(reqCtx *gin.Context) {
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized (e.g., expired or missing refresh token)"
 // @Router /v1/auth/logout [get]
 func (authRoute *AuthRoute) Logout(reqCtx *gin.Context) {
-	http.SetCookie(reqCtx.Writer, &http.Cookie{
-		Name:     auth.RefreshTokenKey,
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
-		Expires:  time.Unix(0, 0),
-		MaxAge:   -1,
-	})
+	http.SetCookie(reqCtx.Writer, responses.NewCookieWithSecurity(
+		auth.RefreshTokenKey,
+		"",
+		time.Unix(0, 0),
+	))
 	reqCtx.Status(http.StatusOK)
 }
 
@@ -169,15 +164,13 @@ func (authRoute *AuthRoute) RefreshToken(reqCtx *gin.Context) {
 		return
 	}
 
-	http.SetCookie(reqCtx.Writer, &http.Cookie{
-		Name:     auth.RefreshTokenKey,
-		Value:    refreshTokenString,
-		Expires:  refreshTokenExp,
-		HttpOnly: true,
-		Secure:   true,
-		Path:     "/",
-		SameSite: http.SameSiteStrictMode,
-	})
+	http.SetCookie(reqCtx.Writer,
+		responses.NewCookieWithSecurity(
+			auth.RefreshTokenKey,
+			refreshTokenString,
+			refreshTokenExp,
+		),
+	)
 
 	reqCtx.JSON(http.StatusOK, &AccessTokenResponse{
 		AccessTokenResponseObjectTypeObject,
@@ -265,15 +258,11 @@ func (authRoute *AuthRoute) GuestLogin(reqCtx *gin.Context) {
 		return
 	}
 
-	http.SetCookie(reqCtx.Writer, &http.Cookie{
-		Name:     auth.RefreshTokenKey,
-		Value:    refreshTokenString,
-		Expires:  refreshTokenExp,
-		HttpOnly: true,
-		Secure:   true,
-		Path:     "/",
-		SameSite: http.SameSiteStrictMode,
-	})
+	http.SetCookie(reqCtx.Writer, responses.NewCookieWithSecurity(
+		auth.RefreshTokenKey,
+		refreshTokenString,
+		refreshTokenExp,
+	))
 
 	reqCtx.JSON(http.StatusOK, &AccessTokenResponse{
 		AccessTokenResponseObjectTypeObject,
