@@ -3,6 +3,7 @@ package inferencemodelregistry
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -40,12 +41,15 @@ func (r *InferenceModelRegistry) ListModels(ctx context.Context) []inferencemode
 	var models []inferencemodel.Model
 
 	// Try to get from cache first
-	err := r.cache.Get(ctx, cache.ModelsCacheKey, &models)
-	if err != nil {
-		// Cache miss - rebuild from JanInferenceClient
-		models = r.rebuildModelsFromJanClient(ctx)
+	cachedModelsJSON, err := r.cache.Get(ctx, cache.ModelsCacheKey)
+	if err == nil && cachedModelsJSON != "" {
+		if jsonErr := json.Unmarshal([]byte(cachedModelsJSON), &models); jsonErr == nil {
+			return models
+		}
 	}
 
+	// Cache miss - rebuild from JanInferenceClient
+	models = r.rebuildModelsFromJanClient(ctx)
 	return models
 }
 
@@ -53,9 +57,14 @@ func (r *InferenceModelRegistry) ListModels(ctx context.Context) []inferencemode
 func (r *InferenceModelRegistry) hasModelsChanged(ctx context.Context, serviceName string, newModels []inferencemodel.Model) bool {
 	// Compare by model IDs only to avoid relying on per-model detail cache
 	cacheKey := cache.RegistryEndpointModelsKey + ":" + sanitizeKeyPart(serviceName)
-	var cachedIDs []string
-	if err := r.cache.Get(ctx, cacheKey, &cachedIDs); err != nil {
+	cachedIDsJSON, err := r.cache.Get(ctx, cacheKey)
+	if err != nil {
 		// Cache miss or error - treat as changed so we populate
+		return true
+	}
+
+	var cachedIDs []string
+	if jsonErr := json.Unmarshal([]byte(cachedIDsJSON), &cachedIDs); jsonErr != nil {
 		return true
 	}
 
@@ -99,10 +108,20 @@ func (r *InferenceModelRegistry) SetModels(ctx context.Context, serviceName stri
 		serviceCacheKey := cache.RegistryEndpointModelsKey + ":" + sanitizeKeyPart(serviceName)
 		modelIDs := functional.Map(models, func(m inferencemodel.Model) string { return m.ID })
 
-		if err := r.cache.Set(ctx, serviceCacheKey, modelIDs, r.cacheExpiry); err != nil {
+		// Convert to JSON strings for cache storage
+		modelIDsJSON, err := json.Marshal(modelIDs)
+		if err != nil {
 			return err
 		}
-		if err := r.cache.Set(ctx, cache.ModelsCacheKey, models, r.cacheExpiry); err != nil {
+		modelsJSON, err := json.Marshal(models)
+		if err != nil {
+			return err
+		}
+
+		if err := r.cache.Set(ctx, serviceCacheKey, string(modelIDsJSON), r.cacheExpiry); err != nil {
+			return err
+		}
+		if err := r.cache.Set(ctx, cache.ModelsCacheKey, string(modelsJSON), r.cacheExpiry); err != nil {
 			return err
 		}
 
@@ -120,9 +139,14 @@ func (r *InferenceModelRegistry) RemoveServiceModels(ctx context.Context, servic
 		serviceCacheKey := cache.RegistryEndpointModelsKey + ":" + sanitizeKeyPart(serviceName)
 
 		// 1) Read BEFORE deleting
-		var serviceModelIDs []string
-		if err := r.cache.Get(ctx, serviceCacheKey, &serviceModelIDs); err != nil {
+		serviceModelIDsJSON, err := r.cache.Get(ctx, serviceCacheKey)
+		if err != nil {
 			// nothing to do
+			return nil
+		}
+
+		var serviceModelIDs []string
+		if jsonErr := json.Unmarshal([]byte(serviceModelIDsJSON), &serviceModelIDs); jsonErr != nil {
 			return nil
 		}
 		serviceModelSet := make(map[string]struct{}, len(serviceModelIDs))
@@ -136,8 +160,11 @@ func (r *InferenceModelRegistry) RemoveServiceModels(ctx context.Context, servic
 		}
 
 		// 3) Remove those models from the global list
+		existingJSON, _ := r.cache.Get(ctx, cache.ModelsCacheKey)
 		var existing []inferencemodel.Model
-		_ = r.cache.Get(ctx, cache.ModelsCacheKey, &existing)
+		if existingJSON != "" {
+			json.Unmarshal([]byte(existingJSON), &existing)
+		}
 
 		var filtered []inferencemodel.Model
 		for _, m := range existing {
@@ -145,7 +172,12 @@ func (r *InferenceModelRegistry) RemoveServiceModels(ctx context.Context, servic
 				filtered = append(filtered, m)
 			}
 		}
-		if err := r.cache.Set(ctx, cache.ModelsCacheKey, filtered, r.cacheExpiry); err != nil {
+
+		filteredJSON, err := json.Marshal(filtered)
+		if err != nil {
+			return err
+		}
+		if err := r.cache.Set(ctx, cache.ModelsCacheKey, string(filteredJSON), r.cacheExpiry); err != nil {
 			return err
 		}
 
@@ -156,12 +188,16 @@ func (r *InferenceModelRegistry) RemoveServiceModels(ctx context.Context, servic
 
 func (r *InferenceModelRegistry) GetEndpointToModels(ctx context.Context, serviceName string) ([]string, bool) {
 	// Try to get from cache first
-	var models []string
 	cacheKey := cache.RegistryEndpointModelsKey + ":" + sanitizeKeyPart(serviceName)
-	err := r.cache.Get(ctx, cacheKey, &models)
+	modelsJSON, err := r.cache.Get(ctx, cacheKey)
 	if err != nil {
 		// Cache miss - this service has no models yet
 		// Return empty result and don't populate cache
+		return nil, false
+	}
+
+	var models []string
+	if jsonErr := json.Unmarshal([]byte(modelsJSON), &models); jsonErr != nil {
 		return nil, false
 	}
 
@@ -170,17 +206,21 @@ func (r *InferenceModelRegistry) GetEndpointToModels(ctx context.Context, servic
 
 func (r *InferenceModelRegistry) GetModelToEndpoints(ctx context.Context) map[string][]string {
 	// Try to get from cache first
-	var modelToEndpoints map[string][]string
-	err := r.cache.Get(ctx, cache.RegistryModelEndpointsKey, &modelToEndpoints)
+	modelToEndpointsJSON, err := r.cache.Get(ctx, cache.RegistryModelEndpointsKey)
 	if err != nil {
 		// Cache miss - rebuild from JanInferenceClient
 		r.rebuildModelsFromJanClient(ctx)
 
 		// Try to get again after rebuild
-		err = r.cache.Get(ctx, cache.RegistryModelEndpointsKey, &modelToEndpoints)
+		modelToEndpointsJSON, err = r.cache.Get(ctx, cache.RegistryModelEndpointsKey)
 		if err != nil {
 			return make(map[string][]string)
 		}
+	}
+
+	var modelToEndpoints map[string][]string
+	if jsonErr := json.Unmarshal([]byte(modelToEndpointsJSON), &modelToEndpoints); jsonErr != nil {
+		return make(map[string][]string)
 	}
 
 	return modelToEndpoints
@@ -213,21 +253,24 @@ func (r *InferenceModelRegistry) rebuildModelsFromJanClient(ctx context.Context)
 
 	// Store models in cache
 	if len(models) > 0 {
-		r.cache.Set(ctx, cache.ModelsCacheKey, models, r.cacheExpiry)
+		modelsJSON, _ := json.Marshal(models)
+		r.cache.Set(ctx, cache.ModelsCacheKey, string(modelsJSON), r.cacheExpiry)
 
 		// Store service models mapping
 		serviceCacheKey := cache.RegistryEndpointModelsKey + ":" + sanitizeKeyPart(r.janClient.BaseURL)
 		modelIDs := functional.Map(models, func(model inferencemodel.Model) string {
 			return model.ID
 		})
-		r.cache.Set(ctx, serviceCacheKey, modelIDs, r.cacheExpiry)
+		modelIDsJSON, _ := json.Marshal(modelIDs)
+		r.cache.Set(ctx, serviceCacheKey, string(modelIDsJSON), r.cacheExpiry)
 
 		// Build model-to-endpoints mapping
 		modelToEndpoints := make(map[string][]string)
 		for _, model := range models {
 			modelToEndpoints[model.ID] = append(modelToEndpoints[model.ID], r.janClient.BaseURL)
 		}
-		r.cache.Set(ctx, cache.RegistryModelEndpointsKey, modelToEndpoints, r.cacheExpiry)
+		modelToEndpointsJSON, _ := json.Marshal(modelToEndpoints)
+		r.cache.Set(ctx, cache.RegistryModelEndpointsKey, string(modelToEndpointsJSON), r.cacheExpiry)
 	}
 
 	return models
@@ -239,9 +282,14 @@ func (r *InferenceModelRegistry) rebuildModelToEndpointsMapping(ctx context.Cont
 
 	// This is a simplified implementation - in production you'd scan all service keys
 	// For now, we'll just rebuild from known models
-	var allModels []inferencemodel.Model
-	if err := r.cache.Get(ctx, cache.ModelsCacheKey, &allModels); err != nil {
+	allModelsJSON, err := r.cache.Get(ctx, cache.ModelsCacheKey)
+	if err != nil {
 		return err
+	}
+
+	var allModels []inferencemodel.Model
+	if jsonErr := json.Unmarshal([]byte(allModelsJSON), &allModels); jsonErr != nil {
+		return jsonErr
 	}
 
 	// For each model, find which services have it (this is not optimal but works)
@@ -252,7 +300,11 @@ func (r *InferenceModelRegistry) rebuildModelToEndpointsMapping(ctx context.Cont
 		}
 	}
 
-	return r.cache.Set(ctx, cache.RegistryModelEndpointsKey, modelToEndpoints, r.cacheExpiry)
+	modelToEndpointsJSON, err := json.Marshal(modelToEndpoints)
+	if err != nil {
+		return err
+	}
+	return r.cache.Set(ctx, cache.RegistryModelEndpointsKey, string(modelToEndpointsJSON), r.cacheExpiry)
 }
 
 // CheckInferenceModels checks and updates models from JanInferenceClient (moved from cron service)

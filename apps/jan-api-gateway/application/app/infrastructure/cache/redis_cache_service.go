@@ -2,7 +2,6 @@ package cache
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
@@ -73,56 +72,45 @@ func NewRedisCacheService() CacheService {
 	}
 }
 
-// Set stores a value in Redis with an expiration time
-func (r *RedisCacheService) Set(ctx context.Context, key string, value any, expiration time.Duration) error {
-	jsonValue, err := json.Marshal(value)
-	if err != nil {
-		return fmt.Errorf("failed to marshal value: %w", err)
-	}
-
-	return r.client.Set(ctx, key, jsonValue, expiration).Err()
+// Set stores a string value in Redis with an expiration time
+func (r *RedisCacheService) Set(ctx context.Context, key string, value string, expiration time.Duration) error {
+	return r.client.Set(ctx, key, value, expiration).Err()
 }
 
-// Get retrieves a value from Redis
-func (r *RedisCacheService) Get(ctx context.Context, key string, dest any) error {
+// Get retrieves a string value from Redis
+func (r *RedisCacheService) Get(ctx context.Context, key string) (string, error) {
 	val, err := r.client.Get(ctx, key).Result()
 	if err != nil {
 		if err == redis.Nil {
-			return fmt.Errorf("key not found: %s", key)
+			return "", fmt.Errorf("key not found: %s", key)
 		}
-		return fmt.Errorf("failed to get value: %w", err)
+		return "", fmt.Errorf("failed to get value: %w", err)
 	}
 
-	return json.Unmarshal([]byte(val), dest)
+	return val, nil
 }
 
-// GetWithFallback retrieves a value from Redis, or executes fallback function if not found
-func (r *RedisCacheService) GetWithFallback(ctx context.Context, key string, dest any, fallback func() (any, error), expiration time.Duration) error {
+// GetWithFallback retrieves a string value from Redis, or executes fallback function if not found
+func (r *RedisCacheService) GetWithFallback(ctx context.Context, key string, fallback func() (string, error), expiration time.Duration) (string, error) {
 	// Try to get from cache first
-	err := r.Get(ctx, key, dest)
+	result, err := r.Get(ctx, key)
 	if err == nil {
-		return nil // Found in cache
+		return result, nil // Found in cache
 	}
 
 	// Cache miss, execute fallback
-	value, err := fallback()
+	result, err = fallback()
 	if err != nil {
-		return fmt.Errorf("fallback function failed: %w", err)
+		return "", fmt.Errorf("fallback function failed: %w", err)
 	}
 
 	// Store in cache for future requests
-	if err := r.Set(ctx, key, value, expiration); err != nil {
+	if err := r.Set(ctx, key, result, expiration); err != nil {
 		logger.GetLogger().Error(fmt.Sprintf("Failed to cache value: %v", err))
 		// Don't return error, just log it
 	}
 
-	// Copy the value to dest
-	jsonValue, err := json.Marshal(value)
-	if err != nil {
-		return fmt.Errorf("failed to marshal fallback value: %w", err)
-	}
-
-	return json.Unmarshal(jsonValue, dest)
+	return result, nil
 }
 
 // Delete removes a key from Redis synchronously (blocking)

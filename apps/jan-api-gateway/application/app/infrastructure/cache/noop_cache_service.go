@@ -2,7 +2,6 @@ package cache
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -13,29 +12,18 @@ import (
 type NoOpCacheService struct{}
 
 // Set is a no-op implementation
-func (n *NoOpCacheService) Set(ctx context.Context, key string, value any, expiration time.Duration) error {
+func (n *NoOpCacheService) Set(ctx context.Context, key string, value string, expiration time.Duration) error {
 	return nil
 }
 
 // Get always returns "key not found" error
-func (n *NoOpCacheService) Get(ctx context.Context, key string, dest any) error {
-	return fmt.Errorf("key not found: %s", key)
+func (n *NoOpCacheService) Get(ctx context.Context, key string) (string, error) {
+	return "", fmt.Errorf("key not found: %s", key)
 }
 
 // GetWithFallback always executes the fallback function
-func (n *NoOpCacheService) GetWithFallback(ctx context.Context, key string, dest any, fallback func() (any, error), expiration time.Duration) error {
-	value, err := fallback()
-	if err != nil {
-		return fmt.Errorf("fallback function failed: %w", err)
-	}
-
-	// Copy the value to dest
-	jsonValue, err := json.Marshal(value)
-	if err != nil {
-		return fmt.Errorf("failed to marshal fallback value: %w", err)
-	}
-
-	return json.Unmarshal(jsonValue, dest)
+func (n *NoOpCacheService) GetWithFallback(ctx context.Context, key string, fallback func() (string, error), expiration time.Duration) (string, error) {
+	return fallback()
 }
 
 // Delete is a no-op implementation

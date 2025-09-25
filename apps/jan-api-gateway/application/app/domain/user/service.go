@@ -1,6 +1,7 @@
 package user
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"golang.org/x/net/context"
@@ -106,10 +107,12 @@ func (s *UserService) FindByPublicID(ctx context.Context, publicID string) (*Use
 	cacheKey := fmt.Sprintf(cache.UserByPublicIDKey, publicID)
 
 	// Try to get from cache first
-	var cachedUser *User
-	err := s.cache.Get(ctx, cacheKey, &cachedUser)
-	if err == nil && cachedUser != nil {
-		return cachedUser, nil
+	cachedUserJSON, err := s.cache.Get(ctx, cacheKey)
+	if err == nil && cachedUserJSON != "" {
+		var cachedUser User
+		if jsonErr := json.Unmarshal([]byte(cachedUserJSON), &cachedUser); jsonErr == nil {
+			return &cachedUser, nil
+		}
 	}
 
 	// Cache miss or error - fetch from database
@@ -124,9 +127,11 @@ func (s *UserService) FindByPublicID(ctx context.Context, publicID string) (*Use
 	user := userEntities[0]
 
 	// Cache the result for future requests
-	if cacheErr := s.cache.Set(ctx, cacheKey, user, cache.UserCacheTTL); cacheErr != nil {
-		// Log cache error but don't fail the request
-		// TODO: Add proper logging here
+	if userJSON, jsonErr := json.Marshal(user); jsonErr == nil {
+		if cacheErr := s.cache.Set(ctx, cacheKey, string(userJSON), cache.UserCacheTTL); cacheErr != nil {
+			// Log cache error but don't fail the request
+			logger.GetLogger().Errorf("failed to cache user %s: %v", publicID, cacheErr)
+		}
 	}
 
 	return user, nil

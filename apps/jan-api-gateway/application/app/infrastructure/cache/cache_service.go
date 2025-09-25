@@ -9,14 +9,14 @@ import (
 
 // CacheService defines the interface for cache operations
 type CacheService interface {
-	// Set stores a value in cache with an expiration time
-	Set(ctx context.Context, key string, value any, expiration time.Duration) error
+	// Set stores a string value in cache with an expiration time
+	Set(ctx context.Context, key string, value string, expiration time.Duration) error
 
-	// Get retrieves a value from cache
-	Get(ctx context.Context, key string, dest any) error
+	// Get retrieves a string value from cache
+	Get(ctx context.Context, key string) (string, error)
 
-	// GetWithFallback retrieves a value from cache, or executes fallback function if not found
-	GetWithFallback(ctx context.Context, key string, dest any, fallback func() (any, error), expiration time.Duration) error
+	// GetWithFallback retrieves a string value from cache, or executes fallback function if not found
+	GetWithFallback(ctx context.Context, key string, fallback func() (string, error), expiration time.Duration) (string, error)
 
 	// Delete removes a key from cache synchronously (blocking)
 	Delete(ctx context.Context, key string) error

@@ -2,6 +2,7 @@ package inference
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 
 	openai "github.com/sashabaranov/go-openai"
@@ -61,14 +62,12 @@ func (p *JanInferenceProvider) CreateCompletionStream(ctx context.Context, apiKe
 
 // GetModels returns available models with Redis caching
 func (p *JanInferenceProvider) GetModels(ctx context.Context) (*inference.ModelsResponse, error) {
-	var response inference.ModelsResponse
-
 	// Try to get from cache first
-	err := p.cache.GetWithFallback(ctx, cache.ModelsCacheKey, &response, func() (any, error) {
+	cachedResponseJSON, err := p.cache.GetWithFallback(ctx, cache.ModelsCacheKey, func() (string, error) {
 		// Cache miss, call the underlying client
 		clientResponse, err := p.client.GetModels(ctx)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 
 		// Convert to domain models
@@ -82,14 +81,28 @@ func (p *JanInferenceProvider) GetModels(ctx context.Context) (*inference.Models
 			}
 		}
 
-		return &inference.ModelsResponse{
+		response := &inference.ModelsResponse{
 			Object: clientResponse.Object,
 			Data:   models,
-		}, nil
+		}
+
+		// Convert to JSON string for caching
+		responseJSON, jsonErr := json.Marshal(response)
+		if jsonErr != nil {
+			return "", jsonErr
+		}
+
+		return string(responseJSON), nil
 	}, cache.ModelsCacheTTL)
 
 	if err != nil {
 		return nil, err
+	}
+
+	// Unmarshal the cached JSON response
+	var response inference.ModelsResponse
+	if jsonErr := json.Unmarshal([]byte(cachedResponseJSON), &response); jsonErr != nil {
+		return nil, jsonErr
 	}
 
 	return &response, nil
