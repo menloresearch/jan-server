@@ -7,9 +7,9 @@ kind: Deployment
 metadata:
   name: {{ .name }}
   labels:
-    {{- include "jan-api-gateway.labels" $ | nindent 4 }}
+    {{- include "jan-gateway.labels" $ | nindent 4 }}
     model.aibrix.ai/name: {{ .name }}
-    model.aibrix.ai/port: {{ .model.port | quote }}
+    model.aibrix.ai/port: {{ .port | quote }}
   {{- with .labels }}
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -116,7 +116,7 @@ kind: Service
 metadata:
   name: {{ .name }}
   labels:
-    {{- include "jan-api-gateway.labels" $ | nindent 4 }}
+    {{- include "jan-gateway.labels" $ | nindent 4 }}
     model.aibrix.ai/name: {{ .name }}
     prometheus-discovery: "true"
   annotations:
@@ -140,7 +140,7 @@ kind: ServiceMonitor
 metadata:
   name: {{ .name }}
   labels:
-    {{- include "jan-api-gateway.labels" $ | nindent 4 }}
+    {{- include "jan-gateway.labels" $ | nindent 4 }}
     model.aibrix.ai/name: {{ .name }}
 spec:
   endpoints:
@@ -159,7 +159,7 @@ kind: PodAutoscaler
 metadata:
   name: {{ .name }}-autoscaler
   labels:
-    {{- include "jan-api-gateway.labels" $ | nindent 4 }}
+    {{- include "jan-gateway.labels" $ | nindent 4 }}
     app.kubernetes.io/name: aibrix
     app.kubernetes.io/managed-by: kustomize
   annotations:
@@ -199,7 +199,7 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: {{ .name }}-hpa
   labels:
-    {{- include "jan-api-gateway.labels" $ | nindent 4 }}
+    {{- include "jan-gateway.labels" $ | nindent 4 }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

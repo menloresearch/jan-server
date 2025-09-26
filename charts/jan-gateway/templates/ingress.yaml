@@ -1,8 +1,8 @@
-{{- if .Values.janApiGateway.ingress.enabled -}}
-{{- $fullName := include "jan-api-gateway.fullname" . -}}
-{{- $svcPort := .Values.janApiGateway.service.port -}}
-{{- if and .Values.janApiGateway.ingress.className (not (hasKey .Values.janApiGateway.ingress.annotations "kubernetes.io/ingress.class")) }}
-  {{- $_ := set .Values.janApiGateway.ingress.annotations "kubernetes.io/ingress.class" .Values.janApiGateway.ingress.className}}
+{{- if .Values.gateway.ingress.enabled -}}
+{{- $fullName := include "jan-gateway.fullname" . -}}
+{{- $svcPort := .Values.gateway.service.port -}}
+{{- if and .Values.gateway.ingress.className (not (hasKey .Values.gateway.ingress.annotations "kubernetes.io/ingress.class")) }}
+  {{- $_ := set .Values.gateway.ingress.annotations "kubernetes.io/ingress.class" .Values.gateway.ingress.className}}
 {{- end }}
 {{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion -}}
 apiVersion: networking.k8s.io/v1
@@ -15,18 +15,18 @@ kind: Ingress
 metadata:
   name: {{ $fullName }}
   labels:
-    {{- include "jan-api-gateway.labels" . | nindent 4 }}
-  {{- with .Values.janApiGateway.ingress.annotations }}
+    {{- include "jan-gateway.labels" . | nindent 4 }}
+  {{- with .Values.gateway.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  {{- if and .Values.janApiGateway.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
-  ingressClassName: {{ .Values.janApiGateway.ingress.className }}
+  {{- if and .Values.gateway.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
+  ingressClassName: {{ .Values.gateway.ingress.className }}
   {{- end }}
-  {{- if .Values.janApiGateway.ingress.tls }}
+  {{- if .Values.gateway.ingress.tls }}
   tls:
-    {{- range .Values.janApiGateway.ingress.tls }}
+    {{- range .Values.gateway.ingress.tls }}
     - hosts:
         {{- range .hosts }}
         - {{ . | quote }}
@@ -35,7 +35,7 @@ spec:
     {{- end }}
   {{- end }}
   rules:
-    {{- range .Values.janApiGateway.ingress.hosts }}
+    {{- range .Values.gateway.ingress.hosts }}
     - host: {{ .host | quote }}
       http:
         paths:

@@ -1,17 +1,17 @@
-﻿# Jan API Gateway Helm Chart Configuration
-# This file contains all configurable values for the Jan API Gateway deployment
+﻿# Jan Gateway Helm Chart Configuration
+# This file contains all configurable values for the Jan Gateway deployment
 # Uncomment and modify values as needed for your environment
 
 # =============================================================================
-# Jan API Gateway Application Configuration
+# Jan Gateway Application Configuration
 # =============================================================================
-janApiGateway:
+gateway:
   # Number of replicas to deploy
   replicaCount: 1
 
   # Container image configuration
   image:
-    repository: janai/jan-api-gateway
+    repository: menloltd/jan-gateway
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion (currently "1.0.0")
     # Leave empty to use Chart.yaml appVersion, or specify version like "v1.2.3"
@@ -34,13 +34,13 @@ janApiGateway:
   env:
     # Application specific configs
     - name: JAN_INFERENCE_MODEL_URL
-      value: "http://jan-inference-model:8080"
+      value: "http://envoy-aibrix-system-aibrix-eg-903790dc.envoy-gateway-system" # This is default values if you enable Inference with AIbrix, modify if you use and external endpoint
     - name: ALLOWED_CORS_HOSTS
       value: "*.jan.ai,*.menlo.ai,http://localhost:3001"
     - name: ENABLE_ADMIN_API
       value: "true"
-    # Note: CACHE_TYPE, CACHE_URL, CACHE_PASSWORD are automatically configured by the chart based on valkey settings
-    - name: CACHE_DB
+    # Note: REDIS_URL, REDIS_PASSWORD are automatically configured by the chart based on valkey settings
+    - name: REDIS_DB
       value: "0"
 
   # Additional environment variables for advanced configuration
@@ -235,11 +235,14 @@ janApiGateway:
 # PostgreSQL Configuration (Bitnami PostgreSQL chart)
 postgresql:
   enabled: true # Set to false to use external PostgreSQL
-  auth:
-    postgresPassword: "" # Will be auto-generated if empty
-    username: "jan_user"
-    password: "" # Will be auto-generated if empty
-    database: "jan_api_gateway"
+  global:
+    postgresql:
+      auth:
+        postgresPassword: "" # Will be auto-generated if empty
+        username: "jan_user"
+        password: "jan_password" # Will be auto-generated if empty
+        database: "jan_api_gateway"
+
   primary:
     service:
       ports:
@@ -287,16 +290,16 @@ externalValkey:
 # Inference Configuration
 # =============================================================================
 inference:
-  enabled: false # Set to true to enable inference capabilities
+  enabled: true # Set to true to enable inference capabilities
 
   # =============================================================================
   # Shared Storage Configuration
   # =============================================================================
   storage:
-    enabled: false # Set to true to enable shared storage for models
+    enabled: true # Set to true to enable shared storage for models
     pvcName: "hf-hub-cache"
     storageClassName: "multiattach" # ReadWriteMany storage class
-    size: "500Gi"
+    size: "100Gi"
 
     # Mount paths for shared storage
     hfCachePath: "/root/.cache/huggingface/hub"
@@ -310,13 +313,13 @@ inference:
   dependencies:
     # GPU Operator
     gpuOperator:
-      enabled: false
+      enabled: true
       version: "v25.3.2"
 
     # KubeRay Operator
     kuberayOperator:
-      enabled: false
-      version: "1.2.1"
+      enabled: true
+      version: "1.4.1"
       namespace: "kuberay-system"
       includeCrds: true
       fullnameOverride: "kuberay-operator"
@@ -329,22 +332,37 @@ inference:
 
     # Envoy Gateway
     envoyGateway:
-      enabled: false
+      enabled: true
       version: "1.5.1"
 
     # Aibrix
     aibrix:
-      enabled: false
+      enabled: true
       version: "0.4.1"
       repository: "https://artifacthub.io/packages/helm/danchev/aibrix"
+
+  # =============================================================================
+  # Cleanup Configuration
+  # =============================================================================
+  cleanup:
+    # Auto-cleanup dependencies when uninstalling the chart
+    # WARNING: This will remove operators that other charts might be using!
+    # Only enable if you're sure no other applications depend on these operators
+    autoCleanupDependencies: true # Set to true to auto-remove operators on uninstall
+
+    # Individual cleanup control (only used if autoCleanupDependencies=true)
+    cleanupGpuOperator: false
+    cleanupKuberayOperator: true
+    cleanupEnvoyGateway: true
+    cleanupAibrix: true
 
   # =============================================================================
   # Models Configuration
   # =============================================================================
   models:
     # Example model configuration - users can add multiple models
-    - name: "qwen3-coder-30b-a3b-instruct-fp8"
-      enabled: false
+    - name: "jan-v1-4b"
+      enabled: true
 
       # Container configuration
       image: "registry.menlo.ai/dockerhub/vllm/vllm-openai:v0.10.2"
@@ -360,11 +378,16 @@ inference:
             --host 0.0.0.0 \
             --port 8000 \
             --uvicorn-log-level warning \
-            --model Qwen/Qwen3-Coder-30B-A3B-Instruct-FP8 \
-            --served-model-name qwen3-coder-30b-a3b-instruct-fp8 \
-            --tool-call-parser qwen3_coder \
+            --model janhq/Jan-v1-2509 \
+            --served-model-name jan-v1-4b \
+            --max-num-batched-tokens 1024 \
             --enable-auto-tool-choice \
-            --api-server-count 4      # Resource configuration
+            --tool-call-parser hermes \
+            --reasoning-parser qwen3 \
+            --max-model-len 131072 \
+            --compilation-config '{"cudagraph_mode":"FULL_AND_PIECEWISE","compile_sizes":[1,2,4]}' \
+            --async-scheduling \
+            --api-server-count 4
       resources:
         limits:
           nvidia.com/gpu: "1"
@@ -373,21 +396,24 @@ inference:
 
       # Probes configuration
       livenessProbe:
+        failureThreshold: 15
         httpGet:
-          path: "/health"
+          path: /health
           port: 8000
-        initialDelaySeconds: 240
-        periodSeconds: 5
-        failureThreshold: 3
+          scheme: HTTP
+        initialDelaySeconds: 300
+        periodSeconds: 30
+        successThreshold: 1
         timeoutSeconds: 1
 
       readinessProbe:
+        failureThreshold: 15
         httpGet:
-          path: "/health"
+          path: /health
           port: 8000
-        initialDelaySeconds: 240
+          scheme: HTTP
+        initialDelaySeconds: 300
         periodSeconds: 30
-        failureThreshold: 5
         successThreshold: 1
         timeoutSeconds: 1
 
@@ -405,7 +431,7 @@ inference:
 
       # Prometheus monitoring
       serviceMonitor:
-        enabled: true
+        enabled: false
         interval: "30s"
         path: "/metrics"
 
@@ -446,7 +472,7 @@ inference:
           # For optimizer-based autoscaling (uncomment when using optimizer)
           # metricSourceType: "domain"
           # endpoint: "aibrix-gpu-optimizer.aibrix-system.svc.cluster.local:8080"
-          # path: "/metrics/default/qwen3-coder-30b-a3b-instruct-fp8"
+          # path: "/metrics/default/jan-v1-4b"
           # targetMetric: "vllm:deployment_replicas"
           # targetValue: "100"
 

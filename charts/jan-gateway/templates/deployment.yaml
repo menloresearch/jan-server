@@ -1,28 +1,28 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "jan-api-gateway.fullname" . }}
+  name: {{ include "jan-gateway.fullname" . }}
   labels:
-    {{- include "jan-api-gateway.labels" . | nindent 4 }}
+    {{- include "jan-gateway.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.janApiGateway.replicaCount }}
+  replicas: {{ .Values.gateway.replicaCount }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ include "jan-api-gateway.name" . }}
+      app.kubernetes.io/name: {{ include "jan-gateway.name" . }}
       app.kubernetes.io/instance: {{ .Release.Name }}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: {{ include "jan-api-gateway.name" . }}
+        app.kubernetes.io/name: {{ include "jan-gateway.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
-      {{- with .Values.janApiGateway.imagePullSecrets }}
+      {{- with .Values.gateway.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "jan-api-gateway.serviceAccountName" . }}
+      serviceAccountName: {{ include "jan-gateway.serviceAccountName" . }}
       securityContext:
-        {{- toYaml .Values.janApiGateway.podSecurityContext | nindent 8 }}
+        {{- toYaml .Values.gateway.podSecurityContext | nindent 8 }}
       initContainers:
         {{- if .Values.postgresql.enabled }}
         - name: wait-for-postgres
@@ -59,8 +59,8 @@ spec:
               echo "Building database connection strings..."
               {{- if .Values.postgresql.enabled }}
               # Bitnami PostgreSQL
-              WRITE_DSN="host={{ .Release.Name }}-postgresql user={{ .Values.postgresql.auth.username }} password=${DB_PASSWORD} dbname={{ .Values.postgresql.auth.database }} port=5432 sslmode=disable"
-              READ_DSN="host={{ .Release.Name }}-postgresql user={{ .Values.postgresql.auth.username }} password=${DB_PASSWORD} dbname={{ .Values.postgresql.auth.database }} port=5432 sslmode=disable"
+              WRITE_DSN="host={{ .Release.Name }}-postgresql user={{ .Values.postgresql.global.postgresql.auth.username }} password=${DB_PASSWORD} dbname={{ .Values.postgresql.global.postgresql.auth.database }} port=5432 sslmode=disable"
+              READ_DSN="host={{ .Release.Name }}-postgresql user={{ .Values.postgresql.global.postgresql.auth.username }} password=${DB_PASSWORD} dbname={{ .Values.postgresql.global.postgresql.auth.database }} port=5432 sslmode=disable"
               {{- else if .Values.externalPostgresql.host }}
               {{- if .Values.externalPostgresql.existingSecret }}
               # External PostgreSQL with existing secret
@@ -100,13 +100,13 @@ spec:
             - name: shared-config
               mountPath: /shared
       containers:
-        - name: jan-api-gateway
+        - name: jan-gateway
           securityContext:
-            {{- toYaml .Values.janApiGateway.securityContext | nindent 12 }}
-          image: "{{ .Values.janApiGateway.image.repository }}:{{ .Values.janApiGateway.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.janApiGateway.image.pullPolicy }}
+            {{- toYaml .Values.gateway.securityContext | nindent 12 }}
+          image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.gateway.image.pullPolicy }}
           ports:
-            - containerPort: {{ .Values.janApiGateway.service.port }}
+            - containerPort: {{ .Values.gateway.service.port }}
           command: ["/bin/sh"]
           args:
             - -c
@@ -117,152 +117,148 @@ spec:
                 . /shared/db-config.env
               fi
               # Start the main application
-              exec /root/jan-api-gateway
+              exec /root/jan-gateway
           env:
-            {{- range .Values.janApiGateway.env }}
+            {{- range .Values.gateway.env }}
             - name: {{ .name }}
               value: {{ .value | quote }}
             {{- end }}
             
             {{/* Valkey/Redis Configuration - Cluster mode */}}
             {{- if .Values.valkey.enabled }}
-            - name: CACHE_TYPE
-              value: "valkey"
-            - name: CACHE_URL
-              value: "valkey://{{ include "jan-api-gateway.fullname" . }}-valkey-cluster:6379"
+            - name: REDIS_URL
+              value: "redis://{{ include "jan-gateway.fullname" . }}-valkey-cluster:6379"
             {{- if .Values.valkey.usePassword }}
-            - name: CACHE_PASSWORD
+            - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "jan-api-gateway.fullname" . }}-valkey-cluster"
+                  name: "{{ include "jan-gateway.fullname" . }}-valkey-cluster"
                   key: "valkey-password"
             {{- else }}
-            - name: CACHE_PASSWORD
+            - name: REDIS_PASSWORD
               value: ""
             {{- end }}
             {{- else if .Values.externalValkey.host }}
-            - name: CACHE_TYPE
-              value: "valkey"
-            - name: CACHE_URL
-              value: "valkey://{{ .Values.externalValkey.host }}:{{ .Values.externalValkey.port }}"
+            - name: REDIS_URL
+              value: "redis://{{ .Values.externalValkey.host }}:{{ .Values.externalValkey.port }}"
             {{- if .Values.externalValkey.existingSecret }}
-            - name: CACHE_PASSWORD
+            - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.externalValkey.existingSecret }}
                   key: {{ .Values.externalValkey.secretKeys.passwordKey }}
             {{- else if .Values.externalValkey.password }}
-            - name: CACHE_PASSWORD
+            - name: REDIS_PASSWORD
               value: {{ .Values.externalValkey.password | quote }}
             {{- else }}
-            - name: CACHE_PASSWORD
+            - name: REDIS_PASSWORD
               value: ""
             {{- end }}
             {{- end }}
             
             {{/* OAuth2 Configuration */}}
-            {{- if .Values.janApiGateway.oauth2.enabled }}
-            {{- if .Values.janApiGateway.oauth2.existingSecret }}
+            {{- if .Values.gateway.oauth2.enabled }}
+            {{- if .Values.gateway.oauth2.existingSecret }}
             - name: OAUTH2_GOOGLE_CLIENT_ID
               valueFrom:
                 secretKeyRef:
-                  name: "{{ .Values.janApiGateway.oauth2.existingSecret }}"
+                  name: "{{ .Values.gateway.oauth2.existingSecret }}"
                   key: google-client-id
             - name: OAUTH2_GOOGLE_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: "{{ .Values.janApiGateway.oauth2.existingSecret }}"
+                  name: "{{ .Values.gateway.oauth2.existingSecret }}"
                   key: google-client-secret
             {{- else }}
             - name: OAUTH2_GOOGLE_CLIENT_ID
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "jan-api-gateway.fullname" . }}-oauth2"
+                  name: "{{ include "jan-gateway.fullname" . }}-oauth2"
                   key: google-client-id
             - name: OAUTH2_GOOGLE_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "jan-api-gateway.fullname" . }}-oauth2"
+                  name: "{{ include "jan-gateway.fullname" . }}-oauth2"
                   key: google-client-secret
             {{- end }}
             - name: OAUTH2_GOOGLE_REDIRECT_URL
-              value: "{{ .Values.janApiGateway.oauth2.google.redirectUrl }}"
+              value: "{{ .Values.gateway.oauth2.google.redirectUrl }}"
             {{- end }}
             
             {{/* SMTP Configuration */}}
-            {{- if .Values.janApiGateway.smtp.enabled }}
+            {{- if .Values.gateway.smtp.enabled }}
             - name: SMTP_HOST
-              value: "{{ .Values.janApiGateway.smtp.host }}"
+              value: "{{ .Values.gateway.smtp.host }}"
             - name: SMTP_PORT
-              value: "{{ .Values.janApiGateway.smtp.port }}"
-            {{- if .Values.janApiGateway.smtp.existingSecret }}
+              value: "{{ .Values.gateway.smtp.port }}"
+            {{- if .Values.gateway.smtp.existingSecret }}
             - name: SMTP_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: "{{ .Values.janApiGateway.smtp.existingSecret }}"
+                  name: "{{ .Values.gateway.smtp.existingSecret }}"
                   key: smtp-username
             - name: SMTP_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: "{{ .Values.janApiGateway.smtp.existingSecret }}"
+                  name: "{{ .Values.gateway.smtp.existingSecret }}"
                   key: smtp-password
             {{- else }}
             - name: SMTP_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "jan-api-gateway.fullname" . }}-smtp"
+                  name: "{{ include "jan-gateway.fullname" . }}-smtp"
                   key: smtp-username
             - name: SMTP_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "jan-api-gateway.fullname" . }}-smtp"
+                  name: "{{ include "jan-gateway.fullname" . }}-smtp"
                   key: smtp-password
             {{- end }}
             - name: SMTP_SENDER_EMAIL
-              value: "{{ .Values.janApiGateway.smtp.fromEmail }}"
+              value: "{{ .Values.gateway.smtp.fromEmail }}"
             {{- end }}
             
             {{/* Application Secrets */}}
-            {{- if .Values.janApiGateway.secrets.existingSecret }}
+            {{- if .Values.gateway.secrets.existingSecret }}
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: "{{ .Values.janApiGateway.secrets.existingSecret }}"
+                  name: "{{ .Values.gateway.secrets.existingSecret }}"
                   key: jwt-secret
             - name: APIKEY_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: "{{ .Values.janApiGateway.secrets.existingSecret }}"
+                  name: "{{ .Values.gateway.secrets.existingSecret }}"
                   key: apikey-secret
             - name: SERPER_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: "{{ .Values.janApiGateway.secrets.existingSecret }}"
+                  name: "{{ .Values.gateway.secrets.existingSecret }}"
                   key: serper-api-key
             {{- else }}
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "jan-api-gateway.fullname" . }}-secrets"
+                  name: "{{ include "jan-gateway.fullname" . }}-secrets"
                   key: jwt-secret
             - name: APIKEY_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "jan-api-gateway.fullname" . }}-secrets"
+                  name: "{{ include "jan-gateway.fullname" . }}-secrets"
                   key: apikey-secret
             - name: SERPER_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "jan-api-gateway.fullname" . }}-secrets"
+                  name: "{{ include "jan-gateway.fullname" . }}-secrets"
                   key: serper-api-key
             {{- end }}
             
             {{/* Other Application Configuration */}}
             - name: ORGANIZATION_ADMIN_EMAIL
-              value: "{{ .Values.janApiGateway.secrets.adminEmail }}"
+              value: "{{ .Values.gateway.secrets.adminEmail }}"
             
             {{/* Additional environment variables */}}
-            {{- range .Values.janApiGateway.extraEnv }}
+            {{- range .Values.gateway.extraEnv }}
             - name: {{ .name }}
               {{- if .value }}
               value: {{ .value | quote }}
@@ -272,22 +268,22 @@ spec:
               {{- end }}
             {{- end }}
           resources:
-            {{- toYaml .Values.janApiGateway.resources | nindent 12 }}
+            {{- toYaml .Values.gateway.resources | nindent 12 }}
           volumeMounts:
             - name: shared-config
               mountPath: /shared
       volumes:
         - name: shared-config
           emptyDir: {}
-      {{- with .Values.janApiGateway.nodeSelector }}
+      {{- with .Values.gateway.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.janApiGateway.affinity }}
+      {{- with .Values.gateway.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.janApiGateway.tolerations }}
+      {{- with .Values.gateway.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
