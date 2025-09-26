@@ -43,20 +43,6 @@ The core API service that provides OpenAI-compatible endpoints and manages all c
 - Swagger/OpenAPI documentation
 - Built-in pprof profiling with Grafana Pyroscope integration
 
-### Jan Inference Model
-The AI model serving service that handles model inference requests.
-
-**Key Features:**
-- Scalable model serving infrastructure
-- Health monitoring and automatic failover
-- Load balancing across multiple model instances
-- Integration with various AI model backends
-
-**Technology Stack:**
-- Python-based model serving
-- Docker containerization
-- Kubernetes-native deployment
-
 ### PostgreSQL Database
 The persistent data storage layer with enterprise-grade features.
 
