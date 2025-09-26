@@ -11,7 +11,7 @@ gateway:
 
   # Container image configuration
   image:
-    repository: menloltd/jan-gateway
+    repository: menloltd/jan-server
     pullPolicy: IfNotPresent
     # Overrides the image tag whose default is the chart appVersion (currently "1.0.0")
     # Leave empty to use Chart.yaml appVersion, or specify version like "v1.2.3"

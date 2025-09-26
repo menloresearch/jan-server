@@ -247,7 +247,7 @@ node_modules/
 dist/
 
 # helm
-charts/jan-gateway/charts/*.tgz
+charts/jan-server/charts/*.tgz
 
 # Migration
 apps/jan-api-gateway/application/cmd/codegen/dbmigration/tmp/*

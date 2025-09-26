@@ -18,7 +18,7 @@ Helm chart for deploying the Jan Gateway with optional AI/ML inference support.
 ### Install without inference
 
 ```bash
-helm install jan-gateway ./jan-gateway \
+helm install jan-server ./jan-server \
   --namespace jan-system \
   --create-namespace
 ```
@@ -26,7 +26,7 @@ helm install jan-gateway ./jan-gateway \
 ### Install with inference enabled
 
 ```bash
-helm install jan-gateway ./jan-gateway \
+helm install jan-server ./jan-server \
   --namespace jan-system \
   --create-namespace \
   --set inference.enabled=true \
@@ -39,7 +39,7 @@ helm install jan-gateway ./jan-gateway \
 | --- | ---- | ------- | ----------- |
 | **Core** | | | |
 | gateway.replicaCount | int | `1` | Number of application replicas |
-| gateway.image.repository | string | `"janai/jan-gateway"` | Container image repository |
+| gateway.image.repository | string | `"janai/jan-server"` | Container image repository |
 | gateway.image.tag | string | `""` | Image tag (defaults to chart appVersion) |
 | **Dependencies** | | | |
 | postgresql.enabled | bool | `true` | Deploy bundled PostgreSQL chart |
@@ -100,7 +100,7 @@ inference:
 ## Upgrade
 
 ```bash
-helm upgrade jan-gateway ./jan-gateway \
+helm upgrade jan-server ./jan-server \
   --namespace jan-system \
   --reuse-values
 ```
@@ -108,13 +108,13 @@ helm upgrade jan-gateway ./jan-gateway \
 ## Uninstall
 
 ```bash
-helm uninstall jan-gateway --namespace jan-system
+helm uninstall jan-server --namespace jan-system
 
 # enable cleanup if inference dependencies were installed
-helm upgrade jan-gateway ./jan-gateway \
+helm upgrade jan-server ./jan-server \
   --namespace jan-system \
   --set inference.cleanup.autoCleanupDependencies=true
-helm uninstall jan-gateway --namespace jan-system
+helm uninstall jan-server --namespace jan-system
 ```
 
 ## Maintainers

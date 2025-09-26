@@ -2,9 +2,9 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ include "jan-gateway.fullname" . }}
+  name: {{ include "jan-server.fullname" . }}
   labels:
-    {{- include "jan-gateway.labels" . | nindent 4 }}
+    {{- include "jan-server.labels" . | nindent 4 }}
 spec:
   {{- if .Values.gateway.podDisruptionBudget.minAvailable }}
   minAvailable: {{ .Values.gateway.podDisruptionBudget.minAvailable }}
@@ -14,6 +14,6 @@ spec:
   {{- end }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ include "jan-gateway.name" . }}
+      app.kubernetes.io/name: {{ include "jan-server.name" . }}
       app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}

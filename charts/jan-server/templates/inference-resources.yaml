@@ -7,10 +7,10 @@ kind: Service
 metadata:
   name: {{ .name }}-service
   labels:
-    {{- include "jan-gateway.labels" $ | nindent 4 }}
+    {{- include "jan-server.labels" $ | nindent 4 }}
 spec:
   selector:
-    {{- include "jan-gateway.selectorLabels" $ | nindent 4 }}
+    {{- include "jan-server.selectorLabels" $ | nindent 4 }}
     model: {{ .name }}
   ports:
     - protocol: TCP

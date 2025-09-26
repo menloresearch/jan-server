@@ -135,10 +135,10 @@ If you plan to run real LLM models (not mock servers) and have an NVIDIA GPU:
 
 ### Production Deployment
 
-For production deployments, modify the Helm values in `charts/jan-gateway/values.yaml` and deploy using:
+For production deployments, modify the Helm values in `charts/jan-server/values.yaml` and deploy using:
 
 ```bash
-helm install jan-server ./charts/jan-gateway
+helm install jan-server ./charts/jan-server
 ```
 
 ## ⚙️ Configuration
@@ -184,7 +184,7 @@ jan-server/
 │       ├── application/           # Python application code
 │       └── Dockerfile           # Container configuration
 ├── charts/                        # Helm charts
-│   └── jan-gateway/           # Main deployment chart
+│   └── jan-server/           # Main deployment chart
 ├── scripts/                      # Deployment and utility scripts
 └── README.md                     # This file
 ```
@@ -259,13 +259,13 @@ kubectl port-forward svc/jan-server-jan-api-gateway 8080:8080
 ### Production Deployment
 ```bash
 # Update Helm dependencies
-helm dependency update ./charts/jan-gateway
+helm dependency update ./charts/jan-server
 
 # Deploy to production
-helm install jan-server ./charts/jan-gateway
+helm install jan-server ./charts/jan-server
 
 # Upgrade deployment
-helm upgrade jan-server ./charts/jan-gateway
+helm upgrade jan-server ./charts/jan-server
 
 # Uninstall
 helm uninstall jan-server
@@ -320,14 +320,14 @@ kubectl logs jan-server-jan-inference-model-<POD_ID>
 **Solutions**:
 ```bash
 # Update Helm dependencies
-helm dependency update ./charts/jan-gateway
+helm dependency update ./charts/jan-server
 
 # Check Helm status
 helm list
 
 # Uninstall and reinstall
 helm uninstall jan-server
-helm install jan-server ./charts/jan-gateway
+helm install jan-server ./charts/jan-server
 ```
 
 ## 📚 API Documentation

@@ -2,7 +2,7 @@
 Helper template to check if required CRDs exist.
 This will be used in other templates to conditionally render resources.
 */}}
-{{- define "jan-gateway.crdsExist" -}}
+{{- define "jan-server.crdsExist" -}}
 {{- $crdsReady := true }}
 
 {{/* Check GPU Operator CRDs if enabled */}}
@@ -39,7 +39,7 @@ This will be used in other templates to conditionally render resources.
 {{/*
 Helper template to generate CRD validation warning
 */}}
-{{- define "jan-gateway.crdValidationWarning" -}}
+{{- define "jan-server.crdValidationWarning" -}}
 {{- $missingCrds := list }}
 
 {{- if and .Values.inference.enabled .Values.inference.dependencies.gpuOperator.enabled }}

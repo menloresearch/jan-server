@@ -2,19 +2,19 @@
 apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
-  name: {{ include "jan-gateway.fullname" . }}
+  name: {{ include "jan-server.fullname" . }}
   labels:
-    {{- include "jan-gateway.labels" . | nindent 4 }}
+    {{- include "jan-server.labels" . | nindent 4 }}
 spec:
   targetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "jan-gateway.fullname" . }}
+    name: {{ include "jan-server.fullname" . }}
   updatePolicy:
     updateMode: {{ .Values.gateway.vpa.updateMode }}
   resourcePolicy:
     containerPolicies:
-    - containerName: jan-gateway
+    - containerName: jan-server
       {{- with .Values.gateway.vpa.minAllowed }}
       minAllowed:
         {{- toYaml . | nindent 8 }}

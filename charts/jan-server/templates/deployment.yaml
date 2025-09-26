@@ -1,26 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "jan-gateway.fullname" . }}
+  name: {{ include "jan-server.fullname" . }}
   labels:
-    {{- include "jan-gateway.labels" . | nindent 4 }}
+    {{- include "jan-server.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.gateway.replicaCount }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ include "jan-gateway.name" . }}
+      app.kubernetes.io/name: {{ include "jan-server.name" . }}
       app.kubernetes.io/instance: {{ .Release.Name }}
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: {{ include "jan-gateway.name" . }}
+        app.kubernetes.io/name: {{ include "jan-server.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
       {{- with .Values.gateway.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "jan-gateway.serviceAccountName" . }}
+      serviceAccountName: {{ include "jan-server.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.gateway.podSecurityContext | nindent 8 }}
       initContainers:
@@ -100,7 +100,7 @@ spec:
             - name: shared-config
               mountPath: /shared
       containers:
-        - name: jan-gateway
+        - name: jan-server
           securityContext:
             {{- toYaml .Values.gateway.securityContext | nindent 12 }}
           image: "{{ .Values.gateway.image.repository }}:{{ .Values.gateway.image.tag | default .Chart.AppVersion }}"
@@ -117,7 +117,7 @@ spec:
                 . /shared/db-config.env
               fi
               # Start the main application
-              exec /root/jan-gateway
+              exec /root/jan-server
           env:
             {{- range .Values.gateway.env }}
             - name: {{ .name }}
@@ -127,12 +127,12 @@ spec:
             {{/* Valkey/Redis Configuration - Cluster mode */}}
             {{- if .Values.valkey.enabled }}
             - name: REDIS_URL
-              value: "redis://{{ include "jan-gateway.fullname" . }}-valkey-cluster:6379"
+              value: "redis://{{ include "jan-server.fullname" . }}-valkey-cluster:6379"
             {{- if .Values.valkey.usePassword }}
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "jan-gateway.fullname" . }}-valkey-cluster"
+                  name: "{{ include "jan-server.fullname" . }}-valkey-cluster"
                   key: "valkey-password"
             {{- else }}
             - name: REDIS_PASSWORD
@@ -173,12 +173,12 @@ spec:
             - name: OAUTH2_GOOGLE_CLIENT_ID
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "jan-gateway.fullname" . }}-oauth2"
+                  name: "{{ include "jan-server.fullname" . }}-oauth2"
                   key: google-client-id
             - name: OAUTH2_GOOGLE_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "jan-gateway.fullname" . }}-oauth2"
+                  name: "{{ include "jan-server.fullname" . }}-oauth2"
                   key: google-client-secret
             {{- end }}
             - name: OAUTH2_GOOGLE_REDIRECT_URL
@@ -206,12 +206,12 @@ spec:
             - name: SMTP_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "jan-gateway.fullname" . }}-smtp"
+                  name: "{{ include "jan-server.fullname" . }}-smtp"
                   key: smtp-username
             - name: SMTP_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "jan-gateway.fullname" . }}-smtp"
+                  name: "{{ include "jan-server.fullname" . }}-smtp"
                   key: smtp-password
             {{- end }}
             - name: SMTP_SENDER_EMAIL
@@ -239,17 +239,17 @@ spec:
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "jan-gateway.fullname" . }}-secrets"
+                  name: "{{ include "jan-server.fullname" . }}-secrets"
                   key: jwt-secret
             - name: APIKEY_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "jan-gateway.fullname" . }}-secrets"
+                  name: "{{ include "jan-server.fullname" . }}-secrets"
                   key: apikey-secret
             - name: SERPER_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "jan-gateway.fullname" . }}-secrets"
+                  name: "{{ include "jan-server.fullname" . }}-secrets"
                   key: serper-api-key
             {{- end }}
             

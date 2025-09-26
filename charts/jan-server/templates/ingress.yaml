@@ -1,5 +1,5 @@
 {{- if .Values.gateway.ingress.enabled -}}
-{{- $fullName := include "jan-gateway.fullname" . -}}
+{{- $fullName := include "jan-server.fullname" . -}}
 {{- $svcPort := .Values.gateway.service.port -}}
 {{- if and .Values.gateway.ingress.className (not (hasKey .Values.gateway.ingress.annotations "kubernetes.io/ingress.class")) }}
   {{- $_ := set .Values.gateway.ingress.annotations "kubernetes.io/ingress.class" .Values.gateway.ingress.className}}
@@ -15,7 +15,7 @@ kind: Ingress
 metadata:
   name: {{ $fullName }}
   labels:
-    {{- include "jan-gateway.labels" . | nindent 4 }}
+    {{- include "jan-server.labels" . | nindent 4 }}
   {{- with .Values.gateway.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}

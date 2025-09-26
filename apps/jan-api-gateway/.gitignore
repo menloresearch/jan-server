@@ -249,6 +249,6 @@ node_modules/
 dist/
 
 # helm
-charts/jan-gateway/charts/*.tgz
+charts/jan-server/charts/*.tgz
 
 apps/jan-api-gateway/application/cmd/server/__debug_bin*

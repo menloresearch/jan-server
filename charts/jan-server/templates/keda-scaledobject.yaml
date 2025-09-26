@@ -2,12 +2,12 @@
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
-  name: {{ include "jan-gateway.fullname" . }}
+  name: {{ include "jan-server.fullname" . }}
   labels:
-    {{- include "jan-gateway.labels" . | nindent 4 }}
+    {{- include "jan-server.labels" . | nindent 4 }}
 spec:
   scaleTargetRef:
-    name: {{ include "jan-gateway.fullname" . }}
+    name: {{ include "jan-server.fullname" . }}
   minReplicaCount: {{ .Values.gateway.keda.minReplicas }}
   maxReplicaCount: {{ .Values.gateway.keda.maxReplicas }}
   pollingInterval: {{ .Values.gateway.keda.pollingInterval }}
