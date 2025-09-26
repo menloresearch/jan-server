@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/user"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
+	"menlo.ai/jan-api-gateway/config"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
@@ -51,6 +53,10 @@ func (googleAuthAPI *GoogleAuthAPI) RegisterRouter(router *gin.RouterGroup) {
 	googleRouter := router.Group("/google")
 	googleRouter.POST("/callback", googleAuthAPI.HandleGoogleCallback)
 	googleRouter.GET("/login", googleAuthAPI.GetGoogleLoginUrl)
+
+	if config.IsDev() {
+		googleRouter.GET("/googletest", googleAuthAPI.HandleTestCallback)
+	}
 }
 
 type GoogleCallbackRequest struct {
@@ -298,4 +304,18 @@ func (googleAuthAPI *GoogleAuthAPI) GetGoogleLoginUrl(reqCtx *gin.Context) {
 		Object: "google.login.url",
 		Url:    authURL,
 	})
+}
+
+// HandleTestCallback is for development use only. Do not use in production.
+// The OAUTH2_GOOGLE_REDIRECT_URL should be http://localhost:8080/v1/auth/google/googletest
+func (googleAuthAPI *GoogleAuthAPI) HandleTestCallback(reqCtx *gin.Context) {
+	code := reqCtx.Query("code")
+	state := reqCtx.Query("state")
+	curlCommand := fmt.Sprintf(`curl --request POST \
+		--url 'http://localhost:8080/v1/auth/google/callback' \
+		--header 'Content-Type: application/json' \
+		--cookie 'jan_oauth_state=%s' \
+		--data '{"code": "%s", "state": "%s"}'`, state, code, state)
+	reqCtx.String(http.StatusOK, curlCommand)
+
 }
