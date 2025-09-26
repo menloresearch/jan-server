@@ -241,7 +241,6 @@ The Jan API Gateway includes Redis caching for inference models to significantly
 ### Redis Features
 - **Model List Caching**: Cache model discovery for 10 minutes
 - **Transparent Integration**: No code changes needed in existing handlers
-- **Fallback Support**: Graceful degradation when Redis is unavailable
 - **Centralized Constants**: Redis cache keys defined as constants
 
 ### Quick Setup

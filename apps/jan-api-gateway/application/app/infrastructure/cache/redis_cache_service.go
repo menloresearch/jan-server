@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/go-redsync/redsync/v4"
-	"github.com/go-redsync/redsync/v4/redis/goredis/v9"
 	"github.com/redis/go-redis/v9"
 	"menlo.ai/jan-api-gateway/app/utils/logger"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
@@ -20,55 +19,41 @@ type RedisCacheService struct {
 }
 
 // NewRedisCacheService creates a new Redis cache service
-func NewRedisCacheService() CacheService {
-	// Parse Redis URL and options
+func NewRedisCacheService() *RedisCacheService {
 	redisURL := environment_variables.EnvironmentVariables.REDIS_URL
 	if redisURL == "" {
-		redisURL = "redis://localhost:6379"
+		panic("REDIS_URL environment variable must be set")
 	}
 
 	opts, err := redis.ParseURL(redisURL)
 	if err != nil {
-		logger.GetLogger().Error(fmt.Sprintf("Failed to parse Redis URL: %v", err))
-		// Fallback to default configuration
-		opts = &redis.Options{
-			Addr:     "localhost:6379",
-			Password: "",
-			DB:       0,
-		}
+		panic(fmt.Sprintf("failed to parse Redis URL: %v", err))
 	}
 
-	// Override with environment variables if provided
 	if environment_variables.EnvironmentVariables.REDIS_PASSWORD != "" {
 		opts.Password = environment_variables.EnvironmentVariables.REDIS_PASSWORD
 	}
 	if environment_variables.EnvironmentVariables.REDIS_DB != "" {
 		if db, err := strconv.Atoi(environment_variables.EnvironmentVariables.REDIS_DB); err == nil {
 			opts.DB = db
+		} else {
+			panic(fmt.Sprintf("invalid REDIS_DB value: %v", err))
 		}
 	}
 
 	client := redis.NewClient(opts)
 
-	// Test connection
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := client.Ping(ctx).Err(); err != nil {
-		logger.GetLogger().Error(fmt.Sprintf("Failed to connect to Redis: %v", err))
-		// Return a no-op implementation for graceful degradation
-		return &NoOpCacheService{}
-	} else {
-		logger.GetLogger().Info("Successfully connected to Redis")
+		panic(fmt.Sprintf("failed to connect to Redis: %v", err))
 	}
 
-	// Create redsync instance
-	pool := goredis.NewPool(client)
-	rs := redsync.New(pool)
+	logger.GetLogger().Info("Successfully connected to Redis")
 
 	return &RedisCacheService{
 		client: client,
-		rs:     rs,
 	}
 }
 
@@ -173,7 +158,7 @@ func (r *RedisCacheService) NewMutex(name string, options ...redsync.Option) *re
 }
 
 // WithLock executes a function with a distributed lock using go-redsync
-func WithLock(cache CacheService, lockName string, fn func() error, ttl time.Duration) error {
+func WithLock(cache RedisCacheService, lockName string, fn func() error, ttl time.Duration) error {
 	mutex := cache.NewMutex(lockName, redsync.WithExpiry(ttl))
 
 	// Acquire lock

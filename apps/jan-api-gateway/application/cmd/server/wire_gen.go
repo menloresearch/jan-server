@@ -8,13 +8,12 @@ package main
 
 import (
 	"context"
-
 	"gorm.io/gorm"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/cron"
-	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
+	"menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
 	"menlo.ai/jan-api-gateway/app/domain/invite"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
@@ -34,23 +33,24 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/inference"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
-	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	auth2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth/google"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conv"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conversations"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp"
-	mcpimpl "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	organization2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/invites"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
-	apikeys "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects/api_keys"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects/api_keys"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/responses"
-	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
+	"menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
+)
 
+import (
 	_ "github.com/grafana/pyroscope-go/godeltaprof/http/pprof"
-
 	_ "net/http/pprof"
 )
 
@@ -65,8 +65,8 @@ func CreateApplication() (*Application, error) {
 	organizationRepository := organizationrepo.NewOrganizationGormRepository(transactionDatabase)
 	organizationService := organization.NewService(organizationRepository)
 	userRepository := userrepo.NewUserGormRepository(transactionDatabase)
-	cacheService := cache.NewRedisCacheService()
-	userService := user.NewService(userRepository, cacheService)
+	redisCacheService := cache.NewRedisCacheService()
+	userService := user.NewService(userRepository, redisCacheService)
 	apiKeyRepository := apikeyrepo.NewApiKeyGormRepository(transactionDatabase)
 	apiKeyService := apikey.NewService(apiKeyRepository, organizationService)
 	projectRepository := projectrepo.NewProjectGormRepository(transactionDatabase)
@@ -89,7 +89,7 @@ func CreateApplication() (*Application, error) {
 	conversationService := conversation.NewService(conversationRepository, itemRepository)
 	completionNonStreamHandler := conv.NewCompletionNonStreamHandler(inferenceProvider, conversationService)
 	completionStreamHandler := conv.NewCompletionStreamHandler(inferenceProvider, conversationService)
-	inferenceModelRegistry := inferencemodelregistry.NewInferenceModelRegistry(cacheService, janInferenceClient)
+	inferenceModelRegistry := inferencemodelregistry.NewInferenceModelRegistry(redisCacheService, janInferenceClient)
 	convCompletionAPI := conv.NewConvCompletionAPI(completionNonStreamHandler, completionStreamHandler, conversationService, authService, inferenceModelRegistry)
 	serperService := serpermcp.NewSerperService()
 	serperMCP := mcpimpl.NewSerperMCP(serperService)
@@ -120,8 +120,8 @@ func CreateDataInitializer() (*DataInitializer, error) {
 	db := ProvideDatabase()
 	transactionDatabase := transaction.NewDatabase(db)
 	userRepository := userrepo.NewUserGormRepository(transactionDatabase)
-	cacheService := cache.NewRedisCacheService()
-	userService := user.NewService(userRepository, cacheService)
+	redisCacheService := cache.NewRedisCacheService()
+	userService := user.NewService(userRepository, redisCacheService)
 	apiKeyRepository := apikeyrepo.NewApiKeyGormRepository(transactionDatabase)
 	organizationRepository := organizationrepo.NewOrganizationGormRepository(transactionDatabase)
 	organizationService := organization.NewService(organizationRepository)

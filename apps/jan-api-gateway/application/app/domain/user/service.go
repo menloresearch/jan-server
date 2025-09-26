@@ -3,6 +3,7 @@ package user
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"golang.org/x/net/context"
 	"menlo.ai/jan-api-gateway/app/infrastructure/cache"
@@ -10,12 +11,17 @@ import (
 	"menlo.ai/jan-api-gateway/app/utils/logger"
 )
 
+const (
+	// UserCacheTTL is the TTL for cached user lookups
+	UserCacheTTL = 15 * time.Minute
+)
+
 type UserService struct {
 	userrepo UserRepository
-	cache    cache.CacheService
+	cache    *cache.RedisCacheService
 }
 
-func NewService(userrepo UserRepository, cacheService cache.CacheService) *UserService {
+func NewService(userrepo UserRepository, cacheService *cache.RedisCacheService) *UserService {
 	return &UserService{
 		userrepo: userrepo,
 		cache:    cacheService,
@@ -35,47 +41,18 @@ func (s *UserService) RegisterUser(ctx context.Context, user *User) (*User, erro
 }
 
 func (s *UserService) UpdateUser(ctx context.Context, user *User) (*User, error) {
-	// Use distributed lock to prevent race conditions
-	lockKey := fmt.Sprintf(cache.UserLockKey, user.PublicID)
-
-	var result *User
-	var updateErr error
-
-	// Execute with lock using go-redsync
-	err := cache.WithLock(s.cache, lockKey, func() error {
-		// Update database
-		if err := s.userrepo.Update(ctx, user); err != nil {
-			updateErr = err
-			return err
-		}
-
-		// Invalidate cache for this user
-		if user.PublicID != "" {
-			cacheKey := fmt.Sprintf(cache.UserByPublicIDKey, user.PublicID)
-			if cacheErr := s.cache.Unlink(ctx, cacheKey); cacheErr != nil {
-				// Log cache error but don't fail the request
-				logger.GetLogger().Errorf("failed to invalidate cache for user %s: %v", user.PublicID, cacheErr)
-			}
-		}
-
-		result = user
-		return nil
-	}, cache.UserLockTTL)
-
-	if err != nil {
-		logger.GetLogger().Warnf("Failed to acquire lock for user %s update: %v", user.PublicID, err)
-		// Still update the database even if we can't acquire lock
-		if err := s.userrepo.Update(ctx, user); err != nil {
-			return nil, err
-		}
-		return user, nil
+	if err := s.userrepo.Update(ctx, user); err != nil {
+		return nil, err
 	}
 
-	if updateErr != nil {
-		return nil, updateErr
+	if user.PublicID != "" {
+		cacheKey := fmt.Sprintf(cache.UserByPublicIDKey, user.PublicID)
+		if cacheErr := s.cache.Unlink(ctx, cacheKey); cacheErr != nil {
+			logger.GetLogger().Errorf("failed to invalidate cache for user %s: %v", user.PublicID, cacheErr)
+		}
 	}
 
-	return result, nil
+	return user, nil
 }
 
 func (s *UserService) FindByEmail(ctx context.Context, email string) (*User, error) {
@@ -128,7 +105,7 @@ func (s *UserService) FindByPublicID(ctx context.Context, publicID string) (*Use
 
 	// Cache the result for future requests
 	if userJSON, jsonErr := json.Marshal(user); jsonErr == nil {
-		if cacheErr := s.cache.Set(ctx, cacheKey, string(userJSON), cache.UserCacheTTL); cacheErr != nil {
+		if cacheErr := s.cache.Set(ctx, cacheKey, string(userJSON), UserCacheTTL); cacheErr != nil {
 			// Log cache error but don't fail the request
 			logger.GetLogger().Errorf("failed to cache user %s: %v", publicID, cacheErr)
 		}

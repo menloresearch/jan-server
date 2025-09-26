@@ -159,16 +159,14 @@ The following environment variables are **automatically configured** in the laun
 | `OAUTH2_GOOGLE_CLIENT_ID` | Google OAuth2 client ID | `your-google-client-id` |
 | `OAUTH2_GOOGLE_CLIENT_SECRET` | Google OAuth2 client secret | `your-google-client-secret` |
 | `OAUTH2_GOOGLE_REDIRECT_URL` | Google OAuth2 redirect URL | `http://localhost:8080/auth/google/callback` |
-| `CACHE_URL` | Cache connection URL (Valkey primary) | `valkey://localhost:6379` |
-| `CACHE_PASSWORD` | Cache authentication password | `` (empty for dev) |
-| `CACHE_DB` | Cache database number | `0` |
-| `CACHE_TYPE` | Cache service type (`valkey` or `redis`) | `valkey` |
+| `REDIS_URL` | Redis connection URL | `redis://localhost:6379` |
+| `REDIS_PASSWORD` | Redis authentication password | `` (empty for dev) |
+| `REDIS_DB` | Redis database number | `0` |
 
 **📝 Redis Cache Notes:**
 - **Redis** is used for caching inference models and improving performance
 - Cache keys are automatically managed by the application
-- The application automatically selects the cache service based on `CACHE_TYPE`
-- If cache connection fails, the application gracefully degrades to NoOp cache
+- Redis connection is required for optimal performance
 
 **Note**: You can modify these values in `.vscode/launch.json` if needed for your environment.
 
@@ -180,7 +178,7 @@ The following environment variables are **automatically configured** in the laun
 3. **View Database Status**: Use Command Palette → "Tasks: Run Task" → "Wait for Database"
 4. **View Redis Status**: Use Command Palette → "Tasks: Run Task" → "Wait for Redis"
 5. **View Logs**: Check the integrated terminal for database and Redis startup logs
-6. **Cache Fallback**: If Redis fails, the application will fallback to NoOp cache gracefully
+6. **Redis Connection**: Ensure Redis is running and accessible on the configured port
 
 ### Go Extension Issues
 1. **Install Go Extension**: VS Code/Cursor should prompt you automatically

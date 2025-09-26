@@ -15,25 +15,24 @@ import (
 )
 
 type InferenceModelRegistry struct {
-	cache       cache.CacheService
-	cacheExpiry time.Duration
-	janClient   *janinference.JanInferenceClient
+	cache     *cache.RedisCacheService
+	janClient *janinference.JanInferenceClient
 }
 
 const (
 	// Consistent timeout for all Jan client operations
 	janClientTimeout = 20 * time.Second
+	ModelsCacheTTL   = 10 * time.Minute
 )
 
 // sanitizeKeyPart encodes dynamic key parts to be Redis-key safe
 func sanitizeKeyPart(s string) string { return base64.RawURLEncoding.EncodeToString([]byte(s)) }
 
 // NewInferenceModelRegistry creates a new registry instance with cache service
-func NewInferenceModelRegistry(cacheService cache.CacheService, janClient *janinference.JanInferenceClient) *InferenceModelRegistry {
+func NewInferenceModelRegistry(cacheService *cache.RedisCacheService, janClient *janinference.JanInferenceClient) *InferenceModelRegistry {
 	return &InferenceModelRegistry{
-		cache:       cacheService,
-		cacheExpiry: cache.ModelsCacheTTL,
-		janClient:   janClient,
+		cache:     cacheService,
+		janClient: janClient,
 	}
 }
 
@@ -90,44 +89,41 @@ func (r *InferenceModelRegistry) SetModels(ctx context.Context, serviceName stri
 		return errors.New("service name cannot be empty")
 	}
 
-	return cache.WithLock(r.cache, cache.RegistryLockKey, func() error {
-		// Check if models have changed - if not, do nothing
-		if !r.hasModelsChanged(ctx, serviceName, models) {
-			return nil
-		}
+	if !r.hasModelsChanged(ctx, serviceName, models) {
+		return nil
+	}
 
-		// Clear all existing cache
-		r.cache.Unlink(ctx, cache.RegistryModelEndpointsKey)
-		r.cache.Unlink(ctx, cache.ModelsCacheKey)
+	// Clear all existing cache
+	r.cache.Unlink(ctx, cache.RegistryModelEndpointsKey)
+	r.cache.Unlink(ctx, cache.ModelsCacheKey)
 
-		// Clear pattern-based entries
-		pattern := cache.RegistryEndpointModelsKey + ":*"
-		r.cache.DeletePattern(ctx, pattern)
+	// Clear pattern-based entries
+	pattern := cache.RegistryEndpointModelsKey + ":*"
+	r.cache.DeletePattern(ctx, pattern)
 
-		// Add back all models
-		serviceCacheKey := cache.RegistryEndpointModelsKey + ":" + sanitizeKeyPart(serviceName)
-		modelIDs := functional.Map(models, func(m inferencemodel.Model) string { return m.ID })
+	// Add back all models
+	serviceCacheKey := cache.RegistryEndpointModelsKey + ":" + sanitizeKeyPart(serviceName)
+	modelIDs := functional.Map(models, func(m inferencemodel.Model) string { return m.ID })
 
-		// Convert to JSON strings for cache storage
-		modelIDsJSON, err := json.Marshal(modelIDs)
-		if err != nil {
-			return err
-		}
-		modelsJSON, err := json.Marshal(models)
-		if err != nil {
-			return err
-		}
+	// Convert to JSON strings for cache storage
+	modelIDsJSON, err := json.Marshal(modelIDs)
+	if err != nil {
+		return err
+	}
+	modelsJSON, err := json.Marshal(models)
+	if err != nil {
+		return err
+	}
 
-		if err := r.cache.Set(ctx, serviceCacheKey, string(modelIDsJSON), r.cacheExpiry); err != nil {
-			return err
-		}
-		if err := r.cache.Set(ctx, cache.ModelsCacheKey, string(modelsJSON), r.cacheExpiry); err != nil {
-			return err
-		}
+	if err := r.cache.Set(ctx, serviceCacheKey, string(modelIDsJSON), ModelsCacheTTL); err != nil {
+		return err
+	}
+	if err := r.cache.Set(ctx, cache.ModelsCacheKey, string(modelsJSON), ModelsCacheTTL); err != nil {
+		return err
+	}
 
-		// Rebuild reverse mapping
-		return r.rebuildModelToEndpointsMapping(ctx)
-	}, cache.RegistryLockTTL)
+	// Rebuild reverse mapping
+	return r.rebuildModelToEndpointsMapping(ctx)
 }
 
 func (r *InferenceModelRegistry) RemoveServiceModels(ctx context.Context, serviceName string) error {
@@ -135,55 +131,53 @@ func (r *InferenceModelRegistry) RemoveServiceModels(ctx context.Context, servic
 		return errors.New("service name cannot be empty")
 	}
 
-	return cache.WithLock(r.cache, cache.RegistryLockKey, func() error {
-		serviceCacheKey := cache.RegistryEndpointModelsKey + ":" + sanitizeKeyPart(serviceName)
+	serviceCacheKey := cache.RegistryEndpointModelsKey + ":" + sanitizeKeyPart(serviceName)
 
-		// 1) Read BEFORE deleting
-		serviceModelIDsJSON, err := r.cache.Get(ctx, serviceCacheKey)
-		if err != nil {
-			// nothing to do
-			return nil
-		}
+	// 1) Read BEFORE deleting
+	serviceModelIDsJSON, err := r.cache.Get(ctx, serviceCacheKey)
+	if err != nil {
+		// nothing to do
+		return nil
+	}
 
-		var serviceModelIDs []string
-		if jsonErr := json.Unmarshal([]byte(serviceModelIDsJSON), &serviceModelIDs); jsonErr != nil {
-			return nil
-		}
-		serviceModelSet := make(map[string]struct{}, len(serviceModelIDs))
-		for _, id := range serviceModelIDs {
-			serviceModelSet[id] = struct{}{}
-		}
+	var serviceModelIDs []string
+	if jsonErr := json.Unmarshal([]byte(serviceModelIDsJSON), &serviceModelIDs); jsonErr != nil {
+		return nil
+	}
+	serviceModelSet := make(map[string]struct{}, len(serviceModelIDs))
+	for _, id := range serviceModelIDs {
+		serviceModelSet[id] = struct{}{}
+	}
 
-		// 2) Delete mapping
-		if err := r.cache.Unlink(ctx, serviceCacheKey); err != nil {
-			return err
-		}
+	// 2) Delete mapping
+	if err := r.cache.Unlink(ctx, serviceCacheKey); err != nil {
+		return err
+	}
 
-		// 3) Remove those models from the global list
-		existingJSON, _ := r.cache.Get(ctx, cache.ModelsCacheKey)
-		var existing []inferencemodel.Model
-		if existingJSON != "" {
-			json.Unmarshal([]byte(existingJSON), &existing)
-		}
+	// 3) Remove those models from the global list
+	existingJSON, _ := r.cache.Get(ctx, cache.ModelsCacheKey)
+	var existing []inferencemodel.Model
+	if existingJSON != "" {
+		json.Unmarshal([]byte(existingJSON), &existing)
+	}
 
-		var filtered []inferencemodel.Model
-		for _, m := range existing {
-			if _, ok := serviceModelSet[m.ID]; !ok {
-				filtered = append(filtered, m)
-			}
+	var filtered []inferencemodel.Model
+	for _, m := range existing {
+		if _, ok := serviceModelSet[m.ID]; !ok {
+			filtered = append(filtered, m)
 		}
+	}
 
-		filteredJSON, err := json.Marshal(filtered)
-		if err != nil {
-			return err
-		}
-		if err := r.cache.Set(ctx, cache.ModelsCacheKey, string(filteredJSON), r.cacheExpiry); err != nil {
-			return err
-		}
+	filteredJSON, err := json.Marshal(filtered)
+	if err != nil {
+		return err
+	}
+	if err := r.cache.Set(ctx, cache.ModelsCacheKey, string(filteredJSON), ModelsCacheTTL); err != nil {
+		return err
+	}
 
-		// 4) Rebuild reverse mapping
-		return r.rebuildModelToEndpointsMapping(ctx)
-	}, cache.RegistryLockTTL)
+	// 4) Rebuild reverse mapping
+	return r.rebuildModelToEndpointsMapping(ctx)
 }
 
 func (r *InferenceModelRegistry) GetEndpointToModels(ctx context.Context, serviceName string) ([]string, bool) {
@@ -254,7 +248,7 @@ func (r *InferenceModelRegistry) rebuildModelsFromJanClient(ctx context.Context)
 	// Store models in cache
 	if len(models) > 0 {
 		modelsJSON, _ := json.Marshal(models)
-		r.cache.Set(ctx, cache.ModelsCacheKey, string(modelsJSON), r.cacheExpiry)
+		r.cache.Set(ctx, cache.ModelsCacheKey, string(modelsJSON), ModelsCacheTTL)
 
 		// Store service models mapping
 		serviceCacheKey := cache.RegistryEndpointModelsKey + ":" + sanitizeKeyPart(r.janClient.BaseURL)
@@ -262,7 +256,7 @@ func (r *InferenceModelRegistry) rebuildModelsFromJanClient(ctx context.Context)
 			return model.ID
 		})
 		modelIDsJSON, _ := json.Marshal(modelIDs)
-		r.cache.Set(ctx, serviceCacheKey, string(modelIDsJSON), r.cacheExpiry)
+		r.cache.Set(ctx, serviceCacheKey, string(modelIDsJSON), ModelsCacheTTL)
 
 		// Build model-to-endpoints mapping
 		modelToEndpoints := make(map[string][]string)
@@ -270,7 +264,7 @@ func (r *InferenceModelRegistry) rebuildModelsFromJanClient(ctx context.Context)
 			modelToEndpoints[model.ID] = append(modelToEndpoints[model.ID], r.janClient.BaseURL)
 		}
 		modelToEndpointsJSON, _ := json.Marshal(modelToEndpoints)
-		r.cache.Set(ctx, cache.RegistryModelEndpointsKey, string(modelToEndpointsJSON), r.cacheExpiry)
+		r.cache.Set(ctx, cache.RegistryModelEndpointsKey, string(modelToEndpointsJSON), ModelsCacheTTL)
 	}
 
 	return models
@@ -304,7 +298,7 @@ func (r *InferenceModelRegistry) rebuildModelToEndpointsMapping(ctx context.Cont
 	if err != nil {
 		return err
 	}
-	return r.cache.Set(ctx, cache.RegistryModelEndpointsKey, string(modelToEndpointsJSON), r.cacheExpiry)
+	return r.cache.Set(ctx, cache.RegistryModelEndpointsKey, string(modelToEndpointsJSON), ModelsCacheTTL)
 }
 
 // CheckInferenceModels checks and updates models from JanInferenceClient (moved from cron service)
@@ -334,16 +328,4 @@ func (r *InferenceModelRegistry) CheckInferenceModels(ctx context.Context) {
 		// Clean and add new models (no merging or change checking)
 		_ = r.SetModels(ctx, r.janClient.BaseURL, models) // Ignore error in cron context
 	}
-}
-
-func (r *InferenceModelRegistry) ClearAllCache(ctx context.Context) error {
-	// Clear all cache entries
-	r.cache.Unlink(ctx, cache.RegistryModelEndpointsKey)
-	r.cache.Unlink(ctx, cache.ModelsCacheKey)
-
-	// Clear pattern-based entries
-	pattern := cache.RegistryEndpointModelsKey + ":*"
-	r.cache.DeletePattern(ctx, pattern)
-
-	return nil
 }
