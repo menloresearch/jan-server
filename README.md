@@ -43,20 +43,6 @@ The core API service that provides OpenAI-compatible endpoints and manages all c
 - Swagger/OpenAPI documentation
 - Built-in pprof profiling with Grafana Pyroscope integration
 
-### Jan Inference Model
-The AI model serving service that handles model inference requests.
-
-**Key Features:**
-- Scalable model serving infrastructure
-- Health monitoring and automatic failover
-- Load balancing across multiple model instances
-- Integration with various AI model backends
-
-**Technology Stack:**
-- Python-based model serving
-- Docker containerization
-- Kubernetes-native deployment
-
 ### PostgreSQL Database
 The persistent data storage layer with enterprise-grade features.
 
@@ -149,10 +135,10 @@ If you plan to run real LLM models (not mock servers) and have an NVIDIA GPU:
 
 ### Production Deployment
 
-For production deployments, modify the Helm values in `charts/umbrella-chart/values.yaml` and deploy using:
+For production deployments, modify the Helm values in `charts/jan-server/values.yaml` and deploy using:
 
 ```bash
-helm install jan-server ./charts/umbrella-chart
+helm install jan-server ./charts/jan-server
 ```
 
 ## ⚙️ Configuration
@@ -182,8 +168,6 @@ The system is configured through environment variables defined in the Helm value
 
 The system uses Helm charts for deployment configuration:
 
-- **Umbrella Chart**: Main deployment chart that orchestrates all services
-- **Service Charts**: Individual charts for each service (API Gateway, Inference Model)
 - **Values Files**: Configuration files for different environments
 
 ## 🔧 Development
@@ -200,8 +184,7 @@ jan-server/
 │       ├── application/           # Python application code
 │       └── Dockerfile           # Container configuration
 ├── charts/                        # Helm charts
-│   ├── apps-charts/              # Individual service charts
-│   └── umbrella-chart/           # Main deployment chart
+│   └── jan-server/           # Main deployment chart
 ├── scripts/                      # Deployment and utility scripts
 └── README.md                     # This file
 ```
@@ -276,13 +259,13 @@ kubectl port-forward svc/jan-server-jan-api-gateway 8080:8080
 ### Production Deployment
 ```bash
 # Update Helm dependencies
-helm dependency update ./charts/umbrella-chart
+helm dependency update ./charts/jan-server
 
 # Deploy to production
-helm install jan-server ./charts/umbrella-chart
+helm install jan-server ./charts/jan-server
 
 # Upgrade deployment
-helm upgrade jan-server ./charts/umbrella-chart
+helm upgrade jan-server ./charts/jan-server
 
 # Uninstall
 helm uninstall jan-server
@@ -337,14 +320,14 @@ kubectl logs jan-server-jan-inference-model-<POD_ID>
 **Solutions**:
 ```bash
 # Update Helm dependencies
-helm dependency update ./charts/umbrella-chart
+helm dependency update ./charts/jan-server
 
 # Check Helm status
 helm list
 
 # Uninstall and reinstall
 helm uninstall jan-server
-helm install jan-server ./charts/umbrella-chart
+helm install jan-server ./charts/jan-server
 ```
 
 ## 📚 API Documentation

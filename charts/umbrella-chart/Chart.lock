@@ -1,9 +1,0 @@
-dependencies:
-- name: jan-api-gateway
-  repository: file://../apps-charts/jan-api-gateway
-  version: 0.1.0
-- name: postgresql
-  repository: https://charts.bitnami.com/bitnami
-  version: 16.7.27
-digest: sha256:1f2e9d25dd023ad91a182d713d38081c7257b7e81d145d37913788841c0ca2a5
-generated: "2025-09-03T12:20:17.067104+08:00"
