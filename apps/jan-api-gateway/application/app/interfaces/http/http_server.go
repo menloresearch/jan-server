@@ -2,6 +2,7 @@ package http
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -9,6 +10,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/interfaces/http/middleware"
 	v1 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	"menlo.ai/jan-api-gateway/app/utils/logger"
+	"menlo.ai/jan-api-gateway/config"
 
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -24,6 +26,22 @@ func (s *HttpServer) bindSwagger() {
 	g := s.engine.Group("/")
 
 	g.GET("/api/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+}
+
+func (s *HttpServer) bindDev() {
+	g := s.engine.Group("/")
+
+	g.GET("/auth/googletest", func(c *gin.Context) {
+		code := c.Query("code")
+		state := c.Query("state")
+		curlCommand := fmt.Sprintf(`curl --request POST \
+  --url 'http://localhost:8080/v1/auth/google/callback' \
+  --header 'Content-Type: application/json' \
+  --cookie 'jan_oauth_state=%s' \
+  --data '{"code": "%s", "state": "%s"}'`, state, code, state)
+		c.String(http.StatusOK, curlCommand)
+	})
+
 }
 
 func NewHttpServer(v1Route *v1.V1Route) *HttpServer {
@@ -42,6 +60,9 @@ func NewHttpServer(v1Route *v1.V1Route) *HttpServer {
 		c.JSON(200, "ok")
 	})
 	server.bindSwagger()
+	if config.IsDev() {
+		server.bindDev()
+	}
 	return &server
 }
 
