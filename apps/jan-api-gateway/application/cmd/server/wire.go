@@ -37,6 +37,7 @@ func CreateDataInitializer() (*DataInitializer, error) {
 	wire.Build(
 		ProvideDatabase,
 		repository.RepositoryProvider,
+		infrastructure.InfrastructureProvider,
 		domain.ServiceProvider,
 		wire.Struct(new(DataInitializer), "*"),
 	)

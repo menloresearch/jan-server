@@ -29,14 +29,16 @@ type ConvCompletionAPI struct {
 	completionStreamHandler    *CompletionStreamHandler
 	conversationService        *conversation.ConversationService
 	authService                *auth.AuthService
+	registry                   *inferencemodelregistry.InferenceModelRegistry
 }
 
-func NewConvCompletionAPI(completionNonStreamHandler *CompletionNonStreamHandler, completionStreamHandler *CompletionStreamHandler, conversationService *conversation.ConversationService, authService *auth.AuthService) *ConvCompletionAPI {
+func NewConvCompletionAPI(completionNonStreamHandler *CompletionNonStreamHandler, completionStreamHandler *CompletionStreamHandler, conversationService *conversation.ConversationService, authService *auth.AuthService, registry *inferencemodelregistry.InferenceModelRegistry) *ConvCompletionAPI {
 	return &ConvCompletionAPI{
 		completionNonStreamHandler: completionNonStreamHandler,
 		completionStreamHandler:    completionStreamHandler,
 		conversationService:        conversationService,
 		authService:                authService,
+		registry:                   registry,
 	}
 }
 
@@ -203,9 +205,8 @@ func (api *ConvCompletionAPI) PostCompletion(reqCtx *gin.Context) {
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - missing or invalid authentication"
 // @Router /v1/conv/models [get]
 func (api *ConvCompletionAPI) GetModels(reqCtx *gin.Context) {
-	// Import the necessary packages at the top of the file
-	registry := inferencemodelregistry.GetInstance()
-	models := registry.ListModels()
+	ctx := reqCtx.Request.Context()
+	models := api.registry.ListModels(ctx)
 
 	// Convert to response format
 	responseData := make([]Model, len(models))

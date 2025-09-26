@@ -39,6 +39,7 @@ type ResponseModelService struct {
 	responseService       *ResponseService
 	streamModelService    *StreamModelService
 	nonStreamModelService *NonStreamModelService
+	modelRegistry         *inferencemodelregistry.InferenceModelRegistry
 }
 
 // NewResponseModelService creates a new ResponseModelService instance
@@ -48,6 +49,7 @@ func NewResponseModelService(
 	apikeyService *apikey.ApiKeyService,
 	conversationService *conversation.ConversationService,
 	responseService *ResponseService,
+	modelRegistry *inferencemodelregistry.InferenceModelRegistry,
 ) *ResponseModelService {
 	responseModelService := &ResponseModelService{
 		UserService:         userService,
@@ -55,6 +57,7 @@ func NewResponseModelService(
 		apikeyService:       apikeyService,
 		conversationService: conversationService,
 		responseService:     responseService,
+		modelRegistry:       modelRegistry,
 	}
 
 	// Initialize specialized handlers
@@ -77,8 +80,7 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 	key := ""
 
 	// Check if model exists in registry
-	modelRegistry := inferencemodelregistry.GetInstance()
-	mToE := modelRegistry.GetModelToEndpoints()
+	mToE := h.modelRegistry.GetModelToEndpoints(ctx)
 	endpoints, ok := mToE[request.Model]
 	if !ok {
 		return nil, common.NewErrorWithMessage("Model validation error", "h8i9j0k1-l2m3-4567-hijk-890123456789")

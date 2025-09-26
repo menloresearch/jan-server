@@ -10,10 +10,13 @@ import (
 )
 
 type ModelAPI struct {
+	registry *inferencemodelregistry.InferenceModelRegistry
 }
 
-func NewModelAPI() *ModelAPI {
-	return &ModelAPI{}
+func NewModelAPI(registry *inferencemodelregistry.InferenceModelRegistry) *ModelAPI {
+	return &ModelAPI{
+		registry: registry,
+	}
 }
 
 func (modelAPI *ModelAPI) RegisterRouter(router *gin.RouterGroup) {
@@ -30,11 +33,12 @@ func (modelAPI *ModelAPI) RegisterRouter(router *gin.RouterGroup) {
 // @Success 200 {object} ModelsResponse "Successful response"
 // @Router /v1/models [get]
 func (modelAPI *ModelAPI) GetModels(reqCtx *gin.Context) {
-	registry := inferencemodelregistry.GetInstance()
-	registry.ListModels()
+	ctx := reqCtx.Request.Context()
+	models := modelAPI.registry.ListModels(ctx)
+
 	reqCtx.JSON(http.StatusOK, ModelsResponse{
 		Object: "list",
-		Data: functional.Map(registry.ListModels(), func(model inferencemodel.Model) Model {
+		Data: functional.Map(models, func(model inferencemodel.Model) Model {
 			return Model{
 				ID:      model.ID,
 				Object:  model.Object,

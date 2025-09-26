@@ -12,12 +12,15 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
+	"menlo.ai/jan-api-gateway/app/domain/cron"
+	"menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
 	"menlo.ai/jan-api-gateway/app/domain/invite"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/response"
 	"menlo.ai/jan-api-gateway/app/domain/user"
+	"menlo.ai/jan-api-gateway/app/infrastructure/cache"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/apikeyrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/conversationrepo"
@@ -62,7 +65,8 @@ func CreateApplication() (*Application, error) {
 	organizationRepository := organizationrepo.NewOrganizationGormRepository(transactionDatabase)
 	organizationService := organization.NewService(organizationRepository)
 	userRepository := userrepo.NewUserGormRepository(transactionDatabase)
-	userService := user.NewService(userRepository)
+	redisCacheService := cache.NewRedisCacheService()
+	userService := user.NewService(userRepository, redisCacheService)
 	apiKeyRepository := apikeyrepo.NewApiKeyGormRepository(transactionDatabase)
 	apiKeyService := apikey.NewService(apiKeyRepository, organizationService)
 	projectRepository := projectrepo.NewProjectGormRepository(transactionDatabase)
@@ -85,26 +89,29 @@ func CreateApplication() (*Application, error) {
 	conversationService := conversation.NewService(conversationRepository, itemRepository)
 	completionNonStreamHandler := conv.NewCompletionNonStreamHandler(inferenceProvider, conversationService)
 	completionStreamHandler := conv.NewCompletionStreamHandler(inferenceProvider, conversationService)
-	convCompletionAPI := conv.NewConvCompletionAPI(completionNonStreamHandler, completionStreamHandler, conversationService, authService)
+	inferenceModelRegistry := inferencemodelregistry.NewInferenceModelRegistry(redisCacheService, janInferenceClient)
+	convCompletionAPI := conv.NewConvCompletionAPI(completionNonStreamHandler, completionStreamHandler, conversationService, authService, inferenceModelRegistry)
 	serperService := serpermcp.NewSerperService()
 	serperMCP := mcpimpl.NewSerperMCP(serperService)
 	convMCPAPI := conv.NewConvMCPAPI(authService, serperMCP)
 	convChatRoute := conv.NewConvChatRoute(authService, convCompletionAPI, convMCPAPI)
 	conversationAPI := conversations.NewConversationAPI(conversationService, authService)
-	modelAPI := v1.NewModelAPI()
+	modelAPI := v1.NewModelAPI(inferenceModelRegistry)
 	mcpapi := mcp.NewMCPAPI(serperMCP, authService)
 	googleAuthAPI := google.NewGoogleAuthAPI(userService, authService)
 	authRoute := auth2.NewAuthRoute(googleAuthAPI, userService, authService)
 	responseRepository := responserepo.NewResponseGormRepository(transactionDatabase)
 	responseService := response.NewResponseService(responseRepository, itemRepository, conversationService)
-	responseModelService := response.NewResponseModelService(userService, authService, apiKeyService, conversationService, responseService)
+	responseModelService := response.NewResponseModelService(userService, authService, apiKeyService, conversationService, responseService, inferenceModelRegistry)
 	streamModelService := response.NewStreamModelService(responseModelService)
 	nonStreamModelService := response.NewNonStreamModelService(responseModelService)
 	responseRoute := responses.NewResponseRoute(responseModelService, authService, responseService, streamModelService, nonStreamModelService)
 	v1Route := v1.NewV1Route(organizationRoute, chatRoute, convChatRoute, conversationAPI, modelAPI, mcpapi, authRoute, responseRoute)
 	httpServer := http.NewHttpServer(v1Route)
+	cronService := cron.NewService(janInferenceClient, inferenceModelRegistry)
 	application := &Application{
-		HttpServer: httpServer,
+		HttpServer:  httpServer,
+		CronService: cronService,
 	}
 	return application, nil
 }
@@ -113,7 +120,8 @@ func CreateDataInitializer() (*DataInitializer, error) {
 	db := ProvideDatabase()
 	transactionDatabase := transaction.NewDatabase(db)
 	userRepository := userrepo.NewUserGormRepository(transactionDatabase)
-	userService := user.NewService(userRepository)
+	redisCacheService := cache.NewRedisCacheService()
+	userService := user.NewService(userRepository, redisCacheService)
 	apiKeyRepository := apikeyrepo.NewApiKeyGormRepository(transactionDatabase)
 	organizationRepository := organizationrepo.NewOrganizationGormRepository(transactionDatabase)
 	organizationService := organization.NewService(organizationRepository)
