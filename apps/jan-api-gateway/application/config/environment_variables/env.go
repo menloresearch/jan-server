@@ -30,9 +30,10 @@ type EnvironmentVariable struct {
 	INVITE_REDIRECT_URL         string
 	ORGANIZATION_ADMIN_EMAIL    string
 	// Redis configuration
-	REDIS_URL      string
-	REDIS_PASSWORD string
-	REDIS_DB       int
+	REDIS_URL        string
+	REDIS_PASSWORD   string
+	REDIS_DB         int
+	REDIS_IS_CLUSTER bool
 }
 
 func (ev *EnvironmentVariable) LoadFromEnv() {

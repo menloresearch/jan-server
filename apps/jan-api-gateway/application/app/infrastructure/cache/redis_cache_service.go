@@ -37,7 +37,11 @@ func NewRedisCacheService() *RedisCacheService {
 		opts.DB = dbVal
 	}
 
-	if len(opts.Addrs) > 1 && opts.DB != 0 {
+	if environment_variables.EnvironmentVariables.REDIS_IS_CLUSTER {
+		opts.IsClusterMode = true
+	}
+
+	if (len(opts.Addrs) > 1 || opts.IsClusterMode) && opts.DB != 0 {
 		logger.GetLogger().Warn("Ignoring non-zero REDIS_DB when using Redis Cluster configuration")
 		opts.DB = 0
 	}
