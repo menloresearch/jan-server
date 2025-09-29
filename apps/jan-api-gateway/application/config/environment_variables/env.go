@@ -1,13 +1,13 @@
 package environment_variables
 
 import (
-	"fmt"
 	"os"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
+	"menlo.ai/jan-api-gateway/app/utils/logger"
 	"menlo.ai/jan-api-gateway/config"
 )
 
@@ -32,7 +32,7 @@ type EnvironmentVariable struct {
 	// Redis configuration
 	REDIS_URL      string
 	REDIS_PASSWORD string
-	REDIS_DB       string
+	REDIS_DB       int
 }
 
 func (ev *EnvironmentVariable) LoadFromEnv() {
@@ -43,7 +43,7 @@ func (ev *EnvironmentVariable) LoadFromEnv() {
 		envKey := field.Name
 		envValue := os.Getenv(envKey)
 		if envValue == "" {
-			fmt.Printf("Missing SYSENV: %s\n", envKey)
+			logger.GetLogger().Warnf("Missing SYSENV: %s", envKey)
 		}
 		if envValue != "" {
 			switch v.Field(i).Kind() {
@@ -52,14 +52,14 @@ func (ev *EnvironmentVariable) LoadFromEnv() {
 			case reflect.Int:
 				intV, err := strconv.Atoi(envValue)
 				if err != nil {
-					fmt.Printf("Invalid int value for %s: %s\n", envKey, envValue)
+					logger.GetLogger().Errorf("Invalid int value for %s: %s", envKey, envValue)
 				} else {
 					v.Field(i).SetInt(int64(intV))
 				}
 			case reflect.Bool:
 				boolVal, err := strconv.ParseBool(envValue)
 				if err != nil {
-					fmt.Printf("Invalid boolean value for %s: %s\n", envKey, envValue)
+					logger.GetLogger().Errorf("Invalid boolean value for %s: %s", envKey, envValue)
 				} else {
 					v.Field(i).SetBool(boolVal)
 				}
@@ -70,10 +70,10 @@ func (ev *EnvironmentVariable) LoadFromEnv() {
 					hosts := strings.Split(envValue, ",")
 					v.Field(i).Set(reflect.ValueOf(hosts))
 				} else {
-					fmt.Printf("Unsupported slice type for %s\n", field.Name)
+					logger.GetLogger().Errorf("Unsupported slice type for %s", field.Name)
 				}
 			default:
-				fmt.Printf("Unsupported field type: %s\n", field.Name)
+				logger.GetLogger().Errorf("Unsupported field type: %s", field.Name)
 			}
 		}
 	}
