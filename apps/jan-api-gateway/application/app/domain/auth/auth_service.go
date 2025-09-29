@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -62,34 +63,45 @@ func (s *AuthService) InitOrganization(ctx context.Context) error {
 	// set DEFAULT_ORGANIZATION
 	organization.UpdateDefaultOrganization(orgEntity)
 
-	email := environment_variables.EnvironmentVariables.ORGANIZATION_ADMIN_EMAIL
-	admin, err := s.userService.FindByEmail(ctx, email)
-	if err != nil {
-		return err
+	emails := environment_variables.EnvironmentVariables.ORGANIZATION_ADMIN_EMAILS
+	if len(emails) == 0 {
+		return fmt.Errorf("no ORGANIZATION_ADMIN_EMAILS configured")
 	}
-	if admin == nil {
-		admin, err = s.RegisterUser(ctx, &user.User{
-			Name:    "Admin",
-			Email:   email,
-			IsGuest: false,
-			Enabled: true,
+
+	for _, rawEmail := range emails {
+		email := strings.TrimSpace(rawEmail)
+		if email == "" {
+			continue
+		}
+
+		admin, err := s.userService.FindByEmail(ctx, email)
+		if err != nil {
+			return err
+		}
+		if admin == nil {
+			admin, err = s.RegisterUser(ctx, &user.User{
+				Name:    "Admin",
+				Email:   email,
+				IsGuest: false,
+				Enabled: true,
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+		err = s.organizationService.AddMember(ctx, &organization.OrganizationMember{
+			UserID:         admin.ID,
+			OrganizationID: orgEntity.ID,
+			Role:           organization.OrganizationMemberRoleOwner,
 		})
 		if err != nil {
 			return err
 		}
 	}
-	err = s.organizationService.AddMember(ctx, &organization.OrganizationMember{
-		UserID:         admin.ID,
-		OrganizationID: orgEntity.ID,
-		Role:           organization.OrganizationMemberRoleOwner,
-	})
-	if err != nil {
-		return err
-	}
 
 	return nil
 }
-
 func (s *AuthService) RegisterUser(ctx context.Context, user *user.User) (*user.User, error) {
 	_, err := s.userService.RegisterUser(ctx, user)
 	if err != nil {
