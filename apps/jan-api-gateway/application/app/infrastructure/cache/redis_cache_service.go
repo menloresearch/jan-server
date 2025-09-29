@@ -3,7 +3,6 @@ package cache
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -34,12 +33,8 @@ func NewRedisCacheService() *RedisCacheService {
 		opts.Password = pwd
 	}
 
-	if dbVal := environment_variables.EnvironmentVariables.REDIS_DB; dbVal != "" {
-		db, err := strconv.Atoi(dbVal)
-		if err != nil {
-			panic(fmt.Sprintf("invalid REDIS_DB value: %v", err))
-		}
-		opts.DB = db
+	if dbVal := environment_variables.EnvironmentVariables.REDIS_DB; dbVal != 0 {
+		opts.DB = dbVal
 	}
 
 	if len(opts.Addrs) > 1 && opts.DB != 0 {
