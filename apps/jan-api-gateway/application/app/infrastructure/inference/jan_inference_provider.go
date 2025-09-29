@@ -56,16 +56,15 @@ func (p *JanInferenceProvider) CreateCompletionStream(ctx context.Context, apiKe
 	return reader, nil
 }
 
-// GetModels returns available models
 func (p *JanInferenceProvider) GetModels(ctx context.Context) (*inference.ModelsResponse, error) {
-	response, err := p.client.GetModels(ctx)
+	clientResponse, err := p.client.GetModels(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Convert to domain models
-	models := make([]inference.Model, len(response.Data))
-	for i, model := range response.Data {
+	models := make([]inference.Model, len(clientResponse.Data))
+	for i, model := range clientResponse.Data {
 		models[i] = inference.Model{
 			ID:      model.ID,
 			Object:  model.Object,
@@ -74,10 +73,11 @@ func (p *JanInferenceProvider) GetModels(ctx context.Context) (*inference.Models
 		}
 	}
 
-	return &inference.ModelsResponse{
-		Object: response.Object,
+	response := &inference.ModelsResponse{
+		Object: clientResponse.Object,
 		Data:   models,
-	}, nil
+	}
+	return response, nil
 }
 
 // ValidateModel checks if a model is supported
