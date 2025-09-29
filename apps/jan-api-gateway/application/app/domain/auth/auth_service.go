@@ -63,9 +63,9 @@ func (s *AuthService) InitOrganization(ctx context.Context) error {
 	// set DEFAULT_ORGANIZATION
 	organization.UpdateDefaultOrganization(orgEntity)
 
-	emails := strings.Split(environment_variables.EnvironmentVariables.ORGANIZATION_ADMIN_EMAIL, ",")
+	emails := environment_variables.EnvironmentVariables.ORGANIZATION_ADMIN_EMAILS
 	if len(emails) == 0 {
-		return fmt.Errorf("no ORGANIZATION_ADMIN_EMAIL configured")
+		return fmt.Errorf("no ORGANIZATION_ADMIN_EMAILS configured")
 	}
 
 	for _, rawEmail := range emails {
