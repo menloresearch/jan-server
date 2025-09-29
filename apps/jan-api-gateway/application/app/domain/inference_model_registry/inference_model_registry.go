@@ -51,7 +51,7 @@ func (r *InferenceModelRegistry) ListModels(ctx context.Context) []inferencemode
 			log.Infof("ListModels: returning %d models from cache", len(models))
 			return models
 		}
-		log.Infof("ListModels: failed to unmarshal cached models: %v", jsonErr)
+		log.Infof("ListModels: failed to unmarshal cached models: %v", err)
 	} else {
 		if err != nil {
 			log.Infof("ListModels: cache lookup failed: %v", err)
