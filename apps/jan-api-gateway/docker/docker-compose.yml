@@ -21,5 +21,21 @@ services:
       retries: 5
     restart: unless-stopped
 
+  valkey:
+    image: valkey/valkey:7-alpine
+    container_name: jan-api-gateway-valkey
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    command: valkey-server --appendonly yes
+
 volumes:
   postgres_data:
+  valkey_data:
