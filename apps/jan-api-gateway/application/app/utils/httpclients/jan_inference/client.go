@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
+	inferencemodel "menlo.ai/jan-api-gateway/app/domain/inference_model"
 	"menlo.ai/jan-api-gateway/app/utils/httpclients"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 	"resty.dev/v3"
@@ -108,14 +109,7 @@ func (c *JanInferenceClient) GetModels(ctx context.Context) (*ModelsResponse, er
 	return &result, err
 }
 
-type Model struct {
-	ID      string `json:"id"`
-	Object  string `json:"object"`
-	Created int    `json:"created"`
-	OwnedBy string `json:"owned_by"`
-}
-
 type ModelsResponse struct {
-	Object string  `json:"object"`
-	Data   []Model `json:"data"`
+	Object string                 `json:"object"`
+	Data   []inferencemodel.Model `json:"data"`
 }

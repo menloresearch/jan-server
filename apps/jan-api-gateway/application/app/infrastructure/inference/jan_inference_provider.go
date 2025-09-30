@@ -8,6 +8,7 @@ import (
 
 	openai "github.com/sashabaranov/go-openai"
 	inference "menlo.ai/jan-api-gateway/app/domain/inference"
+	inferencemodel "menlo.ai/jan-api-gateway/app/domain/inference_model"
 	"menlo.ai/jan-api-gateway/app/domain/modelprovider"
 	"menlo.ai/jan-api-gateway/app/infrastructure/cache"
 	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
@@ -92,13 +93,15 @@ func (p *JanProvider) GetModels(ctx context.Context) (*inference.ModelsResponse,
 			return "", err
 		}
 
-		models := make([]inference.Model, len(clientResponse.Data))
+		models := make([]inference.InferenceProviderModel, len(clientResponse.Data))
 		for i, model := range clientResponse.Data {
-			models[i] = inference.Model{
-				ID:           model.ID,
-				Object:       model.Object,
-				Created:      model.Created,
-				OwnedBy:      model.OwnedBy,
+			models[i] = inference.InferenceProviderModel{
+				Model: inferencemodel.Model{
+					ID:      model.ID,
+					Object:  model.Object,
+					Created: model.Created,
+					OwnedBy: model.OwnedBy,
+				},
 				ProviderID:   p.ID(),
 				ProviderType: p.Type(),
 				Vendor:       p.Vendor(),

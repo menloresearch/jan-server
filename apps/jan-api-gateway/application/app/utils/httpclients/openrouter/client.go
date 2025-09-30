@@ -6,6 +6,7 @@ import (
 	"io"
 
 	openai "github.com/sashabaranov/go-openai"
+	inferencemodel "menlo.ai/jan-api-gateway/app/domain/inference_model"
 	"menlo.ai/jan-api-gateway/app/utils/httpclients"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 	"resty.dev/v3"
@@ -59,16 +60,9 @@ func (c *Client) CreateChatCompletionStream(ctx context.Context, apiKey string, 
 	return resp.RawResponse.Body, nil
 }
 
-type Model struct {
-	ID      string `json:"id"`
-	Object  string `json:"object"`
-	OwnedBy string `json:"owned_by"`
-	Created int    `json:"created"`
-}
-
 type ModelsResponse struct {
-	Object string  `json:"object"`
-	Data   []Model `json:"data"`
+	Object string                 `json:"object"`
+	Data   []inferencemodel.Model `json:"data"`
 }
 
 func (c *Client) GetModels(ctx context.Context, apiKey string) (*ModelsResponse, error) {

@@ -94,7 +94,7 @@ type ExtendedCompletionResponse struct {
 }
 
 // Model represents a model in the response
-type Model struct {
+type ModelResponse struct {
 	ID             string `json:"id"`
 	Object         string `json:"object"`
 	Created        int    `json:"created"`
@@ -107,8 +107,8 @@ type Model struct {
 
 // ModelsResponse represents the response for listing models
 type ModelsResponse struct {
-	Object string  `json:"object"`
-	Data   []Model `json:"data"`
+	Object string          `json:"object"`
+	Data   []ModelResponse `json:"data"`
 }
 
 // PostCompletion
@@ -303,13 +303,13 @@ func (api *ConvCompletionAPI) GetModels(reqCtx *gin.Context) {
 		return
 	}
 
-	data := make([]Model, 0, len(modelsResp.Data))
+	data := make([]ModelResponse, 0, len(modelsResp.Data))
 	for _, m := range modelsResp.Data {
 		name := providerNames[m.ProviderID]
 		if name == "" {
 			name = m.ProviderID
 		}
-		data = append(data, Model{
+		data = append(data, ModelResponse{
 			ID:             m.ID,
 			Object:         m.Object,
 			Created:        m.Created,

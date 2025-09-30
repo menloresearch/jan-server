@@ -8,6 +8,7 @@ import (
 
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/inference"
+	inferencemodel "menlo.ai/jan-api-gateway/app/domain/inference_model"
 	"menlo.ai/jan-api-gateway/app/utils/httpclients"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 	"resty.dev/v3"
@@ -26,7 +27,7 @@ type Client struct {
 func NewClient() *Client {
 	base := environment_variables.EnvironmentVariables.GEMINI_BASE_URL
 	if base == "" {
-		base = "https://generativelanguage.googleapis.com/v1beta"
+		base = "https://generativelanguage.googleapis.com/v1beta/openai"
 	}
 	return &Client{baseURL: base}
 }
@@ -56,39 +57,49 @@ type generateContentResponse struct {
 }
 
 type modelsResponse struct {
-	Models []struct {
-		Name        string `json:"name"`
-		DisplayName string `json:"displayName"`
-		Description string `json:"description"`
-	} `json:"models"`
+	Object string `json:"object"`
+	Data   []struct {
+		ID          string `json:"id"`
+		Object      string `json:"object"`
+		OwnedBy     string `json:"owned_by"`
+		DisplayName string `json:"display_name"`
+	} `json:"data"`
 }
 
 func (c *Client) CreateChatCompletion(ctx context.Context, apiKey string, request openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
-	geminiReq := convertToGeminiRequest(request)
-	var geminiResp generateContentResponse
-	endpoint := fmt.Sprintf("%s/models/%s:generateContent", c.baseURL, request.Model)
+	var resp openai.ChatCompletionResponse
 	_, err := RestyClient.R().
 		SetContext(ctx).
-		SetQueryParam("key", apiKey).
+		SetHeader("Authorization", fmt.Sprintf("Bearer %s", apiKey)).
 		SetHeader("Content-Type", "application/json").
-		SetBody(geminiReq).
-		SetResult(&geminiResp).
-		Post(endpoint)
+		SetBody(request).
+		SetResult(&resp).
+		Post(c.baseURL + "/chat/completions")
 	if err != nil {
 		return nil, err
 	}
-	return convertToOpenAIResponse(request.Model, geminiResp), nil
+	return &resp, nil
 }
 
 func (c *Client) CreateChatCompletionStream(ctx context.Context, apiKey string, request openai.ChatCompletionRequest) (io.ReadCloser, error) {
-	return nil, fmt.Errorf("gemini streaming completions not supported")
+	resp, err := RestyClient.R().
+		SetContext(ctx).
+		SetHeader("Authorization", fmt.Sprintf("Bearer %s", apiKey)).
+		SetHeader("Content-Type", "application/json").
+		SetBody(request).
+		SetDoNotParseResponse(true).
+		Post(c.baseURL + "/chat/completions")
+	if err != nil {
+		return nil, err
+	}
+	return resp.RawResponse.Body, nil
 }
 
 func (c *Client) GetModels(ctx context.Context, apiKey string) (*inference.ModelsResponse, error) {
 	var resp modelsResponse
 	_, err := RestyClient.R().
 		SetContext(ctx).
-		SetQueryParam("key", apiKey).
+		SetHeader("Authorization", fmt.Sprintf("Bearer %s", apiKey)).
 		SetHeader("Content-Type", "application/json").
 		SetResult(&resp).
 		Get(c.baseURL + "/models")
@@ -96,14 +107,16 @@ func (c *Client) GetModels(ctx context.Context, apiKey string) (*inference.Model
 		return nil, err
 	}
 
-	models := make([]inference.Model, 0, len(resp.Models))
+	models := make([]inference.InferenceProviderModel, 0, len(resp.Data))
 	now := int(time.Now().Unix())
-	for _, model := range resp.Models {
-		models = append(models, inference.Model{
-			ID:      model.Name,
-			Object:  "model",
-			Created: now,
-			OwnedBy: "google",
+	for _, model := range resp.Data {
+		models = append(models, inference.InferenceProviderModel{
+			Model: inferencemodel.Model{
+				ID:      model.ID,
+				Object:  model.Object,
+				Created: now,
+				OwnedBy: model.OwnedBy,
+			},
 		})
 	}
 	return &inference.ModelsResponse{Object: "list", Data: models}, nil
