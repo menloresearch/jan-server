@@ -19,12 +19,19 @@ import (
 
 // Constants for streaming configuration
 const (
-	RequestTimeout    = 120 * time.Second
-	ChannelBufferSize = 100
-	ErrorBufferSize   = 10
-	DataPrefix        = "data: "
-	DoneMarker        = "[DONE]"
+	RequestTimeout       = 120 * time.Second
+	ChannelBufferSize    = 100
+	ScannerInitialBuffer = 12 * 1024
+	ScannerMaxBuffer     = 1024 * 1024
+	DataPrefix           = "data: "
+	DoneMarker           = "[DONE]"
 )
+
+// StreamMessage carries either a streaming line or an error.
+type StreamMessage struct {
+	Line string
+	Err  error
+}
 
 // CompletionStreamHandler handles streaming chat completions
 type CompletionStreamHandler struct {
@@ -75,15 +82,20 @@ func (s *CompletionStreamHandler) StreamCompletionAndAccumulateResponse(reqCtx *
 		}
 	}
 
-	// Create buffered channels for data and errors
-	dataChan := make(chan string, ChannelBufferSize)
-	errChan := make(chan error, ErrorBufferSize)
+	// Create buffered channel for streaming messages
+	msgChan := make(chan StreamMessage, ChannelBufferSize)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 
 	// Start streaming in a goroutine
-	go s.streamResponseToChannel(ctx, selection, request, dataChan, errChan, &wg)
+	go s.streamResponseToChannel(ctx, selection, request, msgChan, &wg)
+
+	// Close the channel once streaming goroutine finishes
+	go func() {
+		wg.Wait()
+		close(msgChan)
+	}()
 
 	// Accumulators for different types of content
 	var fullContent string
@@ -95,12 +107,18 @@ func (s *CompletionStreamHandler) StreamCompletionAndAccumulateResponse(reqCtx *
 	streamingComplete := false
 	for !streamingComplete {
 		select {
-		case line, ok := <-dataChan:
+		case msg, ok := <-msgChan:
 			if !ok {
 				// Channel closed, streaming complete
 				streamingComplete = true
 				break
 			}
+
+			if msg.Err != nil {
+				return nil, common.NewError(msg.Err, "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
+			}
+
+			line := msg.Line
 
 			// Forward the raw line to client
 			if err := s.writeSSELine(reqCtx, line); err != nil {
@@ -137,15 +155,6 @@ func (s *CompletionStreamHandler) StreamCompletionAndAccumulateResponse(reqCtx *
 				}
 			}
 
-		case err, ok := <-errChan:
-			if !ok {
-				// Channel closed, no more errors
-				continue
-			}
-			if err != nil {
-				return nil, common.NewError(err, "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
-			}
-
 		case <-ctx.Done():
 			return nil, common.NewError(ctx.Err(), "bc82d69c-685b-4556-9d1f-2a4a80ae8ca4")
 		}
@@ -153,9 +162,6 @@ func (s *CompletionStreamHandler) StreamCompletionAndAccumulateResponse(reqCtx *
 
 	// Wait for streaming goroutine to complete and close channels
 	wg.Wait()
-
-	close(dataChan)
-	close(errChan)
 
 	// Build the complete response
 	response := s.buildCompleteResponse(fullContent, fullReasoning, functionCallAccumulator, toolCallAccumulator, completionItemID, request.Model, request)
@@ -167,38 +173,55 @@ func (s *CompletionStreamHandler) StreamCompletionAndAccumulateResponse(reqCtx *
 }
 
 // streamResponseToChannel streams the response from inference provider to channels
-func (s *CompletionStreamHandler) streamResponseToChannel(ctx context.Context, selection infrainference.ProviderSelection, request openai.ChatCompletionRequest, dataChan chan<- string, errChan chan<- error, wg *sync.WaitGroup) {
+func (s *CompletionStreamHandler) streamResponseToChannel(ctx context.Context, selection infrainference.ProviderSelection, request openai.ChatCompletionRequest, msgChan chan<- StreamMessage, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	// Get streaming reader from inference provider
 	reader, err := s.multiProvider.CreateCompletionStream(ctx, selection, request)
 	if err != nil {
-		errChan <- err
+		select {
+		case msgChan <- StreamMessage{Err: err}:
+		default:
+		}
 		return
 	}
 	defer func() {
 		if closeErr := reader.Close(); closeErr != nil {
-			// Log the close error but don't send it to errChan to avoid overriding the original error
-			// In a production environment, you might want to use a proper logger here
 			logger.GetLogger().Errorf("unable to close reader: %v", closeErr)
 		}
 	}()
 
 	scanner := bufio.NewScanner(reader)
+	scanner.Buffer(make([]byte, 0, ScannerInitialBuffer), ScannerMaxBuffer)
+
 	for scanner.Scan() {
 		select {
 		case <-ctx.Done():
-			errChan <- ctx.Err()
+			select {
+			case msgChan <- StreamMessage{Err: ctx.Err()}:
+			default:
+			}
 			return
 		default:
-			line := scanner.Text()
-			dataChan <- line
+		}
+
+		line := scanner.Text()
+
+		select {
+		case msgChan <- StreamMessage{Line: line}:
+		case <-ctx.Done():
+			select {
+			case msgChan <- StreamMessage{Err: ctx.Err()}:
+			default:
+			}
+			return
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		errChan <- err
-		return
+		select {
+		case msgChan <- StreamMessage{Err: err}:
+		default:
+		}
 	}
 }
 

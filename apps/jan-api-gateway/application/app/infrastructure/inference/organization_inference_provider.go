@@ -84,7 +84,10 @@ func (p *OrganizationProvider) CreateCompletionStream(ctx context.Context, reque
 		}
 		return p.openRouterClient.CreateChatCompletionStream(ctx, p.apiKey, request)
 	case modelprovider.ProviderVendorGemini:
-		return nil, fmt.Errorf("gemini streaming not supported")
+		if p.geminiClient == nil {
+			return nil, fmt.Errorf("gemini client not configured")
+		}
+		return p.geminiClient.CreateChatCompletionStream(ctx, p.apiKey, request)
 	default:
 		return nil, fmt.Errorf("unsupported vendor: %s", p.descriptor.Vendor)
 	}
