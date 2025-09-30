@@ -23,6 +23,6 @@ var RepositoryProvider = wire.NewSet(
 	conversationrepo.NewConversationGormRepository,
 	itemrepo.NewItemGormRepository,
 	responserepo.NewResponseGormRepository,
-	modelproviderrepo.NewModelProviderRepository,
+	modelproviderrepo.NewModelProviderGormRepository,
 	transaction.NewDatabase,
 )

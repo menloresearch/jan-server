@@ -120,5 +120,4 @@ type ModelProviderRepository interface {
 	FindByID(ctx context.Context, id uint) (*ModelProvider, error)
 	FindByPublicID(ctx context.Context, publicID string) (*ModelProvider, error)
 	Find(ctx context.Context, filter ProviderFilter, pagination *query.Pagination) ([]*ModelProvider, error)
-	Count(ctx context.Context, filter ProviderFilter) (int64, error)
 }

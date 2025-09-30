@@ -9,7 +9,6 @@ package main
 import (
 	"context"
 	"gorm.io/gorm"
-	"menlo.ai/jan-api-gateway/app/domain"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
@@ -82,12 +81,8 @@ func CreateApplication() (*Application, error) {
 	authService := auth.NewAuthService(userService, apiKeyService, organizationService, projectService, inviteService)
 	adminApiKeyAPI := organization2.NewAdminApiKeyAPI(organizationService, authService, apiKeyService, userService)
 	projectApiKeyRoute := apikeys.NewProjectApiKeyRoute(organizationService, projectService, apiKeyService, userService)
-	modelProviderGormRepository := modelproviderrepo.NewModelProviderRepository(transactionDatabase)
-	string2 := domain.ProvideModelProviderSecret()
-	modelProviderService, err := modelprovider.NewService(modelProviderGormRepository, string2)
-	if err != nil {
-		return nil, err
-	}
+	modelProviderRepository := modelproviderrepo.NewModelProviderGormRepository(transactionDatabase)
+	modelProviderService := modelprovider.NewModelProviderService(modelProviderRepository)
 	projectProviderRoute := providers.NewProjectProviderRoute(authService, modelProviderService, projectService, redisCacheService)
 	projectsRoute := projects.NewProjectsRoute(projectService, apiKeyService, authService, projectApiKeyRoute, projectProviderRoute)
 	invitesRoute := invites.NewInvitesRoute(inviteService, projectService, organizationService, authService)

@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"github.com/google/wire"
+	inferencedomain "menlo.ai/jan-api-gateway/app/domain/inference"
 	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
 	"menlo.ai/jan-api-gateway/app/infrastructure/cache"
 	"menlo.ai/jan-api-gateway/app/infrastructure/inference"
@@ -12,6 +13,7 @@ import (
 
 var InfrastructureProvider = wire.NewSet(
 	janinference.NewJanInferenceClient,
+	wire.Bind(new(inferencedomain.InferenceProvider), new(*inference.MultiProviderInference)),
 	openrouterclient.NewClient,
 	geminiclient.NewClient,
 	inference.NewJanProvider,

@@ -30,7 +30,7 @@ var ServiceProvider = wire.NewSet(
 	response.NewNonStreamModelService,
 	serpermcp.NewSerperService,
 	cron.NewService,
-	modelprovider.NewService,
+	modelprovider.NewModelProviderService,
 	ProvideModelProviderSecret,
 )
 

@@ -14,9 +14,11 @@ type ProviderSelection struct {
 	ProviderType   modelprovider.ProviderType
 	Vendor         modelprovider.ProviderVendor
 	OrganizationID *uint
-	ProjectID      *uint
-	ProjectIDs     []uint
-	Model          string
+	// The explicit target from the caller that they are asking for
+	ProjectID *uint
+	// Every project the authenticated user can access
+	ProjectIDs []uint
+	Model      string
 }
 
 type ProviderSummary struct {

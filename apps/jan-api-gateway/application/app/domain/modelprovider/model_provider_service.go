@@ -10,6 +10,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/query"
 	"menlo.ai/jan-api-gateway/app/utils/crypto"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
+	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
 type ModelProviderService struct {
@@ -37,19 +38,13 @@ type UpdateOrganizationProviderInput struct {
 	Metadata map[string]any
 }
 
-func NewService(repo ModelProviderRepository, encryptionSecret string) (*ModelProviderService, error) {
-	if encryptionSecret == "" {
-		return nil, crypto.ErrSecretEmpty
-	}
-	return &ModelProviderService{repo: repo, encryptionSecret: encryptionSecret}, nil
+func NewModelProviderService(repo ModelProviderRepository) *ModelProviderService {
+	secret := environment_variables.EnvironmentVariables.MODEL_PROVIDER_SECRET
+	return &ModelProviderService{repo: repo, encryptionSecret: secret}
 }
 
 func (s *ModelProviderService) List(ctx context.Context, filter ProviderFilter, pagination *query.Pagination) ([]*ModelProvider, error) {
 	return s.repo.Find(ctx, filter, pagination)
-}
-
-func (s *ModelProviderService) Count(ctx context.Context, filter ProviderFilter) (int64, error) {
-	return s.repo.Count(ctx, filter)
 }
 
 func (s *ModelProviderService) GetByPublicID(ctx context.Context, publicID string) (*ModelProvider, error) {
