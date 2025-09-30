@@ -122,7 +122,6 @@ func (cApi *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		return
 	}
 
-	// TODO: Implement admin API key check for enhanced security
 	selection, selectionErr := helpers.ParseProviderSelection(request.ProviderID, request.ProviderType, request.ProviderVendor)
 
 	if selectionErr != nil {

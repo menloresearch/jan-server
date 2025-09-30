@@ -111,9 +111,6 @@ func (p *ModelProvider) AssignDefaults() {
 	if p.MetadataJSON == "" {
 		p.MetadataJSON = "{}"
 	}
-	if p.Active == false {
-		p.Active = true
-	}
 }
 
 type ModelProviderRepository interface {

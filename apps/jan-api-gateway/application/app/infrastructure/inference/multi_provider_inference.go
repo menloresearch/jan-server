@@ -22,6 +22,13 @@ import (
 
 const aggregatedModelsCacheTTL = 10 * time.Minute
 
+type providerCacheEntry struct {
+	instance   providerInstance
+	descriptor *modelprovider.ModelProvider
+	apiKey     string
+	loadedAt   time.Time
+}
+
 type MultiProviderInference struct {
 	janProvider       *JanProvider
 	providerService   *modelprovider.ModelProviderService
@@ -29,7 +36,7 @@ type MultiProviderInference struct {
 	openRouterClient  *openrouter.Client
 	mu                sync.RWMutex
 	geminiClient      *gemini.Client
-	organizationCache map[string]providerInstance
+	organizationCache map[string]*providerCacheEntry
 }
 
 func NewMultiProviderInference(jan *JanProvider, providerService *modelprovider.ModelProviderService, cacheService *cache.RedisCacheService, openRouterClient *openrouter.Client, geminiClient *gemini.Client) *MultiProviderInference {
@@ -39,7 +46,7 @@ func NewMultiProviderInference(jan *JanProvider, providerService *modelprovider.
 		cache:             cacheService,
 		openRouterClient:  openRouterClient,
 		geminiClient:      geminiClient,
-		organizationCache: make(map[string]providerInstance),
+		organizationCache: make(map[string]*providerCacheEntry),
 	}
 }
 
@@ -166,7 +173,9 @@ func (m *MultiProviderInference) ListProviders(ctx context.Context, filter infer
 		})
 		seen[provider.PublicID] = struct{}{}
 		if provider.Active {
-			_ = m.ensureCachedProvider(ctx, provider.PublicID)
+			if _, err := m.getProviderEntry(ctx, provider.PublicID); err != nil {
+				logger.GetLogger().Warnf("multi-provider inference: failed to warm cache for provider %s: %v", provider.PublicID, err)
+			}
 		}
 	}
 
@@ -190,18 +199,14 @@ func (m *MultiProviderInference) resolveProvider(ctx context.Context, selection 
 			return m.janProvider, nil
 		}
 
-		if provider := m.getCachedProvider(providerID); provider != nil {
-			return provider, nil
-		}
-
-		if err := m.ensureCachedProvider(ctx, providerID); err != nil {
+		entry, err := m.getProviderEntry(ctx, providerID)
+		if err != nil {
 			return nil, err
 		}
-
-		if provider := m.getCachedProvider(providerID); provider != nil {
-			return provider, nil
+		if err := m.validateProviderAccess(selection, entry.descriptor); err != nil {
+			return nil, err
 		}
-		return nil, fmt.Errorf("provider %s not found", providerID)
+		return entry.instance, nil
 	}
 
 	modelID := strings.TrimSpace(selection.Model)
@@ -224,28 +229,97 @@ func (m *MultiProviderInference) resolveProvider(ctx context.Context, selection 
 	return m.janProvider, nil
 }
 
-func (m *MultiProviderInference) getCachedProvider(providerID string) providerInstance {
+func (m *MultiProviderInference) getCachedProvider(providerID string) (*providerCacheEntry, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.organizationCache[providerID]
+	entry, ok := m.organizationCache[providerID]
+	return entry, ok
 }
 
-func (m *MultiProviderInference) ensureCachedProvider(ctx context.Context, providerID string) error {
+func (m *MultiProviderInference) storeProviderInCache(providerID string, entry *providerCacheEntry) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if _, exists := m.organizationCache[providerID]; exists {
+	m.organizationCache[providerID] = entry
+}
+
+func (m *MultiProviderInference) removeProviderFromCache(providerID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.organizationCache, providerID)
+}
+
+func (m *MultiProviderInference) getProviderEntry(ctx context.Context, providerID string) (*providerCacheEntry, error) {
+	descriptor, apiKey, err := m.providerService.GetByPublicIDWithKey(ctx, providerID)
+	if err != nil {
+		return nil, err
+	}
+	if !descriptor.Active {
+		m.removeProviderFromCache(providerID)
+		return nil, fmt.Errorf("provider %s is disabled", providerID)
+	}
+
+	if entry, ok := m.getCachedProvider(providerID); ok {
+		if providersEquivalent(entry.descriptor, descriptor) && entry.apiKey == apiKey {
+			entry.descriptor = descriptor
+			return entry, nil
+		}
+	}
+
+	instance := NewOrganizationProvider(descriptor, apiKey, m.cache, m.openRouterClient, m.geminiClient)
+	entry := &providerCacheEntry{
+		instance:   instance,
+		descriptor: descriptor,
+		apiKey:     apiKey,
+		loadedAt:   time.Now(),
+	}
+	m.storeProviderInCache(providerID, entry)
+	return entry, nil
+}
+
+func providersEquivalent(a, b *modelprovider.ModelProvider) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	if !a.UpdatedAt.Equal(b.UpdatedAt) {
+		return false
+	}
+	if (a.LastSyncedAt == nil) != (b.LastSyncedAt == nil) {
+		return false
+	}
+	if a.LastSyncedAt != nil && !a.LastSyncedAt.Equal(*b.LastSyncedAt) {
+		return false
+	}
+	if a.Active != b.Active {
+		return false
+	}
+	if a.APIKeyHint != b.APIKeyHint {
+		return false
+	}
+	return true
+}
+
+func (m *MultiProviderInference) validateProviderAccess(selection inference.ProviderSelection, descriptor *modelprovider.ModelProvider) error {
+	if descriptor == nil {
 		return nil
 	}
-	provider, apiKey, err := m.providerService.GetByPublicIDWithKey(ctx, providerID)
-	if err != nil {
-		return err
+	if descriptor.ProjectID != nil {
+		if selection.ProjectID != nil && *selection.ProjectID == *descriptor.ProjectID {
+			return nil
+		}
+		for _, id := range selection.ProjectIDs {
+			if id == *descriptor.ProjectID {
+				return nil
+			}
+		}
+		return fmt.Errorf("provider %s is not accessible in the current project context", descriptor.PublicID)
 	}
-	if !provider.Active {
-		return fmt.Errorf("provider %s is disabled", providerID)
+	if descriptor.OrganizationID == nil {
+		return fmt.Errorf("provider %s is not accessible in the current organization context", descriptor.PublicID)
 	}
-	instance := NewOrganizationProvider(provider, apiKey, m.cache, m.openRouterClient, m.geminiClient)
-	m.organizationCache[providerID] = instance
-	return nil
+	if selection.OrganizationID != nil && *selection.OrganizationID == *descriptor.OrganizationID {
+		return nil
+	}
+	return fmt.Errorf("provider %s is not accessible in the current organization context", descriptor.PublicID)
 }
 
 func (m *MultiProviderInference) findProviderByModel(ctx context.Context, selection inference.ProviderSelection, modelID string) (providerInstance, error) {
@@ -617,18 +691,11 @@ func (m *MultiProviderInference) getProviderInstance(ctx context.Context, provid
 		return m.janProvider, nil
 	}
 
-	if provider := m.getCachedProvider(providerID); provider != nil {
-		return provider, nil
-	}
-
-	if err := m.ensureCachedProvider(ctx, providerID); err != nil {
+	entry, err := m.getProviderEntry(ctx, providerID)
+	if err != nil {
 		return nil, err
 	}
-
-	if provider := m.getCachedProvider(providerID); provider != nil {
-		return provider, nil
-	}
-	return nil, fmt.Errorf("provider %s not found", providerID)
+	return entry.instance, nil
 }
 
 func (m *MultiProviderInference) storeModelsInCache(ctx context.Context, key string, models []inference.InferenceProviderModel) {
