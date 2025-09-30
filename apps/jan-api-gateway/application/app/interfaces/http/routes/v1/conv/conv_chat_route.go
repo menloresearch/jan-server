@@ -34,6 +34,7 @@ func (convChatRoute *ConvChatRoute) RegisterRouter(router gin.IRouter) {
 	convChatRouter := router.Group("/conv",
 		convChatRoute.authService.AppUserAuthMiddleware(),
 		convChatRoute.authService.RegisteredUserMiddleware(),
+		convChatRoute.authService.DefaultOrganizationMemberOptionalMiddleware(),
 	)
 	convChatRoute.convCompletionAPI.RegisterRouter(convChatRouter)
 

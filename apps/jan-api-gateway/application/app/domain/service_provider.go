@@ -8,10 +8,12 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/cron"
 	"menlo.ai/jan-api-gateway/app/domain/invite"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
+	modelproviderservice "menlo.ai/jan-api-gateway/app/domain/modelprovider/service"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/response"
 	"menlo.ai/jan-api-gateway/app/domain/user"
+	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
 var ServiceProvider = wire.NewSet(
@@ -28,4 +30,14 @@ var ServiceProvider = wire.NewSet(
 	response.NewNonStreamModelService,
 	serpermcp.NewSerperService,
 	cron.NewService,
+	modelproviderservice.NewService,
+	ProvideModelProviderSecret,
 )
+
+func ProvideModelProviderSecret() string {
+	secret := environment_variables.EnvironmentVariables.MODEL_PROVIDER_SECRET
+	if secret == "" {
+		secret = environment_variables.EnvironmentVariables.APIKEY_SECRET
+	}
+	return secret
+}

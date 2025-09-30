@@ -21,6 +21,7 @@ type EnvironmentVariable struct {
 	DB_POSTGRESQL_WRITE_DSN     string
 	DB_POSTGRESQL_READ1_DSN     string
 	APIKEY_SECRET               string
+	MODEL_PROVIDER_SECRET       string
 	ALLOWED_CORS_HOSTS          []string
 	SMTP_HOST                   string
 	SMTP_PORT                   int
@@ -33,6 +34,10 @@ type EnvironmentVariable struct {
 	REDIS_URL      string
 	REDIS_PASSWORD string
 	REDIS_DB       int
+
+	// inference provider
+	OPENROUTER_BASE_URL string
+	GEMINI_BASE_URL     string
 }
 
 func (ev *EnvironmentVariable) LoadFromEnv() {
@@ -67,8 +72,8 @@ func (ev *EnvironmentVariable) LoadFromEnv() {
 				if v.Field(i).Type().Elem().Kind() == reflect.Uint8 {
 					v.Field(i).SetBytes([]byte(envValue))
 				} else if v.Field(i).Type().Elem().Kind() == reflect.String {
-					hosts := strings.Split(envValue, ",")
-					v.Field(i).Set(reflect.ValueOf(hosts))
+					entries := strings.Split(envValue, ",")
+					v.Field(i).Set(reflect.ValueOf(entries))
 				} else {
 					logger.GetLogger().Errorf("Unsupported slice type for %s", field.Name)
 				}

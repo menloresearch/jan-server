@@ -129,9 +129,9 @@ func (responseRoute *ResponseRoute) registerRoutes(router *gin.RouterGroup) {
 // @Security BearerAuth
 // @Accept json
 // @Produce json
-// @Param request body requesttypes.CreateResponseRequest true "Request payload containing model, input, and generation parameters"
-// @Success 200 {object} responses.Response "Created response"
-// @Success 202 {object} responses.Response "Response accepted for background processing"
+// @Param request body object true "Request payload containing model, input, and generation parameters"
+// @Success 200 {object} object "Created response"
+// @Success 202 {object} object "Response accepted for background processing"
 // @Failure 400 {object} responses.ErrorResponse "Invalid request payload"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 422 {object} responses.ErrorResponse "Validation error"
@@ -246,7 +246,7 @@ func (responseRoute *ResponseRoute) handleResponseCreation(reqCtx *gin.Context, 
 // @Accept json
 // @Produce json
 // @Param response_id path string true "Unique identifier of the response"
-// @Success 200 {object} responses.Response "Response details"
+// @Success 200 {object} object "Response details"
 // @Failure 400 {object} responses.ErrorResponse "Invalid request"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
@@ -282,7 +282,7 @@ func (responseRoute *ResponseRoute) GetResponse(reqCtx *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param response_id path string true "Unique identifier of the response"
-// @Success 200 {object} responses.Response "Deleted response"
+// @Success 200 {object} object "Deleted response"
 // @Failure 400 {object} responses.ErrorResponse "Invalid request"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
@@ -331,7 +331,7 @@ func (responseRoute *ResponseRoute) DeleteResponse(reqCtx *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param response_id path string true "Unique identifier of the response to cancel"
-// @Success 200 {object} responses.Response "Response cancelled successfully"
+// @Success 200 {object} object "Response cancelled successfully"
 // @Failure 400 {object} responses.ErrorResponse "Invalid request or response cannot be cancelled"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
@@ -413,7 +413,7 @@ func (responseRoute *ResponseRoute) CancelResponse(reqCtx *gin.Context) {
 // @Param limit query int false "Maximum number of items to return (default: 20, max: 100)"
 // @Param after query string false "Cursor for pagination - return items after this ID"
 // @Param before query string false "Cursor for pagination - return items before this ID"
-// @Success 200 {object} responses.ListInputItemsResponse "List of input items"
+// @Success 200 {object} object "List of input items"
 // @Failure 400 {object} responses.ErrorResponse "Invalid request or pagination parameters"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"

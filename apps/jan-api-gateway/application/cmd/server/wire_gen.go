@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"gorm.io/gorm"
+	"menlo.ai/jan-api-gateway/app/domain"
 	"menlo.ai/jan-api-gateway/app/domain/apikey"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
@@ -16,6 +17,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
 	"menlo.ai/jan-api-gateway/app/domain/invite"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
+	modelproviderservice "menlo.ai/jan-api-gateway/app/domain/modelprovider/service"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/response"
@@ -26,6 +28,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/conversationrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/inviterepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/itemrepo"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/modelproviderrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/organizationrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/projectrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/responserepo"
@@ -45,8 +48,11 @@ import (
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/invites"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects/api_keys"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/providers"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/responses"
+	"menlo.ai/jan-api-gateway/app/utils/httpclients/gemini"
 	"menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
+	"menlo.ai/jan-api-gateway/app/utils/httpclients/openrouter"
 )
 
 import (
@@ -76,27 +82,38 @@ func CreateApplication() (*Application, error) {
 	authService := auth.NewAuthService(userService, apiKeyService, organizationService, projectService, inviteService)
 	adminApiKeyAPI := organization2.NewAdminApiKeyAPI(organizationService, authService, apiKeyService, userService)
 	projectApiKeyRoute := apikeys.NewProjectApiKeyRoute(organizationService, projectService, apiKeyService, userService)
-	projectsRoute := projects.NewProjectsRoute(projectService, apiKeyService, authService, projectApiKeyRoute)
+	repository := modelproviderrepo.NewModelProviderRepository(transactionDatabase)
+	string2 := domain.ProvideModelProviderSecret()
+	modelProviderService, err := modelproviderservice.NewService(repository, string2)
+	if err != nil {
+		return nil, err
+	}
+	projectProviderRoute := providers.NewProjectProviderRoute(authService, modelProviderService, projectService, redisCacheService)
+	projectsRoute := projects.NewProjectsRoute(projectService, apiKeyService, authService, projectApiKeyRoute, projectProviderRoute)
 	invitesRoute := invites.NewInvitesRoute(inviteService, projectService, organizationService, authService)
-	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI, projectsRoute, invitesRoute, authService)
+	organizationProviderRoute := providers.NewOrganizationProviderRoute(authService, modelProviderService, redisCacheService)
+	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI, projectsRoute, invitesRoute, organizationProviderRoute, authService)
 	context := provideContext()
 	janInferenceClient := janinference.NewJanInferenceClient(context)
-	inferenceProvider := inference.NewJanInferenceProvider(janInferenceClient)
-	completionAPI := chat.NewCompletionAPI(inferenceProvider, authService)
+	janProvider := inference.NewJanProvider(janInferenceClient, redisCacheService)
+	client := openrouter.NewClient()
+	geminiClient := gemini.NewClient()
+	multiProviderInference := inference.NewMultiProviderInference(janProvider, modelProviderService, redisCacheService, client, geminiClient)
+	completionAPI := chat.NewCompletionAPI(multiProviderInference, authService, projectService)
 	chatRoute := chat.NewChatRoute(authService, completionAPI)
 	conversationRepository := conversationrepo.NewConversationGormRepository(transactionDatabase)
 	itemRepository := itemrepo.NewItemGormRepository(transactionDatabase)
 	conversationService := conversation.NewService(conversationRepository, itemRepository)
-	completionNonStreamHandler := conv.NewCompletionNonStreamHandler(inferenceProvider, conversationService)
-	completionStreamHandler := conv.NewCompletionStreamHandler(inferenceProvider, conversationService)
+	completionNonStreamHandler := conv.NewCompletionNonStreamHandler(multiProviderInference, conversationService)
+	completionStreamHandler := conv.NewCompletionStreamHandler(multiProviderInference, conversationService)
 	inferenceModelRegistry := inferencemodelregistry.NewInferenceModelRegistry(redisCacheService, janInferenceClient)
-	convCompletionAPI := conv.NewConvCompletionAPI(completionNonStreamHandler, completionStreamHandler, conversationService, authService, inferenceModelRegistry)
+	convCompletionAPI := conv.NewConvCompletionAPI(completionNonStreamHandler, completionStreamHandler, conversationService, authService, projectService, inferenceModelRegistry)
 	serperService := serpermcp.NewSerperService()
 	serperMCP := mcpimpl.NewSerperMCP(serperService)
 	convMCPAPI := conv.NewConvMCPAPI(authService, serperMCP)
 	convChatRoute := conv.NewConvChatRoute(authService, convCompletionAPI, convMCPAPI)
 	conversationAPI := conversations.NewConversationAPI(conversationService, authService)
-	modelAPI := v1.NewModelAPI(inferenceModelRegistry)
+	modelAPI := v1.NewModelAPI(multiProviderInference, inferenceModelRegistry, authService, projectService)
 	mcpapi := mcp.NewMCPAPI(serperMCP, authService)
 	googleAuthAPI := google.NewGoogleAuthAPI(userService, authService)
 	authRoute := auth2.NewAuthRoute(googleAuthAPI, userService, authService)

@@ -60,7 +60,7 @@ type ToolCallAccumulator struct {
 }
 
 // StreamCompletionAndAccumulateResponse streams SSE events to client and accumulates a complete response for internal processing
-func (s *CompletionStreamHandler) StreamCompletionAndAccumulateResponse(reqCtx *gin.Context, apiKey string, request openai.ChatCompletionRequest, conv *conversation.Conversation, conversationCreated bool, askItemID string, completionItemID string) (*ExtendedCompletionResponse, *common.Error) {
+func (s *CompletionStreamHandler) StreamCompletionAndAccumulateResponse(reqCtx *gin.Context, selection inference.ProviderSelection, request openai.ChatCompletionRequest, conv *conversation.Conversation, conversationCreated bool, askItemID string, completionItemID string) (*ExtendedCompletionResponse, *common.Error) {
 	// Add timeout context
 	ctx, cancel := context.WithTimeout(reqCtx.Request.Context(), RequestTimeout)
 	defer cancel()
@@ -83,7 +83,7 @@ func (s *CompletionStreamHandler) StreamCompletionAndAccumulateResponse(reqCtx *
 	wg.Add(1)
 
 	// Start streaming in a goroutine
-	go s.streamResponseToChannel(ctx, apiKey, request, dataChan, errChan, &wg)
+	go s.streamResponseToChannel(ctx, selection, request, dataChan, errChan, &wg)
 
 	// Accumulators for different types of content
 	var fullContent string
@@ -167,11 +167,11 @@ func (s *CompletionStreamHandler) StreamCompletionAndAccumulateResponse(reqCtx *
 }
 
 // streamResponseToChannel streams the response from inference provider to channels
-func (s *CompletionStreamHandler) streamResponseToChannel(ctx context.Context, apiKey string, request openai.ChatCompletionRequest, dataChan chan<- string, errChan chan<- error, wg *sync.WaitGroup) {
+func (s *CompletionStreamHandler) streamResponseToChannel(ctx context.Context, selection inference.ProviderSelection, request openai.ChatCompletionRequest, dataChan chan<- string, errChan chan<- error, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	// Get streaming reader from inference provider
-	reader, err := s.inferenceProvider.CreateCompletionStream(ctx, apiKey, request)
+	reader, err := s.inferenceProvider.CreateCompletionStream(ctx, selection, request)
 	if err != nil {
 		errChan <- err
 		return
