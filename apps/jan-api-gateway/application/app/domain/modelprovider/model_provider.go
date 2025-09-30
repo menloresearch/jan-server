@@ -85,19 +85,15 @@ func ValidateCombination(providerType ProviderType, vendor ProviderVendor) error
 	return fmt.Errorf("vendor %s is not supported for provider type %s", vendor, providerType)
 }
 
-var ErrMissingAPIKey = errors.New("missing provider api key")
-var ErrInvalidName = errors.New("provider name cannot be empty")
-var ErrDuplicateProviderVendor = errors.New("provider vendor already exists for this scope")
-
 func (p *ModelProvider) EnsureValid() error {
 	if strings.TrimSpace(p.Name) == "" {
-		return ErrInvalidName
+		return errors.New("provider name cannot be empty")
 	}
 	if err := ValidateCombination(p.Type, p.Vendor); err != nil {
 		return err
 	}
 	if p.Type == ProviderTypeOrganization && strings.TrimSpace(p.EncryptedAPIKey) == "" {
-		return ErrMissingAPIKey
+		return errors.New("missing provider api key")
 	}
 	return nil
 }

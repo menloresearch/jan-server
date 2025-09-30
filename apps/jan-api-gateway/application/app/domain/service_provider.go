@@ -13,7 +13,6 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/response"
 	"menlo.ai/jan-api-gateway/app/domain/user"
-	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
 var ServiceProvider = wire.NewSet(
@@ -31,13 +30,4 @@ var ServiceProvider = wire.NewSet(
 	serpermcp.NewSerperService,
 	cron.NewService,
 	modelprovider.NewModelProviderService,
-	ProvideModelProviderSecret,
 )
-
-func ProvideModelProviderSecret() string {
-	secret := environment_variables.EnvironmentVariables.MODEL_PROVIDER_SECRET
-	if secret == "" {
-		secret = environment_variables.EnvironmentVariables.APIKEY_SECRET
-	}
-	return secret
-}

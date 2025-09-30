@@ -3,6 +3,7 @@ package modelprovider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -84,7 +85,7 @@ func (s *ModelProviderService) RegisterOrganizationProvider(ctx context.Context,
 	}
 
 	if strings.TrimSpace(input.APIKey) == "" {
-		return nil, ErrMissingAPIKey
+		return nil, errors.New("missing provider api key")
 	}
 	if err := s.applyAPIKey(provider, input.APIKey); err != nil {
 		return nil, err
@@ -175,7 +176,7 @@ func (s *ModelProviderService) ensureVendorUnique(ctx context.Context, provider 
 		return err
 	}
 	if len(providers) > 0 {
-		return fmt.Errorf("%w: %s", ErrDuplicateProviderVendor, provider.Vendor)
+		return fmt.Errorf("%w: %s", errors.New("provider vendor already exists for this scope"), provider.Vendor)
 	}
 	return nil
 }
