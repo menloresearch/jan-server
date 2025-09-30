@@ -17,6 +17,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/invite"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
+	"menlo.ai/jan-api-gateway/app/domain/organization/models"
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/response"
 	"menlo.ai/jan-api-gateway/app/domain/user"
@@ -32,6 +33,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/inference"
+	"menlo.ai/jan-api-gateway/app/infrastructure/kubernetes"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
 	auth2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth"
@@ -43,6 +45,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/mcp/mcp_impl"
 	organization2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/invites"
+	models2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/models"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects/api_keys"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/responses"
@@ -78,7 +81,16 @@ func CreateApplication() (*Application, error) {
 	projectApiKeyRoute := apikeys.NewProjectApiKeyRoute(organizationService, projectService, apiKeyService, userService)
 	projectsRoute := projects.NewProjectsRoute(projectService, apiKeyService, authService, projectApiKeyRoute)
 	invitesRoute := invites.NewInvitesRoute(inviteService, projectService, organizationService, authService)
-	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI, projectsRoute, invitesRoute, authService)
+	kubernetesService, err := kubernetes.NewKubernetesService()
+	if err != nil {
+		return nil, err
+	}
+	modelService, err := models.NewModelService(kubernetesService, redisCacheService)
+	if err != nil {
+		return nil, err
+	}
+	modelsAPI := models2.NewModelsAPI(modelService, authService)
+	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI, projectsRoute, invitesRoute, modelsAPI, authService)
 	context := provideContext()
 	janInferenceClient := janinference.NewJanInferenceClient(context)
 	inferenceProvider := inference.NewJanInferenceProvider(janInferenceClient)

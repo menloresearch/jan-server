@@ -187,6 +187,27 @@ gateway:
     name: ""
 
   # =============================================================================
+  # Models API Configuration
+  # =============================================================================
+  models:
+    # Enable models API functionality (requires Kubernetes cluster deployment)
+    enabled: false # Set to true to enable models API
+
+    # Default namespace for model deployments
+    namespace: "jan-models"
+
+    # Default resource requirements for models
+    defaultResources:
+      cpu: "100m"
+      memory: "256Mi"
+
+    # GPU resource defaults
+    defaultGPU:
+      enabled: true
+      minVRAM: "4Gi"
+      preferredVRAM: "8Gi"
+
+  # =============================================================================
   # Pod Disruption Budget
   # =============================================================================
   podDisruptionBudget:
