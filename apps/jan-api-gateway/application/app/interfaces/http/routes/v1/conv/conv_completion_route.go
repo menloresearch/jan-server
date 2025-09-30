@@ -268,7 +268,7 @@ func (api *ConvCompletionAPI) GetModels(reqCtx *gin.Context) {
 		})
 		return
 	}
-	providers, err := api.completionNonStreamHandler.inferenceProvider.ListProviders(ctx, filter)
+	providers, err := api.completionNonStreamHandler.multiProvider.ListProviders(ctx, filter)
 	if err != nil {
 		logger.GetLogger().Errorf("failed to list providers: %v", err)
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
@@ -293,7 +293,7 @@ func (api *ConvCompletionAPI) GetModels(reqCtx *gin.Context) {
 		selection.ProjectIDs = append(selection.ProjectIDs, (*filter.ProjectIDs)...)
 	}
 
-	modelsResp, err := api.completionNonStreamHandler.inferenceProvider.GetModels(ctx, selection)
+	modelsResp, err := api.completionNonStreamHandler.multiProvider.GetModels(ctx, selection)
 	if err != nil {
 		logger.GetLogger().Errorf("failed to aggregate models: %v", err)
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{

@@ -12,8 +12,9 @@ import (
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/common"
-	"menlo.ai/jan-api-gateway/app/domain/inference"
+	domaininference "menlo.ai/jan-api-gateway/app/domain/inference"
 	"menlo.ai/jan-api-gateway/app/domain/project"
+	infrainference "menlo.ai/jan-api-gateway/app/infrastructure/inference"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/helpers"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/utils/logger"
@@ -47,16 +48,16 @@ type ChatCompletionRequest struct {
 
 // CompletionAPI handles chat completion requests with streaming support
 type CompletionAPI struct {
-	inferenceProvider inference.InferenceProvider
-	authService       *auth.AuthService
-	projectService    *project.ProjectService
+	multiProvider  *infrainference.MultiProviderInference
+	authService    *auth.AuthService
+	projectService *project.ProjectService
 }
 
-func NewCompletionAPI(inferenceProvider inference.InferenceProvider, authService *auth.AuthService, projectService *project.ProjectService) *CompletionAPI {
+func NewCompletionAPI(multiProvider *infrainference.MultiProviderInference, authService *auth.AuthService, projectService *project.ProjectService) *CompletionAPI {
 	return &CompletionAPI{
-		inferenceProvider: inferenceProvider,
-		authService:       authService,
-		projectService:    projectService,
+		multiProvider:  multiProvider,
+		authService:    authService,
+		projectService: projectService,
 	}
 }
 
@@ -164,9 +165,9 @@ func (cApi *CompletionAPI) PostCompletion(reqCtx *gin.Context) {
 }
 
 // CallCompletionAndGetRestResponse calls the inference model and returns a complete non-streaming response
-func (cApi *CompletionAPI) CallCompletionAndGetRestResponse(ctx context.Context, selection inference.ProviderSelection, request openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, *common.Error) {
+func (cApi *CompletionAPI) CallCompletionAndGetRestResponse(ctx context.Context, selection domaininference.ProviderSelection, request openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, *common.Error) {
 	// Call inference provider to get complete response
-	response, err := cApi.inferenceProvider.CreateCompletion(ctx, selection, request)
+	response, err := cApi.multiProvider.CreateCompletion(ctx, selection, request)
 	if err != nil {
 		logger.GetLogger().Errorf("inference failed: %v", err)
 		return nil, common.NewError(err, "0199600c-3b65-7618-83ca-443a583d91c9")
@@ -176,7 +177,7 @@ func (cApi *CompletionAPI) CallCompletionAndGetRestResponse(ctx context.Context,
 }
 
 // StreamCompletionResponse streams SSE events directly to the client
-func (cApi *CompletionAPI) StreamCompletionResponse(reqCtx *gin.Context, selection inference.ProviderSelection, request openai.ChatCompletionRequest) *common.Error {
+func (cApi *CompletionAPI) StreamCompletionResponse(reqCtx *gin.Context, selection domaininference.ProviderSelection, request openai.ChatCompletionRequest) *common.Error {
 	// Create timeout context wrapping the request context
 	ctx, cancel := context.WithTimeout(reqCtx.Request.Context(), RequestTimeout)
 	defer cancel()
@@ -267,7 +268,7 @@ func (cApi *CompletionAPI) StreamCompletionResponse(reqCtx *gin.Context, selecti
 	return nil
 }
 
-func (cApi *CompletionAPI) populateSelectionContext(reqCtx *gin.Context, userID uint, selection *inference.ProviderSelection) {
+func (cApi *CompletionAPI) populateSelectionContext(reqCtx *gin.Context, userID uint, selection *domaininference.ProviderSelection) {
 	if selection == nil {
 		return
 	}
@@ -292,11 +293,11 @@ func (cApi *CompletionAPI) populateSelectionContext(reqCtx *gin.Context, userID 
 }
 
 // streamResponseToChannel streams the response from inference provider to a unified channel
-func (cApi *CompletionAPI) streamResponseToChannel(ctx context.Context, selection inference.ProviderSelection, request openai.ChatCompletionRequest, msgChan chan<- StreamMessage, wg *sync.WaitGroup) {
+func (cApi *CompletionAPI) streamResponseToChannel(ctx context.Context, selection domaininference.ProviderSelection, request openai.ChatCompletionRequest, msgChan chan<- StreamMessage, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	// Get streaming reader from inference provider
-	reader, err := cApi.inferenceProvider.CreateCompletionStream(ctx, selection, request)
+	reader, err := cApi.multiProvider.CreateCompletionStream(ctx, selection, request)
 	if err != nil {
 		select {
 		case msgChan <- StreamMessage{Err: err}:

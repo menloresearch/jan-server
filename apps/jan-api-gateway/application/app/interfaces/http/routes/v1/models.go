@@ -5,26 +5,27 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
-	"menlo.ai/jan-api-gateway/app/domain/inference"
+	domaininference "menlo.ai/jan-api-gateway/app/domain/inference"
 	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
 	"menlo.ai/jan-api-gateway/app/domain/project"
+	infrainference "menlo.ai/jan-api-gateway/app/infrastructure/inference"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/utils/logger"
 )
 
 type ModelAPI struct {
-	inferenceProvider inference.InferenceProvider
-	registry          *inferencemodelregistry.InferenceModelRegistry
-	authService       *auth.AuthService
-	projectService    *project.ProjectService
+	multiProvider  *infrainference.MultiProviderInference
+	registry       *inferencemodelregistry.InferenceModelRegistry
+	authService    *auth.AuthService
+	projectService *project.ProjectService
 }
 
-func NewModelAPI(inferenceProvider inference.InferenceProvider, registry *inferencemodelregistry.InferenceModelRegistry, authService *auth.AuthService, projectService *project.ProjectService) *ModelAPI {
+func NewModelAPI(multiProvider *infrainference.MultiProviderInference, registry *inferencemodelregistry.InferenceModelRegistry, authService *auth.AuthService, projectService *project.ProjectService) *ModelAPI {
 	return &ModelAPI{
-		inferenceProvider: inferenceProvider,
-		registry:          registry,
-		authService:       authService,
-		projectService:    projectService,
+		multiProvider:  multiProvider,
+		registry:       registry,
+		authService:    authService,
+		projectService: projectService,
 	}
 }
 
@@ -49,7 +50,7 @@ func (modelAPI *ModelAPI) GetModels(reqCtx *gin.Context) {
 		})
 		return
 	}
-	providers, err := modelAPI.inferenceProvider.ListProviders(ctx, filter)
+	providers, err := modelAPI.multiProvider.ListProviders(ctx, filter)
 	if err != nil {
 		logger.GetLogger().Errorf("failed to list providers: %v", err)
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
@@ -64,7 +65,7 @@ func (modelAPI *ModelAPI) GetModels(reqCtx *gin.Context) {
 		providerNames[provider.ProviderID] = provider.Name
 	}
 
-	selection := inference.ProviderSelection{
+	selection := domaininference.ProviderSelection{
 		OrganizationID: filter.OrganizationID,
 	}
 	if filter.ProjectID != nil {
@@ -74,7 +75,7 @@ func (modelAPI *ModelAPI) GetModels(reqCtx *gin.Context) {
 		selection.ProjectIDs = append(selection.ProjectIDs, (*filter.ProjectIDs)...)
 	}
 
-	modelsResp, err := modelAPI.inferenceProvider.GetModels(ctx, selection)
+	modelsResp, err := modelAPI.multiProvider.GetModels(ctx, selection)
 	if err != nil {
 		logger.GetLogger().Errorf("failed to aggregate models: %v", err)
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
@@ -149,7 +150,7 @@ func (modelAPI *ModelAPI) GetProviders(reqCtx *gin.Context) {
 		})
 		return
 	}
-	providers, err := modelAPI.inferenceProvider.ListProviders(ctx, filter)
+	providers, err := modelAPI.multiProvider.ListProviders(ctx, filter)
 	if err != nil {
 		logger.GetLogger().Errorf("failed to list providers: %v", err)
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
@@ -177,8 +178,8 @@ func (modelAPI *ModelAPI) GetProviders(reqCtx *gin.Context) {
 	})
 }
 
-func (modelAPI *ModelAPI) buildProviderFilter(reqCtx *gin.Context) (inference.ProviderSummaryFilter, error) {
-	filter := inference.ProviderSummaryFilter{}
+func (modelAPI *ModelAPI) buildProviderFilter(reqCtx *gin.Context) (domaininference.ProviderSummaryFilter, error) {
+	filter := domaininference.ProviderSummaryFilter{}
 	if org, ok := auth.GetAdminOrganizationFromContext(reqCtx); ok && org != nil {
 		filter.OrganizationID = &org.ID
 	}

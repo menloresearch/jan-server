@@ -1,10 +1,6 @@
 package inference
 
 import (
-	"context"
-	"io"
-
-	openai "github.com/sashabaranov/go-openai"
 	inferencemodel "menlo.ai/jan-api-gateway/app/domain/inference_model"
 	"menlo.ai/jan-api-gateway/app/domain/modelprovider"
 )
@@ -37,14 +33,6 @@ type ProviderSummaryFilter struct {
 	Type           *modelprovider.ProviderType
 	Vendor         *modelprovider.ProviderVendor
 	Active         *bool
-}
-
-type InferenceProvider interface {
-	CreateCompletion(ctx context.Context, selection ProviderSelection, request openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error)
-	CreateCompletionStream(ctx context.Context, selection ProviderSelection, request openai.ChatCompletionRequest) (io.ReadCloser, error)
-	GetModels(ctx context.Context, selection ProviderSelection) (*ModelsResponse, error)
-	ValidateModel(ctx context.Context, selection ProviderSelection, model string) error
-	ListProviders(ctx context.Context, filter ProviderSummaryFilter) ([]ProviderSummary, error)
 }
 
 type ModelsResponse struct {
