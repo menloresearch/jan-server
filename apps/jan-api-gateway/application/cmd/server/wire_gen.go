@@ -35,6 +35,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/inference"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/admin"
 	auth2 "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth/google"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
@@ -87,6 +88,7 @@ func CreateApplication() (*Application, error) {
 	invitesRoute := invites.NewInvitesRoute(inviteService, projectService, organizationService, authService)
 	organizationProviderRoute := providers.NewOrganizationProviderRoute(authService, modelProviderService, redisCacheService)
 	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI, projectsRoute, invitesRoute, organizationProviderRoute, authService)
+	adminCacheRoute := admin.NewCacheRoute(authService, redisCacheService)
 	context := provideContext()
 	janInferenceClient := janinference.NewJanInferenceClient(context)
 	janProvider := inference.NewJanProvider(janInferenceClient, redisCacheService)
@@ -116,7 +118,7 @@ func CreateApplication() (*Application, error) {
 	streamModelService := response.NewStreamModelService(responseModelService)
 	nonStreamModelService := response.NewNonStreamModelService(responseModelService)
 	responseRoute := responses.NewResponseRoute(responseModelService, authService, responseService, streamModelService, nonStreamModelService)
-	v1Route := v1.NewV1Route(organizationRoute, chatRoute, convChatRoute, conversationAPI, modelAPI, mcpapi, authRoute, responseRoute)
+	v1Route := v1.NewV1Route(organizationRoute, adminCacheRoute, chatRoute, convChatRoute, conversationAPI, modelAPI, mcpapi, authRoute, responseRoute)
 	httpServer := http.NewHttpServer(v1Route)
 	cronService := cron.NewService(janProvider)
 	application := &Application{

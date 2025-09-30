@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/admin"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/auth"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/chat"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/conv"
@@ -16,6 +17,7 @@ import (
 
 type V1Route struct {
 	organizationRoute *organization.OrganizationRoute
+	adminRoute        *admin.CacheRoute
 	chatRoute         *chat.ChatRoute
 	convChatRoute     *conv.ConvChatRoute
 	conversationAPI   *conversations.ConversationAPI
@@ -27,6 +29,7 @@ type V1Route struct {
 
 func NewV1Route(
 	organizationRoute *organization.OrganizationRoute,
+	adminRoute *admin.CacheRoute,
 	chatRoute *chat.ChatRoute,
 	convChatRoute *conv.ConvChatRoute,
 	conversationAPI *conversations.ConversationAPI,
@@ -36,14 +39,15 @@ func NewV1Route(
 	responsesRoute *responses.ResponseRoute,
 ) *V1Route {
 	return &V1Route{
-		organizationRoute,
-		chatRoute,
-		convChatRoute,
-		conversationAPI,
-		modelAPI,
-		mcpAPI,
-		authRoute,
-		responsesRoute,
+		organizationRoute: organizationRoute,
+		adminRoute:        adminRoute,
+		chatRoute:         chatRoute,
+		convChatRoute:     convChatRoute,
+		conversationAPI:   conversationAPI,
+		modelAPI:          modelAPI,
+		mcpAPI:            mcpAPI,
+		authRoute:         authRoute,
+		responsesRoute:    responsesRoute,
 	}
 }
 
@@ -56,6 +60,7 @@ func (v1Route *V1Route) RegisterRouter(router gin.IRouter) {
 	v1Route.modelAPI.RegisterRouter(v1Router)
 	v1Route.mcpAPI.RegisterRouter(v1Router)
 	v1Route.organizationRoute.RegisterRouter(v1Router)
+	v1Route.adminRoute.RegisterRouter(v1Router)
 	v1Route.authRoute.RegisterRouter(v1Router)
 	v1Route.responsesRoute.RegisterRouter(v1Router)
 }
