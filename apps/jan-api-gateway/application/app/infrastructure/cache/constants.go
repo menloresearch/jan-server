@@ -6,7 +6,6 @@ const (
 	JanModelsCacheKey                 = CacheVersion + ":models:jan"
 	OrganizationModelsCacheKeyPattern = CacheVersion + ":models:organization:%d"
 	ProjectModelsCacheKeyPattern      = CacheVersion + ":models:project:%d"
-	UserModelsCacheKeyPattern         = CacheVersion + ":models:user:%d"
 	RegistryEndpointModelsKey         = CacheVersion + ":registry:endpoint_models"
 	RegistryModelEndpointsKey         = CacheVersion + ":registry:model_endpoints"
 	UserByPublicIDKey                 = CacheVersion + ":user:public_id:%s"
