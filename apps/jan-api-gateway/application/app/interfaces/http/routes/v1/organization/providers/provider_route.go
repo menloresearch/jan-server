@@ -139,6 +139,7 @@ func (route *OrganizationProviderRoute) CreateOrganizationProvider(reqCtx *gin.C
 	}
 
 	route.invalidateOrganizationModelsCache(ctx, orgEntity.ID)
+	unlinkProviderModelsCache(ctx, route.cache, provider.PublicID, "organization provider")
 
 	reqCtx.JSON(http.StatusCreated, ProviderResponseFromModel(provider))
 }
@@ -242,6 +243,7 @@ func (route *ProjectProviderRoute) CreateProjectProvider(reqCtx *gin.Context) {
 
 	route.invalidateProjectModelsCache(ctx, projectEntity.ID)
 	route.invalidateOrganizationModelsCache(ctx, orgEntity.ID)
+	unlinkProviderModelsCache(ctx, route.cache, provider.PublicID, "project provider")
 
 	reqCtx.JSON(http.StatusCreated, ProviderResponseFromModel(provider))
 }
@@ -361,5 +363,19 @@ func (route *ProjectProviderRoute) invalidateOrganizationModelsCache(ctx context
 	cacheKey := fmt.Sprintf(cache.OrganizationModelsCacheKeyPattern, organizationID)
 	if err := route.cache.Unlink(ctx, cacheKey); err != nil {
 		logger.GetLogger().Warnf("project provider: failed to invalidate organization cache for org %d: %v", organizationID, err)
+	}
+}
+
+func unlinkProviderModelsCache(ctx context.Context, cacheService *cache.RedisCacheService, providerID string, logPrefix string) {
+	if cacheService == nil {
+		return
+	}
+	trimmed := strings.TrimSpace(providerID)
+	if trimmed == "" {
+		return
+	}
+	cacheKey := fmt.Sprintf("%s:%s", cache.ModelsCacheKey, trimmed)
+	if err := cacheService.Unlink(ctx, cacheKey); err != nil {
+		logger.GetLogger().Warnf("%s: failed to invalidate provider models cache for provider %s: %v", logPrefix, trimmed, err)
 	}
 }

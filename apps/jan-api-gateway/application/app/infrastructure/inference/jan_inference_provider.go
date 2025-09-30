@@ -81,6 +81,16 @@ func (p *JanProvider) CreateCompletionStream(ctx context.Context, request openai
 		}
 		defer resp.RawResponse.Body.Close()
 
+		if resp.IsError() {
+			body, readErr := io.ReadAll(resp.RawResponse.Body)
+			if readErr != nil {
+				writer.CloseWithError(fmt.Errorf("jan provider: streaming request failed with status %d", resp.StatusCode()))
+				return
+			}
+			writer.CloseWithError(fmt.Errorf("jan provider: streaming request failed with status %d: %s", resp.StatusCode(), strings.TrimSpace(string(body))))
+			return
+		}
+
 		if _, err = io.Copy(writer, resp.RawResponse.Body); err != nil {
 			writer.CloseWithError(err)
 		}

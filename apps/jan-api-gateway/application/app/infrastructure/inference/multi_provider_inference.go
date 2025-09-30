@@ -25,7 +25,6 @@ const providerCacheTTL = time.Minute
 type providerCacheEntry struct {
 	instance   providerInstance
 	descriptor *modelprovider.ModelProvider
-	apiKey     string
 	loadedAt   time.Time
 }
 
@@ -270,7 +269,6 @@ func (m *MultiProviderInference) getProviderEntry(ctx context.Context, providerI
 	entry := &providerCacheEntry{
 		instance:   NewOrganizationProvider(descriptor, apiKey, m.cache, m.openRouterClient, m.geminiClient),
 		descriptor: descriptor,
-		apiKey:     apiKey,
 		loadedAt:   time.Now(),
 	}
 	m.storeProviderInCache(providerID, entry)
@@ -408,25 +406,22 @@ func (m *MultiProviderInference) getAggregatedModels(ctx context.Context, select
 func (m *MultiProviderInference) loadJanModels(ctx context.Context) ([]InferenceProviderModel, error) {
 	cached, err := m.cache.Get(ctx, cache.JanModelsCacheKey)
 	if err == nil && cached != "" {
-		var models []InferenceProviderModel
-		decodeErr := json.Unmarshal([]byte(cached), &models)
+		var response ModelsResponse
+		decodeErr := json.Unmarshal([]byte(cached), &response)
 		if decodeErr == nil {
-			return models, nil
+			return response.Data, nil
 		}
-		logger.GetLogger().Warnf("multi-provider inference: unable to unmarshal cached Jan models: %v", decodeErr)
+		logger.GetLogger().Warnf("multi-provider inference: unable to decode cached Jan models: %v", decodeErr)
 	}
 
 	resp, err := m.janProvider.GetModels(ctx)
 	if err != nil {
 		return nil, err
 	}
-	models := resp.Data
-	m.storeModelsInCache(ctx, cache.JanModelsCacheKey, models)
-	return models, nil
+	return resp.Data, nil
 }
 
-func (m *MultiProviderInference) loadOrganizationModels(ctx context.Context, organizationID uint) ([]InferenceProviderModel, error) {
-	cacheKey := fmt.Sprintf(cache.OrganizationModelsCacheKeyPattern, organizationID)
+func (m *MultiProviderInference) loadModelsWithCache(ctx context.Context, cacheKey string, rebuild func() ([]InferenceProviderModel, error), onDecodeError func(error)) ([]InferenceProviderModel, error) {
 	cached, err := m.cache.Get(ctx, cacheKey)
 	if err == nil && cached != "" {
 		var models []InferenceProviderModel
@@ -434,35 +429,37 @@ func (m *MultiProviderInference) loadOrganizationModels(ctx context.Context, org
 		if decodeErr == nil {
 			return models, nil
 		}
-		logger.GetLogger().Warnf("multi-provider inference: unable to unmarshal cached organization models for org %d: %v", organizationID, decodeErr)
+		if onDecodeError != nil {
+			onDecodeError(decodeErr)
+		} else {
+			logger.GetLogger().Warnf("multi-provider inference: unable to unmarshal cached models for key %s: %v", cacheKey, decodeErr)
+		}
 	}
 
-	models, err := m.rebuildOrganizationModels(ctx, organizationID)
+	models, err := rebuild()
 	if err != nil {
 		return nil, err
 	}
+
 	m.storeModelsInCache(ctx, cacheKey, models)
 	return models, nil
+}
+func (m *MultiProviderInference) loadOrganizationModels(ctx context.Context, organizationID uint) ([]InferenceProviderModel, error) {
+	cacheKey := fmt.Sprintf(cache.OrganizationModelsCacheKeyPattern, organizationID)
+	return m.loadModelsWithCache(ctx, cacheKey, func() ([]InferenceProviderModel, error) {
+		return m.rebuildOrganizationModels(ctx, organizationID)
+	}, func(decodeErr error) {
+		logger.GetLogger().Warnf("multi-provider inference: unable to unmarshal cached organization models for org %d: %v", organizationID, decodeErr)
+	})
 }
 
 func (m *MultiProviderInference) loadProjectModels(ctx context.Context, projectID uint) ([]InferenceProviderModel, error) {
 	cacheKey := fmt.Sprintf(cache.ProjectModelsCacheKeyPattern, projectID)
-	cached, err := m.cache.Get(ctx, cacheKey)
-	if err == nil && cached != "" {
-		var models []InferenceProviderModel
-		decodeErr := json.Unmarshal([]byte(cached), &models)
-		if decodeErr == nil {
-			return models, nil
-		}
+	return m.loadModelsWithCache(ctx, cacheKey, func() ([]InferenceProviderModel, error) {
+		return m.rebuildProjectModels(ctx, projectID)
+	}, func(decodeErr error) {
 		logger.GetLogger().Warnf("multi-provider inference: unable to unmarshal cached project models for project %d: %v", projectID, decodeErr)
-	}
-
-	models, err := m.rebuildProjectModels(ctx, projectID)
-	if err != nil {
-		return nil, err
-	}
-	m.storeModelsInCache(ctx, cacheKey, models)
-	return models, nil
+	})
 }
 
 func (m *MultiProviderInference) rebuildOrganizationModels(ctx context.Context, organizationID uint) ([]InferenceProviderModel, error) {
