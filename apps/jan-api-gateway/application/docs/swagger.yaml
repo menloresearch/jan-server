@@ -630,6 +630,61 @@ definitions:
       expiresAt:
         type: string
     type: object
+  app_interfaces_http_routes_v1_organization_providers.ProviderRequest:
+    properties:
+      active:
+        type: boolean
+      api_key:
+        type: string
+      base_url:
+        type: string
+      metadata:
+        additionalProperties: {}
+        type: object
+      name:
+        type: string
+      vendor:
+        type: string
+    required:
+    - api_key
+    - name
+    - vendor
+    type: object
+  app_interfaces_http_routes_v1_organization_providers.ProviderResponse:
+    properties:
+      active:
+        type: boolean
+      api_key_hint:
+        type: string
+      name:
+        type: string
+      organization_id:
+        type: integer
+      project_id:
+        type: integer
+      provider_id:
+        type: string
+      scope:
+        type: string
+      type:
+        type: string
+      vendor:
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_organization_providers.UpdateProviderRequest:
+    properties:
+      active:
+        type: boolean
+      api_key:
+        type: string
+      base_url:
+        type: string
+      metadata:
+        additionalProperties: {}
+        type: object
+      name:
+        type: string
+    type: object
   menlo_ai_jan-api-gateway_app_domain_conversation.ItemRole:
     enum:
     - system
@@ -953,6 +1008,22 @@ definitions:
   : properties:
       result:
         $ref: '#/definitions/app_interfaces_http_routes_v1_organization_projects_api_keys.ApiKeyResponse'
+      status:
+        type: string
+    type: object
+  ? menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_v1_organization_providers_ProviderResponse
+  : properties:
+      result:
+        $ref: '#/definitions/app_interfaces_http_routes_v1_organization_providers.ProviderResponse'
+      status:
+        type: string
+    type: object
+  ? menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-array_app_interfaces_http_routes_v1_organization_providers_ProviderResponse
+  : properties:
+      result:
+        items:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_providers.ProviderResponse'
+        type: array
       status:
         type: string
     type: object
@@ -2860,6 +2931,210 @@ paths:
       summary: Create Project
       tags:
       - Administration API
+  /v1/organization/projects/{proj_public_id}/providers:
+    get:
+      description: Returns all providers scoped to the specified project.
+      parameters:
+      - description: Project public ID
+        in: path
+        name: proj_public_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Providers retrieved
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-array_app_interfaces_http_routes_v1_organization_providers_ProviderResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List project providers
+      tags:
+      - Providers API
+    post:
+      consumes:
+      - application/json
+      description: Registers a new project-scoped provider under the specified project.
+      parameters:
+      - description: Project public ID
+        in: path
+        name: proj_public_id
+        required: true
+        type: string
+      - description: Provider configuration
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_providers.ProviderRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Provider created
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_providers.ProviderResponse'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create project provider
+      tags:
+      - Providers API
+  /v1/organization/projects/{proj_public_id}/providers/{provider_id}:
+    delete:
+      description: Removes a project-scoped provider and clears cached models.
+      parameters:
+      - description: Project public ID
+        in: path
+        name: proj_public_id
+        required: true
+        type: string
+      - description: Provider public ID
+        in: path
+        name: provider_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: Provider deleted
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Provider not found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete project provider
+      tags:
+      - Providers API
+    get:
+      description: Fetches details for a project-scoped provider.
+      parameters:
+      - description: Project public ID
+        in: path
+        name: proj_public_id
+        required: true
+        type: string
+      - description: Provider public ID
+        in: path
+        name: provider_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Provider details
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_v1_organization_providers_ProviderResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Provider not found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get project provider
+      tags:
+      - Providers API
+    patch:
+      consumes:
+      - application/json
+      description: Updates metadata, activation state, or credentials for a project-scoped
+        provider.
+      parameters:
+      - description: Project public ID
+        in: path
+        name: proj_public_id
+        required: true
+        type: string
+      - description: Provider public ID
+        in: path
+        name: provider_id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_providers.UpdateProviderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Provider updated
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_v1_organization_providers_ProviderResponse'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Provider not found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update project provider
+      tags:
+      - Providers API
   /v1/organization/projects/{project_id}:
     get:
       description: Retrieves a specific project by its ID.
@@ -3038,6 +3313,187 @@ paths:
       summary: Create a new project API key
       tags:
       - Administration API
+  /v1/organization/providers:
+    get:
+      description: Returns organization-level providers visible to the authenticated
+        user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Providers retrieved
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-array_app_interfaces_http_routes_v1_organization_providers_ProviderResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List organization providers
+      tags:
+      - Providers API
+    post:
+      consumes:
+      - application/json
+      description: Registers a new organization-scoped inference provider. API keys
+        are stored encrypted.
+      parameters:
+      - description: Provider configuration
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_providers.ProviderRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Provider created
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_providers.ProviderResponse'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create organization provider
+      tags:
+      - Providers API
+  /v1/organization/providers/{provider_id}:
+    delete:
+      description: Removes an organization-scoped provider and invalidates cached
+        models.
+      parameters:
+      - description: Provider public ID
+        in: path
+        name: provider_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: Provider deleted
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Provider not found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete organization provider
+      tags:
+      - Providers API
+    get:
+      description: Fetches details for a single organization-scoped provider.
+      parameters:
+      - description: Provider public ID
+        in: path
+        name: provider_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Provider details
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_v1_organization_providers_ProviderResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Provider not found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get organization provider
+      tags:
+      - Providers API
+    patch:
+      consumes:
+      - application/json
+      description: Updates metadata, activation state, or credentials for an organization-scoped
+        provider.
+      parameters:
+      - description: Provider public ID
+        in: path
+        name: provider_id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_providers.UpdateProviderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Provider updated
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_v1_organization_providers_ProviderResponse'
+        "400":
+          description: Invalid payload
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "403":
+          description: Insufficient permissions
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Provider not found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update organization provider
+      tags:
+      - Providers API
   /v1/responses:
     post:
       consumes:
