@@ -495,9 +495,10 @@ func (m *MultiProviderInference) rebuildOrganizationModels(ctx context.Context, 
 
 func (m *MultiProviderInference) rebuildProjectModels(ctx context.Context, projectID uint) ([]InferenceProviderModel, error) {
 	active := true
+	ids := []uint{projectID}
 	filter := modelprovider.ProviderFilter{
-		ProjectID: &projectID,
-		Active:    &active,
+		ProjectIDs: &ids,
+		Active:     &active,
 	}
 
 	providers, err := m.providerService.List(ctx, filter, nil)

@@ -94,6 +94,9 @@ func (s *ModelProviderService) RegisterOrganizationProvider(ctx context.Context,
 	if err := provider.EnsureValid(); err != nil {
 		return nil, err
 	}
+	if err := s.ensureVendorUnique(ctx, provider); err != nil {
+		return nil, err
+	}
 	if err := s.assignPublicID(provider); err != nil {
 		return nil, err
 	}
@@ -144,6 +147,37 @@ func (s *ModelProviderService) DeleteByPublicID(ctx context.Context, publicID st
 		return err
 	}
 	return s.repo.DeleteByID(ctx, provider.ID)
+}
+
+func (s *ModelProviderService) ensureVendorUnique(ctx context.Context, provider *ModelProvider) error {
+	if provider == nil || provider.OrganizationID == nil {
+		return nil
+	}
+
+	filter := ProviderFilter{
+		OrganizationID: provider.OrganizationID,
+	}
+	vendor := provider.Vendor
+	filter.Vendor = &vendor
+	providerType := provider.Type
+	filter.Type = &providerType
+
+	if provider.ProjectID != nil {
+		ids := []uint{*provider.ProjectID}
+		filter.ProjectIDs = &ids
+	} else {
+		ids := []uint{}
+		filter.ProjectIDs = &ids
+	}
+
+	providers, err := s.repo.Find(ctx, filter, nil)
+	if err != nil {
+		return err
+	}
+	if len(providers) > 0 {
+		return fmt.Errorf("%w: %s", ErrDuplicateProviderVendor, provider.Vendor)
+	}
+	return nil
 }
 
 func (s *ModelProviderService) applyAPIKey(provider *ModelProvider, apiKey string) error {

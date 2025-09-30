@@ -57,7 +57,6 @@ type ProviderFilter struct {
 	IDs            []uint
 	PublicID       *string
 	OrganizationID *uint
-	ProjectID      *uint
 	ProjectIDs     *[]uint
 	Type           *ProviderType
 	Vendor         *ProviderVendor
@@ -88,6 +87,7 @@ func ValidateCombination(providerType ProviderType, vendor ProviderVendor) error
 
 var ErrMissingAPIKey = errors.New("missing provider api key")
 var ErrInvalidName = errors.New("provider name cannot be empty")
+var ErrDuplicateProviderVendor = errors.New("provider vendor already exists for this scope")
 
 func (p *ModelProvider) EnsureValid() error {
 	if strings.TrimSpace(p.Name) == "" {

@@ -259,9 +259,11 @@ func (route *ProjectProviderRoute) ListProjectProviders(reqCtx *gin.Context) {
 		return
 	}
 
-	providers, err := route.providerService.List(reqCtx.Request.Context(), modelprovider.ProviderFilter{
+	ctx := reqCtx.Request.Context()
+	projectIDs := []uint{projectEntity.ID}
+	providers, err := route.providerService.List(ctx, modelprovider.ProviderFilter{
 		OrganizationID: &orgEntity.ID,
-		ProjectID:      &projectEntity.ID,
+		ProjectIDs:     &projectIDs,
 	}, nil)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{

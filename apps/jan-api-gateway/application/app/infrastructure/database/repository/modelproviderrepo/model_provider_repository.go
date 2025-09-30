@@ -105,10 +105,13 @@ func applyFilter(query *gorm.DB, filter domain.ProviderFilter) *gorm.DB {
 	if filter.OrganizationID != nil {
 		query = query.Where("organization_id = ?", *filter.OrganizationID)
 	}
-	if filter.ProjectIDs != nil && len(*filter.ProjectIDs) > 0 {
-		query = query.Where("project_id IN ?", *filter.ProjectIDs)
-	} else if filter.ProjectID != nil {
-		query = query.Where("project_id = ?", *filter.ProjectID)
+	if filter.ProjectIDs != nil {
+		ids := *filter.ProjectIDs
+		if len(ids) == 0 {
+			query = query.Where("project_id IS NULL")
+		} else {
+			query = query.Where("project_id IN ?", ids)
+		}
 	}
 	if filter.Type != nil {
 		query = query.Where("type = ?", filter.Type.String())
