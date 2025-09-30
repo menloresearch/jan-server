@@ -75,13 +75,13 @@ func (c *Client) CreateChatCompletionStream(ctx context.Context, apiKey string, 
 		defer writer.Close()
 
 		reqBody := request
-		reqBody.Stream = true // <— KEY
-
+		reqBody.Stream = true
 		req := RestyClient.R().SetBody(reqBody)
 
 		resp, err := req.
 			SetContext(ctx).
 			SetHeader("Authorization", fmt.Sprintf("Bearer %s", apiKey)).
+			SetHeader("Accept-Encoding", "identity"). // <- no gzip
 			SetHeader("Content-Type", "application/json").
 			SetDoNotParseResponse(true).
 			Post(c.baseURL + "/chat/completions")
