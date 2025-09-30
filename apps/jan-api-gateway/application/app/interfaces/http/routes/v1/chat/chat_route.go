@@ -25,6 +25,7 @@ func (chatRoute *ChatRoute) RegisterRouter(router gin.IRouter) {
 	chatRouter := router.Group("/chat",
 		chatRoute.authService.AppUserAuthMiddleware(),
 		chatRoute.authService.RegisteredUserMiddleware(),
+		chatRoute.authService.DefaultOrganizationMemberOptionalMiddleware(),
 	)
 	chatRoute.completionAPI.RegisterRouter(chatRouter)
 }

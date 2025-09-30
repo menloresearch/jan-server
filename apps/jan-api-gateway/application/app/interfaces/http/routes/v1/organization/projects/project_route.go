@@ -15,15 +15,17 @@ import (
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses/openai"
 	projectApikeyRoute "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/projects/api_keys"
+	providerRoute "menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1/organization/providers"
 	"menlo.ai/jan-api-gateway/app/utils/functional"
 	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
 type ProjectsRoute struct {
-	projectService     *project.ProjectService
-	apiKeyService      *apikey.ApiKeyService
-	authService        *auth.AuthService
-	projectApiKeyRoute *projectApikeyRoute.ProjectApiKeyRoute
+	projectService       *project.ProjectService
+	apiKeyService        *apikey.ApiKeyService
+	authService          *auth.AuthService
+	projectApiKeyRoute   *projectApikeyRoute.ProjectApiKeyRoute
+	projectProviderRoute *providerRoute.ProjectProviderRoute
 }
 
 func NewProjectsRoute(
@@ -31,12 +33,14 @@ func NewProjectsRoute(
 	apiKeyService *apikey.ApiKeyService,
 	authService *auth.AuthService,
 	projectApiKeyRoute *projectApikeyRoute.ProjectApiKeyRoute,
+	projectProviderRoute *providerRoute.ProjectProviderRoute,
 ) *ProjectsRoute {
 	return &ProjectsRoute{
 		projectService,
 		apiKeyService,
 		authService,
 		projectApiKeyRoute,
+		projectProviderRoute,
 	}
 }
 
@@ -73,6 +77,7 @@ func (projectsRoute *ProjectsRoute) RegisterRouter(router gin.IRouter) {
 		projectsRoute.ArchiveProject,
 	)
 	projectsRoute.projectApiKeyRoute.RegisterRouter(projectIdRouter)
+	projectsRoute.projectProviderRoute.RegisterRouter(projectIdRouter)
 }
 
 // GetProjects godoc

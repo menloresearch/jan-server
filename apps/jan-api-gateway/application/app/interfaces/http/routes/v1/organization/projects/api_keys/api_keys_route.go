@@ -163,9 +163,7 @@ func (api *ProjectApiKeyRoute) CreateProjectApiKey(reqCtx *gin.Context) {
 		return
 	}
 
-	api.projectService.FindOneMemberByFilter(ctx, project.ProjectMemberFilter{
-		
-	})
+	api.projectService.FindOneMemberByFilter(ctx, project.ProjectMemberFilter{})
 
 	key, hash, err := api.apikeyService.GenerateKeyAndHash(ctx, apikey.ApikeyTypeProject)
 	if err != nil {

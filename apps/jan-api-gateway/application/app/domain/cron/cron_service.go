@@ -4,31 +4,40 @@ import (
 	"context"
 
 	"github.com/mileusna/crontab"
-	inference_model_registry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
-	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
+	infrainference "menlo.ai/jan-api-gateway/app/infrastructure/inference"
+	"menlo.ai/jan-api-gateway/app/utils/logger"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 )
 
-type CronService struct {
-	JanInferenceClient     *janinference.JanInferenceClient
-	InferenceModelRegistry *inference_model_registry.InferenceModelRegistry
+type JanModelRefresher interface {
+	RefreshModels(ctx context.Context) (*infrainference.ModelsResponse, error)
 }
 
-func NewService(janInferenceClient *janinference.JanInferenceClient, registry *inference_model_registry.InferenceModelRegistry) *CronService {
+type CronService struct {
+	JanProvider JanModelRefresher
+}
+
+func NewService(janProvider JanModelRefresher) *CronService {
 	return &CronService{
-		JanInferenceClient:     janInferenceClient,
-		InferenceModelRegistry: registry,
+		JanProvider: janProvider,
 	}
 }
 
 func (cs *CronService) Start(ctx context.Context, ctab *crontab.Crontab) {
-	// Run initial check
-	cs.InferenceModelRegistry.CheckInferenceModels(ctx)
+	cs.refreshJanModels(ctx)
 
 	ctab.AddJob("* * * * *", func() {
-		cs.InferenceModelRegistry.CheckInferenceModels(ctx)
-
-		// Reload environment variables
+		cs.refreshJanModels(ctx)
 		environment_variables.EnvironmentVariables.LoadFromEnv()
 	})
+}
+
+func (cs *CronService) refreshJanModels(ctx context.Context) {
+	if cs == nil || cs.JanProvider == nil {
+		return
+	}
+
+	if _, err := cs.JanProvider.RefreshModels(ctx); err != nil {
+		logger.GetLogger().Warnf("cron service: failed to refresh Jan models: %v", err)
+	}
 }

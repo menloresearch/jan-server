@@ -200,6 +200,10 @@ func (r *RedisCacheService) Exists(ctx context.Context, key string) (bool, error
 	return result > 0, nil
 }
 
+func (r *RedisCacheService) FlushAll(ctx context.Context) error {
+	return r.client.FlushDB(ctx).Err()
+}
+
 func (r *RedisCacheService) Close() error {
 	return r.client.Close()
 }

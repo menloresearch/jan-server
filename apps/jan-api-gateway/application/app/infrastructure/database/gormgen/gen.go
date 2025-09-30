@@ -21,6 +21,7 @@ var (
 	Conversation       *conversation
 	Invite             *invite
 	Item               *item
+	ModelProvider      *modelProvider
 	Organization       *organization
 	OrganizationMember *organizationMember
 	Project            *project
@@ -35,6 +36,7 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	Conversation = &Q.Conversation
 	Invite = &Q.Invite
 	Item = &Q.Item
+	ModelProvider = &Q.ModelProvider
 	Organization = &Q.Organization
 	OrganizationMember = &Q.OrganizationMember
 	Project = &Q.Project
@@ -50,6 +52,7 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		Conversation:       newConversation(db, opts...),
 		Invite:             newInvite(db, opts...),
 		Item:               newItem(db, opts...),
+		ModelProvider:      newModelProvider(db, opts...),
 		Organization:       newOrganization(db, opts...),
 		OrganizationMember: newOrganizationMember(db, opts...),
 		Project:            newProject(db, opts...),
@@ -66,6 +69,7 @@ type Query struct {
 	Conversation       conversation
 	Invite             invite
 	Item               item
+	ModelProvider      modelProvider
 	Organization       organization
 	OrganizationMember organizationMember
 	Project            project
@@ -83,6 +87,7 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		Conversation:       q.Conversation.clone(db),
 		Invite:             q.Invite.clone(db),
 		Item:               q.Item.clone(db),
+		ModelProvider:      q.ModelProvider.clone(db),
 		Organization:       q.Organization.clone(db),
 		OrganizationMember: q.OrganizationMember.clone(db),
 		Project:            q.Project.clone(db),
@@ -107,6 +112,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		Conversation:       q.Conversation.replaceDB(db),
 		Invite:             q.Invite.replaceDB(db),
 		Item:               q.Item.replaceDB(db),
+		ModelProvider:      q.ModelProvider.replaceDB(db),
 		Organization:       q.Organization.replaceDB(db),
 		OrganizationMember: q.OrganizationMember.replaceDB(db),
 		Project:            q.Project.replaceDB(db),
@@ -121,6 +127,7 @@ type queryCtx struct {
 	Conversation       IConversationDo
 	Invite             IInviteDo
 	Item               IItemDo
+	ModelProvider      IModelProviderDo
 	Organization       IOrganizationDo
 	OrganizationMember IOrganizationMemberDo
 	Project            IProjectDo
@@ -135,6 +142,7 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		Conversation:       q.Conversation.WithContext(ctx),
 		Invite:             q.Invite.WithContext(ctx),
 		Item:               q.Item.WithContext(ctx),
+		ModelProvider:      q.ModelProvider.WithContext(ctx),
 		Organization:       q.Organization.WithContext(ctx),
 		OrganizationMember: q.OrganizationMember.WithContext(ctx),
 		Project:            q.Project.WithContext(ctx),

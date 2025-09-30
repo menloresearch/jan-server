@@ -12,8 +12,10 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/common"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
-	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
+	"menlo.ai/jan-api-gateway/app/domain/project"
 	userdomain "menlo.ai/jan-api-gateway/app/domain/user"
+	"menlo.ai/jan-api-gateway/app/infrastructure/inference"
+	"menlo.ai/jan-api-gateway/app/interfaces/http/helpers"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
 	"menlo.ai/jan-api-gateway/app/utils/logger"
@@ -29,16 +31,22 @@ type ConvCompletionAPI struct {
 	completionStreamHandler    *CompletionStreamHandler
 	conversationService        *conversation.ConversationService
 	authService                *auth.AuthService
-	registry                   *inferencemodelregistry.InferenceModelRegistry
+	projectService             *project.ProjectService
 }
 
-func NewConvCompletionAPI(completionNonStreamHandler *CompletionNonStreamHandler, completionStreamHandler *CompletionStreamHandler, conversationService *conversation.ConversationService, authService *auth.AuthService, registry *inferencemodelregistry.InferenceModelRegistry) *ConvCompletionAPI {
+func NewConvCompletionAPI(
+	completionNonStreamHandler *CompletionNonStreamHandler,
+	completionStreamHandler *CompletionStreamHandler,
+	conversationService *conversation.ConversationService,
+	authService *auth.AuthService,
+	projectService *project.ProjectService,
+) *ConvCompletionAPI {
 	return &ConvCompletionAPI{
 		completionNonStreamHandler: completionNonStreamHandler,
 		completionStreamHandler:    completionStreamHandler,
 		conversationService:        conversationService,
 		authService:                authService,
-		registry:                   registry,
+		projectService:             projectService,
 	}
 }
 
@@ -57,6 +65,9 @@ type ExtendedChatCompletionRequest struct {
 	Conversation   string `json:"conversation,omitempty"`
 	Store          bool   `json:"store,omitempty"`           // If true, the response will be stored in the conversation, default is false
 	StoreReasoning bool   `json:"store_reasoning,omitempty"` // If true, the reasoning will be stored in the conversation, default is false
+	ProviderID     string `json:"provider_id,omitempty"`
+	ProviderType   string `json:"provider_type,omitempty"`
+	ProviderVendor string `json:"provider_vendor,omitempty"`
 }
 
 // ResponseMetadata contains additional metadata about the completion response
@@ -77,17 +88,21 @@ type ExtendedCompletionResponse struct {
 }
 
 // Model represents a model in the response
-type Model struct {
-	ID      string `json:"id"`
-	Object  string `json:"object"`
-	Created int    `json:"created"`
-	OwnedBy string `json:"owned_by"`
+type ModelResponse struct {
+	ID             string `json:"id"`
+	Object         string `json:"object"`
+	Created        int    `json:"created"`
+	OwnedBy        string `json:"owned_by"`
+	ProviderID     string `json:"provider_id"`
+	ProviderType   string `json:"provider_type"`
+	ProviderVendor string `json:"provider_vendor"`
+	ProviderName   string `json:"provider_name"`
 }
 
 // ModelsResponse represents the response for listing models
 type ModelsResponse struct {
-	Object string  `json:"object"`
-	Data   []Model `json:"data"`
+	Object string          `json:"object"`
+	Data   []ModelResponse `json:"data"`
 }
 
 // PostCompletion
@@ -146,7 +161,17 @@ func (api *ConvCompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		})
 		return
 	}
-	// TODO: Implement admin API key check
+	selection, selectionErr := helpers.ParseProviderSelection(request.ProviderID, request.ProviderType, request.ProviderVendor)
+	if selectionErr != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  "b12c0487-f35c-49f5-9aa0-3d41fba1c821",
+			Error: selectionErr.Error(),
+		})
+		return
+	}
+
+	selection.Model = strings.TrimSpace(request.Model)
+	api.populateSelectionContext(reqCtx, &selection)
 
 	// Handle conversation management
 	conv, conversationCreated, convErr := api.handleConversationManagement(reqCtx, request.Conversation, request.Messages)
@@ -169,10 +194,10 @@ func (api *ConvCompletionAPI) PostCompletion(reqCtx *gin.Context) {
 
 	if request.Stream {
 		// Handle streaming completion - streams SSE events and accumulates response
-		response, err = api.completionStreamHandler.StreamCompletionAndAccumulateResponse(reqCtx, "", request.ChatCompletionRequest, conv, conversationCreated, askItemID, completionItemID)
+		response, err = api.completionStreamHandler.StreamCompletionAndAccumulateResponse(reqCtx, selection, request.ChatCompletionRequest, conv, conversationCreated, askItemID, completionItemID)
 	} else {
 		// Handle non-streaming completion
-		response, err = api.completionNonStreamHandler.CallCompletionAndGetRestResponse(reqCtx.Request.Context(), "", request.ChatCompletionRequest)
+		response, err = api.completionNonStreamHandler.CallCompletionAndGetRestResponse(reqCtx.Request.Context(), selection, request.ChatCompletionRequest)
 	}
 
 	if err != nil {
@@ -204,24 +229,94 @@ func (api *ConvCompletionAPI) PostCompletion(reqCtx *gin.Context) {
 // @Success 200 {object} ModelsResponse "Successful response"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - missing or invalid authentication"
 // @Router /v1/conv/models [get]
+func (api *ConvCompletionAPI) populateSelectionContext(reqCtx *gin.Context, selection *inference.ProviderSelection) {
+	if selection == nil {
+		return
+	}
+
+	filter, err := api.buildProviderFilter(reqCtx)
+	if err != nil {
+		logger.GetLogger().Warnf("conv completion: failed to build provider filter: %v", err)
+		return
+	}
+	if filter.OrganizationID != nil {
+		selection.OrganizationID = filter.OrganizationID
+	}
+	if filter.ProjectID != nil {
+		selection.ProjectID = filter.ProjectID
+	}
+	if filter.ProjectIDs != nil {
+		selection.ProjectIDs = append(selection.ProjectIDs, (*filter.ProjectIDs)...)
+	}
+}
+
 func (api *ConvCompletionAPI) GetModels(reqCtx *gin.Context) {
 	ctx := reqCtx.Request.Context()
-	models := api.registry.ListModels(ctx)
+	filter, err := api.buildProviderFilter(reqCtx)
+	if err != nil {
+		logger.GetLogger().Errorf("failed to build provider filter: %v", err)
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code:  "59c1d8d7-a21f-4c08-a77d-9d70f4c36e45",
+			Error: "failed to list providers",
+		})
+		return
+	}
+	providers, err := api.completionNonStreamHandler.multiProvider.ListProviders(ctx, filter)
+	if err != nil {
+		logger.GetLogger().Errorf("failed to list providers: %v", err)
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code:  "d0dcdc23-53b1-4d22-91ee-63e397348b2f",
+			Error: "failed to list providers",
+		})
+		return
+	}
 
-	// Convert to response format
-	responseData := make([]Model, len(models))
-	for i, model := range models {
-		responseData[i] = Model{
-			ID:      model.ID,
-			Object:  model.Object,
-			Created: model.Created,
-			OwnedBy: model.OwnedBy,
+	providerNames := make(map[string]string, len(providers))
+	for _, provider := range providers {
+		providerNames[provider.ProviderID] = provider.Name
+	}
+
+	selection := inference.ProviderSelection{
+		OrganizationID: filter.OrganizationID,
+	}
+	if filter.ProjectID != nil {
+		selection.ProjectID = filter.ProjectID
+	}
+	if filter.ProjectIDs != nil {
+		selection.ProjectIDs = append(selection.ProjectIDs, (*filter.ProjectIDs)...)
+	}
+
+	modelsResp, err := api.completionNonStreamHandler.multiProvider.GetModels(ctx, selection)
+	if err != nil {
+		logger.GetLogger().Errorf("failed to aggregate models: %v", err)
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code:  "c9c1a1b2-1f4a-4c9d-8e79-cfcb9e4c2fbe",
+			Error: "failed to list models",
+		})
+		return
+	}
+
+	data := make([]ModelResponse, 0, len(modelsResp.Data))
+	for _, m := range modelsResp.Data {
+		name := providerNames[m.ProviderID]
+		if name == "" {
+			name = m.ProviderID
 		}
+		data = append(data, ModelResponse{
+			ID:             m.ID,
+			Object:         m.Object,
+			Created:        m.Created,
+			OwnedBy:        m.OwnedBy,
+			ProviderID:     m.ProviderID,
+			ProviderType:   m.ProviderType.String(),
+			ProviderVendor: m.Vendor.String(),
+			ProviderName:   name,
+		})
 	}
 
 	reqCtx.JSON(http.StatusOK, ModelsResponse{
 		Object: "list",
-		Data:   responseData,
+		Data:   data,
 	})
 }
 
@@ -263,6 +358,33 @@ func (api *ConvCompletionAPI) processCompletionResponse(reqCtx *gin.Context, res
 
 	// Modify response to include item ID and metadata
 	return api.completionNonStreamHandler.ModifyCompletionResponse(response, conv, conversationCreated, assistantItem, askItemID, completionItemID, request.Store, request.StoreReasoning)
+}
+
+func (api *ConvCompletionAPI) buildProviderFilter(reqCtx *gin.Context) (inference.ProviderSummaryFilter, error) {
+	filter := inference.ProviderSummaryFilter{}
+	if org, ok := auth.GetAdminOrganizationFromContext(reqCtx); ok && org != nil {
+		filter.OrganizationID = &org.ID
+	}
+	user, ok := auth.GetUserFromContext(reqCtx)
+	if !ok || user == nil {
+		return filter, nil
+	}
+	ctx := reqCtx.Request.Context()
+	projects, err := api.projectService.Find(ctx, project.ProjectFilter{
+		MemberID: &user.ID,
+	}, nil)
+	if err != nil {
+		return filter, err
+	}
+	if len(projects) == 0 {
+		return filter, nil
+	}
+	ids := make([]uint, 0, len(projects))
+	for _, p := range projects {
+		ids = append(ids, p.ID)
+	}
+	filter.ProjectIDs = &ids
+	return filter, nil
 }
 
 // handleConversationManagement handles conversation loading or creation and returns conversation, created flag, and error
