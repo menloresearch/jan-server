@@ -6,7 +6,6 @@ import (
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/common"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
-	domaininference "menlo.ai/jan-api-gateway/app/domain/inference"
 	infrainference "menlo.ai/jan-api-gateway/app/infrastructure/inference"
 )
 
@@ -25,7 +24,7 @@ func NewCompletionNonStreamHandler(multiProvider *infrainference.MultiProviderIn
 }
 
 // CallCompletionAndGetRestResponse calls the inference model and returns a non-streaming REST response
-func (uc *CompletionNonStreamHandler) CallCompletionAndGetRestResponse(ctx context.Context, selection domaininference.ProviderSelection, request openai.ChatCompletionRequest) (*ExtendedCompletionResponse, *common.Error) {
+func (uc *CompletionNonStreamHandler) CallCompletionAndGetRestResponse(ctx context.Context, selection infrainference.ProviderSelection, request openai.ChatCompletionRequest) (*ExtendedCompletionResponse, *common.Error) {
 
 	// Call inference provider
 	response, err := uc.multiProvider.CreateCompletion(ctx, selection, request)

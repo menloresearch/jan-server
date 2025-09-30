@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"menlo.ai/jan-api-gateway/app/domain/inference"
 	"menlo.ai/jan-api-gateway/app/domain/modelprovider"
+	infrainference "menlo.ai/jan-api-gateway/app/infrastructure/inference"
 )
 
-func ParseProviderSelection(providerID, providerType, providerVendor string) (inference.ProviderSelection, error) {
-	selection := inference.ProviderSelection{}
+func ParseProviderSelection(providerID, providerType, providerVendor string) (infrainference.ProviderSelection, error) {
+	selection := infrainference.ProviderSelection{}
 	selection.ProviderID = strings.TrimSpace(providerID)
 
 	if providerType != "" {

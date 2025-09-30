@@ -7,8 +7,6 @@ import (
 	"time"
 
 	openai "github.com/sashabaranov/go-openai"
-	"menlo.ai/jan-api-gateway/app/domain/inference"
-	inferencemodel "menlo.ai/jan-api-gateway/app/domain/inference_model"
 	"menlo.ai/jan-api-gateway/app/utils/httpclients"
 	"menlo.ai/jan-api-gateway/config/environment_variables"
 	"resty.dev/v3"
@@ -32,7 +30,7 @@ func NewClient() *Client {
 	return &Client{baseURL: base}
 }
 
-type modelsResponse struct {
+type modelsAPIResponse struct {
 	Object string `json:"object"`
 	Data   []struct {
 		ID          string `json:"id"`
@@ -40,6 +38,18 @@ type modelsResponse struct {
 		OwnedBy     string `json:"owned_by"`
 		DisplayName string `json:"display_name"`
 	} `json:"data"`
+}
+
+type Model struct {
+	ID      string
+	Object  string
+	Created int
+	OwnedBy string
+}
+
+type ModelsResponse struct {
+	Object string
+	Data   []Model
 }
 
 func (c *Client) CreateChatCompletion(ctx context.Context, apiKey string, request openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
@@ -71,8 +81,8 @@ func (c *Client) CreateChatCompletionStream(ctx context.Context, apiKey string, 
 	return resp.RawResponse.Body, nil
 }
 
-func (c *Client) GetModels(ctx context.Context, apiKey string) (*inference.ModelsResponse, error) {
-	var resp modelsResponse
+func (c *Client) GetModels(ctx context.Context, apiKey string) (*ModelsResponse, error) {
+	var resp modelsAPIResponse
 	_, err := RestyClient.R().
 		SetContext(ctx).
 		SetHeader("Authorization", fmt.Sprintf("Bearer %s", apiKey)).
@@ -83,17 +93,15 @@ func (c *Client) GetModels(ctx context.Context, apiKey string) (*inference.Model
 		return nil, err
 	}
 
-	models := make([]inference.InferenceProviderModel, 0, len(resp.Data))
+	models := make([]Model, 0, len(resp.Data))
 	now := int(time.Now().Unix())
 	for _, model := range resp.Data {
-		models = append(models, inference.InferenceProviderModel{
-			Model: inferencemodel.Model{
-				ID:      model.ID,
-				Object:  model.Object,
-				Created: now,
-				OwnedBy: model.OwnedBy,
-			},
+		models = append(models, Model{
+			ID:      model.ID,
+			Object:  model.Object,
+			Created: now,
+			OwnedBy: model.OwnedBy,
 		})
 	}
-	return &inference.ModelsResponse{Object: "list", Data: models}, nil
+	return &ModelsResponse{Object: resp.Object, Data: models}, nil
 }

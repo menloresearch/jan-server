@@ -12,7 +12,6 @@ import (
 
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/sirupsen/logrus"
-	inference "menlo.ai/jan-api-gateway/app/domain/inference"
 	"menlo.ai/jan-api-gateway/app/domain/modelprovider"
 	"menlo.ai/jan-api-gateway/app/infrastructure/cache"
 	"menlo.ai/jan-api-gateway/app/utils/httpclients/gemini"
@@ -51,7 +50,7 @@ func NewMultiProviderInference(jan *JanProvider, providerService *modelprovider.
 	}
 }
 
-func (m *MultiProviderInference) CreateCompletion(ctx context.Context, selection inference.ProviderSelection, request openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
+func (m *MultiProviderInference) CreateCompletion(ctx context.Context, selection ProviderSelection, request openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
 	provider, err := m.resolveProvider(ctx, selection)
 	if err != nil {
 		return nil, err
@@ -65,7 +64,7 @@ func (m *MultiProviderInference) CreateCompletion(ctx context.Context, selection
 	return provider.CreateCompletion(ctx, request)
 }
 
-func (m *MultiProviderInference) CreateCompletionStream(ctx context.Context, selection inference.ProviderSelection, request openai.ChatCompletionRequest) (io.ReadCloser, error) {
+func (m *MultiProviderInference) CreateCompletionStream(ctx context.Context, selection ProviderSelection, request openai.ChatCompletionRequest) (io.ReadCloser, error) {
 	provider, err := m.resolveProvider(ctx, selection)
 	if err != nil {
 		return nil, err
@@ -73,7 +72,7 @@ func (m *MultiProviderInference) CreateCompletionStream(ctx context.Context, sel
 	return provider.CreateCompletionStream(ctx, request)
 }
 
-func (m *MultiProviderInference) GetModels(ctx context.Context, selection inference.ProviderSelection) (*inference.ModelsResponse, error) {
+func (m *MultiProviderInference) GetModels(ctx context.Context, selection ProviderSelection) (*ModelsResponse, error) {
 	if strings.TrimSpace(selection.ProviderID) != "" {
 		provider, err := m.resolveProvider(ctx, selection)
 		if err != nil {
@@ -87,13 +86,13 @@ func (m *MultiProviderInference) GetModels(ctx context.Context, selection infere
 		return nil, err
 	}
 
-	return &inference.ModelsResponse{
+	return &ModelsResponse{
 		Object: "list",
 		Data:   models,
 	}, nil
 }
 
-func (m *MultiProviderInference) ValidateModel(ctx context.Context, selection inference.ProviderSelection, model string) error {
+func (m *MultiProviderInference) ValidateModel(ctx context.Context, selection ProviderSelection, model string) error {
 	provider, err := m.resolveProvider(ctx, selection)
 	if err != nil {
 		return err
@@ -101,12 +100,12 @@ func (m *MultiProviderInference) ValidateModel(ctx context.Context, selection in
 	return provider.ValidateModel(ctx, model)
 }
 
-func (m *MultiProviderInference) ListProviders(ctx context.Context, filter inference.ProviderSummaryFilter) ([]inference.ProviderSummary, error) {
-	summaries := make([]inference.ProviderSummary, 0)
+func (m *MultiProviderInference) ListProviders(ctx context.Context, filter ProviderSummaryFilter) ([]ProviderSummary, error) {
+	summaries := make([]ProviderSummary, 0)
 	seen := make(map[string]struct{})
 
 	if shouldIncludeJan(filter) {
-		summaries = append(summaries, inference.ProviderSummary{
+		summaries = append(summaries, ProviderSummary{
 			ProviderID: JanDefaultProviderID,
 			Name:       m.janProvider.Name(),
 			Type:       m.janProvider.Type(),
@@ -164,7 +163,7 @@ func (m *MultiProviderInference) ListProviders(ctx context.Context, filter infer
 		if _, exists := seen[provider.PublicID]; exists {
 			continue
 		}
-		summaries = append(summaries, inference.ProviderSummary{
+		summaries = append(summaries, ProviderSummary{
 			ProviderID: provider.PublicID,
 			Name:       provider.Name,
 			Type:       provider.Type,
@@ -183,7 +182,7 @@ func (m *MultiProviderInference) ListProviders(ctx context.Context, filter infer
 	return summaries, nil
 }
 
-func shouldIncludeJan(filter inference.ProviderSummaryFilter) bool {
+func shouldIncludeJan(filter ProviderSummaryFilter) bool {
 	if filter.Type != nil && *filter.Type != modelprovider.ProviderTypeJan {
 		return false
 	}
@@ -193,7 +192,7 @@ func shouldIncludeJan(filter inference.ProviderSummaryFilter) bool {
 	return true
 }
 
-func (m *MultiProviderInference) resolveProvider(ctx context.Context, selection inference.ProviderSelection) (providerInstance, error) {
+func (m *MultiProviderInference) resolveProvider(ctx context.Context, selection ProviderSelection) (providerInstance, error) {
 	providerID := strings.TrimSpace(selection.ProviderID)
 	if providerID != "" {
 		if providerID == JanDefaultProviderID {
@@ -278,7 +277,7 @@ func (m *MultiProviderInference) getProviderEntry(ctx context.Context, providerI
 	return entry, nil
 }
 
-func (m *MultiProviderInference) validateProviderAccess(selection inference.ProviderSelection, descriptor *modelprovider.ModelProvider) error {
+func (m *MultiProviderInference) validateProviderAccess(selection ProviderSelection, descriptor *modelprovider.ModelProvider) error {
 	if descriptor == nil {
 		return nil
 	}
@@ -302,7 +301,7 @@ func (m *MultiProviderInference) validateProviderAccess(selection inference.Prov
 	return fmt.Errorf("provider %s is not accessible in the current organization context", descriptor.PublicID)
 }
 
-func (m *MultiProviderInference) findProviderByModel(ctx context.Context, selection inference.ProviderSelection, modelID string) (providerInstance, error) {
+func (m *MultiProviderInference) findProviderByModel(ctx context.Context, selection ProviderSelection, modelID string) (providerInstance, error) {
 	projectIDs := uniqueSortedProjectIDs(selection)
 	for _, projectID := range projectIDs {
 		models, err := m.loadProjectModels(ctx, projectID)
@@ -343,13 +342,13 @@ func (m *MultiProviderInference) findProviderByModel(ctx context.Context, select
 	return nil, fmt.Errorf("model %s not found", modelID)
 }
 
-func (m *MultiProviderInference) getAggregatedModels(ctx context.Context, selection inference.ProviderSelection) ([]inference.InferenceProviderModel, error) {
+func (m *MultiProviderInference) getAggregatedModels(ctx context.Context, selection ProviderSelection) ([]InferenceProviderModel, error) {
 	janModels, janErr := m.loadJanModels(ctx)
 	if janErr != nil {
 		logger.GetLogger().Warnf("multi-provider inference: failed to load Jan models from cache: %v", janErr)
 	}
 
-	var organizationModels []inference.InferenceProviderModel
+	var organizationModels []InferenceProviderModel
 	if selection.OrganizationID != nil {
 		var err error
 		organizationModels, err = m.loadOrganizationModels(ctx, *selection.OrganizationID)
@@ -358,7 +357,7 @@ func (m *MultiProviderInference) getAggregatedModels(ctx context.Context, select
 		}
 	}
 
-	projectModels := make([][]inference.InferenceProviderModel, 0)
+	projectModels := make([][]InferenceProviderModel, 0)
 	for _, projectID := range uniqueSortedProjectIDs(selection) {
 		models, err := m.loadProjectModels(ctx, projectID)
 		if err != nil {
@@ -370,7 +369,7 @@ func (m *MultiProviderInference) getAggregatedModels(ctx context.Context, select
 		}
 	}
 
-	result := make([]inference.InferenceProviderModel, 0, len(janModels)+len(organizationModels))
+	result := make([]InferenceProviderModel, 0, len(janModels)+len(organizationModels))
 	seen := make(map[string]struct{})
 
 	for _, models := range projectModels {
@@ -406,10 +405,10 @@ func (m *MultiProviderInference) getAggregatedModels(ctx context.Context, select
 	return result, nil
 }
 
-func (m *MultiProviderInference) loadJanModels(ctx context.Context) ([]inference.InferenceProviderModel, error) {
+func (m *MultiProviderInference) loadJanModels(ctx context.Context) ([]InferenceProviderModel, error) {
 	cached, err := m.cache.Get(ctx, cache.JanModelsCacheKey)
 	if err == nil && cached != "" {
-		var models []inference.InferenceProviderModel
+		var models []InferenceProviderModel
 		decodeErr := json.Unmarshal([]byte(cached), &models)
 		if decodeErr == nil {
 			return models, nil
@@ -426,11 +425,11 @@ func (m *MultiProviderInference) loadJanModels(ctx context.Context) ([]inference
 	return models, nil
 }
 
-func (m *MultiProviderInference) loadOrganizationModels(ctx context.Context, organizationID uint) ([]inference.InferenceProviderModel, error) {
+func (m *MultiProviderInference) loadOrganizationModels(ctx context.Context, organizationID uint) ([]InferenceProviderModel, error) {
 	cacheKey := fmt.Sprintf(cache.OrganizationModelsCacheKeyPattern, organizationID)
 	cached, err := m.cache.Get(ctx, cacheKey)
 	if err == nil && cached != "" {
-		var models []inference.InferenceProviderModel
+		var models []InferenceProviderModel
 		decodeErr := json.Unmarshal([]byte(cached), &models)
 		if decodeErr == nil {
 			return models, nil
@@ -446,11 +445,11 @@ func (m *MultiProviderInference) loadOrganizationModels(ctx context.Context, org
 	return models, nil
 }
 
-func (m *MultiProviderInference) loadProjectModels(ctx context.Context, projectID uint) ([]inference.InferenceProviderModel, error) {
+func (m *MultiProviderInference) loadProjectModels(ctx context.Context, projectID uint) ([]InferenceProviderModel, error) {
 	cacheKey := fmt.Sprintf(cache.ProjectModelsCacheKeyPattern, projectID)
 	cached, err := m.cache.Get(ctx, cacheKey)
 	if err == nil && cached != "" {
-		var models []inference.InferenceProviderModel
+		var models []InferenceProviderModel
 		decodeErr := json.Unmarshal([]byte(cached), &models)
 		if decodeErr == nil {
 			return models, nil
@@ -466,7 +465,7 @@ func (m *MultiProviderInference) loadProjectModels(ctx context.Context, projectI
 	return models, nil
 }
 
-func (m *MultiProviderInference) rebuildOrganizationModels(ctx context.Context, organizationID uint) ([]inference.InferenceProviderModel, error) {
+func (m *MultiProviderInference) rebuildOrganizationModels(ctx context.Context, organizationID uint) ([]InferenceProviderModel, error) {
 	active := true
 	filter := modelprovider.ProviderFilter{
 		OrganizationID: &organizationID,
@@ -478,7 +477,7 @@ func (m *MultiProviderInference) rebuildOrganizationModels(ctx context.Context, 
 		return nil, err
 	}
 
-	models := make([]inference.InferenceProviderModel, 0)
+	models := make([]InferenceProviderModel, 0)
 	for _, provider := range providers {
 		if provider == nil || !provider.Active || provider.ProjectID != nil {
 			continue
@@ -494,7 +493,7 @@ func (m *MultiProviderInference) rebuildOrganizationModels(ctx context.Context, 
 	return models, nil
 }
 
-func (m *MultiProviderInference) rebuildProjectModels(ctx context.Context, projectID uint) ([]inference.InferenceProviderModel, error) {
+func (m *MultiProviderInference) rebuildProjectModels(ctx context.Context, projectID uint) ([]InferenceProviderModel, error) {
 	active := true
 	filter := modelprovider.ProviderFilter{
 		ProjectID: &projectID,
@@ -506,7 +505,7 @@ func (m *MultiProviderInference) rebuildProjectModels(ctx context.Context, proje
 		return nil, err
 	}
 
-	models := make([]inference.InferenceProviderModel, 0)
+	models := make([]InferenceProviderModel, 0)
 	for _, provider := range providers {
 		if provider == nil || !provider.Active {
 			continue
@@ -522,7 +521,7 @@ func (m *MultiProviderInference) rebuildProjectModels(ctx context.Context, proje
 	return models, nil
 }
 
-func (m *MultiProviderInference) selectScopedProvider(ctx context.Context, selection inference.ProviderSelection) (providerInstance, error) {
+func (m *MultiProviderInference) selectScopedProvider(ctx context.Context, selection ProviderSelection) (providerInstance, error) {
 	active := true
 
 	var providerType *modelprovider.ProviderType
@@ -651,7 +650,7 @@ func providerRecency(provider *modelprovider.ModelProvider) time.Time {
 	return provider.UpdatedAt
 }
 
-func (m *MultiProviderInference) getProviderModels(ctx context.Context, providerID string) ([]inference.InferenceProviderModel, error) {
+func (m *MultiProviderInference) getProviderModels(ctx context.Context, providerID string) ([]InferenceProviderModel, error) {
 	instance, err := m.getProviderInstance(ctx, providerID)
 	if err != nil {
 		return nil, err
@@ -678,7 +677,7 @@ func (m *MultiProviderInference) getProviderInstance(ctx context.Context, provid
 	return entry.instance, nil
 }
 
-func (m *MultiProviderInference) storeModelsInCache(ctx context.Context, key string, models []inference.InferenceProviderModel) {
+func (m *MultiProviderInference) storeModelsInCache(ctx context.Context, key string, models []InferenceProviderModel) {
 	payload, err := json.Marshal(models)
 	if err != nil {
 		logger.GetLogger().Warnf("multi-provider inference: failed to marshal models for key %s: %v", key, err)
@@ -689,7 +688,7 @@ func (m *MultiProviderInference) storeModelsInCache(ctx context.Context, key str
 	}
 }
 
-func uniqueSortedProjectIDs(selection inference.ProviderSelection) []uint {
+func uniqueSortedProjectIDs(selection ProviderSelection) []uint {
 	ids := make([]uint, 0, len(selection.ProjectIDs)+1)
 	if selection.ProjectID != nil {
 		ids = append(ids, *selection.ProjectID)

@@ -13,11 +13,9 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/common"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
-	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
 	"menlo.ai/jan-api-gateway/app/domain/user"
 	requesttypes "menlo.ai/jan-api-gateway/app/interfaces/http/requests"
 	responsetypes "menlo.ai/jan-api-gateway/app/interfaces/http/responses"
-	janinference "menlo.ai/jan-api-gateway/app/utils/httpclients/jan_inference"
 	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
@@ -39,7 +37,6 @@ type ResponseModelService struct {
 	responseService       *ResponseService
 	streamModelService    *StreamModelService
 	nonStreamModelService *NonStreamModelService
-	modelRegistry         *inferencemodelregistry.InferenceModelRegistry
 }
 
 // NewResponseModelService creates a new ResponseModelService instance
@@ -49,7 +46,6 @@ func NewResponseModelService(
 	apikeyService *apikey.ApiKeyService,
 	conversationService *conversation.ConversationService,
 	responseService *ResponseService,
-	modelRegistry *inferencemodelregistry.InferenceModelRegistry,
 ) *ResponseModelService {
 	responseModelService := &ResponseModelService{
 		UserService:         userService,
@@ -57,7 +53,6 @@ func NewResponseModelService(
 		apikeyService:       apikeyService,
 		conversationService: conversationService,
 		responseService:     responseService,
-		modelRegistry:       modelRegistry,
 	}
 
 	// Initialize specialized handlers
@@ -79,31 +74,10 @@ func (h *ResponseModelService) CreateResponse(ctx context.Context, userID uint, 
 	// TODO add the logic to get the API key for the user
 	key := ""
 
-	// Check if model exists in registry
-	mToE := h.modelRegistry.GetModelToEndpoints(ctx)
-	endpoints, ok := mToE[request.Model]
-	if !ok {
-		return nil, common.NewErrorWithMessage("Model validation error", "h8i9j0k1-l2m3-4567-hijk-890123456789")
-	}
-
 	// Convert response request to chat completion request using domain service
 	chatCompletionRequest := h.responseService.ConvertToChatCompletionRequest(request)
 	if chatCompletionRequest == nil {
 		return nil, common.NewErrorWithMessage("Input validation error", "i9j0k1l2-m3n4-5678-ijkl-901234567890")
-	}
-
-	// Check if model endpoint exists
-	janInferenceClient := janinference.NewJanInferenceClient(ctx)
-	endpointExists := false
-	for _, endpoint := range endpoints {
-		if endpoint == janInferenceClient.BaseURL {
-			endpointExists = true
-			break
-		}
-	}
-
-	if !endpointExists {
-		return nil, common.NewErrorWithMessage("Model validation error", "h8i9j0k1-l2m3-4567-hijk-890123456789")
 	}
 
 	// Handle conversation logic using domain service

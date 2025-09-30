@@ -13,7 +13,6 @@ import (
 	openai "github.com/sashabaranov/go-openai"
 	"menlo.ai/jan-api-gateway/app/domain/common"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
-	domaininference "menlo.ai/jan-api-gateway/app/domain/inference"
 	infrainference "menlo.ai/jan-api-gateway/app/infrastructure/inference"
 	"menlo.ai/jan-api-gateway/app/utils/logger"
 )
@@ -61,7 +60,7 @@ type ToolCallAccumulator struct {
 }
 
 // StreamCompletionAndAccumulateResponse streams SSE events to client and accumulates a complete response for internal processing
-func (s *CompletionStreamHandler) StreamCompletionAndAccumulateResponse(reqCtx *gin.Context, selection domaininference.ProviderSelection, request openai.ChatCompletionRequest, conv *conversation.Conversation, conversationCreated bool, askItemID string, completionItemID string) (*ExtendedCompletionResponse, *common.Error) {
+func (s *CompletionStreamHandler) StreamCompletionAndAccumulateResponse(reqCtx *gin.Context, selection infrainference.ProviderSelection, request openai.ChatCompletionRequest, conv *conversation.Conversation, conversationCreated bool, askItemID string, completionItemID string) (*ExtendedCompletionResponse, *common.Error) {
 	// Add timeout context
 	ctx, cancel := context.WithTimeout(reqCtx.Request.Context(), RequestTimeout)
 	defer cancel()
@@ -168,7 +167,7 @@ func (s *CompletionStreamHandler) StreamCompletionAndAccumulateResponse(reqCtx *
 }
 
 // streamResponseToChannel streams the response from inference provider to channels
-func (s *CompletionStreamHandler) streamResponseToChannel(ctx context.Context, selection domaininference.ProviderSelection, request openai.ChatCompletionRequest, dataChan chan<- string, errChan chan<- error, wg *sync.WaitGroup) {
+func (s *CompletionStreamHandler) streamResponseToChannel(ctx context.Context, selection infrainference.ProviderSelection, request openai.ChatCompletionRequest, dataChan chan<- string, errChan chan<- error, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	// Get streaming reader from inference provider

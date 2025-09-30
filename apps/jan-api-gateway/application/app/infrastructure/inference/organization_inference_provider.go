@@ -8,7 +8,6 @@ import (
 	"time"
 
 	openai "github.com/sashabaranov/go-openai"
-	inference "menlo.ai/jan-api-gateway/app/domain/inference"
 	inferencemodel "menlo.ai/jan-api-gateway/app/domain/inference_model"
 	"menlo.ai/jan-api-gateway/app/domain/modelprovider"
 	"menlo.ai/jan-api-gateway/app/infrastructure/cache"
@@ -91,7 +90,7 @@ func (p *OrganizationProvider) CreateCompletionStream(ctx context.Context, reque
 	}
 }
 
-func (p *OrganizationProvider) GetModels(ctx context.Context) (*inference.ModelsResponse, error) {
+func (p *OrganizationProvider) GetModels(ctx context.Context) (*ModelsResponse, error) {
 	cacheKey := fmt.Sprintf("%s:%s", cache.ModelsCacheKey, p.ID())
 	cachedResponseJSON, err := p.cache.GetWithFallback(ctx, cacheKey, func() (string, error) {
 		response, err := p.fetchModels(ctx)
@@ -107,14 +106,14 @@ func (p *OrganizationProvider) GetModels(ctx context.Context) (*inference.Models
 	if err != nil {
 		return nil, err
 	}
-	var models inference.ModelsResponse
+	var models ModelsResponse
 	if err := json.Unmarshal([]byte(cachedResponseJSON), &models); err != nil {
 		return nil, err
 	}
 	return &models, nil
 }
 
-func (p *OrganizationProvider) fetchModels(ctx context.Context) (*inference.ModelsResponse, error) {
+func (p *OrganizationProvider) fetchModels(ctx context.Context) (*ModelsResponse, error) {
 	switch p.descriptor.Vendor {
 	case modelprovider.ProviderVendorOpenRouter:
 		if p.openRouterClient == nil {
@@ -124,9 +123,9 @@ func (p *OrganizationProvider) fetchModels(ctx context.Context) (*inference.Mode
 		if err != nil {
 			return nil, err
 		}
-		models := make([]inference.InferenceProviderModel, len(resp.Data))
+		models := make([]InferenceProviderModel, len(resp.Data))
 		for i, model := range resp.Data {
-			models[i] = inference.InferenceProviderModel{
+			models[i] = InferenceProviderModel{
 				Model: inferencemodel.Model{
 					ID:      model.ID,
 					Object:  model.Object,
@@ -138,7 +137,7 @@ func (p *OrganizationProvider) fetchModels(ctx context.Context) (*inference.Mode
 				Vendor:       p.Vendor(),
 			}
 		}
-		return &inference.ModelsResponse{Object: resp.Object, Data: models}, nil
+		return &ModelsResponse{Object: resp.Object, Data: models}, nil
 	case modelprovider.ProviderVendorGemini:
 		if p.geminiClient == nil {
 			return nil, fmt.Errorf("gemini client not configured")
@@ -147,12 +146,21 @@ func (p *OrganizationProvider) fetchModels(ctx context.Context) (*inference.Mode
 		if err != nil {
 			return nil, err
 		}
-		for i := range resp.Data {
-			resp.Data[i].ProviderID = p.ID()
-			resp.Data[i].ProviderType = p.Type()
-			resp.Data[i].Vendor = p.Vendor()
+		models := make([]InferenceProviderModel, len(resp.Data))
+		for i, model := range resp.Data {
+			models[i] = InferenceProviderModel{
+				Model: inferencemodel.Model{
+					ID:      model.ID,
+					Object:  model.Object,
+					Created: model.Created,
+					OwnedBy: model.OwnedBy,
+				},
+				ProviderID:   p.ID(),
+				ProviderType: p.Type(),
+				Vendor:       p.Vendor(),
+			}
 		}
-		return resp, nil
+		return &ModelsResponse{Object: resp.Object, Data: models}, nil
 	default:
 		return nil, fmt.Errorf("unsupported vendor: %s", p.descriptor.Vendor)
 	}

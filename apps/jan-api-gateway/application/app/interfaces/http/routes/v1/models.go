@@ -5,8 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
-	domaininference "menlo.ai/jan-api-gateway/app/domain/inference"
-	inferencemodelregistry "menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
+
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	infrainference "menlo.ai/jan-api-gateway/app/infrastructure/inference"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
@@ -15,15 +14,13 @@ import (
 
 type ModelAPI struct {
 	multiProvider  *infrainference.MultiProviderInference
-	registry       *inferencemodelregistry.InferenceModelRegistry
 	authService    *auth.AuthService
 	projectService *project.ProjectService
 }
 
-func NewModelAPI(multiProvider *infrainference.MultiProviderInference, registry *inferencemodelregistry.InferenceModelRegistry, authService *auth.AuthService, projectService *project.ProjectService) *ModelAPI {
+func NewModelAPI(multiProvider *infrainference.MultiProviderInference, authService *auth.AuthService, projectService *project.ProjectService) *ModelAPI {
 	return &ModelAPI{
 		multiProvider:  multiProvider,
-		registry:       registry,
 		authService:    authService,
 		projectService: projectService,
 	}
@@ -65,7 +62,7 @@ func (modelAPI *ModelAPI) GetModels(reqCtx *gin.Context) {
 		providerNames[provider.ProviderID] = provider.Name
 	}
 
-	selection := domaininference.ProviderSelection{
+	selection := infrainference.ProviderSelection{
 		OrganizationID: filter.OrganizationID,
 	}
 	if filter.ProjectID != nil {
@@ -178,8 +175,8 @@ func (modelAPI *ModelAPI) GetProviders(reqCtx *gin.Context) {
 	})
 }
 
-func (modelAPI *ModelAPI) buildProviderFilter(reqCtx *gin.Context) (domaininference.ProviderSummaryFilter, error) {
-	filter := domaininference.ProviderSummaryFilter{}
+func (modelAPI *ModelAPI) buildProviderFilter(reqCtx *gin.Context) (infrainference.ProviderSummaryFilter, error) {
+	filter := infrainference.ProviderSummaryFilter{}
 	if org, ok := auth.GetAdminOrganizationFromContext(reqCtx); ok && org != nil {
 		filter.OrganizationID = &org.ID
 	}
