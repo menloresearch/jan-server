@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/modelprovider"
-	modelproviderservice "menlo.ai/jan-api-gateway/app/domain/modelprovider/service"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/infrastructure/cache"
@@ -19,13 +18,13 @@ import (
 
 type OrganizationProviderRoute struct {
 	authService     *auth.AuthService
-	providerService *modelproviderservice.ModelProviderService
+	providerService *modelprovider.ModelProviderService
 	cache           *cache.RedisCacheService
 }
 
 type ProjectProviderRoute struct {
 	authService     *auth.AuthService
-	providerService *modelproviderservice.ModelProviderService
+	providerService *modelprovider.ModelProviderService
 	projectService  *project.ProjectService
 	cache           *cache.RedisCacheService
 }
@@ -51,7 +50,7 @@ type ProviderResponse struct {
 	ProjectID      *uint  `json:"project_id,omitempty"`
 }
 
-func NewOrganizationProviderRoute(authService *auth.AuthService, providerService *modelproviderservice.ModelProviderService, cacheService *cache.RedisCacheService) *OrganizationProviderRoute {
+func NewOrganizationProviderRoute(authService *auth.AuthService, providerService *modelprovider.ModelProviderService, cacheService *cache.RedisCacheService) *OrganizationProviderRoute {
 	return &OrganizationProviderRoute{
 		authService:     authService,
 		providerService: providerService,
@@ -59,7 +58,7 @@ func NewOrganizationProviderRoute(authService *auth.AuthService, providerService
 	}
 }
 
-func NewProjectProviderRoute(authService *auth.AuthService, providerService *modelproviderservice.ModelProviderService, projectService *project.ProjectService, cacheService *cache.RedisCacheService) *ProjectProviderRoute {
+func NewProjectProviderRoute(authService *auth.AuthService, providerService *modelprovider.ModelProviderService, projectService *project.ProjectService, cacheService *cache.RedisCacheService) *ProjectProviderRoute {
 	return &ProjectProviderRoute{
 		authService:     authService,
 		providerService: providerService,
@@ -122,7 +121,7 @@ func (route *OrganizationProviderRoute) CreateOrganizationProvider(reqCtx *gin.C
 	}
 
 	ctx := reqCtx.Request.Context()
-	provider, err := route.providerService.RegisterOrganizationProvider(ctx, modelproviderservice.CreateOrganizationProviderInput{
+	provider, err := route.providerService.RegisterOrganizationProvider(ctx, modelprovider.CreateOrganizationProviderInput{
 		OrganizationID: orgEntity.ID,
 		Name:           req.Name,
 		Vendor:         vendor,
@@ -223,7 +222,7 @@ func (route *ProjectProviderRoute) CreateProjectProvider(reqCtx *gin.Context) {
 		active = *req.Active
 	}
 
-	provider, err := route.providerService.RegisterOrganizationProvider(ctx, modelproviderservice.CreateOrganizationProviderInput{
+	provider, err := route.providerService.RegisterOrganizationProvider(ctx, modelprovider.CreateOrganizationProviderInput{
 		OrganizationID: orgEntity.ID,
 		ProjectID:      &projectEntity.ID,
 		Name:           req.Name,

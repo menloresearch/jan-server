@@ -14,7 +14,6 @@ import (
 	"github.com/sirupsen/logrus"
 	inference "menlo.ai/jan-api-gateway/app/domain/inference"
 	"menlo.ai/jan-api-gateway/app/domain/modelprovider"
-	modelproviderservice "menlo.ai/jan-api-gateway/app/domain/modelprovider/service"
 	"menlo.ai/jan-api-gateway/app/infrastructure/cache"
 	"menlo.ai/jan-api-gateway/app/utils/httpclients/gemini"
 	"menlo.ai/jan-api-gateway/app/utils/httpclients/openrouter"
@@ -25,7 +24,7 @@ const aggregatedModelsCacheTTL = 10 * time.Minute
 
 type MultiProviderInference struct {
 	janProvider       *JanProvider
-	providerService   *modelproviderservice.ModelProviderService
+	providerService   *modelprovider.ModelProviderService
 	cache             *cache.RedisCacheService
 	openRouterClient  *openrouter.Client
 	mu                sync.RWMutex
@@ -33,7 +32,7 @@ type MultiProviderInference struct {
 	organizationCache map[string]providerInstance
 }
 
-func NewMultiProviderInference(jan *JanProvider, providerService *modelproviderservice.ModelProviderService, cacheService *cache.RedisCacheService, openRouterClient *openrouter.Client, geminiClient *gemini.Client) *MultiProviderInference {
+func NewMultiProviderInference(jan *JanProvider, providerService *modelprovider.ModelProviderService, cacheService *cache.RedisCacheService, openRouterClient *openrouter.Client, geminiClient *gemini.Client) *MultiProviderInference {
 	return &MultiProviderInference{
 		janProvider:       jan,
 		providerService:   providerService,

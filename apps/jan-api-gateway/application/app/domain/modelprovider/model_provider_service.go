@@ -1,4 +1,4 @@
-package service
+package modelprovider
 
 import (
 	"context"
@@ -7,27 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"menlo.ai/jan-api-gateway/app/domain/modelprovider"
 	"menlo.ai/jan-api-gateway/app/domain/query"
-	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/modelproviderrepo"
 	"menlo.ai/jan-api-gateway/app/utils/crypto"
 	"menlo.ai/jan-api-gateway/app/utils/idgen"
 )
 
-type repository interface {
-	Create(ctx context.Context, provider *modelprovider.ModelProvider) error
-	Update(ctx context.Context, provider *modelprovider.ModelProvider) error
-	DeleteByID(ctx context.Context, id uint) error
-	FindByID(ctx context.Context, id uint) (*modelprovider.ModelProvider, error)
-	FindByPublicID(ctx context.Context, publicID string) (*modelprovider.ModelProvider, error)
-	Find(ctx context.Context, filter modelprovider.ProviderFilter, pagination *query.Pagination) ([]*modelprovider.ModelProvider, error)
-	Count(ctx context.Context, filter modelprovider.ProviderFilter) (int64, error)
-}
-
-var _ repository = (*modelproviderrepo.ModelProviderGormRepository)(nil)
-
 type ModelProviderService struct {
-	repo             repository
+	repo             ModelProviderRepository
 	encryptionSecret string
 }
 
@@ -35,7 +21,7 @@ type CreateOrganizationProviderInput struct {
 	OrganizationID uint
 	ProjectID      *uint
 	Name           string
-	Vendor         modelprovider.ProviderVendor
+	Vendor         ProviderVendor
 	BaseURL        string
 	APIKey         string
 	Metadata       map[string]any
@@ -51,26 +37,26 @@ type UpdateOrganizationProviderInput struct {
 	Metadata map[string]any
 }
 
-func NewService(repo repository, encryptionSecret string) (*ModelProviderService, error) {
+func NewService(repo ModelProviderRepository, encryptionSecret string) (*ModelProviderService, error) {
 	if encryptionSecret == "" {
 		return nil, crypto.ErrSecretEmpty
 	}
 	return &ModelProviderService{repo: repo, encryptionSecret: encryptionSecret}, nil
 }
 
-func (s *ModelProviderService) List(ctx context.Context, filter modelprovider.ProviderFilter, pagination *query.Pagination) ([]*modelprovider.ModelProvider, error) {
+func (s *ModelProviderService) List(ctx context.Context, filter ProviderFilter, pagination *query.Pagination) ([]*ModelProvider, error) {
 	return s.repo.Find(ctx, filter, pagination)
 }
 
-func (s *ModelProviderService) Count(ctx context.Context, filter modelprovider.ProviderFilter) (int64, error) {
+func (s *ModelProviderService) Count(ctx context.Context, filter ProviderFilter) (int64, error) {
 	return s.repo.Count(ctx, filter)
 }
 
-func (s *ModelProviderService) GetByPublicID(ctx context.Context, publicID string) (*modelprovider.ModelProvider, error) {
+func (s *ModelProviderService) GetByPublicID(ctx context.Context, publicID string) (*ModelProvider, error) {
 	return s.repo.FindByPublicID(ctx, publicID)
 }
 
-func (s *ModelProviderService) GetByPublicIDWithKey(ctx context.Context, publicID string) (*modelprovider.ModelProvider, string, error) {
+func (s *ModelProviderService) GetByPublicIDWithKey(ctx context.Context, publicID string) (*ModelProvider, string, error) {
 	provider, err := s.repo.FindByPublicID(ctx, publicID)
 	if err != nil {
 		return nil, "", err
@@ -82,12 +68,12 @@ func (s *ModelProviderService) GetByPublicIDWithKey(ctx context.Context, publicI
 	return provider, key, nil
 }
 
-func (s *ModelProviderService) RegisterOrganizationProvider(ctx context.Context, input CreateOrganizationProviderInput) (*modelprovider.ModelProvider, error) {
-	provider := &modelprovider.ModelProvider{
+func (s *ModelProviderService) RegisterOrganizationProvider(ctx context.Context, input CreateOrganizationProviderInput) (*ModelProvider, error) {
+	provider := &ModelProvider{
 		OrganizationID: &input.OrganizationID,
 		ProjectID:      input.ProjectID,
 		Name:           strings.TrimSpace(input.Name),
-		Type:           modelprovider.ProviderTypeOrganization,
+		Type:           ProviderTypeOrganization,
 		Vendor:         input.Vendor,
 		BaseURL:        strings.TrimSpace(input.BaseURL),
 		Active:         input.Active,
@@ -98,12 +84,12 @@ func (s *ModelProviderService) RegisterOrganizationProvider(ctx context.Context,
 	}
 	provider.MetadataJSON = metadataJSON
 
-	if err := modelprovider.ValidateCombination(provider.Type, provider.Vendor); err != nil {
+	if err := ValidateCombination(provider.Type, provider.Vendor); err != nil {
 		return nil, err
 	}
 
 	if strings.TrimSpace(input.APIKey) == "" {
-		return nil, modelprovider.ErrMissingAPIKey
+		return nil, ErrMissingAPIKey
 	}
 	if err := s.applyAPIKey(provider, input.APIKey); err != nil {
 		return nil, err
@@ -122,7 +108,7 @@ func (s *ModelProviderService) RegisterOrganizationProvider(ctx context.Context,
 	return provider, nil
 }
 
-func (s *ModelProviderService) UpdateOrganizationProvider(ctx context.Context, input UpdateOrganizationProviderInput) (*modelprovider.ModelProvider, error) {
+func (s *ModelProviderService) UpdateOrganizationProvider(ctx context.Context, input UpdateOrganizationProviderInput) (*ModelProvider, error) {
 	provider, err := s.repo.FindByPublicID(ctx, input.PublicID)
 	if err != nil {
 		return nil, err
@@ -165,7 +151,7 @@ func (s *ModelProviderService) DeleteByPublicID(ctx context.Context, publicID st
 	return s.repo.DeleteByID(ctx, provider.ID)
 }
 
-func (s *ModelProviderService) applyAPIKey(provider *modelprovider.ModelProvider, apiKey string) error {
+func (s *ModelProviderService) applyAPIKey(provider *ModelProvider, apiKey string) error {
 	ciphertext, err := crypto.EncryptString(s.encryptionSecret, apiKey)
 	if err != nil {
 		return err
@@ -174,14 +160,14 @@ func (s *ModelProviderService) applyAPIKey(provider *modelprovider.ModelProvider
 	return nil
 }
 
-func (s *ModelProviderService) decryptAPIKey(provider *modelprovider.ModelProvider) (string, error) {
+func (s *ModelProviderService) decryptAPIKey(provider *ModelProvider) (string, error) {
 	if strings.TrimSpace(provider.EncryptedAPIKey) == "" {
 		return "", nil
 	}
 	return crypto.DecryptString(s.encryptionSecret, provider.EncryptedAPIKey)
 }
 
-func (s *ModelProviderService) assignPublicID(provider *modelprovider.ModelProvider) error {
+func (s *ModelProviderService) assignPublicID(provider *ModelProvider) error {
 	publicID, err := idgen.GenerateSecureID("prov", 16)
 	if err != nil {
 		return err

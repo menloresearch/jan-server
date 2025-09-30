@@ -1,10 +1,13 @@
 package modelprovider
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	"menlo.ai/jan-api-gateway/app/domain/query"
 )
 
 type ProviderType string
@@ -111,4 +114,14 @@ func (p *ModelProvider) AssignDefaults() {
 	if p.Active == false {
 		p.Active = true
 	}
+}
+
+type ModelProviderRepository interface {
+	Create(ctx context.Context, provider *ModelProvider) error
+	Update(ctx context.Context, provider *ModelProvider) error
+	DeleteByID(ctx context.Context, id uint) error
+	FindByID(ctx context.Context, id uint) (*ModelProvider, error)
+	FindByPublicID(ctx context.Context, publicID string) (*ModelProvider, error)
+	Find(ctx context.Context, filter ProviderFilter, pagination *query.Pagination) ([]*ModelProvider, error)
+	Count(ctx context.Context, filter ProviderFilter) (int64, error)
 }

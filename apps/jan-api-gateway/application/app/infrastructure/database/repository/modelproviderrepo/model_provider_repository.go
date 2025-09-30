@@ -16,6 +16,8 @@ type ModelProviderGormRepository struct {
 	db *transaction.Database
 }
 
+var _ domain.ModelProviderRepository = (*ModelProviderGormRepository)(nil)
+
 func NewModelProviderRepository(db *transaction.Database) *ModelProviderGormRepository {
 	return &ModelProviderGormRepository{db: db}
 }

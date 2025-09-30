@@ -17,7 +17,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/inference_model_registry"
 	"menlo.ai/jan-api-gateway/app/domain/invite"
 	"menlo.ai/jan-api-gateway/app/domain/mcp/serpermcp"
-	modelproviderservice "menlo.ai/jan-api-gateway/app/domain/modelprovider/service"
+	"menlo.ai/jan-api-gateway/app/domain/modelprovider"
 	"menlo.ai/jan-api-gateway/app/domain/organization"
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/response"
@@ -82,9 +82,9 @@ func CreateApplication() (*Application, error) {
 	authService := auth.NewAuthService(userService, apiKeyService, organizationService, projectService, inviteService)
 	adminApiKeyAPI := organization2.NewAdminApiKeyAPI(organizationService, authService, apiKeyService, userService)
 	projectApiKeyRoute := apikeys.NewProjectApiKeyRoute(organizationService, projectService, apiKeyService, userService)
-	repository := modelproviderrepo.NewModelProviderRepository(transactionDatabase)
+	modelProviderGormRepository := modelproviderrepo.NewModelProviderRepository(transactionDatabase)
 	string2 := domain.ProvideModelProviderSecret()
-	modelProviderService, err := modelproviderservice.NewService(repository, string2)
+	modelProviderService, err := modelprovider.NewService(modelProviderGormRepository, string2)
 	if err != nil {
 		return nil, err
 	}
