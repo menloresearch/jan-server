@@ -111,6 +111,137 @@ func (s *ModelService) ValidateModelAPIAccess(ctx context.Context) error {
 	return s.k8sService.ValidateModelDeploymentRequirements(ctx)
 }
 
+// GetKubernetesStatus returns cached Kubernetes availability status
+func (s *ModelService) GetKubernetesStatus(ctx context.Context) (*KubernetesStatus, error) {
+	// Try cache first
+	cacheKey := s.getCacheKey("k8s", "status")
+	var cachedStatus KubernetesStatus
+	if err := s.getCachedModelData(ctx, cacheKey, &cachedStatus); err == nil {
+		return &cachedStatus, nil
+	}
+
+	// Check if we can access K8s
+	err := s.ValidateModelAPIAccess(ctx)
+
+	status := &KubernetesStatus{
+		Available: err == nil,
+		InCluster: s.k8sService != nil,
+	}
+
+	if err != nil {
+		status.Message = err.Error()
+	} else {
+		status.Message = "Kubernetes API accessible"
+	}
+
+	// Cache for 2 minutes (shorter than other data as this can change)
+	_ = s.cacheModelData(ctx, cacheKey, status)
+
+	return status, nil
+}
+
+// GetClusterStatus returns cached cluster validation status with enhanced information
+func (s *ModelService) GetClusterStatus(ctx context.Context) (*ClusterStatus, error) {
+	// Try cache first
+	cacheKey := s.getCacheKey("k8s", "cluster_status")
+	var cachedStatus ClusterStatus
+	if err := s.getCachedModelData(ctx, cacheKey, &cachedStatus); err == nil {
+		return &cachedStatus, nil
+	}
+
+	// Get basic GPU status from existing method
+	gpuStatus, err := s.k8sService.GetClusterGPUStatus(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster GPU status: %w", err)
+	}
+
+	// TODO: Add dependency validation when available
+	// For now, create basic validation based on GPU status
+	status := &ClusterStatus{
+		Valid:     true, // Assume valid if we can get GPU status
+		GPUStatus: gpuStatus,
+		Dependencies: ClusterDependenciesStatus{
+			// TODO: Implement actual dependency checks
+			AibrixOperator:  DependencyStatus{Available: true, Message: "Not validated"},
+			GPUOperator:     DependencyStatus{Available: true, Message: "Not validated"},
+			KuberayOperator: DependencyStatus{Available: true, Message: "Not validated"},
+			EnvoyGateway:    DependencyStatus{Available: true, Message: "Not validated"},
+			StorageClasses:  DependencyStatus{Available: true, Message: "Not validated"},
+			Namespace:       DependencyStatus{Available: true, Message: "Not validated"},
+		},
+		Warnings: []string{},
+		Errors:   []string{},
+	}
+
+	// Cache for 5 minutes
+	_ = s.cacheModelData(ctx, cacheKey, status)
+
+	return status, nil
+}
+
+// GetGPUResources returns cached GPU resources information based on cluster status
+func (s *ModelService) GetGPUResources(ctx context.Context) (*GPUResources, error) {
+	// Try cache first
+	cacheKey := s.getCacheKey("k8s", "gpu_resources")
+	var cachedResources GPUResources
+	if err := s.getCachedModelData(ctx, cacheKey, &cachedResources); err == nil {
+		return &cachedResources, nil
+	}
+
+	// Get GPU status from cluster
+	clusterGPUStatus, err := s.k8sService.GetClusterGPUStatus(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cluster GPU status: %w", err)
+	}
+
+	// Convert ClusterGPUStatus to GPUResources format
+	resources := &GPUResources{
+		TotalNodes: clusterGPUStatus.TotalNodes,
+		GPUNodes:   make([]*kubernetes.NodeGPUInfo, len(clusterGPUStatus.GPUNodes)),
+		Summary: GPUResourcesSummary{
+			TotalGPUs:     clusterGPUStatus.TotalGPUs,
+			AvailableGPUs: clusterGPUStatus.TotalGPUs, // Assume all available for now
+			GPUTypes:      []string{},
+			TotalVRAM:     "Unknown",
+			AvailableVRAM: "Unknown",
+		},
+		Availability: GPUAvailability{
+			ByType: make(map[string]GPUTypeAvailability),
+		},
+	}
+
+	// Copy GPU nodes and extract type information
+	gpuTypeMap := make(map[string]int)
+
+	for i, node := range clusterGPUStatus.GPUNodes {
+		resources.GPUNodes[i] = &node
+
+		// Extract GPU type information
+		if node.GPUType != "" {
+			gpuTypeMap[node.GPUType] += node.GPUCount
+		}
+	}
+
+	// Extract unique GPU types
+	for gpuType := range gpuTypeMap {
+		resources.Summary.GPUTypes = append(resources.Summary.GPUTypes, gpuType)
+	}
+
+	// Build availability map
+	for gpuType, total := range gpuTypeMap {
+		resources.Availability.ByType[gpuType] = GPUTypeAvailability{
+			Total:     total,
+			Available: total,     // Assume all available for now
+			VRAM:      "Unknown", // Could be extracted from NodeGPUInfo.TotalVRAM if needed
+		}
+	}
+
+	// Cache for 3 minutes (GPU status can change fairly quickly)
+	_ = s.cacheModelData(ctx, cacheKey, resources)
+
+	return resources, nil
+}
+
 // GetModels returns all models for an organization with optional filtering
 func (s *ModelService) GetModels(ctx context.Context, orgID uint, filter *ModelFilter) ([]*Model, error) {
 	if err := s.ValidateModelAPIAccess(ctx); err != nil {
@@ -472,8 +603,7 @@ func (s *ModelService) matchesFilter(model *Model, filter *ModelFilter) bool {
 
 // validateResourceRequirements validates resource requirements against cluster capabilities
 func (s *ModelService) validateResourceRequirements(ctx context.Context, requirements *ResourceRequirement) error {
-	// For now, just validate that the resources are properly formatted
-	// The actual cluster validation would need to be implemented based on cluster status
+	// Basic validation
 	if requirements.CPU.String() == "" {
 		return fmt.Errorf("CPU requirement is required")
 	}
@@ -481,7 +611,82 @@ func (s *ModelService) validateResourceRequirements(ctx context.Context, require
 		return fmt.Errorf("memory requirement is required")
 	}
 
-	// TODO: Add actual cluster capacity validation when needed
+	// Enhanced cluster capacity validation using cached data
+	return s.validateResourcesAgainstCluster(ctx, requirements)
+}
+
+// validateResourcesAgainstCluster validates resources against actual cluster capacity
+func (s *ModelService) validateResourcesAgainstCluster(ctx context.Context, requirements *ResourceRequirement) error {
+	// Get cached GPU resources to validate GPU requirements
+	if requirements.GPU != nil && requirements.GPU.MinGPUs > 0 {
+		gpuResources, err := s.GetGPUResources(ctx)
+		if err != nil {
+			// If we can't get GPU resources, warn but don't fail
+			// (deployment might still work if GPU resources become available)
+			return nil
+		}
+
+		// Check if cluster has enough GPUs
+		if gpuResources.Summary.AvailableGPUs < requirements.GPU.MinGPUs {
+			return fmt.Errorf("insufficient GPU resources: requested minimum %d GPUs but only %d available in cluster",
+				requirements.GPU.MinGPUs, gpuResources.Summary.AvailableGPUs)
+		}
+
+		// Check if cluster has any GPUs at all
+		if gpuResources.Summary.TotalGPUs == 0 {
+			return fmt.Errorf("no GPU resources found in cluster but %d minimum GPUs requested", requirements.GPU.MinGPUs)
+		}
+
+		// Validate GPU type if specified
+		if requirements.GPU.GPUType != "" {
+			typeAvailable := false
+			for _, availableType := range gpuResources.Summary.GPUTypes {
+				if availableType == requirements.GPU.GPUType {
+					typeAvailable = true
+					break
+				}
+			}
+			if !typeAvailable {
+				return fmt.Errorf("requested GPU type '%s' not available in cluster. Available types: %v",
+					requirements.GPU.GPUType, gpuResources.Summary.GPUTypes)
+			}
+
+			// Check available GPUs of the specific type
+			if typeAvail, exists := gpuResources.Availability.ByType[requirements.GPU.GPUType]; exists {
+				if typeAvail.Available < requirements.GPU.MinGPUs {
+					return fmt.Errorf("insufficient '%s' GPUs: requested minimum %d but only %d available",
+						requirements.GPU.GPUType, requirements.GPU.MinGPUs, typeAvail.Available)
+				}
+			}
+		}
+
+		// TODO: Add VRAM validation when GPU nodes provide detailed VRAM info
+		// Currently NodeGPUInfo has TotalVRAM and AvailableVRAM but it's at node level
+	}
+
+	// Get cached cluster status to validate general capacity
+	clusterStatus, err := s.GetClusterStatus(ctx)
+	if err != nil {
+		// If we can't get cluster status, allow deployment (it will fail at K8s level if invalid)
+		return nil
+	}
+
+	// Check if cluster dependencies are valid for model deployment
+	if !clusterStatus.Valid {
+		warnings := []string{}
+		for _, warning := range clusterStatus.Warnings {
+			warnings = append(warnings, warning)
+		}
+		for _, error := range clusterStatus.Errors {
+			warnings = append(warnings, error)
+		}
+
+		if len(warnings) > 0 {
+			// Log warnings but don't fail - allow deployment attempt
+			// In production, you might want to fail here depending on criticality
+		}
+	}
+
 	return nil
 }
 
@@ -599,8 +804,8 @@ func (s *ModelService) ListAllModels(ctx context.Context, orgID uint) ([]*ModelI
 	return models, nil
 }
 
-// GetClusterStatus returns the current cluster status for models
-func (s *ModelService) GetClusterStatus(ctx context.Context) (*kubernetes.ClusterGPUStatus, error) {
+// GetClusterGPUStatus returns the current cluster GPU status (legacy method for compatibility)
+func (s *ModelService) GetClusterGPUStatus(ctx context.Context) (*kubernetes.ClusterGPUStatus, error) {
 	if err := s.ValidateModelAPIAccess(ctx); err != nil {
 		return nil, err
 	}

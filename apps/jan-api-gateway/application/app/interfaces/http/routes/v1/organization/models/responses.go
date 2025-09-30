@@ -16,6 +16,30 @@ type ClusterStatusResponse struct {
 	ClusterStatus  kubernetes.ClusterGPUStatus `json:"cluster_status"`
 }
 
+// KubernetesStatusResponse represents Kubernetes availability status
+type KubernetesStatusResponse struct {
+	Available bool   `json:"available"`
+	InCluster bool   `json:"in_cluster"`
+	Message   string `json:"message,omitempty"`
+}
+
+// ClusterValidationResponse represents cluster dependency validation
+type ClusterValidationResponse struct {
+	Valid        bool                             `json:"valid"`
+	Dependencies models.ClusterDependenciesStatus `json:"dependencies"`
+	GPUStatus    kubernetes.ClusterGPUStatus      `json:"gpu_status"`
+	Warnings     []string                         `json:"warnings,omitempty"`
+	Errors       []string                         `json:"errors,omitempty"`
+}
+
+// GPUResourcesResponse represents GPU resources information
+type GPUResourcesResponse struct {
+	TotalNodes   int                        `json:"total_nodes"`
+	GPUNodes     []kubernetes.NodeGPUInfo   `json:"gpu_nodes"`
+	Summary      models.GPUResourcesSummary `json:"summary"`
+	Availability models.GPUAvailability     `json:"availability"`
+}
+
 // ModelResponse represents a single model response
 type ModelResponse struct {
 	Model models.Model `json:"model"`

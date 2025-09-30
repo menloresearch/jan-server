@@ -90,7 +90,8 @@ func CreateApplication() (*Application, error) {
 		return nil, err
 	}
 	modelsAPI := models2.NewModelsAPI(modelService, authService)
-	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI, projectsRoute, invitesRoute, modelsAPI, authService)
+	kubernetesAPI := models2.NewKubernetesAPI(modelService, authService)
+	organizationRoute := organization2.NewOrganizationRoute(adminApiKeyAPI, projectsRoute, invitesRoute, modelsAPI, kubernetesAPI, authService)
 	context := provideContext()
 	janInferenceClient := janinference.NewJanInferenceClient(context)
 	inferenceProvider := inference.NewJanInferenceProvider(janInferenceClient)

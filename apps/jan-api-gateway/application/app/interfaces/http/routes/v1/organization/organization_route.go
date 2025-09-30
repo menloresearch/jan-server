@@ -13,15 +13,24 @@ type OrganizationRoute struct {
 	projectsRoute  *projects.ProjectsRoute
 	inviteRoute    *invites.InvitesRoute
 	modelsAPI      *models.ModelsAPI
+	kubernetesAPI  *models.KubernetesAPI
 	authService    *auth.AuthService
 }
 
-func NewOrganizationRoute(adminApiKeyAPI *AdminApiKeyAPI, projectsRoute *projects.ProjectsRoute, inviteRoute *invites.InvitesRoute, modelsAPI *models.ModelsAPI, authService *auth.AuthService) *OrganizationRoute {
+func NewOrganizationRoute(
+	adminApiKeyAPI *AdminApiKeyAPI,
+	projectsRoute *projects.ProjectsRoute,
+	inviteRoute *invites.InvitesRoute,
+	modelsAPI *models.ModelsAPI,
+	kubernetesAPI *models.KubernetesAPI,
+	authService *auth.AuthService,
+) *OrganizationRoute {
 	return &OrganizationRoute{
 		adminApiKeyAPI,
 		projectsRoute,
 		inviteRoute,
 		modelsAPI,
+		kubernetesAPI,
 		authService,
 	}
 }
@@ -32,4 +41,5 @@ func (organizationRoute *OrganizationRoute) RegisterRouter(router gin.IRouter) {
 	organizationRoute.projectsRoute.RegisterRouter(organizationRouter)
 	organizationRoute.inviteRoute.RegisterRouter(organizationRouter)
 	organizationRoute.modelsAPI.RegisterRouter(organizationRouter)
+	organizationRoute.kubernetesAPI.RegisterRouter(organizationRouter)
 }

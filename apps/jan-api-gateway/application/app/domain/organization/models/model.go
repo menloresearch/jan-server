@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"menlo.ai/jan-api-gateway/app/infrastructure/kubernetes"
 )
 
 type ModelCreateRequest struct {
@@ -158,4 +159,66 @@ type ModelFilter struct {
 	IsPublic        *bool        `json:"is_public"`
 	Tags            []string     `json:"tags"`
 	CreatedByUserID *uint        `json:"created_by_user_id"`
+}
+
+// KubernetesStatus represents the availability of Kubernetes APIs
+type KubernetesStatus struct {
+	Available bool   `json:"available"`
+	InCluster bool   `json:"in_cluster"`
+	Message   string `json:"message,omitempty"`
+}
+
+// ClusterStatus represents comprehensive cluster validation information
+type ClusterStatus struct {
+	Valid        bool                         `json:"valid"`
+	Dependencies ClusterDependenciesStatus    `json:"dependencies"`
+	GPUStatus    *kubernetes.ClusterGPUStatus `json:"gpu_status,omitempty"`
+	Warnings     []string                     `json:"warnings,omitempty"`
+	Errors       []string                     `json:"errors,omitempty"`
+}
+
+// ClusterDependenciesStatus represents the status of required dependencies
+type ClusterDependenciesStatus struct {
+	AibrixOperator  DependencyStatus `json:"aibrix_operator"`
+	GPUOperator     DependencyStatus `json:"gpu_operator"`
+	KuberayOperator DependencyStatus `json:"kuberay_operator"`
+	EnvoyGateway    DependencyStatus `json:"envoy_gateway"`
+	StorageClasses  DependencyStatus `json:"storage_classes"`
+	Namespace       DependencyStatus `json:"namespace"`
+}
+
+// DependencyStatus represents the status of a single dependency
+type DependencyStatus struct {
+	Available bool   `json:"available"`
+	Version   string `json:"version,omitempty"`
+	Message   string `json:"message,omitempty"`
+}
+
+// GPUResources represents comprehensive GPU resources information
+type GPUResources struct {
+	TotalNodes   int                       `json:"total_nodes"`
+	GPUNodes     []*kubernetes.NodeGPUInfo `json:"gpu_nodes"`
+	Summary      GPUResourcesSummary       `json:"summary"`
+	Availability GPUAvailability           `json:"availability"`
+}
+
+// GPUResourcesSummary provides aggregate GPU information
+type GPUResourcesSummary struct {
+	TotalGPUs     int      `json:"total_gpus"`
+	AvailableGPUs int      `json:"available_gpus"`
+	GPUTypes      []string `json:"gpu_types"`
+	TotalVRAM     string   `json:"total_vram"`
+	AvailableVRAM string   `json:"available_vram"`
+}
+
+// GPUAvailability provides availability details per GPU type
+type GPUAvailability struct {
+	ByType map[string]GPUTypeAvailability `json:"by_type"`
+}
+
+// GPUTypeAvailability represents availability for a specific GPU type
+type GPUTypeAvailability struct {
+	Total     int    `json:"total"`
+	Available int    `json:"available"`
+	VRAM      string `json:"vram_per_gpu"`
 }

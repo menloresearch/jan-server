@@ -24,6 +24,7 @@ var RouteProvider = wire.NewSet(
 	projects.NewProjectsRoute,
 	organization.NewAdminApiKeyAPI,
 	models.NewModelsAPI,
+	models.NewKubernetesAPI,
 	organization.NewOrganizationRoute,
 	mcp_impl.NewSerperMCP,
 	chat.NewChatRoute,

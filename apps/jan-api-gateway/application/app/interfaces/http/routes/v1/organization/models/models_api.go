@@ -67,7 +67,8 @@ func (api *ModelsAPI) GetClusterStatus(c *gin.Context) {
 		return
 	}
 
-	status, err := api.modelService.GetClusterStatus(ctx)
+	// Use legacy GPU-specific status method for this endpoint
+	gpuStatus, err := api.modelService.GetClusterGPUStatus(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
 			Error: err.Error(),
@@ -77,7 +78,7 @@ func (api *ModelsAPI) GetClusterStatus(c *gin.Context) {
 
 	c.JSON(http.StatusOK, ClusterStatusResponse{
 		OrganizationID: orgID.(uint),
-		ClusterStatus:  *status,
+		ClusterStatus:  *gpuStatus,
 	})
 }
 
