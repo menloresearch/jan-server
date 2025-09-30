@@ -21,6 +21,7 @@ import (
 )
 
 const aggregatedModelsCacheTTL = 10 * time.Minute
+const providerCacheTTL = time.Minute
 
 type providerCacheEntry struct {
 	instance   providerInstance
@@ -249,6 +250,15 @@ func (m *MultiProviderInference) removeProviderFromCache(providerID string) {
 }
 
 func (m *MultiProviderInference) getProviderEntry(ctx context.Context, providerID string) (*providerCacheEntry, error) {
+	if entry, ok := m.getCachedProvider(providerID); ok && entry != nil {
+		if entry.descriptor != nil && !entry.descriptor.Active {
+			return nil, fmt.Errorf("provider %s is disabled", providerID)
+		}
+		if time.Since(entry.loadedAt) < providerCacheTTL {
+			return entry, nil
+		}
+	}
+
 	descriptor, apiKey, err := m.providerService.GetByPublicIDWithKey(ctx, providerID)
 	if err != nil {
 		return nil, err
@@ -258,44 +268,14 @@ func (m *MultiProviderInference) getProviderEntry(ctx context.Context, providerI
 		return nil, fmt.Errorf("provider %s is disabled", providerID)
 	}
 
-	if entry, ok := m.getCachedProvider(providerID); ok {
-		if providersEquivalent(entry.descriptor, descriptor) && entry.apiKey == apiKey {
-			entry.descriptor = descriptor
-			return entry, nil
-		}
-	}
-
-	instance := NewOrganizationProvider(descriptor, apiKey, m.cache, m.openRouterClient, m.geminiClient)
 	entry := &providerCacheEntry{
-		instance:   instance,
+		instance:   NewOrganizationProvider(descriptor, apiKey, m.cache, m.openRouterClient, m.geminiClient),
 		descriptor: descriptor,
 		apiKey:     apiKey,
 		loadedAt:   time.Now(),
 	}
 	m.storeProviderInCache(providerID, entry)
 	return entry, nil
-}
-
-func providersEquivalent(a, b *modelprovider.ModelProvider) bool {
-	if a == nil || b == nil {
-		return false
-	}
-	if !a.UpdatedAt.Equal(b.UpdatedAt) {
-		return false
-	}
-	if (a.LastSyncedAt == nil) != (b.LastSyncedAt == nil) {
-		return false
-	}
-	if a.LastSyncedAt != nil && !a.LastSyncedAt.Equal(*b.LastSyncedAt) {
-		return false
-	}
-	if a.Active != b.Active {
-		return false
-	}
-	if a.APIKeyHint != b.APIKeyHint {
-		return false
-	}
-	return true
 }
 
 func (m *MultiProviderInference) validateProviderAccess(selection inference.ProviderSelection, descriptor *modelprovider.ModelProvider) error {

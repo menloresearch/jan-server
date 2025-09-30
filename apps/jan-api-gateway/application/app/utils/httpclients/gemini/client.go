@@ -32,30 +32,6 @@ func NewClient() *Client {
 	return &Client{baseURL: base}
 }
 
-type geminiPart struct {
-	Text string `json:"text,omitempty"`
-}
-
-type geminiContent struct {
-	Role  string       `json:"role,omitempty"`
-	Parts []geminiPart `json:"parts"`
-}
-
-type generateContentRequest struct {
-	Contents          []geminiContent `json:"contents"`
-	SystemInstruction *geminiContent  `json:"systemInstruction,omitempty"`
-}
-
-type generateContentResponse struct {
-	Candidates []struct {
-		Content struct {
-			Role  string       `json:"role"`
-			Parts []geminiPart `json:"parts"`
-		} `json:"content"`
-		FinishReason string `json:"finishReason"`
-	} `json:"candidates"`
-}
-
 type modelsResponse struct {
 	Object string `json:"object"`
 	Data   []struct {
@@ -120,53 +96,4 @@ func (c *Client) GetModels(ctx context.Context, apiKey string) (*inference.Model
 		})
 	}
 	return &inference.ModelsResponse{Object: "list", Data: models}, nil
-}
-
-func convertToGeminiRequest(request openai.ChatCompletionRequest) generateContentRequest {
-	var systemContent *geminiContent
-	contents := make([]geminiContent, 0, len(request.Messages))
-	for _, msg := range request.Messages {
-		part := geminiPart{Text: msg.Content}
-		content := geminiContent{Role: msg.Role, Parts: []geminiPart{part}}
-		if msg.Role == "system" {
-			if systemContent == nil {
-				systemContent = &geminiContent{Parts: []geminiPart{part}}
-			} else {
-				systemContent.Parts = append(systemContent.Parts, part)
-			}
-			continue
-		}
-		contents = append(contents, content)
-	}
-	return generateContentRequest{
-		Contents:          contents,
-		SystemInstruction: systemContent,
-	}
-}
-
-func convertToOpenAIResponse(model string, geminiResp generateContentResponse) *openai.ChatCompletionResponse {
-	response := &openai.ChatCompletionResponse{
-		ID:      fmt.Sprintf("gemini-%d", time.Now().UnixNano()),
-		Object:  "chat.completion",
-		Created: time.Now().Unix(),
-		Model:   model,
-	}
-	if len(geminiResp.Candidates) == 0 {
-		return response
-	}
-	candidate := geminiResp.Candidates[0]
-	var text string
-	if len(candidate.Content.Parts) > 0 {
-		text = candidate.Content.Parts[0].Text
-	}
-	choice := openai.ChatCompletionChoice{
-		Index: 0,
-		Message: openai.ChatCompletionMessage{
-			Role:    candidate.Content.Role,
-			Content: text,
-		},
-		FinishReason: openai.FinishReason(candidate.FinishReason),
-	}
-	response.Choices = []openai.ChatCompletionChoice{choice}
-	return response
 }
