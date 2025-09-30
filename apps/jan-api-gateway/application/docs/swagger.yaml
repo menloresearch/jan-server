@@ -1,13 +1,6 @@
 basePath: /
 definitions:
-  apikeys.CreateApiKeyRequest:
-    properties:
-      description:
-        type: string
-      expiresAt:
-        type: string
-    type: object
-  auth.AccessTokenResponse:
+  app_interfaces_http_routes_v1_auth.AccessTokenResponse:
     properties:
       access_token:
         type: string
@@ -16,7 +9,7 @@ definitions:
       object:
         type: string
     type: object
-  auth.GetMeResponse:
+  app_interfaces_http_routes_v1_auth.GetMeResponse:
     properties:
       email:
         type: string
@@ -27,7 +20,201 @@ definitions:
       object:
         type: string
     type: object
-  conv.Model:
+  app_interfaces_http_routes_v1_auth_google.AccessTokenResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      object:
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_auth_google.GoogleCallbackRequest:
+    properties:
+      code:
+        type: string
+      state:
+        type: string
+    required:
+    - code
+    type: object
+  app_interfaces_http_routes_v1_auth_google.GoogleLoginUrl:
+    properties:
+      object:
+        type: string
+      url:
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_conv.ExtendedChatCompletionRequest:
+    properties:
+      chat_template_kwargs:
+        additionalProperties: {}
+        description: |-
+          ChatTemplateKwargs provides a way to add non-standard parameters to the request body.
+          Additional kwargs to pass to the template renderer. Will be accessible by the chat template.
+          Such as think mode for qwen3. "chat_template_kwargs": {"enable_thinking": false}
+          https://qwen.readthedocs.io/en/latest/deployment/vllm.html#thinking-non-thinking-modes
+        type: object
+      conversation:
+        type: string
+      frequency_penalty:
+        type: number
+      function_call:
+        description: 'Deprecated: use ToolChoice instead.'
+      functions:
+        description: 'Deprecated: use Tools instead.'
+        items:
+          $ref: '#/definitions/openai.FunctionDefinition'
+        type: array
+      guided_choice:
+        description: |-
+          GuidedChoice is a vLLM-specific extension that restricts the model's output
+          to one of the predefined string choices provided in this field. This feature
+          is used to constrain the model's responses to a controlled set of options,
+          ensuring predictable and consistent outputs in scenarios where specific
+          choices are required.
+        items:
+          type: string
+        type: array
+      logit_bias:
+        additionalProperties:
+          type: integer
+        description: |-
+          LogitBias is must be a token id string (specified by their token ID in the tokenizer), not a word string.
+          incorrect: `"logit_bias":{"You": 6}`, correct: `"logit_bias":{"1639": 6}`
+          refs: https://platform.openai.com/docs/api-reference/chat/create#chat/create-logit_bias
+        type: object
+      logprobs:
+        description: |-
+          LogProbs indicates whether to return log probabilities of the output tokens or not.
+          If true, returns the log probabilities of each output token returned in the content of message.
+          This option is currently not available on the gpt-4-vision-preview model.
+        type: boolean
+      max_completion_tokens:
+        description: |-
+          MaxCompletionTokens An upper bound for the number of tokens that can be generated for a completion,
+          including visible output tokens and reasoning tokens https://platform.openai.com/docs/guides/reasoning
+        type: integer
+      max_tokens:
+        description: |-
+          MaxTokens The maximum number of tokens that can be generated in the chat completion.
+          This value can be used to control costs for text generated via API.
+          Deprecated: use MaxCompletionTokens. Not compatible with o1-series models.
+          refs: https://platform.openai.com/docs/api-reference/chat/create#chat-create-max_tokens
+        type: integer
+      messages:
+        items:
+          $ref: '#/definitions/openai.ChatCompletionMessage'
+        type: array
+      metadata:
+        additionalProperties:
+          type: string
+        description: Metadata to store with the completion.
+        type: object
+      model:
+        type: string
+      "n":
+        type: integer
+      parallel_tool_calls:
+        description: 'Disable the default behavior of parallel tool calls by setting
+          it: false.'
+      prediction:
+        allOf:
+        - $ref: '#/definitions/openai.Prediction'
+        description: Configuration for a predicted output.
+      presence_penalty:
+        type: number
+      provider_id:
+        type: string
+      provider_type:
+        type: string
+      provider_vendor:
+        type: string
+      reasoning_effort:
+        description: Controls effort on reasoning for reasoning models. It can be
+          set to "low", "medium", or "high".
+        type: string
+      response_format:
+        $ref: '#/definitions/openai.ChatCompletionResponseFormat'
+      safety_identifier:
+        description: |-
+          A stable identifier used to help detect users of your application that may be violating OpenAI's usage policies.
+          The IDs should be a string that uniquely identifies each user.
+          We recommend hashing their username or email address, in order to avoid sending us any identifying information.
+          https://platform.openai.com/docs/api-reference/chat/create#chat_create-safety_identifier
+        type: string
+      seed:
+        type: integer
+      service_tier:
+        allOf:
+        - $ref: '#/definitions/openai.ServiceTier'
+        description: Specifies the latency tier to use for processing the request.
+      stop:
+        items:
+          type: string
+        type: array
+      store:
+        description: If true, the response will be stored in the conversation, default
+          is false
+        type: boolean
+      store_reasoning:
+        description: If true, the reasoning will be stored in the conversation, default
+          is false
+        type: boolean
+      stream:
+        type: boolean
+      stream_options:
+        allOf:
+        - $ref: '#/definitions/openai.StreamOptions'
+        description: 'Options for streaming response. Only set this when you set stream:
+          true.'
+      temperature:
+        type: number
+      tool_choice:
+        description: This can be either a string or an ToolChoice object.
+      tools:
+        items:
+          $ref: '#/definitions/openai.Tool'
+        type: array
+      top_logprobs:
+        description: |-
+          TopLogProbs is an integer between 0 and 5 specifying the number of most likely tokens to return at each
+          token position, each with an associated log probability.
+          logprobs must be set to true if this parameter is used.
+        type: integer
+      top_p:
+        type: number
+      user:
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_conv.ExtendedCompletionResponse:
+    properties:
+      choices:
+        items:
+          $ref: '#/definitions/openai.ChatCompletionChoice'
+        type: array
+      created:
+        type: integer
+      id:
+        type: string
+      metadata:
+        $ref: '#/definitions/app_interfaces_http_routes_v1_conv.ResponseMetadata'
+      model:
+        type: string
+      object:
+        type: string
+      prompt_filter_results:
+        items:
+          $ref: '#/definitions/openai.PromptFilterResult'
+        type: array
+      service_tier:
+        $ref: '#/definitions/openai.ServiceTier'
+      system_fingerprint:
+        type: string
+      usage:
+        $ref: '#/definitions/openai.Usage'
+    type: object
+  app_interfaces_http_routes_v1_conv.ModelResponse:
     properties:
       created:
         type: integer
@@ -46,28 +233,33 @@ definitions:
       provider_vendor:
         type: string
     type: object
-  conv.ModelsResponse:
+  app_interfaces_http_routes_v1_conv.ModelsResponse:
     properties:
       data:
         items:
-          $ref: '#/definitions/conv.Model'
+          $ref: '#/definitions/app_interfaces_http_routes_v1_conv.ModelResponse'
         type: array
       object:
         type: string
     type: object
-  conversation.ItemRole:
-    enum:
-    - system
-    - user
-    - assistant
-    - tool
-    type: string
-    x-enum-varnames:
-    - ItemRoleSystem
-    - ItemRoleUser
-    - ItemRoleAssistant
-    - ItemRoleTool
-  conversations.AnnotationResponse:
+  app_interfaces_http_routes_v1_conv.ResponseMetadata:
+    properties:
+      ask_item_id:
+        type: string
+      completion_item_id:
+        type: string
+      conversation_created:
+        type: boolean
+      conversation_id:
+        type: string
+      conversation_title:
+        type: string
+      store:
+        type: boolean
+      store_reasoning:
+        type: boolean
+    type: object
+  app_interfaces_http_routes_v1_conversations.AnnotationResponse:
     properties:
       end_index:
         type: integer
@@ -84,26 +276,26 @@ definitions:
       url:
         type: string
     type: object
-  conversations.ContentResponse:
+  app_interfaces_http_routes_v1_conversations.ContentResponse:
     properties:
       file:
-        $ref: '#/definitions/conversations.FileContentResponse'
+        $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.FileContentResponse'
       finish_reason:
         type: string
       image:
-        $ref: '#/definitions/conversations.ImageContentResponse'
+        $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.ImageContentResponse'
       input_text:
         type: string
       output_text:
-        $ref: '#/definitions/conversations.OutputTextResponse'
+        $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.OutputTextResponse'
       reasoning_content:
         type: string
       text:
-        $ref: '#/definitions/conversations.TextResponse'
+        $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.TextResponse'
       type:
         type: string
     type: object
-  conversations.ConversationContentRequest:
+  app_interfaces_http_routes_v1_conversations.ConversationContentRequest:
     properties:
       text:
         type: string
@@ -112,25 +304,25 @@ definitions:
     required:
     - type
     type: object
-  conversations.ConversationItemRequest:
+  app_interfaces_http_routes_v1_conversations.ConversationItemRequest:
     properties:
       content:
         items:
-          $ref: '#/definitions/conversations.ConversationContentRequest'
+          $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.ConversationContentRequest'
         type: array
       role:
-        $ref: '#/definitions/conversation.ItemRole'
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_conversation.ItemRole'
       type:
         type: string
     required:
     - content
     - type
     type: object
-  conversations.ConversationItemResponse:
+  app_interfaces_http_routes_v1_conversations.ConversationItemResponse:
     properties:
       content:
         items:
-          $ref: '#/definitions/conversations.ContentResponse'
+          $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.ContentResponse'
         type: array
       created_at:
         type: integer
@@ -145,11 +337,11 @@ definitions:
       type:
         type: string
     type: object
-  conversations.CreateConversationRequest:
+  app_interfaces_http_routes_v1_conversations.CreateConversationRequest:
     properties:
       items:
         items:
-          $ref: '#/definitions/conversations.ConversationItemRequest'
+          $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.ConversationItemRequest'
         type: array
       metadata:
         additionalProperties:
@@ -158,16 +350,16 @@ definitions:
       title:
         type: string
     type: object
-  conversations.CreateItemsRequest:
+  app_interfaces_http_routes_v1_conversations.CreateItemsRequest:
     properties:
       items:
         items:
-          $ref: '#/definitions/conversations.ConversationItemRequest'
+          $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.ConversationItemRequest'
         type: array
     required:
     - items
     type: object
-  conversations.DeletedConversationResponse:
+  app_interfaces_http_routes_v1_conversations.DeletedConversationResponse:
     properties:
       deleted:
         type: boolean
@@ -176,7 +368,7 @@ definitions:
       object:
         type: string
     type: object
-  conversations.ExtendedConversationResponse:
+  app_interfaces_http_routes_v1_conversations.ExtendedConversationResponse:
     properties:
       created_at:
         type: integer
@@ -191,7 +383,7 @@ definitions:
       title:
         type: string
     type: object
-  conversations.FileContentResponse:
+  app_interfaces_http_routes_v1_conversations.FileContentResponse:
     properties:
       file_id:
         type: string
@@ -202,7 +394,7 @@ definitions:
       size:
         type: integer
     type: object
-  conversations.ImageContentResponse:
+  app_interfaces_http_routes_v1_conversations.ImageContentResponse:
     properties:
       detail:
         type: string
@@ -211,21 +403,21 @@ definitions:
       url:
         type: string
     type: object
-  conversations.OutputTextResponse:
+  app_interfaces_http_routes_v1_conversations.OutputTextResponse:
     properties:
       annotations:
         items:
-          $ref: '#/definitions/conversations.AnnotationResponse'
+          $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.AnnotationResponse'
         type: array
       text:
         type: string
     type: object
-  conversations.TextResponse:
+  app_interfaces_http_routes_v1_conversations.TextResponse:
     properties:
       value:
         type: string
     type: object
-  conversations.UpdateConversationRequest:
+  app_interfaces_http_routes_v1_conversations.UpdateConversationRequest:
     properties:
       metadata:
         additionalProperties:
@@ -234,78 +426,7 @@ definitions:
       title:
         type: string
     type: object
-  google.AccessTokenResponse:
-    properties:
-      access_token:
-        type: string
-      expires_in:
-        type: integer
-      object:
-        type: string
-    type: object
-  google.GoogleCallbackRequest:
-    properties:
-      code:
-        type: string
-      state:
-        type: string
-    required:
-    - code
-    type: object
-  google.GoogleLoginUrl:
-    properties:
-      object:
-        type: string
-      url:
-        type: string
-    type: object
-  invites.CreateInviteUserRequest:
-    properties:
-      email:
-        type: string
-      projects:
-        items:
-          $ref: '#/definitions/invites.InviteProject'
-        type: array
-      role:
-        type: string
-    type: object
-  invites.InviteProject:
-    properties:
-      id:
-        type: string
-      role:
-        type: string
-    type: object
-  invites.InviteResponse:
-    properties:
-      accepted_at:
-        type: string
-      email:
-        type: string
-      expires_at:
-        type: string
-      id:
-        type: string
-      invited_at:
-        type: string
-      object:
-        type: string
-      projects:
-        items:
-          $ref: '#/definitions/invites.InviteProject'
-        type: array
-      role:
-        type: string
-      status:
-        type: string
-    type: object
-  invites.VerifyInviteUserRequest:
-    properties:
-      code:
-        type: string
-    type: object
-  organization.AdminAPIKeyDeletedResponse:
+  app_interfaces_http_routes_v1_organization.AdminAPIKeyDeletedResponse:
     properties:
       deleted:
         type: boolean
@@ -314,11 +435,11 @@ definitions:
       object:
         type: string
     type: object
-  organization.AdminApiKeyListResponse:
+  app_interfaces_http_routes_v1_organization.AdminApiKeyListResponse:
     properties:
       data:
         items:
-          $ref: '#/definitions/organization.OrganizationAdminAPIKeyResponse'
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization.OrganizationAdminAPIKeyResponse'
         type: array
       first_id:
         type: string
@@ -330,7 +451,7 @@ definitions:
         example: list
         type: string
     type: object
-  organization.CreateOrganizationAdminAPIKeyRequest:
+  app_interfaces_http_routes_v1_organization.CreateOrganizationAdminAPIKeyRequest:
     properties:
       name:
         example: My Admin API Key
@@ -338,7 +459,7 @@ definitions:
     required:
     - name
     type: object
-  organization.OrganizationAdminAPIKeyResponse:
+  app_interfaces_http_routes_v1_organization.OrganizationAdminAPIKeyResponse:
     properties:
       created_at:
         example: 1698765432
@@ -356,7 +477,7 @@ definitions:
         example: api_key
         type: string
       owner:
-        $ref: '#/definitions/organization.Owner'
+        $ref: '#/definitions/app_interfaces_http_routes_v1_organization.Owner'
       redacted_value:
         example: sk-...abcd
         type: string
@@ -364,7 +485,7 @@ definitions:
         example: sk-abcdef1234567890
         type: string
     type: object
-  organization.Owner:
+  app_interfaces_http_routes_v1_organization.Owner:
     properties:
       created_at:
         example: 1698765432
@@ -385,7 +506,53 @@ definitions:
         example: user
         type: string
     type: object
-  projects.CreateProjectRequest:
+  app_interfaces_http_routes_v1_organization_invites.CreateInviteUserRequest:
+    properties:
+      email:
+        type: string
+      projects:
+        items:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_invites.InviteProject'
+        type: array
+      role:
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_organization_invites.InviteProject:
+    properties:
+      id:
+        type: string
+      role:
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_organization_invites.InviteResponse:
+    properties:
+      accepted_at:
+        type: string
+      email:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      invited_at:
+        type: string
+      object:
+        type: string
+      projects:
+        items:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_invites.InviteProject'
+        type: array
+      role:
+        type: string
+      status:
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_organization_invites.VerifyInviteUserRequest:
+    properties:
+      code:
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_organization_projects.CreateProjectRequest:
     properties:
       name:
         example: New AI Project
@@ -393,11 +560,11 @@ definitions:
     required:
     - name
     type: object
-  projects.ProjectListResponse:
+  app_interfaces_http_routes_v1_organization_projects.ProjectListResponse:
     properties:
       data:
         items:
-          $ref: '#/definitions/projects.ProjectResponse'
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_projects.ProjectResponse'
         type: array
       first_id:
         type: string
@@ -409,7 +576,7 @@ definitions:
         example: list
         type: string
     type: object
-  projects.ProjectResponse:
+  app_interfaces_http_routes_v1_organization_projects.ProjectResponse:
     properties:
       archived_at:
         example: 1698765432
@@ -429,17 +596,1184 @@ definitions:
       status:
         type: string
     type: object
-  projects.UpdateProjectRequest:
+  app_interfaces_http_routes_v1_organization_projects.UpdateProjectRequest:
     properties:
       name:
         example: Updated AI Project
         type: string
     type: object
-  responses.ErrorResponse:
+  app_interfaces_http_routes_v1_organization_projects_api_keys.ApiKeyResponse:
+    properties:
+      apikeyType:
+        type: string
+      description:
+        type: string
+      enabled:
+        type: boolean
+      expiresAt:
+        type: string
+      id:
+        type: string
+      key:
+        type: string
+      last_usedAt:
+        type: string
+      permissions:
+        type: string
+      plaintextHint:
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_organization_projects_api_keys.CreateApiKeyRequest:
+    properties:
+      description:
+        type: string
+      expiresAt:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_domain_conversation.ItemRole:
+    enum:
+    - system
+    - user
+    - assistant
+    - tool
+    type: string
+    x-enum-varnames:
+    - ItemRoleSystem
+    - ItemRoleUser
+    - ItemRoleAssistant
+    - ItemRoleTool
+  menlo_ai_jan-api-gateway_app_interfaces_http_requests.CreateResponseRequest:
+    properties:
+      background:
+        description: Whether to run the response in the background.
+        type: boolean
+      conversation:
+        description: The conversation ID to append items to. If not set or set to
+          ClientCreatedRootConversationID, a new conversation will be created.
+        type: string
+      frequency_penalty:
+        description: The frequency penalty to use for this response.
+        type: number
+      input:
+        description: The input to the model. Can be a string or array of strings.
+      logit_bias:
+        additionalProperties:
+          format: float64
+          type: number
+        description: The logit bias to use for this response.
+        type: object
+      max_tokens:
+        description: The maximum number of tokens to generate.
+        type: integer
+      metadata:
+        additionalProperties: {}
+        description: The metadata to use for this response.
+        type: object
+      model:
+        description: The ID of the model to use for this response.
+        type: string
+      presence_penalty:
+        description: The presence penalty to use for this response.
+        type: number
+      previous_response_id:
+        description: The ID of the previous response to continue from. If set, the
+          conversation will be loaded from the previous response.
+        type: string
+      repetition_penalty:
+        description: The repetition penalty to use for this response.
+        type: number
+      response_format:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.ResponseFormat'
+        description: The response format to use for this response.
+      seed:
+        description: The seed to use for this response.
+        type: integer
+      stop:
+        description: The stop sequences to use for this response.
+        items:
+          type: string
+        type: array
+      store:
+        description: Whether to store the conversation. If false, no conversation
+          will be created or used.
+        type: boolean
+      stream:
+        description: Whether to stream the response.
+        type: boolean
+      system_prompt:
+        description: The system prompt to use for this response.
+        type: string
+      temperature:
+        description: The temperature to use for this response.
+        type: number
+      timeout:
+        description: The timeout in seconds for this response.
+        type: integer
+      tool_choice:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.ToolChoice'
+        description: The tool choice to use for this response.
+      tools:
+        description: The tools to use for this response.
+        items:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.Tool'
+        type: array
+      top_k:
+        description: The top_k to use for this response.
+        type: integer
+      top_p:
+        description: The top_p to use for this response.
+        type: number
+      user:
+        description: The user to use for this response.
+        type: string
+    required:
+    - input
+    - model
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_requests.FileInput:
+    properties:
+      file_id:
+        description: The ID of the file.
+        type: string
+    required:
+    - file_id
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_requests.FileSearchInput:
+    properties:
+      file_ids:
+        description: The IDs of the files to search in.
+        items:
+          type: string
+        type: array
+      max_results:
+        description: The number of results to return.
+        type: integer
+      query:
+        description: The query to search for.
+        type: string
+    required:
+    - file_ids
+    - query
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionCall:
+    properties:
+      arguments:
+        additionalProperties: {}
+        description: The arguments to pass to the function.
+        type: object
+      name:
+        description: The name of the function to call.
+        type: string
+    required:
+    - name
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionCallsInput:
+    properties:
+      calls:
+        description: The function calls to make.
+        items:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionCall'
+        type: array
+    required:
+    - calls
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionChoice:
+    properties:
+      name:
+        description: The name of the function.
+        type: string
+    required:
+    - name
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionDefinition:
+    properties:
+      description:
+        description: The description of the function.
+        type: string
+      name:
+        description: The name of the function.
+        type: string
+      parameters:
+        additionalProperties: {}
+        description: The parameters of the function.
+        type: object
+    required:
+    - name
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_requests.ImageInput:
+    properties:
+      data:
+        description: The base64 encoded image data.
+        type: string
+      detail:
+        description: The detail level for the image.
+        type: string
+      url:
+        description: The URL of the image.
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_requests.InputType:
+    enum:
+    - text
+    - image
+    - file
+    - web_search
+    - file_search
+    - streaming
+    - function_calls
+    - reasoning
+    type: string
+    x-enum-varnames:
+    - InputTypeText
+    - InputTypeImage
+    - InputTypeFile
+    - InputTypeWebSearch
+    - InputTypeFileSearch
+    - InputTypeStreaming
+    - InputTypeFunctionCalls
+    - InputTypeReasoning
+  menlo_ai_jan-api-gateway_app_interfaces_http_requests.ReasoningInput:
+    properties:
+      context:
+        description: The context for the reasoning task.
+        type: string
+      task:
+        description: The reasoning task to perform.
+        type: string
+    required:
+    - task
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_requests.ResponseFormat:
+    properties:
+      type:
+        description: The type of response format.
+        type: string
+    required:
+    - type
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_requests.StreamingInput:
+    properties:
+      body:
+        description: The body to send with the request.
+        type: string
+      headers:
+        additionalProperties:
+          type: string
+        description: The headers to send with the request.
+        type: object
+      method:
+        description: The method to use for the request.
+        type: string
+      url:
+        description: The URL to stream from.
+        type: string
+    required:
+    - url
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_requests.Tool:
+    properties:
+      function:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionDefinition'
+        description: The function definition for function tools.
+      type:
+        description: The type of tool.
+        type: string
+    required:
+    - type
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_requests.ToolChoice:
+    properties:
+      function:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionChoice'
+        description: The function to use for function tool choice.
+      type:
+        description: The type of tool choice.
+        type: string
+    required:
+    - type
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_requests.WebSearchInput:
+    properties:
+      max_results:
+        description: The number of results to return.
+        type: integer
+      query:
+        description: The query to search for.
+        type: string
+      search_engine:
+        description: The search engine to use.
+        type: string
+    required:
+    - query
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_responses.ConversationInfo:
+    properties:
+      id:
+        description: The unique ID of the conversation.
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_responses.DetailedUsage:
+    properties:
+      input_tokens:
+        description: The number of tokens in the prompt.
+        type: integer
+      input_tokens_details:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.TokenDetails'
+        description: Details about input tokens.
+      output_tokens:
+        description: The number of tokens in the completion.
+        type: integer
+      output_tokens_details:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.TokenDetails'
+        description: Details about output tokens.
+      total_tokens:
+        description: The total number of tokens used.
+        type: integer
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse:
     properties:
       code:
         type: string
       error:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_responses.FormatType:
+    properties:
+      type:
+        description: The type of format.
+        type: string
+    type: object
+  ? menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_v1_organization_projects_api_keys_ApiKeyResponse
+  : properties:
+      result:
+        $ref: '#/definitions/app_interfaces_http_routes_v1_organization_projects_api_keys.ApiKeyResponse'
+      status:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_responses.InputItem:
+    properties:
+      created:
+        description: The Unix timestamp (in seconds) when the input item was created.
+        type: integer
+      file:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.FileInput'
+        description: The file content (for file type).
+      file_search:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.FileSearchInput'
+        description: The file search content (for file_search type).
+      function_calls:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.FunctionCallsInput'
+        description: The function calls content (for function_calls type).
+      id:
+        description: The unique identifier for the input item.
+        type: string
+      image:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.ImageInput'
+        description: The image content (for image type).
+      object:
+        description: The object type, which is always "input_item".
+        type: string
+      reasoning:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.ReasoningInput'
+        description: The reasoning content (for reasoning type).
+      streaming:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.StreamingInput'
+        description: The streaming content (for streaming type).
+      text:
+        description: The text content (for text type).
+        type: string
+      type:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.InputType'
+        description: The type of input item.
+      web_search:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.WebSearchInput'
+        description: The web search content (for web_search type).
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListInputItemsResponse:
+    properties:
+      data:
+        description: The list of input items.
+        items:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.InputItem'
+        type: array
+      first_id:
+        description: The first ID in the list.
+        type: string
+      has_more:
+        description: Whether there are more items available.
+        type: boolean
+      last_id:
+        description: The last ID in the list.
+        type: string
+      object:
+        description: The object type, which is always "list".
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_responses.Reasoning:
+    properties:
+      effort:
+        description: The effort level for reasoning.
+        type: string
+      summary:
+        description: The summary of reasoning.
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_responses.Response:
+    properties:
+      background:
+        description: Whether the response was run in the background.
+        type: boolean
+      cancelled_at:
+        description: The Unix timestamp (in seconds) when the response was cancelled.
+        type: integer
+      completed_at:
+        description: The Unix timestamp (in seconds) when the response was completed.
+        type: integer
+      conversation:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ConversationInfo'
+        description: The conversation that this response belongs to.
+      created:
+        description: The Unix timestamp (in seconds) when the response was created.
+        type: integer
+      error:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ResponseError'
+        description: The error that occurred during processing, if any.
+      failed_at:
+        description: The Unix timestamp (in seconds) when the response was failed.
+        type: integer
+      frequency_penalty:
+        description: The frequency penalty that was used for this response.
+        type: number
+      id:
+        description: The unique identifier for the response.
+        type: string
+      incomplete_details:
+        description: OpenAI API response fields
+      input:
+        description: The input that was provided to the model. Can be a string or
+          array of strings.
+      instructions: {}
+      logit_bias:
+        additionalProperties:
+          format: float64
+          type: number
+        description: The logit bias that was used for this response.
+        type: object
+      max_output_tokens:
+        type: integer
+      max_tokens:
+        description: The maximum number of tokens that were generated.
+        type: integer
+      metadata:
+        additionalProperties: {}
+        description: The metadata that was provided for this response.
+        type: object
+      model:
+        description: The ID of the model used for this response.
+        type: string
+      object:
+        description: The object type, which is always "response".
+        type: string
+      output:
+        description: The output generated by the model.
+      parallel_tool_calls:
+        type: boolean
+      presence_penalty:
+        description: The presence penalty that was used for this response.
+        type: number
+      previous_response_id:
+        type: string
+      reasoning:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.Reasoning'
+      repetition_penalty:
+        description: The repetition penalty that was used for this response.
+        type: number
+      response_format:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.ResponseFormat'
+        description: The response format that was used for this response.
+      seed:
+        description: The seed that was used for this response.
+        type: integer
+      status:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ResponseStatus'
+        description: The status of the response.
+      stop:
+        description: The stop sequences that were used for this response.
+        items:
+          type: string
+        type: array
+      store:
+        type: boolean
+      stream:
+        description: Whether the response was streamed.
+        type: boolean
+      system_prompt:
+        description: The system prompt that was used for this response.
+        type: string
+      temperature:
+        description: The temperature that was used for this response.
+        type: number
+      text:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.TextFormat'
+      timeout:
+        description: The timeout in seconds that was used for this response.
+        type: integer
+      tool_choice:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.ToolChoice'
+        description: The tool choice that was used for this response.
+      tools:
+        description: The tools that were used for this response.
+        items:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.Tool'
+        type: array
+      top_k:
+        description: The top_k that was used for this response.
+        type: integer
+      top_p:
+        description: The top_p that was used for this response.
+        type: number
+      truncation:
+        type: string
+      usage:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.DetailedUsage'
+        description: The usage statistics for this response.
+      user:
+        description: The user that was provided for this response.
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_responses.ResponseError:
+    properties:
+      code:
+        description: The error code.
+        type: string
+      details:
+        additionalProperties: {}
+        description: The error details.
+        type: object
+      message:
+        description: The error message.
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_responses.ResponseStatus:
+    enum:
+    - pending
+    - running
+    - completed
+    - cancelled
+    - failed
+    type: string
+    x-enum-varnames:
+    - ResponseStatusPending
+    - ResponseStatusRunning
+    - ResponseStatusCompleted
+    - ResponseStatusCancelled
+    - ResponseStatusFailed
+  menlo_ai_jan-api-gateway_app_interfaces_http_responses.TextFormat:
+    properties:
+      format:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.FormatType'
+        description: The format type.
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_responses.TokenDetails:
+    properties:
+      cached_tokens:
+        description: The number of cached tokens.
+        type: integer
+      reasoning_tokens:
+        description: The number of reasoning tokens.
+        type: integer
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.DeleteResponse:
+    properties:
+      deleted:
+        type: boolean
+      id:
+        type: string
+      object:
+        type: string
+    type: object
+  ? menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ConversationItemResponse
+  : properties:
+      data:
+        items:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.ConversationItemResponse'
+        type: array
+      first_id:
+        type: string
+      has_more:
+        type: boolean
+      last_id:
+        type: string
+      object:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ObjectTypeList'
+      total:
+        type: integer
+    type: object
+  ? menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ExtendedConversationResponse
+  : properties:
+      data:
+        items:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.ExtendedConversationResponse'
+        type: array
+      first_id:
+        type: string
+      has_more:
+        type: boolean
+      last_id:
+        type: string
+      object:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ObjectTypeList'
+      total:
+        type: integer
+    type: object
+  ? menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_organization_invites_InviteResponse
+  : properties:
+      data:
+        items:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_invites.InviteResponse'
+        type: array
+      first_id:
+        type: string
+      has_more:
+        type: boolean
+      last_id:
+        type: string
+      object:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ObjectTypeList'
+      total:
+        type: integer
+    type: object
+  menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ObjectTypeList:
+    enum:
+    - list
+    type: string
+    x-enum-varnames:
+    - ObjectTypeListList
+  openai.ChatCompletionChoice:
+    properties:
+      content_filter_results:
+        $ref: '#/definitions/openai.ContentFilterResults'
+      finish_reason:
+        allOf:
+        - $ref: '#/definitions/openai.FinishReason'
+        description: |-
+          FinishReason
+          stop: API returned complete message,
+          or a message terminated by one of the stop sequences provided via the stop parameter
+          length: Incomplete model output due to max_tokens parameter or token limit
+          function_call: The model decided to call a function
+          content_filter: Omitted content due to a flag from our content filters
+          null: API response still in progress or incomplete
+      index:
+        type: integer
+      logprobs:
+        $ref: '#/definitions/openai.LogProbs'
+      message:
+        $ref: '#/definitions/openai.ChatCompletionMessage'
+    type: object
+  openai.ChatCompletionMessage:
+    properties:
+      content:
+        type: string
+      function_call:
+        $ref: '#/definitions/openai.FunctionCall'
+      multiContent:
+        items:
+          $ref: '#/definitions/openai.ChatMessagePart'
+        type: array
+      name:
+        description: |-
+          This property isn't in the official documentation, but it's in
+          the documentation for the official library for python:
+          - https://github.com/openai/openai-python/blob/main/chatml.md
+          - https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb
+        type: string
+      reasoning_content:
+        description: |-
+          This property is used for the "reasoning" feature supported by deepseek-reasoner
+          which is not in the official documentation.
+          the doc from deepseek:
+          - https://api-docs.deepseek.com/api/create-chat-completion#responses
+        type: string
+      refusal:
+        type: string
+      role:
+        type: string
+      tool_call_id:
+        description: For Role=tool prompts this should be set to the ID given in the
+          assistant's prior request to call a tool.
+        type: string
+      tool_calls:
+        description: For Role=assistant prompts this may be set to the tool calls
+          generated by the model, such as function calls.
+        items:
+          $ref: '#/definitions/openai.ToolCall'
+        type: array
+    type: object
+  openai.ChatCompletionRequest:
+    properties:
+      chat_template_kwargs:
+        additionalProperties: {}
+        description: |-
+          ChatTemplateKwargs provides a way to add non-standard parameters to the request body.
+          Additional kwargs to pass to the template renderer. Will be accessible by the chat template.
+          Such as think mode for qwen3. "chat_template_kwargs": {"enable_thinking": false}
+          https://qwen.readthedocs.io/en/latest/deployment/vllm.html#thinking-non-thinking-modes
+        type: object
+      frequency_penalty:
+        type: number
+      function_call:
+        description: 'Deprecated: use ToolChoice instead.'
+      functions:
+        description: 'Deprecated: use Tools instead.'
+        items:
+          $ref: '#/definitions/openai.FunctionDefinition'
+        type: array
+      guided_choice:
+        description: |-
+          GuidedChoice is a vLLM-specific extension that restricts the model's output
+          to one of the predefined string choices provided in this field. This feature
+          is used to constrain the model's responses to a controlled set of options,
+          ensuring predictable and consistent outputs in scenarios where specific
+          choices are required.
+        items:
+          type: string
+        type: array
+      logit_bias:
+        additionalProperties:
+          type: integer
+        description: |-
+          LogitBias is must be a token id string (specified by their token ID in the tokenizer), not a word string.
+          incorrect: `"logit_bias":{"You": 6}`, correct: `"logit_bias":{"1639": 6}`
+          refs: https://platform.openai.com/docs/api-reference/chat/create#chat/create-logit_bias
+        type: object
+      logprobs:
+        description: |-
+          LogProbs indicates whether to return log probabilities of the output tokens or not.
+          If true, returns the log probabilities of each output token returned in the content of message.
+          This option is currently not available on the gpt-4-vision-preview model.
+        type: boolean
+      max_completion_tokens:
+        description: |-
+          MaxCompletionTokens An upper bound for the number of tokens that can be generated for a completion,
+          including visible output tokens and reasoning tokens https://platform.openai.com/docs/guides/reasoning
+        type: integer
+      max_tokens:
+        description: |-
+          MaxTokens The maximum number of tokens that can be generated in the chat completion.
+          This value can be used to control costs for text generated via API.
+          Deprecated: use MaxCompletionTokens. Not compatible with o1-series models.
+          refs: https://platform.openai.com/docs/api-reference/chat/create#chat-create-max_tokens
+        type: integer
+      messages:
+        items:
+          $ref: '#/definitions/openai.ChatCompletionMessage'
+        type: array
+      metadata:
+        additionalProperties:
+          type: string
+        description: Metadata to store with the completion.
+        type: object
+      model:
+        type: string
+      "n":
+        type: integer
+      parallel_tool_calls:
+        description: 'Disable the default behavior of parallel tool calls by setting
+          it: false.'
+      prediction:
+        allOf:
+        - $ref: '#/definitions/openai.Prediction'
+        description: Configuration for a predicted output.
+      presence_penalty:
+        type: number
+      reasoning_effort:
+        description: Controls effort on reasoning for reasoning models. It can be
+          set to "low", "medium", or "high".
+        type: string
+      response_format:
+        $ref: '#/definitions/openai.ChatCompletionResponseFormat'
+      safety_identifier:
+        description: |-
+          A stable identifier used to help detect users of your application that may be violating OpenAI's usage policies.
+          The IDs should be a string that uniquely identifies each user.
+          We recommend hashing their username or email address, in order to avoid sending us any identifying information.
+          https://platform.openai.com/docs/api-reference/chat/create#chat_create-safety_identifier
+        type: string
+      seed:
+        type: integer
+      service_tier:
+        allOf:
+        - $ref: '#/definitions/openai.ServiceTier'
+        description: Specifies the latency tier to use for processing the request.
+      stop:
+        items:
+          type: string
+        type: array
+      store:
+        description: |-
+          Store can be set to true to store the output of this completion request for use in distillations and evals.
+          https://platform.openai.com/docs/api-reference/chat/create#chat-create-store
+        type: boolean
+      stream:
+        type: boolean
+      stream_options:
+        allOf:
+        - $ref: '#/definitions/openai.StreamOptions'
+        description: 'Options for streaming response. Only set this when you set stream:
+          true.'
+      temperature:
+        type: number
+      tool_choice:
+        description: This can be either a string or an ToolChoice object.
+      tools:
+        items:
+          $ref: '#/definitions/openai.Tool'
+        type: array
+      top_logprobs:
+        description: |-
+          TopLogProbs is an integer between 0 and 5 specifying the number of most likely tokens to return at each
+          token position, each with an associated log probability.
+          logprobs must be set to true if this parameter is used.
+        type: integer
+      top_p:
+        type: number
+      user:
+        type: string
+    type: object
+  openai.ChatCompletionResponse:
+    properties:
+      choices:
+        items:
+          $ref: '#/definitions/openai.ChatCompletionChoice'
+        type: array
+      created:
+        type: integer
+      id:
+        type: string
+      model:
+        type: string
+      object:
+        type: string
+      prompt_filter_results:
+        items:
+          $ref: '#/definitions/openai.PromptFilterResult'
+        type: array
+      service_tier:
+        $ref: '#/definitions/openai.ServiceTier'
+      system_fingerprint:
+        type: string
+      usage:
+        $ref: '#/definitions/openai.Usage'
+    type: object
+  openai.ChatCompletionResponseFormat:
+    properties:
+      json_schema:
+        $ref: '#/definitions/openai.ChatCompletionResponseFormatJSONSchema'
+      type:
+        $ref: '#/definitions/openai.ChatCompletionResponseFormatType'
+    type: object
+  openai.ChatCompletionResponseFormatJSONSchema:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      schema: {}
+      strict:
+        type: boolean
+    type: object
+  openai.ChatCompletionResponseFormatType:
+    enum:
+    - json_object
+    - json_schema
+    - text
+    type: string
+    x-enum-varnames:
+    - ChatCompletionResponseFormatTypeJSONObject
+    - ChatCompletionResponseFormatTypeJSONSchema
+    - ChatCompletionResponseFormatTypeText
+  openai.ChatMessageImageURL:
+    properties:
+      detail:
+        $ref: '#/definitions/openai.ImageURLDetail'
+      url:
+        type: string
+    type: object
+  openai.ChatMessagePart:
+    properties:
+      image_url:
+        $ref: '#/definitions/openai.ChatMessageImageURL'
+      text:
+        type: string
+      type:
+        $ref: '#/definitions/openai.ChatMessagePartType'
+    type: object
+  openai.ChatMessagePartType:
+    enum:
+    - text
+    - image_url
+    type: string
+    x-enum-varnames:
+    - ChatMessagePartTypeText
+    - ChatMessagePartTypeImageURL
+  openai.CompletionTokensDetails:
+    properties:
+      accepted_prediction_tokens:
+        type: integer
+      audio_tokens:
+        type: integer
+      reasoning_tokens:
+        type: integer
+      rejected_prediction_tokens:
+        type: integer
+    type: object
+  openai.ContentFilterResults:
+    properties:
+      hate:
+        $ref: '#/definitions/openai.Hate'
+      jailbreak:
+        $ref: '#/definitions/openai.JailBreak'
+      profanity:
+        $ref: '#/definitions/openai.Profanity'
+      self_harm:
+        $ref: '#/definitions/openai.SelfHarm'
+      sexual:
+        $ref: '#/definitions/openai.Sexual'
+      violence:
+        $ref: '#/definitions/openai.Violence'
+    type: object
+  openai.FinishReason:
+    enum:
+    - stop
+    - length
+    - function_call
+    - tool_calls
+    - content_filter
+    - "null"
+    type: string
+    x-enum-varnames:
+    - FinishReasonStop
+    - FinishReasonLength
+    - FinishReasonFunctionCall
+    - FinishReasonToolCalls
+    - FinishReasonContentFilter
+    - FinishReasonNull
+  openai.FunctionCall:
+    properties:
+      arguments:
+        description: call function with arguments in JSON format
+        type: string
+      name:
+        type: string
+    type: object
+  openai.FunctionDefinition:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      parameters:
+        description: |-
+          Parameters is an object describing the function.
+          You can pass json.RawMessage to describe the schema,
+          or you can pass in a struct which serializes to the proper JSON schema.
+          The jsonschema package is provided for convenience, but you should
+          consider another specialized library if you require more complex schemas.
+      strict:
+        type: boolean
+    type: object
+  openai.Hate:
+    properties:
+      filtered:
+        type: boolean
+      severity:
+        type: string
+    type: object
+  openai.ImageURLDetail:
+    enum:
+    - high
+    - low
+    - auto
+    type: string
+    x-enum-varnames:
+    - ImageURLDetailHigh
+    - ImageURLDetailLow
+    - ImageURLDetailAuto
+  openai.JailBreak:
+    properties:
+      detected:
+        type: boolean
+      filtered:
+        type: boolean
+    type: object
+  openai.LogProb:
+    properties:
+      bytes:
+        description: Omitting the field if it is null
+        items:
+          type: integer
+        type: array
+      logprob:
+        type: number
+      token:
+        type: string
+      top_logprobs:
+        description: |-
+          TopLogProbs is a list of the most likely tokens and their log probability, at this token position.
+          In rare cases, there may be fewer than the number of requested top_logprobs returned.
+        items:
+          $ref: '#/definitions/openai.TopLogProbs'
+        type: array
+    type: object
+  openai.LogProbs:
+    properties:
+      content:
+        description: Content is a list of message content tokens with log probability
+          information.
+        items:
+          $ref: '#/definitions/openai.LogProb'
+        type: array
+    type: object
+  openai.Prediction:
+    properties:
+      content:
+        type: string
+      type:
+        type: string
+    type: object
+  openai.Profanity:
+    properties:
+      detected:
+        type: boolean
+      filtered:
+        type: boolean
+    type: object
+  openai.PromptFilterResult:
+    properties:
+      content_filter_results:
+        $ref: '#/definitions/openai.ContentFilterResults'
+      index:
+        type: integer
+    type: object
+  openai.PromptTokensDetails:
+    properties:
+      audio_tokens:
+        type: integer
+      cached_tokens:
+        type: integer
+    type: object
+  openai.SelfHarm:
+    properties:
+      filtered:
+        type: boolean
+      severity:
+        type: string
+    type: object
+  openai.ServiceTier:
+    enum:
+    - auto
+    - default
+    - flex
+    - priority
+    type: string
+    x-enum-varnames:
+    - ServiceTierAuto
+    - ServiceTierDefault
+    - ServiceTierFlex
+    - ServiceTierPriority
+  openai.Sexual:
+    properties:
+      filtered:
+        type: boolean
+      severity:
+        type: string
+    type: object
+  openai.StreamOptions:
+    properties:
+      include_usage:
+        description: |-
+          If set, an additional chunk will be streamed before the data: [DONE] message.
+          The usage field on this chunk shows the token usage statistics for the entire request,
+          and the choices field will always be an empty array.
+          All other chunks will also include a usage field, but with a null value.
+        type: boolean
+    type: object
+  openai.Tool:
+    properties:
+      function:
+        $ref: '#/definitions/openai.FunctionDefinition'
+      type:
+        $ref: '#/definitions/openai.ToolType'
+    type: object
+  openai.ToolCall:
+    properties:
+      function:
+        $ref: '#/definitions/openai.FunctionCall'
+      id:
+        type: string
+      index:
+        description: Index is not nil only in chat completion chunk object
+        type: integer
+      type:
+        $ref: '#/definitions/openai.ToolType'
+    type: object
+  openai.ToolType:
+    enum:
+    - function
+    type: string
+    x-enum-varnames:
+    - ToolTypeFunction
+  openai.TopLogProbs:
+    properties:
+      bytes:
+        items:
+          type: integer
+        type: array
+      logprob:
+        type: number
+      token:
+        type: string
+    type: object
+  openai.Usage:
+    properties:
+      completion_tokens:
+        type: integer
+      completion_tokens_details:
+        $ref: '#/definitions/openai.CompletionTokensDetails'
+      prompt_tokens:
+        type: integer
+      prompt_tokens_details:
+        $ref: '#/definitions/openai.PromptTokensDetails'
+      total_tokens:
+        type: integer
+    type: object
+  openai.Violence:
+    properties:
+      filtered:
+        type: boolean
+      severity:
         type: string
     type: object
 info:
@@ -461,28 +1795,28 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/google.GoogleCallbackRequest'
+          $ref: '#/definitions/app_interfaces_http_routes_v1_auth_google.GoogleCallbackRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Successfully authenticated and returned tokens
           schema:
-            $ref: '#/definitions/google.AccessTokenResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_auth_google.AccessTokenResponse'
         "400":
           description: Bad request (e.g., invalid state, missing code, or invalid
             claims)
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized (e.g., a user claim is not found or is invalid
             in the context)
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       summary: Google OAuth2 Callback
       tags:
       - Authentication API
@@ -494,11 +1828,11 @@ paths:
         "200":
           description: redirect url
           schema:
-            $ref: '#/definitions/google.GoogleLoginUrl'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_auth_google.GoogleLoginUrl'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       summary: Google OAuth2 Login
       tags:
       - Authentication API
@@ -511,15 +1845,15 @@ paths:
         "200":
           description: Successfully refreshed the access token
           schema:
-            $ref: '#/definitions/auth.AccessTokenResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_auth.AccessTokenResponse'
         "400":
           description: Bad Request (e.g., invalid refresh token)
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized (e.g., expired or missing refresh token)
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       summary: Guest Login
       tags:
       - Authentication API
@@ -537,11 +1871,11 @@ paths:
         "400":
           description: Bad Request (e.g., invalid refresh token)
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized (e.g., expired or missing refresh token)
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       summary: Refresh an access token
       tags:
       - Authentication API
@@ -555,11 +1889,11 @@ paths:
         "200":
           description: Successfully retrieved user profile
           schema:
-            $ref: '#/definitions/auth.GetMeResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_auth.GetMeResponse'
         "401":
           description: Unauthorized (e.g., missing or invalid JWT)
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get user profile
@@ -577,15 +1911,15 @@ paths:
         "200":
           description: Successfully refreshed the access token
           schema:
-            $ref: '#/definitions/auth.AccessTokenResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_auth.AccessTokenResponse'
         "400":
           description: Bad Request (e.g., invalid refresh token)
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized (e.g., expired or missing refresh token)
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       summary: Refresh an access token
       tags:
       - Authentication API
@@ -616,7 +1950,7 @@ paths:
         name: request
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/openai.ChatCompletionRequest'
       produces:
       - application/json
       - text/event-stream
@@ -629,15 +1963,15 @@ paths:
         "400":
           description: Invalid request payload, empty messages, or inference failure
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized - missing or invalid authentication
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Create a chat completion
@@ -677,7 +2011,7 @@ paths:
         name: request
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/app_interfaces_http_routes_v1_conv.ExtendedChatCompletionRequest'
       produces:
       - application/json
       - text/event-stream
@@ -690,19 +2024,19 @@ paths:
         "400":
           description: Invalid request payload or conversation not found
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized - missing or invalid authentication
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Conversation not found or user not found
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Create a conversation-aware chat completion
@@ -747,11 +2081,11 @@ paths:
         "200":
           description: Successful response
           schema:
-            $ref: '#/definitions/conv.ModelsResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_conv.ModelsResponse'
         "401":
           description: Unauthorized - missing or invalid authentication
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List available models for conversation-aware chat
@@ -780,19 +2114,19 @@ paths:
         "200":
           description: Successfully retrieved the list of conversations
           schema:
-            type: object
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ExtendedConversationResponse'
         "400":
           description: Bad Request - Invalid pagination parameters
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized - invalid or missing API key
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List Conversations
@@ -809,27 +2143,27 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/conversations.CreateConversationRequest'
+          $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.CreateConversationRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Created conversation
           schema:
-            $ref: '#/definitions/conversations.ExtendedConversationResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.ExtendedConversationResponse'
         "400":
           description: Invalid request - Bad payload, too many items, or invalid item
             format
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Create a conversation
@@ -850,23 +2184,23 @@ paths:
         "200":
           description: Deleted conversation
           schema:
-            $ref: '#/definitions/conversations.DeletedConversationResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.DeletedConversationResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "403":
           description: Access denied
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Conversation not found
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Delete a conversation
@@ -886,23 +2220,23 @@ paths:
         "200":
           description: Conversation details
           schema:
-            $ref: '#/definitions/conversations.ExtendedConversationResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.ExtendedConversationResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "403":
           description: Access denied
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Conversation not found
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get a conversation
@@ -923,34 +2257,34 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/conversations.UpdateConversationRequest'
+          $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.UpdateConversationRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Updated conversation
           schema:
-            $ref: '#/definitions/conversations.ExtendedConversationResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.ExtendedConversationResponse'
         "400":
           description: Invalid request payload or update failed
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "403":
           description: Access denied
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Conversation not found
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Update a conversation
@@ -983,27 +2317,27 @@ paths:
         "200":
           description: List of items
           schema:
-            type: object
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ConversationItemResponse'
         "400":
           description: Bad Request - Invalid pagination parameters
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "403":
           description: Access denied
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Conversation not found
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List items in a conversation
@@ -1024,34 +2358,34 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/conversations.CreateItemsRequest'
+          $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.CreateItemsRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Created items
           schema:
-            type: object
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ConversationItemResponse'
         "400":
           description: Invalid request payload or invalid item format
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "403":
           description: Access denied
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Conversation not found
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Create items in a conversation
@@ -1078,27 +2412,27 @@ paths:
         "200":
           description: Deleted item details
           schema:
-            $ref: '#/definitions/conversations.ConversationItemResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.ConversationItemResponse'
         "400":
           description: Bad Request - Deletion failed
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "403":
           description: Access denied
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Conversation or item not found
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Delete an item from a conversation
@@ -1124,23 +2458,23 @@ paths:
         "200":
           description: Item details
           schema:
-            $ref: '#/definitions/conversations.ConversationItemResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.ConversationItemResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "403":
           description: Access denied
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Conversation or item not found
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get an item from a conversation
@@ -1189,15 +2523,15 @@ paths:
         "200":
           description: Successfully retrieved the list of admin API keys
           schema:
-            $ref: '#/definitions/organization.AdminApiKeyListResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization.AdminApiKeyListResponse'
         "401":
           description: Unauthorized - invalid or missing API key
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List Admin API Keys
@@ -1214,22 +2548,22 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/organization.CreateOrganizationAdminAPIKeyRequest'
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization.CreateOrganizationAdminAPIKeyRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Successfully created admin API key
           schema:
-            $ref: '#/definitions/organization.OrganizationAdminAPIKeyResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization.OrganizationAdminAPIKeyResponse'
         "400":
           description: Bad request - invalid payload
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized - invalid or missing API key
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Create Admin API Key
@@ -1248,16 +2582,16 @@ paths:
         "200":
           description: Successfully deleted the admin API key
           schema:
-            $ref: '#/definitions/organization.AdminAPIKeyDeletedResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization.AdminAPIKeyDeletedResponse'
         "401":
           description: Unauthorized - invalid or missing API key
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Not Found - API key with the given ID does not exist or does
             not belong to the organization
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Delete Admin API Key
@@ -1275,16 +2609,16 @@ paths:
         "200":
           description: Successfully retrieved the admin API key
           schema:
-            $ref: '#/definitions/organization.OrganizationAdminAPIKeyResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization.OrganizationAdminAPIKeyResponse'
         "401":
           description: Unauthorized - invalid or missing API key
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Not Found - API key with the given ID does not exist or does
             not belong to the organization
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get Admin API Key
@@ -1306,19 +2640,19 @@ paths:
         "200":
           description: Successfully retrieved list of invites
           schema:
-            type: object
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_organization_invites_InviteResponse'
         "400":
           description: Invalid or missing query parameter
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized - invalid or missing API key
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List Organization Invites
@@ -1334,26 +2668,26 @@ paths:
         name: invite
         required: true
         schema:
-          $ref: '#/definitions/invites.CreateInviteUserRequest'
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_invites.CreateInviteUserRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Successfully created invite
           schema:
-            $ref: '#/definitions/invites.InviteResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_invites.InviteResponse'
         "400":
           description: Invalid request payload or user already exists
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized - invalid or missing API key
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Create Invite
@@ -1373,19 +2707,19 @@ paths:
         "200":
           description: Successfully deleted invite
           schema:
-            type: object
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.DeleteResponse'
         "401":
           description: Unauthorized - invalid or missing API key
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "403":
           description: Forbidden - only owners can delete invites
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Invite not found
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Delete Invite
@@ -1403,15 +2737,15 @@ paths:
         "200":
           description: Successfully retrieved invite
           schema:
-            $ref: '#/definitions/invites.InviteResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_invites.InviteResponse'
         "401":
           description: Unauthorized - invalid or missing API key
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Invite not found
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Retrieve Invite
@@ -1429,26 +2763,26 @@ paths:
         name: verification
         required: true
         schema:
-          $ref: '#/definitions/invites.VerifyInviteUserRequest'
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_invites.VerifyInviteUserRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Successfully verified invite
           schema:
-            $ref: '#/definitions/invites.InviteResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_invites.InviteResponse'
         "400":
           description: Invalid or expired invite code
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized - invalid or missing API key
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Verify Invite
@@ -1477,15 +2811,15 @@ paths:
         "200":
           description: Successfully retrieved the list of projects
           schema:
-            $ref: '#/definitions/projects.ProjectListResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_projects.ProjectListResponse'
         "401":
           description: Unauthorized - invalid or missing API key
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List Projects
@@ -1501,26 +2835,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/projects.CreateProjectRequest'
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_projects.CreateProjectRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Successfully created project
           schema:
-            $ref: '#/definitions/projects.ProjectResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_projects.ProjectResponse'
         "400":
           description: Bad request - invalid payload
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized - invalid or missing API key
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Create Project
@@ -1539,16 +2873,16 @@ paths:
         "200":
           description: Successfully retrieved the project
           schema:
-            $ref: '#/definitions/projects.ProjectResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_projects.ProjectResponse'
         "401":
           description: Unauthorized - invalid or missing API key
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Not Found - project with the given ID does not exist or does
             not belong to the organization
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get Project
@@ -1569,26 +2903,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/projects.UpdateProjectRequest'
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_projects.UpdateProjectRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Successfully updated the project
           schema:
-            $ref: '#/definitions/projects.ProjectResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_projects.ProjectResponse'
         "400":
           description: Bad request - invalid payload
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized - invalid or missing API key
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Not Found - project with the given ID does not exist
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Update Project
@@ -1607,15 +2941,15 @@ paths:
         "200":
           description: Successfully archived the project
           schema:
-            $ref: '#/definitions/projects.ProjectResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_projects.ProjectResponse'
         "401":
           description: Unauthorized - invalid or missing API key
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Not Found - project with the given ID does not exist
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Archive Project
@@ -1638,23 +2972,23 @@ paths:
         "200":
           description: API key created successfully
           schema:
-            type: object
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_v1_organization_projects_api_keys_ApiKeyResponse'
         "400":
           description: Bad request, e.g., invalid payload or missing IDs
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized, e.g., invalid or missing token
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Not Found, e.g., project or organization not found
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List new project API key
@@ -1675,30 +3009,30 @@ paths:
         name: requestBody
         required: true
         schema:
-          $ref: '#/definitions/apikeys.CreateApiKeyRequest'
+          $ref: '#/definitions/app_interfaces_http_routes_v1_organization_projects_api_keys.CreateApiKeyRequest'
       produces:
       - application/json
       responses:
         "200":
           description: API key created successfully
           schema:
-            type: object
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.GeneralResponse-app_interfaces_http_routes_v1_organization_projects_api_keys_ApiKeyResponse'
         "400":
           description: Bad request, e.g., invalid payload or missing IDs
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized, e.g., invalid or missing token
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Not Found, e.g., project or organization not found
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Create a new project API key
@@ -1780,38 +3114,38 @@ paths:
         name: request
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_requests.CreateResponseRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Created response
           schema:
-            type: object
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.Response'
         "202":
           description: Response accepted for background processing
           schema:
-            type: object
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.Response'
         "400":
           description: Invalid request payload
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "422":
           description: Validation error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "429":
           description: Rate limit exceeded
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Create a response
@@ -1846,27 +3180,27 @@ paths:
         "200":
           description: Deleted response
           schema:
-            type: object
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.Response'
         "400":
           description: Invalid request
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "403":
           description: Access denied
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Response not found
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Delete a response
@@ -1900,27 +3234,27 @@ paths:
         "200":
           description: Response details
           schema:
-            type: object
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.Response'
         "400":
           description: Invalid request
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "403":
           description: Access denied
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Response not found
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Get a response
@@ -1955,27 +3289,27 @@ paths:
         "200":
           description: Response cancelled successfully
           schema:
-            type: object
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.Response'
         "400":
           description: Invalid request or response cannot be cancelled
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "403":
           description: Access denied
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Response not found
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Cancel a response
@@ -2040,27 +3374,27 @@ paths:
         "200":
           description: List of input items
           schema:
-            type: object
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ListInputItemsResponse'
         "400":
           description: Invalid request or pagination parameters
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "403":
           description: Access denied
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "404":
           description: Response not found
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
         "500":
           description: Internal server error
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List input items

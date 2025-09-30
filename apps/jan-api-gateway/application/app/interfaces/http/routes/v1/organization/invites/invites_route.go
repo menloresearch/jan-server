@@ -93,7 +93,7 @@ func (inviteRoute *InvitesRoute) RegisterRouter(router gin.IRouter) {
 // @Security BearerAuth
 // @Param after query string false "Cursor pointing to a record after which to fetch results"
 // @Param limit query int false "Maximum number of results to return"
-// @Success 200 {object} object "Successfully retrieved list of invites"
+// @Success 200 {object} openai.ListResponse[InviteResponse] "Successfully retrieved list of invites"
 // @Failure 400 {object} responses.ErrorResponse "Invalid or missing query parameter"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - invalid or missing API key"
 // @Failure 500 {object} responses.ErrorResponse "Internal server error"
@@ -451,7 +451,7 @@ func (api *InvitesRoute) RetrieveInvite(reqCtx *gin.Context) {
 // @Tags Administration API
 // @Security BearerAuth
 // @Param invite_id path string true "Public ID of the invite"
-// @Success 200 {object} object "Successfully deleted invite"
+// @Success 200 {object} openai.DeleteResponse "Successfully deleted invite"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - invalid or missing API key"
 // @Failure 403 {object} responses.ErrorResponse "Forbidden - only owners can delete invites"
 // @Failure 404 {object} responses.ErrorResponse "Invite not found"

@@ -37,7 +37,6 @@ type StreamMessage struct {
 	Err  error
 }
 
-// @swaggerignore
 type ChatCompletionRequest struct {
 	openai.ChatCompletionRequest
 	ProviderID     string `json:"provider_id,omitempty"`
@@ -87,8 +86,8 @@ func (completionAPI *CompletionAPI) RegisterRouter(router *gin.RouterGroup) {
 // @Accept json
 // @Produce json
 // @Produce text/event-stream
-// @Param request body object true "Chat completion request with streaming options"
-// @Success 200 {object} object "Successful non-streaming response (when stream=false)"
+// @Param request body openai.ChatCompletionRequest true "Chat completion request with streaming options"
+// @Success 200 {object} openai.ChatCompletionResponse "Successful non-streaming response (when stream=false)"
 // @Success 200 {string} string "Successful streaming response (when stream=true) - SSE format with data: {json} events"
 // @Failure 400 {object} responses.ErrorResponse "Invalid request payload, empty messages, or inference failure"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - missing or invalid authentication"
@@ -275,9 +274,6 @@ func (cApi *CompletionAPI) populateSelectionContext(reqCtx *gin.Context, userID 
 		if org, ok := auth.GetAdminOrganizationFromContext(reqCtx); ok && org != nil {
 			selection.OrganizationID = &org.ID
 		}
-	}
-	if cApi.projectService == nil {
-		return
 	}
 
 	ctx := reqCtx.Request.Context()

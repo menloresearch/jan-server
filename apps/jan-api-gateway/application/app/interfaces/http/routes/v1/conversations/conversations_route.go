@@ -173,7 +173,7 @@ func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 // @Param limit query int false "The maximum number of items to return" default(20)
 // @Param after query string false "A cursor for use in pagination. The ID of the last object from the previous page"
 // @Param order query string false "Order of items (asc/desc)"
-// @Success 200 {object} object "Successfully retrieved the list of conversations"
+// @Success 200 {object} openai.ListResponse[ExtendedConversationResponse] "Successfully retrieved the list of conversations"
 // @Failure 400 {object} responses.ErrorResponse "Bad Request - Invalid pagination parameters"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - invalid or missing API key"
 // @Failure 500 {object} responses.ErrorResponse "Internal Server Error"
@@ -458,7 +458,7 @@ func (api *ConversationAPI) DeleteConversationHandler(reqCtx *gin.Context) {
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
 // @Param request body CreateItemsRequest true "Create items request"
-// @Success 200 {object} object "Created items"
+// @Success 200 {object} openai.ListResponse[ConversationItemResponse] "Created items"
 // @Failure 400 {object} responses.ErrorResponse "Invalid request payload or invalid item format"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
@@ -537,7 +537,7 @@ func (api *ConversationAPI) CreateItemsHandler(reqCtx *gin.Context) {
 // @Param limit query int false "Number of items to return (1-100)"
 // @Param after query string false "Cursor for pagination - ID of the last item from previous page"
 // @Param order query string false "Order of items (asc/desc)"
-// @Success 200 {object} object "List of items"
+// @Success 200 {object} openai.ListResponse[ConversationItemResponse] "List of items"
 // @Failure 400 {object} responses.ErrorResponse "Bad Request - Invalid pagination parameters"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"

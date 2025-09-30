@@ -60,7 +60,6 @@ func (completionAPI *ConvCompletionAPI) RegisterRouter(router *gin.RouterGroup) 
 }
 
 // ExtendedChatCompletionRequest extends OpenAI's request with conversation field and store and store_reasoning fields
-// @swaggerignore
 type ExtendedChatCompletionRequest struct {
 	openai.ChatCompletionRequest
 	Conversation   string `json:"conversation,omitempty"`
@@ -83,7 +82,6 @@ type ResponseMetadata struct {
 }
 
 // ExtendedCompletionResponse extends OpenAI's ChatCompletionResponse with additional metadata
-// @swaggerignore
 type ExtendedCompletionResponse struct {
 	openai.ChatCompletionResponse
 	Metadata *ResponseMetadata `json:"metadata,omitempty"`
@@ -136,8 +134,8 @@ type ModelsResponse struct {
 // @Accept json
 // @Produce json
 // @Produce text/event-stream
-// @Param request body object true "Extended chat completion request with streaming, storage, and conversation options"
-// @Success 200 {object} object "Successful non-streaming response (when stream=false)"
+// @Param request body ExtendedChatCompletionRequest true "Extended chat completion request with streaming, storage, and conversation options"
+// @Success 200 {object} ExtendedCompletionResponse "Successful non-streaming response (when stream=false)"
 // @Success 200 {string} string "Successful streaming response (when stream=true) - SSE format with data: {json} events"
 // @Failure 400 {object} responses.ErrorResponse "Invalid request payload or conversation not found"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - missing or invalid authentication"
@@ -163,7 +161,6 @@ func (api *ConvCompletionAPI) PostCompletion(reqCtx *gin.Context) {
 		})
 		return
 	}
-	// TODO: Implement admin API key check
 	selection, selectionErr := helpers.ParseProviderSelection(request.ProviderID, request.ProviderType, request.ProviderVendor)
 	if selectionErr != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
@@ -370,9 +367,6 @@ func (api *ConvCompletionAPI) buildProviderFilter(reqCtx *gin.Context) (inferenc
 	}
 	user, ok := auth.GetUserFromContext(reqCtx)
 	if !ok || user == nil {
-		return filter, nil
-	}
-	if api.projectService == nil {
 		return filter, nil
 	}
 	ctx := reqCtx.Request.Context()
