@@ -254,7 +254,7 @@ spec:
             {{- end }}
             
             {{/* Other Application Configuration */}}
-            - name: ORGANIZATION_ADMIN_EMAIL
+            - name: ORGANIZATION_ADMIN_EMAILS
               value: "{{ .Values.gateway.secrets.adminEmail }}"
             
             {{/* Additional environment variables */}}

@@ -39,8 +39,6 @@ gateway:
       value: "*.jan.ai,*.menlo.ai,http://localhost:3001"
     - name: ENABLE_ADMIN_API
       value: "true"
-    - name: ORGANIZATION_ADMIN_EMAILS
-      value: "hello@example.com"
     # Note: REDIS_URL, REDIS_PASSWORD are automatically configured by the chart based on valkey settings
     - name: REDIS_DB
       value: "0"
@@ -60,7 +58,7 @@ gateway:
   # OAuth2 Configuration (Google Authentication)
   # =============================================================================
   oauth2:
-    enabled: false
+    enabled: true
     google:
       # Google OAuth Client ID - Get from Google Cloud Console
       clientId: "" # Replace with your Google OAuth Client ID

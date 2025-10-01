@@ -212,6 +212,8 @@ func (s *ModelService) GetGPUResources(ctx context.Context) (*GPUResources, erro
 
 	// Copy GPU nodes and extract type information
 	gpuTypeMap := make(map[string]int)
+	gpuTypeVRAMMap := make(map[string]resource.Quantity)
+	var totalVRAM resource.Quantity
 
 	for i, node := range clusterGPUStatus.GPUNodes {
 		resources.GPUNodes[i] = &node
@@ -219,7 +221,22 @@ func (s *ModelService) GetGPUResources(ctx context.Context) (*GPUResources, erro
 		// Extract GPU type information
 		if node.GPUType != "" {
 			gpuTypeMap[node.GPUType] += node.GPUCount
+			
+			// Track VRAM per GPU type (assume all GPUs of same type have same VRAM)
+			if !node.TotalVRAM.IsZero() {
+				gpuTypeVRAMMap[node.GPUType] = node.TotalVRAM
+				// Add to total VRAM (multiply by GPU count on this node)
+				nodeVRAM := node.TotalVRAM.DeepCopy()
+				nodeVRAM.Set(nodeVRAM.Value() * int64(node.GPUCount))
+				totalVRAM.Add(nodeVRAM)
+			}
 		}
+	}
+
+	// Update summary with calculated VRAM
+	if !totalVRAM.IsZero() {
+		resources.Summary.TotalVRAM = totalVRAM.String()
+		resources.Summary.AvailableVRAM = totalVRAM.String() // Assume all available for now
 	}
 
 	// Extract unique GPU types
@@ -227,12 +244,17 @@ func (s *ModelService) GetGPUResources(ctx context.Context) (*GPUResources, erro
 		resources.Summary.GPUTypes = append(resources.Summary.GPUTypes, gpuType)
 	}
 
-	// Build availability map
+	// Build availability map with VRAM information
 	for gpuType, total := range gpuTypeMap {
+		vramPerGPU := "Unknown"
+		if vram, exists := gpuTypeVRAMMap[gpuType]; exists && !vram.IsZero() {
+			vramPerGPU = vram.String()
+		}
+		
 		resources.Availability.ByType[gpuType] = GPUTypeAvailability{
 			Total:     total,
-			Available: total,     // Assume all available for now
-			VRAM:      "Unknown", // Could be extracted from NodeGPUInfo.TotalVRAM if needed
+			Available: total, // Assume all available for now
+			VRAM:      vramPerGPU,
 		}
 	}
 

@@ -40,6 +40,13 @@ func (organizationRoute *OrganizationRoute) RegisterRouter(router gin.IRouter) {
 	organizationRoute.adminApiKeyAPI.RegisterRouter(organizationRouter)
 	organizationRoute.projectsRoute.RegisterRouter(organizationRouter)
 	organizationRoute.inviteRoute.RegisterRouter(organizationRouter)
-	organizationRoute.modelsAPI.RegisterRouter(organizationRouter)
-	organizationRoute.kubernetesAPI.RegisterRouter(organizationRouter)
+	
+	// Models API with authentication and organization context middleware
+	modelsRouter := organizationRouter.Group("",
+		organizationRoute.authService.AdminUserAuthMiddleware(),
+		organizationRoute.authService.RegisteredUserMiddleware(),
+		organizationRoute.authService.DefaultOrganizationMemberOptionalMiddleware(),
+	)
+	organizationRoute.modelsAPI.RegisterRouter(modelsRouter)
+	organizationRoute.kubernetesAPI.RegisterRouter(modelsRouter)
 }

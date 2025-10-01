@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 
 	v1 "k8s.io/api/core/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -193,8 +194,17 @@ func (ks *KubernetesService) extractGPUInfo(node v1.Node) NodeGPUInfo {
 		info.GPUType = gpuModel
 	}
 
-	// Extract memory information
-	if memory, exists := node.Status.Capacity["nvidia.com/gpu.memory"]; exists {
+	// Extract memory information from labels (NVIDIA GPU Operator provides this)
+	if memory, exists := node.Labels["nvidia.com/gpu.memory"]; exists {
+		// Memory is in MB, convert to bytes for resource.Quantity
+		if memoryMB, err := strconv.ParseInt(memory, 10, 64); err == nil {
+			memoryBytes := memoryMB * 1024 * 1024 // Convert MB to bytes
+			info.TotalVRAM = *resource.NewQuantity(memoryBytes, resource.BinarySI)
+		}
+	}
+	
+	// Also check legacy capacity field as fallback
+	if memory, exists := node.Status.Capacity["nvidia.com/gpu.memory"]; exists && info.TotalVRAM.IsZero() {
 		info.TotalVRAM = memory
 	}
 
