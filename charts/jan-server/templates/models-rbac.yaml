@@ -1,5 +1,4 @@
 {{- if .Values.gateway.serviceAccount.create }}
-{{- if .Values.gateway.models.enabled }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -102,5 +101,4 @@ subjects:
 - kind: ServiceAccount
   name: {{ include "jan-server.serviceAccountName" . }}
   namespace: {{ .Release.Namespace }}
-{{- end }}
 {{- end }}
