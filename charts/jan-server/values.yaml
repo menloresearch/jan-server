@@ -39,6 +39,8 @@ gateway:
       value: "*.jan.ai,*.menlo.ai,http://localhost:3001"
     - name: ENABLE_ADMIN_API
       value: "true"
+    - name: ORGANIZATION_ADMIN_EMAILS
+      value: "hello@example.com"
     # Note: REDIS_URL, REDIS_PASSWORD are automatically configured by the chart based on valkey settings
     - name: REDIS_DB
       value: "0"
@@ -263,6 +265,8 @@ postgresql:
         username: "jan_user"
         password: "jan_password" # Will be auto-generated if empty
         database: "jan_api_gateway"
+  image:
+    repository: bitnamilegacy/postgresql
 
   primary:
     service:
@@ -369,13 +373,13 @@ inference:
     # Auto-cleanup dependencies when uninstalling the chart
     # WARNING: This will remove operators that other charts might be using!
     # Only enable if you're sure no other applications depend on these operators
-    autoCleanupDependencies: true # Set to true to auto-remove operators on uninstall
+    autoCleanupDependencies: false # Set to true to auto-remove operators on uninstall
 
     # Individual cleanup control (only used if autoCleanupDependencies=true)
     cleanupGpuOperator: false
-    cleanupKuberayOperator: true
-    cleanupEnvoyGateway: true
-    cleanupAibrix: true
+    cleanupKuberayOperator: false
+    cleanupEnvoyGateway: false
+    cleanupAibrix: false
 
   # =============================================================================
   # Models Configuration
@@ -383,7 +387,7 @@ inference:
   models:
     # Example model configuration - users can add multiple models
     - name: "jan-v1-4b"
-      enabled: true
+      enabled: false
 
       # Container configuration
       image: "registry.menlo.ai/dockerhub/vllm/vllm-openai:v0.10.2"
