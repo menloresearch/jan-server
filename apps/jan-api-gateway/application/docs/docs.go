@@ -1510,6 +1510,530 @@ const docTemplate = `{
                 }
             }
         },
+        "/v1/organization/kubernetes": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Check if the application is running in a Kubernetes cluster and has access to K8s APIs",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Kubernetes"
+                ],
+                "summary": "Check Kubernetes availability",
+                "responses": {
+                    "200": {
+                        "description": "Kubernetes status",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.KubernetesStatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/organization/kubernetes/cluster-status": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Check if the Kubernetes cluster has all required dependencies and configurations for managed model deployment",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Kubernetes"
+                ],
+                "summary": "Validate cluster dependencies",
+                "responses": {
+                    "200": {
+                        "description": "Cluster validation results",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ClusterValidationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - Kubernetes not available",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/organization/kubernetes/gpu-resources": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get detailed information about GPU resources in the Kubernetes cluster including availability and usage",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Kubernetes"
+                ],
+                "summary": "Get GPU resources information",
+                "responses": {
+                    "200": {
+                        "description": "GPU resources information",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.GPUResourcesResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/organization/models": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all models belonging to the organization",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Models"
+                ],
+                "summary": "List organization models",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by model type",
+                        "name": "model_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by model status",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter by public/private models",
+                        "name": "is_public",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of models",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ModelsListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - models API not available",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new AI model for the organization",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Models"
+                ],
+                "summary": "Create a new model",
+                "parameters": [
+                    {
+                        "description": "Model creation request",
+                        "name": "model",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelCreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created model",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ModelResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - models API not available",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/organization/models/all": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all models in the cluster (both managed by jan-server and unmanaged)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Models"
+                ],
+                "summary": "List all models in cluster",
+                "responses": {
+                    "200": {
+                        "description": "List of all models",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.AllModelsListResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - models API not available",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/organization/models/status": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get information about the Kubernetes cluster's capability for model deployment",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Models"
+                ],
+                "summary": "Get cluster status for models",
+                "responses": {
+                    "200": {
+                        "description": "Cluster status information",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ClusterStatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - models API not available",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/v1/organization/models/{model_id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get details of a specific model by its public ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Models"
+                ],
+                "summary": "Get a model by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Model public ID",
+                        "name": "model_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Model details",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ModelResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - models API not available",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Model not found",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update an existing model's properties",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Models"
+                ],
+                "summary": "Update a model",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Model public ID",
+                        "name": "model_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Model update request",
+                        "name": "model",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelUpdateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Updated model",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ModelResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - models API not available",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Model not found",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a model and its associated Kubernetes resources",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Models"
+                ],
+                "summary": "Delete a model",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Model public ID",
+                        "name": "model_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Model deleted successfully"
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - models API not available",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Model not found",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/organization/projects": {
             "get": {
                 "security": [
@@ -3077,6 +3601,121 @@ const docTemplate = `{
                 }
             }
         },
+        "app_interfaces_http_routes_v1_organization_models.AllModelsListResponse": {
+            "type": "object",
+            "properties": {
+                "models": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelInfo"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization_models.ClusterStatusResponse": {
+            "type": "object",
+            "properties": {
+                "cluster_status": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_infrastructure_kubernetes.ClusterGPUStatus"
+                },
+                "organization_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization_models.ClusterValidationResponse": {
+            "type": "object",
+            "properties": {
+                "dependencies": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ClusterDependenciesStatus"
+                },
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "gpu_status": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_infrastructure_kubernetes.ClusterGPUStatus"
+                },
+                "valid": {
+                    "type": "boolean"
+                },
+                "warnings": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization_models.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization_models.GPUResourcesResponse": {
+            "type": "object",
+            "properties": {
+                "availability": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.GPUAvailability"
+                },
+                "gpu_nodes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_infrastructure_kubernetes.NodeGPUInfo"
+                    }
+                },
+                "summary": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.GPUResourcesSummary"
+                },
+                "total_nodes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization_models.KubernetesStatusResponse": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "boolean"
+                },
+                "in_cluster": {
+                    "type": "boolean"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization_models.ModelResponse": {
+            "type": "object",
+            "properties": {
+                "model": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.Model"
+                }
+            }
+        },
+        "app_interfaces_http_routes_v1_organization_models.ModelsListResponse": {
+            "type": "object",
+            "properties": {
+                "models": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.Model"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "app_interfaces_http_routes_v1_organization_projects.CreateProjectRequest": {
             "type": "object",
             "required": [
@@ -3207,6 +3846,498 @@ const docTemplate = `{
                 "ItemRoleAssistant",
                 "ItemRoleTool"
             ]
+        },
+        "menlo_ai_jan-api-gateway_app_domain_organization_models.ClusterDependenciesStatus": {
+            "type": "object",
+            "properties": {
+                "aibrix_operator": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.DependencyStatus"
+                },
+                "envoy_gateway": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.DependencyStatus"
+                },
+                "gpu_operator": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.DependencyStatus"
+                },
+                "kuberay_operator": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.DependencyStatus"
+                },
+                "namespace": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.DependencyStatus"
+                },
+                "storage_classes": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.DependencyStatus"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_domain_organization_models.DependencyStatus": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "boolean"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_domain_organization_models.EnvVar": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_domain_organization_models.GPUAvailability": {
+            "type": "object",
+            "properties": {
+                "by_type": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.GPUTypeAvailability"
+                    }
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_domain_organization_models.GPURequirement": {
+            "type": "object",
+            "properties": {
+                "gpu_type": {
+                    "description": "nvidia, amd, etc.",
+                    "type": "string"
+                },
+                "max_gpus": {
+                    "type": "integer"
+                },
+                "min_gpus": {
+                    "type": "integer"
+                },
+                "min_vram": {
+                    "$ref": "#/definitions/resource.Quantity"
+                },
+                "preferred_vram": {
+                    "$ref": "#/definitions/resource.Quantity"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_domain_organization_models.GPUResourcesSummary": {
+            "type": "object",
+            "properties": {
+                "available_gpus": {
+                    "type": "integer"
+                },
+                "available_vram": {
+                    "type": "string"
+                },
+                "gpu_types": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "total_gpus": {
+                    "type": "integer"
+                },
+                "total_vram": {
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_domain_organization_models.GPUTypeAvailability": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "vram_per_gpu": {
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_domain_organization_models.Model": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by_user_id": {
+                    "type": "integer"
+                },
+                "deployment_name": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "display_name": {
+                    "type": "string"
+                },
+                "endpoint_url": {
+                    "description": "API endpoint information",
+                    "type": "string"
+                },
+                "huggingface_id": {
+                    "description": "Model source information",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "internal_url": {
+                    "type": "string"
+                },
+                "is_public": {
+                    "type": "boolean"
+                },
+                "model_type": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelType"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "namespace": {
+                    "description": "Kubernetes deployment info",
+                    "type": "string"
+                },
+                "organization_id": {
+                    "type": "integer"
+                },
+                "public_id": {
+                    "type": "string"
+                },
+                "repository_url": {
+                    "type": "string"
+                },
+                "requirements": {
+                    "description": "Resource requirements",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ResourceRequirement"
+                        }
+                    ]
+                },
+                "service_name": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelStatus"
+                },
+                "tags": {
+                    "description": "Metadata",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_domain_organization_models.ModelAutoscalingConfig": {
+            "type": "object",
+            "properties": {
+                "max_replicas": {
+                    "type": "integer"
+                },
+                "min_replicas": {
+                    "type": "integer"
+                },
+                "scale_down_delay": {
+                    "type": "string"
+                },
+                "target_metric": {
+                    "type": "string"
+                },
+                "target_value": {
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_domain_organization_models.ModelCreateRequest": {
+            "type": "object",
+            "required": [
+                "display_name",
+                "model_type",
+                "name",
+                "requirements"
+            ],
+            "properties": {
+                "deployment_config": {
+                    "description": "Deployment configuration",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelDeploymentConfig"
+                        }
+                    ]
+                },
+                "description": {
+                    "type": "string"
+                },
+                "display_name": {
+                    "type": "string"
+                },
+                "huggingface_id": {
+                    "type": "string"
+                },
+                "is_public": {
+                    "type": "boolean"
+                },
+                "model_type": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelType"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "repository_url": {
+                    "type": "string"
+                },
+                "requirements": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ResourceRequirement"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_domain_organization_models.ModelDeploymentConfig": {
+            "type": "object",
+            "required": [
+                "image"
+            ],
+            "properties": {
+                "args": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "autoscaling_config": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelAutoscalingConfig"
+                },
+                "command": {
+                    "description": "Command and arguments",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "enable_autoscaling": {
+                    "description": "Autoscaling configuration",
+                    "type": "boolean"
+                },
+                "enable_pvc": {
+                    "description": "Storage configuration",
+                    "type": "boolean"
+                },
+                "extra_env": {
+                    "description": "Environment variables",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.EnvVar"
+                    }
+                },
+                "gpu_count": {
+                    "description": "Resource configuration",
+                    "type": "integer"
+                },
+                "hugging_face_token": {
+                    "description": "Optional Hugging Face token for private models",
+                    "type": "string"
+                },
+                "image": {
+                    "description": "Container image",
+                    "type": "string"
+                },
+                "image_pull_policy": {
+                    "type": "string"
+                },
+                "initial_delay_seconds": {
+                    "description": "Probe configuration",
+                    "type": "integer"
+                },
+                "storage_class": {
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_domain_organization_models.ModelInfo": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "display_name": {
+                    "type": "string"
+                },
+                "is_managed": {
+                    "type": "boolean"
+                },
+                "model_type": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "namespace": {
+                    "type": "string"
+                },
+                "replicas": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_domain_organization_models.ModelStatus": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "creating",
+                "running",
+                "failed",
+                "stopped"
+            ],
+            "x-enum-varnames": [
+                "ModelStatusPending",
+                "ModelStatusCreating",
+                "ModelStatusRunning",
+                "ModelStatusFailed",
+                "ModelStatusStopped"
+            ]
+        },
+        "menlo_ai_jan-api-gateway_app_domain_organization_models.ModelType": {
+            "type": "string",
+            "enum": [
+                "chat",
+                "completion",
+                "embedding",
+                "vision"
+            ],
+            "x-enum-varnames": [
+                "ModelTypeChat",
+                "ModelTypeCompletion",
+                "ModelTypeEmbedding",
+                "ModelTypeVision"
+            ]
+        },
+        "menlo_ai_jan-api-gateway_app_domain_organization_models.ModelUpdateRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "display_name": {
+                    "type": "string"
+                },
+                "is_public": {
+                    "type": "boolean"
+                },
+                "requirements": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ResourceRequirement"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_domain_organization_models.ResourceRequirement": {
+            "type": "object",
+            "properties": {
+                "cpu": {
+                    "$ref": "#/definitions/resource.Quantity"
+                },
+                "gpu": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.GPURequirement"
+                },
+                "memory": {
+                    "$ref": "#/definitions/resource.Quantity"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_infrastructure_kubernetes.ClusterGPUStatus": {
+            "type": "object",
+            "properties": {
+                "aibrix_ok": {
+                    "type": "boolean"
+                },
+                "envoy_gateway_ok": {
+                    "type": "boolean"
+                },
+                "gpu_nodes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_infrastructure_kubernetes.NodeGPUInfo"
+                    }
+                },
+                "gpu_operator_ok": {
+                    "type": "boolean"
+                },
+                "has_gpus": {
+                    "type": "boolean"
+                },
+                "kuberay_ok": {
+                    "type": "boolean"
+                },
+                "total_gpus": {
+                    "type": "integer"
+                },
+                "total_nodes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_infrastructure_kubernetes.NodeGPUInfo": {
+            "type": "object",
+            "properties": {
+                "available_vram": {
+                    "$ref": "#/definitions/resource.Quantity"
+                },
+                "gpu_count": {
+                    "type": "integer"
+                },
+                "gpu_type": {
+                    "type": "string"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "node_name": {
+                    "type": "string"
+                },
+                "total_vram": {
+                    "$ref": "#/definitions/resource.Quantity"
+                }
+            }
         },
         "menlo_ai_jan-api-gateway_app_interfaces_http_requests.CreateResponseRequest": {
             "type": "object",
@@ -4799,6 +5930,34 @@ const docTemplate = `{
                 },
                 "severity": {
                     "type": "string"
+                }
+            }
+        },
+        "resource.Quantity": {
+            "type": "object",
+            "properties": {
+                "Format": {
+                    "type": "string",
+                    "enum": [
+                        "DecimalExponent",
+                        "BinarySI",
+                        "DecimalSI"
+                    ],
+                    "x-enum-comments": {
+                        "BinarySI": "e.g., 12Mi (12 * 2^20)",
+                        "DecimalExponent": "e.g., 12e6",
+                        "DecimalSI": "e.g., 12M  (12 * 10^6)"
+                    },
+                    "x-enum-descriptions": [
+                        "e.g., 12e6",
+                        "e.g., 12Mi (12 * 2^20)",
+                        "e.g., 12M  (12 * 10^6)"
+                    ],
+                    "x-enum-varnames": [
+                        "DecimalExponent",
+                        "BinarySI",
+                        "DecimalSI"
+                    ]
                 }
             }
         }
