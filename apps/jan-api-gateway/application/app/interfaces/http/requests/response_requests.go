@@ -69,6 +69,9 @@ type CreateResponseRequest struct {
 	// The conversation ID to append items to. If not set or set to ClientCreatedRootConversationID, a new conversation will be created.
 	Conversation *string `json:"conversation,omitempty"`
 
+	// The workspace ID to associate the response with for shared instructions.
+	Workspace *string `json:"workspace,omitempty"`
+
 	// The ID of the previous response to continue from. If set, the conversation will be loaded from the previous response.
 	PreviousResponseID *string `json:"previous_response_id,omitempty"`
 

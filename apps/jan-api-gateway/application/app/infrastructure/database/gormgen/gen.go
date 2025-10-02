@@ -27,6 +27,7 @@ var (
 	ProjectMember      *projectMember
 	Response           *response
 	User               *user
+	Workspace          *workspace
 )
 
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
@@ -41,6 +42,7 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	ProjectMember = &Q.ProjectMember
 	Response = &Q.Response
 	User = &Q.User
+	Workspace = &Q.Workspace
 }
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
@@ -56,6 +58,7 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		ProjectMember:      newProjectMember(db, opts...),
 		Response:           newResponse(db, opts...),
 		User:               newUser(db, opts...),
+		Workspace:          newWorkspace(db, opts...),
 	}
 }
 
@@ -72,6 +75,7 @@ type Query struct {
 	ProjectMember      projectMember
 	Response           response
 	User               user
+	Workspace          workspace
 }
 
 func (q *Query) Available() bool { return q.db != nil }
@@ -89,6 +93,7 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		ProjectMember:      q.ProjectMember.clone(db),
 		Response:           q.Response.clone(db),
 		User:               q.User.clone(db),
+		Workspace:          q.Workspace.clone(db),
 	}
 }
 
@@ -113,6 +118,7 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		ProjectMember:      q.ProjectMember.replaceDB(db),
 		Response:           q.Response.replaceDB(db),
 		User:               q.User.replaceDB(db),
+		Workspace:          q.Workspace.replaceDB(db),
 	}
 }
 
@@ -127,6 +133,7 @@ type queryCtx struct {
 	ProjectMember      IProjectMemberDo
 	Response           IResponseDo
 	User               IUserDo
+	Workspace          IWorkspaceDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
@@ -141,6 +148,7 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		ProjectMember:      q.ProjectMember.WithContext(ctx),
 		Response:           q.Response.WithContext(ctx),
 		User:               q.User.WithContext(ctx),
+		Workspace:          q.Workspace.WithContext(ctx),
 	}
 }
 

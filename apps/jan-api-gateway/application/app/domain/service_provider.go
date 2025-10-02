@@ -12,6 +12,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/response"
 	"menlo.ai/jan-api-gateway/app/domain/user"
+	"menlo.ai/jan-api-gateway/app/domain/workspace"
 )
 
 var ServiceProvider = wire.NewSet(
@@ -22,6 +23,7 @@ var ServiceProvider = wire.NewSet(
 	apikey.NewService,
 	user.NewService,
 	conversation.NewService,
+	workspace.NewWorkspaceService,
 	response.NewResponseService,
 	response.NewResponseModelService,
 	response.NewStreamModelService,

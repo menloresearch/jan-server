@@ -31,6 +31,7 @@ var RouteProvider = wire.NewSet(
 	conv_chat.NewConvMCPAPI,
 	conv_chat.NewCompletionNonStreamHandler,
 	conv_chat.NewCompletionStreamHandler,
+	conv_chat.NewWorkspaceRoute,
 	mcp.NewMCPAPI,
 	v1.NewModelAPI,
 	responses.NewResponseRoute,

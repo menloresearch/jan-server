@@ -20,6 +20,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/domain/project"
 	"menlo.ai/jan-api-gateway/app/domain/response"
 	"menlo.ai/jan-api-gateway/app/domain/user"
+	"menlo.ai/jan-api-gateway/app/domain/workspace"
 	"menlo.ai/jan-api-gateway/app/infrastructure/cache"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/apikeyrepo"
@@ -31,6 +32,7 @@ import (
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/responserepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/transaction"
 	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/userrepo"
+	"menlo.ai/jan-api-gateway/app/infrastructure/database/repository/workspacerepo"
 	"menlo.ai/jan-api-gateway/app/infrastructure/inference"
 	"menlo.ai/jan-api-gateway/app/interfaces/http"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/routes/v1"
@@ -95,7 +97,10 @@ func CreateApplication() (*Application, error) {
 	serperMCP := mcpimpl.NewSerperMCP(serperService)
 	convMCPAPI := conv.NewConvMCPAPI(authService, serperMCP)
 	convChatRoute := conv.NewConvChatRoute(authService, convCompletionAPI, convMCPAPI)
-	conversationAPI := conversations.NewConversationAPI(conversationService, authService)
+	workspaceRepository := workspacerepo.NewWorkspaceGormRepository(transactionDatabase)
+	workspaceService := workspace.NewWorkspaceService(workspaceRepository, conversationRepository)
+	workspaceRoute := conv.NewWorkspaceRoute(authService, workspaceService)
+	conversationAPI := conversations.NewConversationAPI(conversationService, authService, workspaceService)
 	modelAPI := v1.NewModelAPI(inferenceModelRegistry)
 	mcpapi := mcp.NewMCPAPI(serperMCP, authService)
 	googleAuthAPI := google.NewGoogleAuthAPI(userService, authService)
@@ -106,7 +111,7 @@ func CreateApplication() (*Application, error) {
 	streamModelService := response.NewStreamModelService(responseModelService)
 	nonStreamModelService := response.NewNonStreamModelService(responseModelService)
 	responseRoute := responses.NewResponseRoute(responseModelService, authService, responseService, streamModelService, nonStreamModelService)
-	v1Route := v1.NewV1Route(organizationRoute, chatRoute, convChatRoute, conversationAPI, modelAPI, mcpapi, authRoute, responseRoute)
+	v1Route := v1.NewV1Route(organizationRoute, chatRoute, convChatRoute, workspaceRoute, conversationAPI, modelAPI, mcpapi, authRoute, responseRoute)
 	httpServer := http.NewHttpServer(v1Route)
 	cronService := cron.NewService(janInferenceClient, inferenceModelRegistry)
 	application := &Application{

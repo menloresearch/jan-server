@@ -28,7 +28,7 @@ type EnvironmentVariable struct {
 	SMTP_PASSWORD               string
 	SMTP_SENDER_EMAIL           string
 	INVITE_REDIRECT_URL         string
-	ORGANIZATION_ADMIN_EMAIL    string
+	ORGANIZATION_ADMIN_EMAILS   []string
 	// Redis configuration
 	REDIS_URL        string
 	REDIS_PASSWORD   string
