@@ -153,13 +153,6 @@ func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 	conversationsRouter.POST("", api.CreateConversationHandler)
 	conversationsRouter.GET("", api.ListConversationsHandler)
 
-	workspaceMiddleware := api.workspaceService.GetWorkspaceMiddleware()
-	conversationsRouter.DELETE(
-		fmt.Sprintf("/workspaces/:%s", workspace.WorkspaceContextKeyPublicID),
-		workspaceMiddleware,
-		api.DeleteWorkspaceConversationsHandler,
-	)
-
 	conversationMiddleWare := api.conversationService.GetConversationMiddleWare()
 	conversationsRouter.PATCH(
 		fmt.Sprintf("/:%s/workspace", conversation.ConversationContextKeyPublicID),
@@ -567,32 +560,6 @@ func (api *ConversationAPI) UpdateConversationWorkspaceHandler(reqCtx *gin.Conte
 
 	response := domainToExtendedConversationResponse(updatedConv)
 	reqCtx.JSON(http.StatusOK, response)
-}
-
-func (api *ConversationAPI) DeleteWorkspaceConversationsHandler(reqCtx *gin.Context) {
-	ctx := reqCtx.Request.Context()
-	workspaceEntity, ok := workspace.GetWorkspaceFromContext(reqCtx)
-	if !ok {
-		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
-			Code:  "c8bc424c-5b20-4cf9-8ca1-7d9ad1b098c8",
-			Error: "workspace not found",
-		})
-		return
-	}
-
-	if err := api.workspaceService.DeleteWorkspaceWithConversations(ctx, workspaceEntity); err != nil {
-		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Code:  err.GetCode(),
-			Error: err.Error(),
-		})
-		return
-	}
-
-	reqCtx.JSON(http.StatusOK, DeletedWorkspaceResponse{
-		ID:      workspaceEntity.PublicID,
-		Object:  "workspace.deleted",
-		Deleted: true,
-	})
 }
 
 // @Summary Create items in a conversation
