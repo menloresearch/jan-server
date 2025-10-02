@@ -321,7 +321,7 @@ func (api *ConvCompletionAPI) createNewConversation(reqCtx *gin.Context, message
 	title := api.generateTitleFromMessages(messages)
 	conv, convErr := api.conversationService.CreateConversation(ctx, user.ID, &title, true, map[string]string{
 		"model": "jan-v1-4b", // Default model
-	})
+	}, nil)
 	if convErr != nil {
 		// If creation fails, return nil
 		return nil, false

@@ -3,11 +3,13 @@ package conversations
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"menlo.ai/jan-api-gateway/app/domain/auth"
 	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/query"
+	"menlo.ai/jan-api-gateway/app/domain/workspace"
 
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses/openai"
@@ -19,18 +21,24 @@ import (
 type ConversationAPI struct {
 	conversationService *conversation.ConversationService
 	authService         *auth.AuthService
+	workspaceService    *workspace.WorkspaceService
 }
 
 // Request structs
 type CreateConversationRequest struct {
-	Title    string                    `json:"title"`
-	Metadata map[string]string         `json:"metadata,omitempty"`
-	Items    []ConversationItemRequest `json:"items,omitempty"`
+	Title       string                    `json:"title"`
+	Metadata    map[string]string         `json:"metadata,omitempty"`
+	Items       []ConversationItemRequest `json:"items,omitempty"`
+	WorkspaceID string                    `json:"workspace_id,omitempty"`
 }
 
 type UpdateConversationRequest struct {
 	Title    *string            `json:"title"`
 	Metadata *map[string]string `json:"metadata"`
+}
+
+type UpdateConversationWorkspaceRequest struct {
+	WorkspaceID *string `json:"workspace_id"`
 }
 
 type ConversationItemRequest struct {
@@ -50,14 +58,21 @@ type CreateItemsRequest struct {
 
 // Response structs
 type ExtendedConversationResponse struct {
-	ID        string            `json:"id"`
-	Title     string            `json:"title"`
-	Object    string            `json:"object"`
-	CreatedAt int64             `json:"created_at"`
-	Metadata  map[string]string `json:"metadata"`
+	ID                string            `json:"id"`
+	Title             string            `json:"title"`
+	Object            string            `json:"object"`
+	WorkspacePublicID string            `json:"workspace_id"`
+	CreatedAt         int64             `json:"created_at"`
+	Metadata          map[string]string `json:"metadata"`
 }
 
 type DeletedConversationResponse struct {
+	ID      string `json:"id"`
+	Object  string `json:"object"`
+	Deleted bool   `json:"deleted"`
+}
+
+type DeletedWorkspaceResponse struct {
 	ID      string `json:"id"`
 	Object  string `json:"object"`
 	Deleted bool   `json:"deleted"`
@@ -119,10 +134,12 @@ type AnnotationResponse struct {
 // NewConversationAPI creates a new conversation API instance
 func NewConversationAPI(
 	conversationService *conversation.ConversationService,
-	authService *auth.AuthService) *ConversationAPI {
+	authService *auth.AuthService,
+	workspaceService *workspace.WorkspaceService) *ConversationAPI {
 	return &ConversationAPI{
 		conversationService,
 		authService,
+		workspaceService,
 	}
 }
 
@@ -136,7 +153,19 @@ func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 	conversationsRouter.POST("", api.CreateConversationHandler)
 	conversationsRouter.GET("", api.ListConversationsHandler)
 
+	workspaceMiddleware := api.workspaceService.GetWorkspaceMiddleware()
+	conversationsRouter.DELETE(
+		fmt.Sprintf("/workspaces/:%s", workspace.WorkspaceContextKeyPublicID),
+		workspaceMiddleware,
+		api.DeleteWorkspaceConversationsHandler,
+	)
+
 	conversationMiddleWare := api.conversationService.GetConversationMiddleWare()
+	conversationsRouter.PATCH(
+		fmt.Sprintf("/:%s/workspace", conversation.ConversationContextKeyPublicID),
+		conversationMiddleWare,
+		api.UpdateConversationWorkspaceHandler,
+	)
 	conversationsRouter.GET(fmt.Sprintf("/:%s", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.GetConversationHandler)
 	conversationsRouter.PATCH(fmt.Sprintf("/:%s", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.UpdateConversationHandler)
 	conversationsRouter.DELETE(fmt.Sprintf("/:%s", conversation.ConversationContextKeyPublicID), conversationMiddleWare, api.DeleteConversationHandler)
@@ -173,7 +202,8 @@ func (api *ConversationAPI) RegisterRouter(router *gin.RouterGroup) {
 // @Param limit query int false "The maximum number of items to return" default(20)
 // @Param after query string false "A cursor for use in pagination. The ID of the last object from the previous page"
 // @Param order query string false "Order of items (asc/desc)"
-// @Success 200 {object} openai.ListResponse[ExtendedConversationResponse] "Successfully retrieved the list of conversations"
+// @Param workspace_id query string false "Filter conversations by workspace public ID"
+// @Success 200 {object} object "Successfully retrieved the list of conversations"
 // @Failure 400 {object} responses.ErrorResponse "Bad Request - Invalid pagination parameters"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized - invalid or missing API key"
 // @Failure 500 {object} responses.ErrorResponse "Internal Server Error"
@@ -183,11 +213,17 @@ func (api *ConversationAPI) ListConversationsHandler(reqCtx *gin.Context) {
 	user, _ := auth.GetUserFromContext(reqCtx)
 	userID := user.ID
 
+	workspaceIDParam := strings.TrimSpace(reqCtx.Query("workspace_id"))
+
 	pagination, err := query.GetCursorPaginationFromQuery(reqCtx, func(lastID string) (*uint, error) {
-		convs, convErr := api.conversationService.FindConversationsByFilter(ctx, conversation.ConversationFilter{
+		filter := conversation.ConversationFilter{
 			UserID:   &userID,
 			PublicID: &lastID,
-		}, nil)
+		}
+		if workspaceIDParam != "" {
+			filter.WorkspacePublicID = &workspaceIDParam
+		}
+		convs, convErr := api.conversationService.FindConversationsByFilter(ctx, filter, nil)
 		if convErr != nil {
 			return nil, convErr
 		}
@@ -206,6 +242,9 @@ func (api *ConversationAPI) ListConversationsHandler(reqCtx *gin.Context) {
 
 	filter := conversation.ConversationFilter{
 		UserID: &userID,
+	}
+	if workspaceIDParam != "" {
+		filter.WorkspacePublicID = &workspaceIDParam
 	}
 	conversations, convErr := api.conversationService.FindConversationsByFilter(ctx, filter, pagination)
 	if convErr != nil {
@@ -317,8 +356,20 @@ func (api *ConversationAPI) CreateConversationHandler(reqCtx *gin.Context) {
 		return
 	}
 
+	// validate workspace ID belongs to user and fetch the workspace public ID
+	workspace, err := api.workspaceService.GetWorkspaceByPublicIDAndUserID(ctx, request.WorkspaceID, userId)
+	if err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:          "019952d0-1dc9-746e-82ff-dd42b1e7930f",
+			ErrorInstance: err.GetError(),
+		})
+		return
+	}
+
+	workspacePublicID := workspace.PublicID
+
 	// Create conversation
-	conv, err := api.conversationService.CreateConversation(ctx, userId, &request.Title, true, request.Metadata)
+	conv, err := api.conversationService.CreateConversation(ctx, userId, &request.Title, true, request.Metadata, &workspacePublicID)
 	if err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:          "019952d0-3e32-76ba-a97f-711223df2c84",
@@ -450,6 +501,100 @@ func (api *ConversationAPI) DeleteConversationHandler(reqCtx *gin.Context) {
 	reqCtx.JSON(http.StatusOK, response)
 }
 
+// @Summary Update conversation workspace
+// @Description Moves a conversation to another workspace or removes it from a workspace
+// @Tags Conversations API
+// @Security BearerAuth
+// @Produce json
+// @Param conversation_id path string true "Conversation ID"
+// @Param request body UpdateConversationWorkspaceRequest true "Workspace assignment payload"
+// @Success 200 {object} ExtendedConversationResponse "Updated conversation"
+// @Failure 400 {object} responses.ErrorResponse "Invalid request payload"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized"
+// @Failure 403 {object} responses.ErrorResponse "Access denied"
+// @Failure 404 {object} responses.ErrorResponse "Workspace or conversation not found"
+// @Failure 500 {object} responses.ErrorResponse "Internal server error"
+// @Router /v1/conversations/{conversation_id}/workspace [patch]
+func (api *ConversationAPI) UpdateConversationWorkspaceHandler(reqCtx *gin.Context) {
+	ctx := reqCtx.Request.Context()
+	conv, ok := conversation.GetConversationFromContext(reqCtx)
+	if !ok {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  "a4fb6e9b-00c8-423c-9836-a83080e34d28",
+			Error: "conversation not found",
+		})
+		return
+	}
+
+	var request UpdateConversationWorkspaceRequest
+	if err := reqCtx.ShouldBindJSON(&request); err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
+			Code:  "7733200c-9a0b-43e1-8807-6b5fa2799f77",
+			Error: "Invalid request payload",
+		})
+		return
+	}
+
+	var workspacePublicID *string
+	if request.WorkspaceID != nil && strings.TrimSpace(*request.WorkspaceID) != "" {
+		trimmedWorkspaceID := strings.TrimSpace(*request.WorkspaceID)
+		workspaceEntity, err := api.workspaceService.GetWorkspaceByPublicIDAndUserID(ctx, trimmedWorkspaceID, conv.UserID)
+		if err != nil {
+			status := http.StatusInternalServerError
+			if err.GetCode() == "c8bc424c-5b20-4cf9-8ca1-7d9ad1b098c8" {
+				status = http.StatusNotFound
+			}
+			reqCtx.AbortWithStatusJSON(status, responses.ErrorResponse{
+				Code:  err.GetCode(),
+				Error: err.Error(),
+			})
+			return
+		}
+		publicID := workspaceEntity.PublicID
+		workspacePublicID = &publicID
+	} else {
+		workspacePublicID = nil
+	}
+
+	updatedConv, err := api.conversationService.UpdateConversationWorkspace(ctx, conv, workspacePublicID)
+	if err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code:  "4c46036b-1f5b-4251-80c9-3d20292a0194",
+			Error: err.Error(),
+		})
+		return
+	}
+
+	response := domainToExtendedConversationResponse(updatedConv)
+	reqCtx.JSON(http.StatusOK, response)
+}
+
+func (api *ConversationAPI) DeleteWorkspaceConversationsHandler(reqCtx *gin.Context) {
+	ctx := reqCtx.Request.Context()
+	workspaceEntity, ok := workspace.GetWorkspaceFromContext(reqCtx)
+	if !ok {
+		reqCtx.AbortWithStatusJSON(http.StatusNotFound, responses.ErrorResponse{
+			Code:  "c8bc424c-5b20-4cf9-8ca1-7d9ad1b098c8",
+			Error: "workspace not found",
+		})
+		return
+	}
+
+	if err := api.workspaceService.DeleteWorkspaceWithConversations(ctx, workspaceEntity); err != nil {
+		reqCtx.AbortWithStatusJSON(http.StatusInternalServerError, responses.ErrorResponse{
+			Code:  err.GetCode(),
+			Error: err.Error(),
+		})
+		return
+	}
+
+	reqCtx.JSON(http.StatusOK, DeletedWorkspaceResponse{
+		ID:      workspaceEntity.PublicID,
+		Object:  "workspace.deleted",
+		Deleted: true,
+	})
+}
+
 // @Summary Create items in a conversation
 // @Description Adds multiple items to a conversation with OpenAI-compatible format
 // @Tags Conversations API
@@ -458,7 +603,7 @@ func (api *ConversationAPI) DeleteConversationHandler(reqCtx *gin.Context) {
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
 // @Param request body CreateItemsRequest true "Create items request"
-// @Success 200 {object} openai.ListResponse[ConversationItemResponse] "Created items"
+// @Success 200 {object} object "Created items"
 // @Failure 400 {object} responses.ErrorResponse "Invalid request payload or invalid item format"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
@@ -537,7 +682,7 @@ func (api *ConversationAPI) CreateItemsHandler(reqCtx *gin.Context) {
 // @Param limit query int false "Number of items to return (1-100)"
 // @Param after query string false "Cursor for pagination - ID of the last item from previous page"
 // @Param order query string false "Order of items (asc/desc)"
-// @Success 200 {object} openai.ListResponse[ConversationItemResponse] "List of items"
+// @Success 200 {object} object "List of items"
 // @Failure 400 {object} responses.ErrorResponse "Bad Request - Invalid pagination parameters"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
@@ -725,11 +870,12 @@ func domainToExtendedConversationResponse(entity *conversation.Conversation) *Ex
 		metadata = make(map[string]string)
 	}
 	return &ExtendedConversationResponse{
-		ID:        entity.PublicID,
-		Object:    "conversation",
-		Title:     ptr.FromString(entity.Title),
-		CreatedAt: entity.CreatedAt.Unix(),
-		Metadata:  metadata,
+		ID:                entity.PublicID,
+		Object:            "conversation",
+		Title:             ptr.FromString(entity.Title),
+		WorkspacePublicID: ptr.FromString(entity.WorkspacePublicID),
+		CreatedAt:         entity.CreatedAt.Unix(),
+		Metadata:          metadata,
 	}
 }
 

@@ -168,21 +168,23 @@ type IncompleteDetails struct {
 }
 
 type Conversation struct {
-	ID        uint               `json:"-"`
-	PublicID  string             `json:"id"` // OpenAI-compatible string ID like "conv_abc123"
-	Title     *string            `json:"title,omitempty"`
-	UserID    uint               `json:"-"`
-	Status    ConversationStatus `json:"status"`
-	Items     []Item             `json:"items,omitempty"`
-	Metadata  map[string]string  `json:"metadata,omitempty"`
-	IsPrivate bool               `json:"is_private"`
-	CreatedAt time.Time          `json:"created_at"` // Unix timestamp for OpenAI compatibility
-	UpdatedAt time.Time          `json:"updated_at"` // Unix timestamp for OpenAI compatibility
+	ID                uint               `json:"-"`
+	PublicID          string             `json:"id"` // OpenAI-compatible string ID like "conv_abc123"
+	Title             *string            `json:"title,omitempty"`
+	UserID            uint               `json:"-"`
+	WorkspacePublicID *string            `json:"workspace_id,omitempty"`
+	Status            ConversationStatus `json:"status"`
+	Items             []Item             `json:"items,omitempty"`
+	Metadata          map[string]string  `json:"metadata,omitempty"`
+	IsPrivate         bool               `json:"is_private"`
+	CreatedAt         time.Time          `json:"created_at"` // Unix timestamp for OpenAI compatibility
+	UpdatedAt         time.Time          `json:"updated_at"` // Unix timestamp for OpenAI compatibility
 }
 
 type ConversationFilter struct {
-	PublicID *string
-	UserID   *uint
+	PublicID          *string
+	UserID            *uint
+	WorkspacePublicID *string
 }
 
 type ItemFilter struct {
@@ -200,6 +202,7 @@ type ConversationRepository interface {
 	FindByPublicID(ctx context.Context, publicID string) (*Conversation, error)
 	Update(ctx context.Context, conversation *Conversation) error
 	Delete(ctx context.Context, id uint) error
+	DeleteByWorkspacePublicID(ctx context.Context, workspacePublicID string) error
 	AddItem(ctx context.Context, conversationID uint, item *Item) error
 	SearchItems(ctx context.Context, conversationID uint, query string) ([]*Item, error)
 	BulkAddItems(ctx context.Context, conversationID uint, items []*Item) error

@@ -67,6 +67,27 @@ func newItem(db *gorm.DB, opts ...gen.DOOption) item {
 				RelationField: field.NewRelation("Conversation.User.Projects", "dbschema.ProjectMember"),
 			},
 		},
+		Workspace: struct {
+			field.RelationField
+			User struct {
+				field.RelationField
+			}
+			Conversations struct {
+				field.RelationField
+			}
+		}{
+			RelationField: field.NewRelation("Conversation.Workspace", "dbschema.Workspace"),
+			User: struct {
+				field.RelationField
+			}{
+				RelationField: field.NewRelation("Conversation.Workspace.User", "dbschema.User"),
+			},
+			Conversations: struct {
+				field.RelationField
+			}{
+				RelationField: field.NewRelation("Conversation.Workspace.Conversations", "dbschema.Conversation"),
+			},
+		},
 		Items: struct {
 			field.RelationField
 			Conversation struct {
@@ -246,6 +267,15 @@ type itemBelongsToConversation struct {
 			field.RelationField
 		}
 		Projects struct {
+			field.RelationField
+		}
+	}
+	Workspace struct {
+		field.RelationField
+		User struct {
+			field.RelationField
+		}
+		Conversations struct {
 			field.RelationField
 		}
 	}
