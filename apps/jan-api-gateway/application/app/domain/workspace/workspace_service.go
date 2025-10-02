@@ -46,7 +46,7 @@ func (s *WorkspaceService) CreateWorkspace(ctx context.Context, userID uint, nam
 	trimmedName := strings.TrimSpace(name)
 	if trimmedName == "" {
 		return nil, common.NewErrorWithMessage("workspace name is required", "3a5dcb2f-9f1c-4f4b-8893-4a62f72f7a00")
-	}50
+	}
 	if len([]rune(trimmedName)) > 50 {
 		return nil, common.NewErrorWithMessage("workspace name is too long", "94a6a12b-d4f0-4594-8125-95de7f9ce3d6")
 	}
