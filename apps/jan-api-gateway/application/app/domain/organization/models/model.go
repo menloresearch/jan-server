@@ -67,15 +67,6 @@ func (req *ModelCreateRequest) ValidateServedModelName() error {
 	return fmt.Errorf("--served-model-name parameter must match model name '%s'. Please ensure your command contains '--served-model-name %s'", req.Name, req.Name)
 }
 
-// ModelCreateFromYAMLRequest contains YAML manifest for custom deployment
-type ModelCreateFromYAMLRequest struct {
-	Name        string   `json:"name" binding:"required"`
-	DisplayName string   `json:"display_name" binding:"required"`
-	Description string   `json:"description"`
-	YAMLContent string   `json:"yaml_content" binding:"required"`
-	Tags        []string `json:"tags"`
-}
-
 // ModelType represents the type of AI model
 type ModelType string
 
@@ -90,11 +81,12 @@ const (
 type ModelStatus string
 
 const (
-	ModelStatusPending  ModelStatus = "pending"
-	ModelStatusCreating ModelStatus = "creating"
-	ModelStatusRunning  ModelStatus = "running"
-	ModelStatusFailed   ModelStatus = "failed"
-	ModelStatusStopped  ModelStatus = "stopped"
+	ModelStatusPending           ModelStatus = "pending"
+	ModelStatusCreating          ModelStatus = "creating"
+	ModelStatusRunning           ModelStatus = "running"
+	ModelStatusFailed            ModelStatus = "failed"
+	ModelStatusStopped           ModelStatus = "stopped"
+	ModelStatusCrashLoopBackOff  ModelStatus = "crash_loop_back_off"
 )
 
 // GPURequirement represents GPU requirements for a model
@@ -144,14 +136,11 @@ type Model struct {
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 	CreatedByUserID string    `json:"created_by_user_id"` // User public ID (e.g. user_abc123)
-}
 
-// ModelUpdateRequest represents a request to update an existing model
-type ModelUpdateRequest struct {
-	DisplayName  *string              `json:"display_name"`
-	Description  *string              `json:"description"`
-	Requirements *ResourceRequirement `json:"requirements"`
-	Tags         []string             `json:"tags"`
+	// Runtime status info (populated from Kubernetes)
+	RestartCount int32  `json:"restart_count,omitempty"`
+	ErrorMessage string `json:"error_message,omitempty"`
+	LastEvent    string `json:"last_event,omitempty"`
 }
 
 // ModelFilter represents filtering options for model queries

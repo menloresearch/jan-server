@@ -1751,63 +1751,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/organization/models/yaml": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Create a new model deployment using custom YAML manifest",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Models"
-                ],
-                "summary": "Create a model from YAML manifest",
-                "parameters": [
-                    {
-                        "description": "Model YAML creation request",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelCreateFromYAMLRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Model created successfully",
-                        "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ModelResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid request body",
-                        "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden - models API not available",
-                        "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/v1/organization/models/{model_id}": {
             "get": {
                 "security": [
@@ -1838,74 +1781,6 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "Model details",
-                        "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ModelResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden - models API not available",
-                        "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Model not found",
-                        "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Update an existing model's properties",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Models"
-                ],
-                "summary": "Update a model",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Model name",
-                        "name": "model_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Model update request",
-                        "name": "model",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelUpdateRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Updated model",
                         "schema": {
                             "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ModelResponse"
                         }
@@ -3910,6 +3785,9 @@ const docTemplate = `{
                     "description": "API endpoint information",
                     "type": "string"
                 },
+                "error_message": {
+                    "type": "string"
+                },
                 "huggingface_id": {
                     "description": "Model source information",
                     "type": "string"
@@ -3919,6 +3797,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "internal_url": {
+                    "type": "string"
+                },
+                "last_event": {
                     "type": "string"
                 },
                 "managed": {
@@ -3943,6 +3824,10 @@ const docTemplate = `{
                         }
                     ]
                 },
+                "restart_count": {
+                    "description": "Runtime status info (populated from Kubernetes)",
+                    "type": "integer"
+                },
                 "service_name": {
                     "type": "string"
                 },
@@ -3960,34 +3845,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "version": {
-                    "type": "string"
-                }
-            }
-        },
-        "menlo_ai_jan-api-gateway_app_domain_organization_models.ModelCreateFromYAMLRequest": {
-            "type": "object",
-            "required": [
-                "display_name",
-                "name",
-                "yaml_content"
-            ],
-            "properties": {
-                "description": {
-                    "type": "string"
-                },
-                "display_name": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "tags": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "yaml_content": {
                     "type": "string"
                 }
             }
@@ -4051,35 +3908,17 @@ const docTemplate = `{
                 "creating",
                 "running",
                 "failed",
-                "stopped"
+                "stopped",
+                "crash_loop_back_off"
             ],
             "x-enum-varnames": [
                 "ModelStatusPending",
                 "ModelStatusCreating",
                 "ModelStatusRunning",
                 "ModelStatusFailed",
-                "ModelStatusStopped"
+                "ModelStatusStopped",
+                "ModelStatusCrashLoopBackOff"
             ]
-        },
-        "menlo_ai_jan-api-gateway_app_domain_organization_models.ModelUpdateRequest": {
-            "type": "object",
-            "properties": {
-                "description": {
-                    "type": "string"
-                },
-                "display_name": {
-                    "type": "string"
-                },
-                "requirements": {
-                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ResourceRequirement"
-                },
-                "tags": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
         },
         "menlo_ai_jan-api-gateway_app_domain_organization_models.ResourceRequirement": {
             "type": "object",

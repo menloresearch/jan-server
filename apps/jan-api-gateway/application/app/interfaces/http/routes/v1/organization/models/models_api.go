@@ -31,9 +31,7 @@ func (api *ModelsAPI) RegisterRouter(router gin.IRouter) {
 
 	modelsRouter.GET("", api.ListModels)
 	modelsRouter.POST("", api.CreateModel)
-	modelsRouter.POST("/yaml", api.CreateModelFromYAML)
 	modelsRouter.GET("/:model_id", api.GetModel)
-	modelsRouter.PUT("/:model_id", api.UpdateModel)
 	modelsRouter.DELETE("/:model_id", api.DeleteModel)
 }
 
@@ -178,73 +176,6 @@ func (api *ModelsAPI) CreateModel(c *gin.Context) {
 	})
 }
 
-// CreateModelFromYAML creates a model from YAML manifest
-// @Summary Create a model from YAML manifest
-// @Description Create a new model deployment using custom YAML manifest
-// @Tags Models
-// @Security BearerAuth
-// @Accept json
-// @Produce json
-// @Param request body orgModels.ModelCreateFromYAMLRequest true "Model YAML creation request"
-// @Success 201 {object} ModelResponse "Model created successfully"
-// @Failure 400 {object} ErrorResponse "Invalid request body"
-// @Failure 403 {object} ErrorResponse "Forbidden - models API not available"
-// @Failure 500 {object} ErrorResponse "Internal server error"
-// @Router /v1/organization/models/yaml [post]
-func (api *ModelsAPI) CreateModelFromYAML(c *gin.Context) {
-	ctx := c.Request.Context()
-
-	organization, err := api.getOrganizationFromContext(c)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: err.Error(),
-		})
-		return
-	}
-
-	userID, exists := c.Get(string(auth.UserContextKeyID))
-	if !exists {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "user context not found",
-		})
-		return
-	}
-
-	userIDStr, ok := userID.(string)
-	if !ok {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "invalid user ID format",
-		})
-		return
-	}
-
-	var req orgModels.ModelCreateFromYAMLRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: err.Error(),
-		})
-		return
-	}
-
-	model, err := api.modelService.CreateModelFromYAML(ctx, organization.ID, userIDStr, &req)
-	if err != nil {
-		if err.Error() == "models API only available when running in Kubernetes cluster" {
-			c.JSON(http.StatusForbidden, ErrorResponse{
-				Error: err.Error(),
-			})
-		} else {
-			c.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: err.Error(),
-			})
-		}
-		return
-	}
-
-	c.JSON(http.StatusCreated, ModelResponse{
-		Model: *model,
-	})
-}
-
 // GetModel returns a specific model
 // @Summary Get a model by name
 // @Description Get details of a specific model by its name
@@ -301,73 +232,6 @@ func (api *ModelsAPI) GetModel(c *gin.Context) {
 	})
 }
 
-// UpdateModel updates an existing model
-// @Summary Update a model
-// @Description Update an existing model's properties
-// @Tags Models
-// @Security BearerAuth
-// @Accept json
-// @Produce json
-// @Param model_id path string true "Model name"
-// @Param model body orgModels.ModelUpdateRequest true "Model update request"
-// @Success 200 {object} ModelResponse "Updated model"
-// @Failure 400 {object} ErrorResponse "Bad request"
-// @Failure 403 {object} ErrorResponse "Forbidden - models API not available"
-// @Failure 404 {object} ErrorResponse "Model not found"
-// @Failure 500 {object} ErrorResponse "Internal server error"
-// @Router /v1/organization/models/{model_id} [put]
-func (api *ModelsAPI) UpdateModel(c *gin.Context) {
-	ctx := c.Request.Context()
-
-	organization, err := api.getOrganizationFromContext(c)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: err.Error(),
-		})
-		return
-	}
-
-	modelID := c.Param("model_id")
-	if modelID == "" {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: "model_id is required",
-		})
-		return
-	}
-
-	var req orgModels.ModelUpdateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: err.Error(),
-		})
-		return
-	}
-
-	model, err := api.modelService.UpdateModel(ctx, organization.ID, modelID, &req)
-	if err != nil {
-		if err.Error() == "models API only available when running in Kubernetes cluster" {
-			c.JSON(http.StatusForbidden, ErrorResponse{
-				Error: err.Error(),
-			})
-		} else if err.Error() == "model not found in organization" {
-			c.JSON(http.StatusNotFound, ErrorResponse{
-				Error: err.Error(),
-			})
-		} else {
-			c.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: err.Error(),
-			})
-		}
-		return
-	}
-
-	c.JSON(http.StatusOK, ModelResponse{
-		Model: *model,
-	})
-}
-
-// ListAllModels returns all models (managed and unmanaged) in the cluster
-// @Summary List all models in cluster
 // DeleteModel deletes a model
 // @Summary Delete a model
 // @Description Delete a model and its associated Kubernetes resources

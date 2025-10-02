@@ -791,6 +791,8 @@ definitions:
       endpoint_url:
         description: API endpoint information
         type: string
+      error_message:
+        type: string
       huggingface_id:
         description: Model source information
         type: string
@@ -798,6 +800,8 @@ definitions:
         description: Model name from Kubernetes
         type: string
       internal_url:
+        type: string
+      last_event:
         type: string
       managed:
         description: true if managed by jan-server, false if unmanaged (e.g., Aibrix)
@@ -813,6 +817,9 @@ definitions:
         allOf:
         - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ResourceRequirement'
         description: Resource requirements
+      restart_count:
+        description: Runtime status info (populated from Kubernetes)
+        type: integer
       service_name:
         type: string
       status:
@@ -826,25 +833,6 @@ definitions:
         type: string
       version:
         type: string
-    type: object
-  menlo_ai_jan-api-gateway_app_domain_organization_models.ModelCreateFromYAMLRequest:
-    properties:
-      description:
-        type: string
-      display_name:
-        type: string
-      name:
-        type: string
-      tags:
-        items:
-          type: string
-        type: array
-      yaml_content:
-        type: string
-    required:
-    - display_name
-    - name
-    - yaml_content
     type: object
   menlo_ai_jan-api-gateway_app_domain_organization_models.ModelCreateRequest:
     properties:
@@ -888,6 +876,7 @@ definitions:
     - running
     - failed
     - stopped
+    - crash_loop_back_off
     type: string
     x-enum-varnames:
     - ModelStatusPending
@@ -895,19 +884,7 @@ definitions:
     - ModelStatusRunning
     - ModelStatusFailed
     - ModelStatusStopped
-  menlo_ai_jan-api-gateway_app_domain_organization_models.ModelUpdateRequest:
-    properties:
-      description:
-        type: string
-      display_name:
-        type: string
-      requirements:
-        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ResourceRequirement'
-      tags:
-        items:
-          type: string
-        type: array
-    type: object
+    - ModelStatusCrashLoopBackOff
   menlo_ai_jan-api-gateway_app_domain_organization_models.ResourceRequirement:
     properties:
       cpu:
@@ -3369,86 +3346,6 @@ paths:
       security:
       - BearerAuth: []
       summary: Get a model by name
-      tags:
-      - Models
-    put:
-      consumes:
-      - application/json
-      description: Update an existing model's properties
-      parameters:
-      - description: Model name
-        in: path
-        name: model_id
-        required: true
-        type: string
-      - description: Model update request
-        in: body
-        name: model
-        required: true
-        schema:
-          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelUpdateRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Updated model
-          schema:
-            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ModelResponse'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
-        "403":
-          description: Forbidden - models API not available
-          schema:
-            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
-        "404":
-          description: Model not found
-          schema:
-            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Update a model
-      tags:
-      - Models
-  /v1/organization/models/yaml:
-    post:
-      consumes:
-      - application/json
-      description: Create a new model deployment using custom YAML manifest
-      parameters:
-      - description: Model YAML creation request
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelCreateFromYAMLRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Model created successfully
-          schema:
-            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ModelResponse'
-        "400":
-          description: Invalid request body
-          schema:
-            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
-        "403":
-          description: Forbidden - models API not available
-          schema:
-            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Create a model from YAML manifest
       tags:
       - Models
   /v1/organization/projects:

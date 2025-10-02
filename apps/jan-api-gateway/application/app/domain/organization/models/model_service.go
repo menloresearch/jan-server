@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -368,85 +367,6 @@ func (s *ModelService) CreateModel(ctx context.Context, orgID uint, userID strin
 	return model, nil
 }
 
-// CreateModelFromYAML creates a model from YAML manifest
-func (s *ModelService) CreateModelFromYAML(ctx context.Context, orgID uint, userID string, req *ModelCreateFromYAMLRequest) (*Model, error) {
-	if err := s.ValidateModelAPIAccess(ctx); err != nil {
-		return nil, err
-	}
-
-	// TODO: Parse and validate YAML content
-	// TODO: Extract model information from YAML
-	// TODO: Apply YAML to Kubernetes cluster
-
-	// For now, create a simple model record
-	model := &Model{
-		ID:              req.Name,
-		OrganizationID:  orgID,
-		DisplayName:     req.DisplayName,
-		Description:     req.Description,
-		Status:          ModelStatusPending,
-		Namespace:       DefaultNamespace,
-		DeploymentName:  req.Name,
-		ServiceName:     req.Name,
-		Tags:            req.Tags,
-		CreatedAt:       time.Now(),
-		UpdatedAt:       time.Now(),
-		CreatedByUserID: userID,
-		Managed:         false, // YAML deployments are unmanaged
-	}
-
-	// TODO: Apply YAML to cluster
-	// kubectl apply -f yaml_content
-
-	model.Status = ModelStatusCreating
-
-	// Invalidate cache
-	_ = s.invalidateModelCache(ctx, orgID, req.Name)
-
-	return model, nil
-}
-
-// UpdateModel updates an existing model
-func (s *ModelService) UpdateModel(ctx context.Context, orgID uint, modelID string, req *ModelUpdateRequest) (*Model, error) {
-	if err := s.ValidateModelAPIAccess(ctx); err != nil {
-		return nil, err
-	}
-
-	model, err := s.GetModel(ctx, orgID, modelID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Update fields if provided
-	if req.DisplayName != nil {
-		model.DisplayName = *req.DisplayName
-	}
-	if req.Description != nil {
-		model.Description = *req.Description
-	}
-	if req.Requirements != nil {
-		if err := s.validateResourceRequirements(ctx, req.Requirements); err != nil {
-			return nil, fmt.Errorf("resource requirements validation failed: %w", err)
-		}
-		model.Requirements = *req.Requirements
-	}
-	if req.Tags != nil {
-		model.Tags = req.Tags
-	}
-
-	model.UpdatedAt = time.Now()
-
-	// Update Kubernetes labels if needed
-	if err := s.updateKubernetesLabels(ctx, model); err != nil {
-		return nil, fmt.Errorf("failed to update Kubernetes labels: %w", err)
-	}
-
-	// Invalidate cache
-	_ = s.invalidateModelCache(ctx, orgID, model.ID)
-
-	return model, nil
-}
-
 // DeleteModel removes a model and its Kubernetes resources
 func (s *ModelService) DeleteModel(ctx context.Context, orgID uint, modelID string) error {
 	if err := s.ValidateModelAPIAccess(ctx); err != nil {
@@ -527,13 +447,19 @@ func (s *ModelService) convertModelInfoToModel(modelInfo *kubernetes.ModelInfo, 
 		// Leave createdByUserID as empty for unmanaged models
 	}
 
-	// Determine status from Kubernetes status
+	// Determine status from Kubernetes status with enhanced error handling
 	status := ModelStatusPending
 	switch modelInfo.Status {
 	case "Running":
 		status = ModelStatusRunning
 	case "Starting":
 		status = ModelStatusCreating
+	case "CrashLoopBackOff":
+		if modelInfo.RestartCount >= 3 {
+			status = ModelStatusCrashLoopBackOff
+		} else {
+			status = ModelStatusPending
+		}
 	default:
 		status = ModelStatusPending
 	}
@@ -552,6 +478,9 @@ func (s *ModelService) convertModelInfoToModel(modelInfo *kubernetes.ModelInfo, 
 		DeploymentName:  modelInfo.Name,
 		ServiceName:     modelInfo.Name,
 		Requirements:    requirements,
+		RestartCount:    modelInfo.RestartCount,
+		ErrorMessage:    modelInfo.ErrorMessage,
+		LastEvent:       modelInfo.LastEvent,
 		CreatedAt:       modelInfo.CreatedAt,
 		UpdatedAt:       modelInfo.CreatedAt,
 		CreatedByUserID: createdByUserID, // 0 for unmanaged models
@@ -609,8 +538,9 @@ func (s *ModelService) deployModelToKubernetes(ctx context.Context, model *Model
 		// No CPU/Memory limits - allow full node utilization for GPU workloads
 		GPUCount:            req.GPUCount,
 		InitialDelaySeconds: int32(req.InitialDelaySeconds),
-		EnablePVC:           req.StorageSize > 0,
-		PVCName:             DefaultPVCName, // Use default PVC name
+		EnablePVC:           req.StorageSize > 0,                  // Enable PVC if storage size specified
+		PVCName:             fmt.Sprintf("%s-storage", model.ID),  // Each model has its own PVC
+		PVCSize:             fmt.Sprintf("%dGi", req.StorageSize), // Convert to Gi format
 		ExtraEnv:            envVars,
 		ManagedLabels: map[string]string{
 			ManagedByLabelKey:    ManagedByLabelValue,
@@ -629,12 +559,6 @@ func (s *ModelService) deployModelToKubernetes(ctx context.Context, model *Model
 		return fmt.Errorf("failed to deploy model: %w", err)
 	}
 
-	return nil
-}
-
-// updateKubernetesLabels updates labels on Kubernetes resources
-func (s *ModelService) updateKubernetesLabels(ctx context.Context, model *Model) error {
-	// TODO: Implement label updates on K8s resources
 	return nil
 }
 
@@ -665,189 +589,6 @@ func (s *ModelService) matchesFilter(model *Model, filter *ModelFilter) bool {
 	// TODO: Implement tag filtering if needed
 	return true
 }
-
-// validateResourceRequirements validates resource requirements against cluster capabilities
-func (s *ModelService) validateResourceRequirements(ctx context.Context, requirements *ResourceRequirement) error {
-	// Basic validation
-	if requirements.CPU.String() == "" {
-		return fmt.Errorf("CPU requirement is required")
-	}
-	if requirements.Memory.String() == "" {
-		return fmt.Errorf("memory requirement is required")
-	}
-
-	// Enhanced cluster capacity validation using cached data
-	return s.validateResourcesAgainstCluster(ctx, requirements)
-}
-
-// validateResourcesAgainstCluster validates resources against actual cluster capacity
-func (s *ModelService) validateResourcesAgainstCluster(ctx context.Context, requirements *ResourceRequirement) error {
-	// Get cached GPU resources to validate GPU requirements
-	if requirements.GPU != nil && requirements.GPU.MinGPUs > 0 {
-		gpuResources, err := s.GetGPUResources(ctx)
-		if err != nil {
-			// If we can't get GPU resources, warn but don't fail
-			// (deployment might still work if GPU resources become available)
-			return nil
-		}
-
-		// Check if cluster has enough GPUs
-		if gpuResources.Summary.AvailableGPUs < requirements.GPU.MinGPUs {
-			return fmt.Errorf("insufficient GPU resources: requested minimum %d GPUs but only %d available in cluster",
-				requirements.GPU.MinGPUs, gpuResources.Summary.AvailableGPUs)
-		}
-
-		// Check if cluster has any GPUs at all
-		if gpuResources.Summary.TotalGPUs == 0 {
-			return fmt.Errorf("no GPU resources found in cluster but %d minimum GPUs requested", requirements.GPU.MinGPUs)
-		}
-
-		// Validate GPU type if specified
-		if requirements.GPU.GPUType != "" {
-			typeAvailable := false
-			for _, availableType := range gpuResources.Summary.GPUTypes {
-				if availableType == requirements.GPU.GPUType {
-					typeAvailable = true
-					break
-				}
-			}
-			if !typeAvailable {
-				return fmt.Errorf("requested GPU type '%s' not available in cluster. Available types: %v",
-					requirements.GPU.GPUType, gpuResources.Summary.GPUTypes)
-			}
-
-			// Check available GPUs of the specific type
-			if typeAvail, exists := gpuResources.Availability.ByType[requirements.GPU.GPUType]; exists {
-				if typeAvail.Available < requirements.GPU.MinGPUs {
-					return fmt.Errorf("insufficient '%s' GPUs: requested minimum %d but only %d available",
-						requirements.GPU.GPUType, requirements.GPU.MinGPUs, typeAvail.Available)
-				}
-			}
-		}
-
-		// TODO: Add VRAM validation when GPU nodes provide detailed VRAM info
-		// Currently NodeGPUInfo has TotalVRAM and AvailableVRAM but it's at node level
-	}
-
-	// Get cached cluster status to validate general capacity
-	clusterStatus, err := s.GetClusterStatus(ctx)
-	if err != nil {
-		// If we can't get cluster status, allow deployment (it will fail at K8s level if invalid)
-		return nil
-	}
-
-	// Check if cluster dependencies are valid for model deployment
-	if !clusterStatus.Valid {
-		warnings := []string{}
-		for _, warning := range clusterStatus.Warnings {
-			warnings = append(warnings, warning)
-		}
-		for _, error := range clusterStatus.Errors {
-			warnings = append(warnings, error)
-		}
-
-		if len(warnings) > 0 {
-			// Log warnings but don't fail - allow deployment attempt
-			// In production, you might want to fail here depending on criticality
-		}
-	}
-
-	return nil
-}
-
-// validateDeploymentConfig validates deployment configuration
-// TODO: Remove this function - not needed for simplified API
-/*
-func (s *ModelService) validateDeploymentConfig(ctx context.Context, config *ModelDeploymentConfig) error {
-	if config.Image == "" {
-		return fmt.Errorf("container image is required")
-	}
-
-	if len(config.Command) == 0 {
-		return fmt.Errorf("container command is required")
-	}
-
-	if config.GPUCount < 0 {
-		return fmt.Errorf("GPU count cannot be negative")
-	}
-
-	if config.InitialDelaySeconds < 0 {
-		return fmt.Errorf("initial delay seconds cannot be negative")
-	}
-
-	// Validate storage class if PVC is enabled
-	if config.EnablePVC {
-		if config.StorageClass == "" {
-			// Try to get default storage class
-			defaultSC, err := s.k8sService.GetDefaultStorageClass(ctx)
-			if err != nil {
-				return fmt.Errorf("PVC enabled but no storage class specified and no default found: %w", err)
-			}
-			config.StorageClass = defaultSC
-		}
-	}
-
-	return nil
-}
-*/
-
-// validateServedModelName validates that --served-model-name in args matches the model name
-// This is required by Aibrix for proper model identification and autoscaling
-func (s *ModelService) validateServedModelName(modelName string, args []string) error {
-	// Look for --served-model-name parameter in args
-	for i, arg := range args {
-		if arg == "--served-model-name" {
-			// Check if there's a next argument
-			if i+1 >= len(args) {
-				return fmt.Errorf("--served-model-name flag found but no value provided")
-			}
-
-			servedModelName := args[i+1]
-			if servedModelName != modelName {
-				return fmt.Errorf("--served-model-name '%s' must match model name '%s' (required by Aibrix for autoscaling)", servedModelName, modelName)
-			}
-
-			return nil // Found and validated
-		}
-
-		// Also check for combined format like --served-model-name=model-name
-		if strings.HasPrefix(arg, "--served-model-name=") {
-			servedModelName := strings.TrimPrefix(arg, "--served-model-name=")
-			if servedModelName != modelName {
-				return fmt.Errorf("--served-model-name '%s' must match model name '%s' (required by Aibrix for autoscaling)", servedModelName, modelName)
-			}
-
-			return nil // Found and validated
-		}
-	}
-
-	// If we're using vLLM image, --served-model-name is recommended for Aibrix integration
-	return fmt.Errorf("--served-model-name parameter not found in args. For Aibrix autoscaling compatibility, please add '--served-model-name %s' to your vLLM command", modelName)
-}
-
-// setDeploymentDefaults sets default values for deployment configuration
-// TODO: Remove this function - not needed for simplified API
-/*
-func (s *ModelService) setDeploymentDefaults(config *ModelDeploymentConfig) {
-	if config.ImagePullPolicy == "" {
-		config.ImagePullPolicy = "IfNotPresent"
-	}
-
-	if config.InitialDelaySeconds == 0 {
-		config.InitialDelaySeconds = 240
-	}
-
-	if config.EnableAutoscaling && config.AutoscalingConfig == nil {
-		config.AutoscalingConfig = &ModelAutoscalingConfig{
-			MinReplicas:    1,
-			MaxReplicas:    10,
-			TargetMetric:   "num_requests_running",
-			TargetValue:    "40",
-			ScaleDownDelay: "3m",
-		}
-	}
-}
-*/
 
 // ListAllModels returns all models in the cluster (managed and unmanaged)
 func (s *ModelService) ListAllModels(ctx context.Context, orgID uint) ([]*ModelInfo, error) {
@@ -925,49 +666,37 @@ func (s *ModelService) ListModels(ctx context.Context, orgID uint, filter *Model
 
 // ModelInfo represents basic model information for listing
 type ModelInfo struct {
-	Name        string    `json:"name"`
-	Namespace   string    `json:"namespace"`
-	IsManaged   bool      `json:"is_managed"`
-	Status      string    `json:"status"`
-	Replicas    int32     `json:"replicas"`
-	CreatedAt   time.Time `json:"created_at"`
-	DisplayName string    `json:"display_name,omitempty"`
-	Description string    `json:"description,omitempty"`
+	Name         string    `json:"name"`
+	Namespace    string    `json:"namespace"`
+	IsManaged    bool      `json:"is_managed"`
+	Status       string    `json:"status"`
+	Replicas     int32     `json:"replicas"`
+	CreatedAt    time.Time `json:"created_at"`
+	DisplayName  string    `json:"display_name,omitempty"`
+	Description  string    `json:"description,omitempty"`
+	RestartCount int32     `json:"restart_count,omitempty"`
+	ErrorMessage string    `json:"error_message,omitempty"`
+	LastEvent    string    `json:"last_event,omitempty"`
 }
 
 // Helper functions
-
-// convertFromKubernetesModelInfo converts Kubernetes ModelInfo to domain ModelInfo
-func convertFromKubernetesModelInfo(k8sModels []*kubernetes.ModelInfo) []ModelInfo {
-	var models []ModelInfo
-	for _, k8sModel := range k8sModels {
-		models = append(models, ModelInfo{
-			Name:        k8sModel.Name,
-			Namespace:   k8sModel.Namespace,
-			IsManaged:   k8sModel.IsManaged,
-			Status:      k8sModel.Status,
-			Replicas:    k8sModel.Replicas,
-			CreatedAt:   k8sModel.CreatedAt,
-			DisplayName: k8sModel.Labels["display-name"],
-			Description: k8sModel.Labels["description"],
-		})
-	}
-	return models
-}
 
 // convertFromKubernetesModelInfoToPointers converts Kubernetes ModelInfo to domain ModelInfo pointers
 func convertFromKubernetesModelInfoToPointers(k8sModels []*kubernetes.ModelInfo) []*ModelInfo {
 	var models []*ModelInfo
 	for _, k8sModel := range k8sModels {
 		model := &ModelInfo{
-			Name:        k8sModel.Name,
-			Namespace:   k8sModel.Namespace,
-			IsManaged:   k8sModel.IsManaged,
-			Status:      k8sModel.Status,
-			Replicas:    k8sModel.Replicas,
-			CreatedAt:   k8sModel.CreatedAt,
-			DisplayName: k8sModel.Labels["display-name"],
-			Description: k8sModel.Labels["description"],
+			Name:         k8sModel.Name,
+			Namespace:    k8sModel.Namespace,
+			IsManaged:    k8sModel.IsManaged,
+			Status:       k8sModel.Status,
+			Replicas:     k8sModel.Replicas,
+			CreatedAt:    k8sModel.CreatedAt,
+			DisplayName:  k8sModel.Labels["display-name"],
+			Description:  k8sModel.Labels["description"],
+			RestartCount: k8sModel.RestartCount,
+			ErrorMessage: k8sModel.ErrorMessage,
+			LastEvent:    k8sModel.LastEvent,
 		}
 		models = append(models, model)
 	}
