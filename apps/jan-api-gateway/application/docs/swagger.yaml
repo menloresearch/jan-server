@@ -558,6 +558,64 @@ definitions:
       code:
         type: string
     type: object
+  app_interfaces_http_routes_v1_organization_models.ClusterValidationResponse:
+    properties:
+      dependencies:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ClusterDependenciesStatus'
+      errors:
+        items:
+          type: string
+        type: array
+      gpu_status:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_infrastructure_kubernetes.ClusterGPUStatus'
+      valid:
+        type: boolean
+      warnings:
+        items:
+          type: string
+        type: array
+    type: object
+  app_interfaces_http_routes_v1_organization_models.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_organization_models.GPUResourcesResponse:
+    properties:
+      availability:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.GPUAvailability'
+      gpu_nodes:
+        items:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_infrastructure_kubernetes.NodeGPUInfo'
+        type: array
+      summary:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.GPUResourcesSummary'
+      total_nodes:
+        type: integer
+    type: object
+  app_interfaces_http_routes_v1_organization_models.KubernetesStatusResponse:
+    properties:
+      available:
+        type: boolean
+      in_cluster:
+        type: boolean
+      message:
+        type: string
+    type: object
+  app_interfaces_http_routes_v1_organization_models.ModelResponse:
+    properties:
+      model:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.Model'
+    type: object
+  app_interfaces_http_routes_v1_organization_models.ModelsListResponse:
+    properties:
+      models:
+        items:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.Model'
+        type: array
+      total:
+        type: integer
+    type: object
   app_interfaces_http_routes_v1_organization_projects.CreateProjectRequest:
     properties:
       name:
@@ -648,6 +706,232 @@ definitions:
     - ItemRoleUser
     - ItemRoleAssistant
     - ItemRoleTool
+  menlo_ai_jan-api-gateway_app_domain_organization_models.ClusterDependenciesStatus:
+    properties:
+      aibrix_operator:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.DependencyStatus'
+      envoy_gateway:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.DependencyStatus'
+      gpu_operator:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.DependencyStatus'
+      kuberay_operator:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.DependencyStatus'
+      namespace:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.DependencyStatus'
+      storage_classes:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.DependencyStatus'
+    type: object
+  menlo_ai_jan-api-gateway_app_domain_organization_models.DependencyStatus:
+    properties:
+      available:
+        type: boolean
+      message:
+        type: string
+      version:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_domain_organization_models.GPUAvailability:
+    properties:
+      by_type:
+        additionalProperties:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.GPUTypeAvailability'
+        type: object
+    type: object
+  menlo_ai_jan-api-gateway_app_domain_organization_models.GPURequirement:
+    properties:
+      gpu_type:
+        description: nvidia, amd, etc.
+        type: string
+      max_gpus:
+        type: integer
+      min_gpus:
+        type: integer
+      min_vram:
+        $ref: '#/definitions/resource.Quantity'
+      preferred_vram:
+        $ref: '#/definitions/resource.Quantity'
+    type: object
+  menlo_ai_jan-api-gateway_app_domain_organization_models.GPUResourcesSummary:
+    properties:
+      available_gpus:
+        type: integer
+      available_vram:
+        type: string
+      gpu_types:
+        items:
+          type: string
+        type: array
+      total_gpus:
+        type: integer
+      total_vram:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_domain_organization_models.GPUTypeAvailability:
+    properties:
+      available:
+        type: integer
+      total:
+        type: integer
+      vram_per_gpu:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_domain_organization_models.Model:
+    properties:
+      created_at:
+        type: string
+      created_by_user_id:
+        description: User public ID (e.g. user_abc123)
+        type: string
+      deployment_name:
+        type: string
+      description:
+        type: string
+      display_name:
+        type: string
+      endpoint_url:
+        description: API endpoint information
+        type: string
+      error_message:
+        type: string
+      huggingface_id:
+        description: Model source information
+        type: string
+      id:
+        description: Model name from Kubernetes
+        type: string
+      internal_url:
+        type: string
+      last_event:
+        type: string
+      managed:
+        description: true if managed by jan-server, false if unmanaged (e.g., Aibrix)
+        type: boolean
+      namespace:
+        description: Kubernetes deployment info
+        type: string
+      organization_id:
+        type: integer
+      repository_url:
+        type: string
+      requirements:
+        allOf:
+        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ResourceRequirement'
+        description: Resource requirements
+      restart_count:
+        description: Runtime status info (populated from Kubernetes)
+        type: integer
+      service_name:
+        type: string
+      status:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelStatus'
+      tags:
+        description: Metadata
+        items:
+          type: string
+        type: array
+      updated_at:
+        type: string
+      version:
+        type: string
+    type: object
+  menlo_ai_jan-api-gateway_app_domain_organization_models.ModelCreateRequest:
+    properties:
+      command:
+        items:
+          type: string
+        type: array
+      description:
+        type: string
+      display_name:
+        type: string
+      gpu_count:
+        type: integer
+      hugging_face_token:
+        type: string
+      image:
+        type: string
+      initial_delay_seconds:
+        type: integer
+      name:
+        type: string
+      replicas:
+        type: integer
+      storage_class:
+        type: string
+      storage_size:
+        type: integer
+      tags:
+        items:
+          type: string
+        type: array
+    required:
+    - display_name
+    - image
+    - name
+    type: object
+  menlo_ai_jan-api-gateway_app_domain_organization_models.ModelStatus:
+    enum:
+    - pending
+    - creating
+    - running
+    - failed
+    - stopped
+    - crash_loop_back_off
+    type: string
+    x-enum-varnames:
+    - ModelStatusPending
+    - ModelStatusCreating
+    - ModelStatusRunning
+    - ModelStatusFailed
+    - ModelStatusStopped
+    - ModelStatusCrashLoopBackOff
+  menlo_ai_jan-api-gateway_app_domain_organization_models.ResourceRequirement:
+    properties:
+      cpu:
+        $ref: '#/definitions/resource.Quantity'
+      gpu:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.GPURequirement'
+      memory:
+        $ref: '#/definitions/resource.Quantity'
+    type: object
+  menlo_ai_jan-api-gateway_app_infrastructure_kubernetes.ClusterGPUStatus:
+    properties:
+      aibrix_ok:
+        type: boolean
+      envoy_gateway_ok:
+        type: boolean
+      gpu_nodes:
+        items:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_infrastructure_kubernetes.NodeGPUInfo'
+        type: array
+      gpu_operator_ok:
+        type: boolean
+      has_gpus:
+        type: boolean
+      kuberay_ok:
+        type: boolean
+      total_gpus:
+        type: integer
+      total_nodes:
+        type: integer
+    type: object
+  menlo_ai_jan-api-gateway_app_infrastructure_kubernetes.NodeGPUInfo:
+    properties:
+      available_vram:
+        $ref: '#/definitions/resource.Quantity'
+      gpu_count:
+        type: integer
+      gpu_type:
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      node_name:
+        type: string
+      total_vram:
+        $ref: '#/definitions/resource.Quantity'
+    type: object
   menlo_ai_jan-api-gateway_app_interfaces_http_requests.CreateResponseRequest:
     properties:
       background:
@@ -1782,6 +2066,27 @@ definitions:
       severity:
         type: string
     type: object
+  resource.Quantity:
+    properties:
+      Format:
+        enum:
+        - DecimalExponent
+        - BinarySI
+        - DecimalSI
+        type: string
+        x-enum-comments:
+          BinarySI: e.g., 12Mi (12 * 2^20)
+          DecimalExponent: e.g., 12e6
+          DecimalSI: e.g., 12M  (12 * 10^6)
+        x-enum-descriptions:
+        - e.g., 12e6
+        - e.g., 12Mi (12 * 2^20)
+        - e.g., 12M  (12 * 10^6)
+        x-enum-varnames:
+        - DecimalExponent
+        - BinarySI
+        - DecimalSI
+    type: object
 info:
   contact: {}
   description: This is the API gateway for Jan Server.
@@ -2812,6 +3117,237 @@ paths:
       summary: Verify Invite
       tags:
       - Administration API
+  /v1/organization/kubernetes:
+    get:
+      consumes:
+      - application/json
+      description: Check if the application is running in a Kubernetes cluster and
+        has access to K8s APIs
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Kubernetes status
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.KubernetesStatusResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Check Kubernetes availability
+      tags:
+      - Kubernetes
+  /v1/organization/kubernetes/cluster-status:
+    get:
+      consumes:
+      - application/json
+      description: Check if the Kubernetes cluster has all required dependencies and
+        configurations for managed model deployment
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cluster validation results
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ClusterValidationResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+        "403":
+          description: Forbidden - Kubernetes not available
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Validate cluster dependencies
+      tags:
+      - Kubernetes
+  /v1/organization/kubernetes/gpu-resources:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about GPU resources in the Kubernetes
+        cluster including availability and usage
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: GPU resources information
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.GPUResourcesResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get GPU resources information
+      tags:
+      - Kubernetes
+  /v1/organization/models:
+    get:
+      consumes:
+      - application/json
+      description: Get all models belonging to the organization (both managed and
+        unmanaged)
+      parameters:
+      - description: Filter by model status
+        in: query
+        name: status
+        type: string
+      - description: Filter by managed (true) or unmanaged (false) models
+        in: query
+        name: managed
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of models
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ModelsListResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+        "403":
+          description: Forbidden - models API not available
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List organization models
+      tags:
+      - Models
+    post:
+      consumes:
+      - application/json
+      description: Create a new AI model for the organization
+      parameters:
+      - description: Model creation request
+        in: body
+        name: model
+        required: true
+        schema:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created model
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ModelResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+        "403":
+          description: Forbidden - models API not available
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a new model
+      tags:
+      - Models
+  /v1/organization/models/{model_id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a model and its associated Kubernetes resources
+      parameters:
+      - description: Model name
+        in: path
+        name: model_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Model deleted successfully
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+        "403":
+          description: Forbidden - models API not available
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+        "404":
+          description: Model not found
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a model
+      tags:
+      - Models
+    get:
+      consumes:
+      - application/json
+      description: Get details of a specific model by its name
+      parameters:
+      - description: Model name
+        in: path
+        name: model_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Model details
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ModelResponse'
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+        "403":
+          description: Forbidden - models API not available
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+        "404":
+          description: Model not found
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a model by name
+      tags:
+      - Models
   /v1/organization/projects:
     get:
       description: Retrieves a paginated list of all projects for the authenticated

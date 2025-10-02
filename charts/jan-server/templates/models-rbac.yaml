@@ -1,0 +1,108 @@
+{{- if .Values.gateway.serviceAccount.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "jan-server.fullname" . }}-models-api
+  labels:
+    {{- include "jan-server.labels" . | nindent 4 }}
+rules:
+# CRD access for checking available operators
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["get", "list", "watch"]
+
+# Node access for GPU information
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+
+# Storage class access for storage validation
+- apiGroups: ["storage.k8s.io"]
+  resources: ["storageclasses"]
+  verbs: ["get", "list", "watch"]
+
+# Namespace access for model deployments
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list", "create", "patch", "update"]
+
+# Pod access for checking resource usage
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+
+# Metrics access for resource monitoring
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["nodes", "pods"]
+  verbs: ["get", "list"]
+
+# Service account for model workloads
+- apiGroups: [""]
+  resources: ["serviceaccounts"]
+  verbs: ["get", "list", "create", "patch", "update"]
+
+# Deployment management for model serving
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "create", "patch", "update", "delete"]
+
+# Service management for model endpoints
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list", "create", "patch", "update", "delete"]
+
+# ConfigMap and Secret management for model configurations
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "create", "patch", "update", "delete"]
+
+# PVC for model storage
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]
+  verbs: ["get", "list", "create", "patch", "update", "delete"]
+
+# HPA for model autoscaling
+- apiGroups: ["autoscaling"]
+  resources: ["horizontalpodautoscalers"]
+  verbs: ["get", "list", "create", "patch", "update", "delete"]
+
+# Aibrix CRD resources for model autoscaling
+- apiGroups: ["autoscaling.aibrix.ai"]
+  resources: ["podautoscalers"]
+  verbs: ["get", "list", "create", "patch", "update", "delete", "watch"]
+
+# GPU Operator resources for GPU management
+- apiGroups: ["nvidia.com"]
+  resources: ["clusterpolicies"]
+  verbs: ["get", "list", "watch"]
+
+# KubeRay resources for Ray cluster management
+- apiGroups: ["ray.io"]
+  resources: ["rayclusters", "rayservices", "rayjobs"]
+  verbs: ["get", "list", "create", "patch", "update", "delete", "watch"]
+
+# Envoy Gateway resources for model routing
+- apiGroups: ["gateway.networking.k8s.io"]
+  resources: ["gateways", "httproutes", "gatewayclasses"]
+  verbs: ["get", "list", "create", "patch", "update", "delete", "watch"]
+
+# Events for debugging and monitoring
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "jan-server.fullname" . }}-models-api
+  labels:
+    {{- include "jan-server.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "jan-server.fullname" . }}-models-api
+subjects:
+- kind: ServiceAccount
+  name: {{ include "jan-server.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}

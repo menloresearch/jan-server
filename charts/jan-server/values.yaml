@@ -58,7 +58,7 @@ gateway:
   # OAuth2 Configuration (Google Authentication)
   # =============================================================================
   oauth2:
-    enabled: false
+    enabled: true
     google:
       # Google OAuth Client ID - Get from Google Cloud Console
       clientId: "" # Replace with your Google OAuth Client ID
@@ -187,6 +187,27 @@ gateway:
     name: ""
 
   # =============================================================================
+  # Models API Configuration
+  # =============================================================================
+  models:
+    # Enable models API functionality (requires Kubernetes cluster deployment)
+    enabled: false # Set to true to enable models API
+
+    # Default namespace for model deployments
+    namespace: "jan-models"
+
+    # Default resource requirements for models
+    defaultResources:
+      cpu: "100m"
+      memory: "256Mi"
+
+    # GPU resource defaults
+    defaultGPU:
+      enabled: true
+      minVRAM: "4Gi"
+      preferredVRAM: "8Gi"
+
+  # =============================================================================
   # Pod Disruption Budget
   # =============================================================================
   podDisruptionBudget:
@@ -242,6 +263,8 @@ postgresql:
         username: "jan_user"
         password: "jan_password" # Will be auto-generated if empty
         database: "jan_api_gateway"
+  image:
+    repository: bitnamilegacy/postgresql
 
   primary:
     service:
@@ -348,13 +371,13 @@ inference:
     # Auto-cleanup dependencies when uninstalling the chart
     # WARNING: This will remove operators that other charts might be using!
     # Only enable if you're sure no other applications depend on these operators
-    autoCleanupDependencies: true # Set to true to auto-remove operators on uninstall
+    autoCleanupDependencies: false # Set to true to auto-remove operators on uninstall
 
     # Individual cleanup control (only used if autoCleanupDependencies=true)
     cleanupGpuOperator: false
-    cleanupKuberayOperator: true
-    cleanupEnvoyGateway: true
-    cleanupAibrix: true
+    cleanupKuberayOperator: false
+    cleanupEnvoyGateway: false
+    cleanupAibrix: false
 
   # =============================================================================
   # Models Configuration
@@ -362,7 +385,7 @@ inference:
   models:
     # Example model configuration - users can add multiple models
     - name: "jan-v1-4b"
-      enabled: true
+      enabled: false
 
       # Container configuration
       image: "registry.menlo.ai/dockerhub/vllm/vllm-openai:v0.10.2"

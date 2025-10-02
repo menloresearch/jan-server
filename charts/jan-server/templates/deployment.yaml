@@ -117,7 +117,7 @@ spec:
                 . /shared/db-config.env
               fi
               # Start the main application
-              exec /root/jan-server
+              exec /root/jan-api-gateway
           env:
             {{- range .Values.gateway.env }}
             - name: {{ .name }}
@@ -127,7 +127,7 @@ spec:
             {{/* Valkey/Redis Configuration - Cluster mode */}}
             {{- if .Values.valkey.enabled }}
             - name: REDIS_URL
-              value: "redis://{{ include "jan-server.fullname" . }}-valkey-cluster:6379"
+              value: "redis://{{ .Release.Name }}-valkey:6379"
             {{- if .Values.valkey.usePassword }}
             - name: REDIS_PASSWORD
               valueFrom:
@@ -254,7 +254,7 @@ spec:
             {{- end }}
             
             {{/* Other Application Configuration */}}
-            - name: ORGANIZATION_ADMIN_EMAIL
+            - name: ORGANIZATION_ADMIN_EMAILS
               value: "{{ .Values.gateway.secrets.adminEmail }}"
             
             {{/* Additional environment variables */}}

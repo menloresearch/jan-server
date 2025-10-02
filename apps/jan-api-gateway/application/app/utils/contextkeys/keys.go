@@ -6,3 +6,5 @@ type HttpClientRequestBody struct{}
 type TransactionContextKey struct{}
 
 const SkipMiddleware = "SkipMiddleware"
+const OrganizationID = "organization_id"
+const UserID = "user_id"
