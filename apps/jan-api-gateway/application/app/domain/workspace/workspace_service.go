@@ -42,14 +42,6 @@ func (s *WorkspaceService) FindWorkspacesByFilter(ctx context.Context, filter Wo
 	return workspaces, nil
 }
 
-func (s *WorkspaceService) CountWorkspacesByFilter(ctx context.Context, filter WorkspaceFilter) (int64, *common.Error) {
-	count, err := s.repo.Count(ctx, filter)
-	if err != nil {
-		return 0, common.NewError(err, "2d7b2075-f64f-4fc9-9d74-29f738ff3f0a")
-	}
-	return count, nil
-}
-
 func (s *WorkspaceService) CreateWorkspace(ctx context.Context, userID uint, name string, instruction *string) (*Workspace, *common.Error) {
 	trimmedName := strings.TrimSpace(name)
 	if trimmedName == "" {
@@ -101,32 +93,6 @@ func (s *WorkspaceService) GetWorkspaceByPublicIDAndUserID(ctx context.Context, 
 	return workspaces[0], nil
 }
 
-func (s *WorkspaceService) GetWorkspaceByID(ctx context.Context, id uint) (*Workspace, *common.Error) {
-	if id == 0 {
-		return nil, common.NewErrorWithMessage("workspace id is required", "d7e0a86f-4f69-421a-9a3f-9048b79ecf5e")
-	}
-
-	workspace, err := s.repo.FindByID(ctx, id)
-	if err != nil {
-		return nil, common.NewError(err, "2225cf26-18c6-44fb-b8f8-8f2f09bc5bf6")
-	}
-	if workspace == nil {
-		return nil, common.NewErrorWithMessage("workspace not found", "4002c7b1-b2a0-4a0b-8684-4c37ff7d9f1f")
-	}
-	return workspace, nil
-}
-
-func (s *WorkspaceService) GetWorkspaceByIDAndUserID(ctx context.Context, id uint, userID uint) (*Workspace, *common.Error) {
-	workspace, err := s.GetWorkspaceByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if workspace.UserID != userID {
-		return nil, common.NewErrorWithMessage("workspace does not belong to user", "c18b514b-5a46-4ed5-8c1c-1928367d5872")
-	}
-	return workspace, nil
-}
-
 func (s *WorkspaceService) UpdateWorkspaceName(ctx context.Context, workspace *Workspace, name string) (*Workspace, *common.Error) {
 	trimmedName := strings.TrimSpace(name)
 	if trimmedName == "" {
@@ -149,13 +115,6 @@ func (s *WorkspaceService) UpdateWorkspaceInstruction(ctx context.Context, works
 		return nil, common.NewError(err, "1c59f37a-56fa-4f64-9d8c-8a6c99b2e3ee")
 	}
 	return workspace, nil
-}
-
-func (s *WorkspaceService) DeleteWorkspace(ctx context.Context, workspace *Workspace) *common.Error {
-	if err := s.repo.Delete(ctx, workspace.ID); err != nil {
-		return common.NewError(err, "4cfb58ef-8016-4f24-8fcb-48d414d351d2")
-	}
-	return nil
 }
 
 func (s *WorkspaceService) DeleteWorkspaceWithConversations(ctx context.Context, workspace *Workspace) *common.Error {

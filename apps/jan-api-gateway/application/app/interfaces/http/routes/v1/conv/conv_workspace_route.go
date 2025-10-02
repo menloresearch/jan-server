@@ -7,16 +7,14 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"menlo.ai/jan-api-gateway/app/domain/auth"
-	"menlo.ai/jan-api-gateway/app/domain/conversation"
 	"menlo.ai/jan-api-gateway/app/domain/workspace"
 	"menlo.ai/jan-api-gateway/app/interfaces/http/responses"
 	"menlo.ai/jan-api-gateway/app/utils/ptr"
 )
 
 type WorkspaceRoute struct {
-	authService         *auth.AuthService
-	workspaceService    *workspace.WorkspaceService
-	conversationService *conversation.ConversationService
+	authService      *auth.AuthService
+	workspaceService *workspace.WorkspaceService
 }
 
 type CreateWorkspaceRequest struct {
@@ -45,11 +43,10 @@ type WorkspaceDeletedResponse struct {
 	Deleted bool   `json:"deleted"`
 }
 
-func NewWorkspaceRoute(authService *auth.AuthService, workspaceService *workspace.WorkspaceService, conversationService *conversation.ConversationService) *WorkspaceRoute {
+func NewWorkspaceRoute(authService *auth.AuthService, workspaceService *workspace.WorkspaceService) *WorkspaceRoute {
 	return &WorkspaceRoute{
-		authService:         authService,
-		workspaceService:    workspaceService,
-		conversationService: conversationService,
+		authService:      authService,
+		workspaceService: workspaceService,
 	}
 }
 

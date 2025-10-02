@@ -99,7 +99,7 @@ func CreateApplication() (*Application, error) {
 	convChatRoute := conv.NewConvChatRoute(authService, convCompletionAPI, convMCPAPI)
 	workspaceRepository := workspacerepo.NewWorkspaceGormRepository(transactionDatabase)
 	workspaceService := workspace.NewWorkspaceService(workspaceRepository, conversationRepository)
-	workspaceRoute := conv.NewWorkspaceRoute(authService, workspaceService, conversationService)
+	workspaceRoute := conv.NewWorkspaceRoute(authService, workspaceService)
 	conversationAPI := conversations.NewConversationAPI(conversationService, authService, workspaceService)
 	modelAPI := v1.NewModelAPI(inferenceModelRegistry)
 	mcpapi := mcp.NewMCPAPI(serperMCP, authService)
