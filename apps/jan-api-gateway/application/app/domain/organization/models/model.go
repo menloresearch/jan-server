@@ -1,6 +1,8 @@
 package models
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -8,65 +10,70 @@ import (
 )
 
 type ModelCreateRequest struct {
-	Name          string              `json:"name" binding:"required"`
-	DisplayName   string              `json:"display_name" binding:"required"`
-	Description   string              `json:"description"`
-	ModelType     ModelType           `json:"model_type" binding:"required"`
-	HuggingFaceID string              `json:"huggingface_id"`
-	RepositoryURL string              `json:"repository_url"`
-	Version       string              `json:"version"`
-	Requirements  ResourceRequirement `json:"requirements" binding:"required"`
-	Tags          []string            `json:"tags"`
-	IsPublic      bool                `json:"is_public"`
-
-	// Deployment configuration
-	DeploymentConfig ModelDeploymentConfig `json:"deployment_config"`
+	Name                string   `json:"name" binding:"required"`
+	DisplayName         string   `json:"display_name" binding:"required"`
+	Description         string   `json:"description"`
+	Image               string   `json:"image" binding:"required"`
+	HuggingFaceToken    string   `json:"hugging_face_token,omitempty"`
+	Command             []string `json:"command,omitempty"`
+	Replicas            int      `json:"replicas"`
+	GPUCount            int      `json:"gpu_count"`
+	InitialDelaySeconds int      `json:"initial_delay_seconds"`
+	StorageClass        string   `json:"storage_class,omitempty"`
+	StorageSize         int      `json:"storage_size"`
+	Tags                []string `json:"tags"`
 }
 
-// ModelDeploymentConfig contains Kubernetes deployment configuration
-type ModelDeploymentConfig struct {
-	// Container image
-	Image           string `json:"image" binding:"required"`
-	ImagePullPolicy string `json:"image_pull_policy"`
-
-	// Command and arguments
-	Command []string `json:"command"`
-	Args    []string `json:"args"`
-
-	// Resource configuration
-	GPUCount int `json:"gpu_count"`
-
-	// Probe configuration
-	InitialDelaySeconds int `json:"initial_delay_seconds"`
-
-	// Storage configuration
-	EnablePVC    bool   `json:"enable_pvc"`
-	StorageClass string `json:"storage_class,omitempty"`
-
-	// Autoscaling configuration
-	EnableAutoscaling bool                    `json:"enable_autoscaling"`
-	AutoscalingConfig *ModelAutoscalingConfig `json:"autoscaling_config,omitempty"`
-
-	// Environment variables
-	ExtraEnv []EnvVar `json:"extra_env"`
-
-	// Optional Hugging Face token for private models
-	HuggingFaceToken string `json:"hugging_face_token,omitempty"`
+// SetDefaults sets default values for the create request
+func (req *ModelCreateRequest) SetDefaults() {
+	if req.Replicas == 0 {
+		req.Replicas = 1
+	}
+	if req.GPUCount == 0 {
+		req.GPUCount = 1
+	}
+	if req.InitialDelaySeconds == 0 {
+		req.InitialDelaySeconds = 60
+	}
+	if req.StorageSize == 0 {
+		req.StorageSize = 20
+	}
 }
 
-// ModelAutoscalingConfig contains autoscaling configuration
-type ModelAutoscalingConfig struct {
-	MinReplicas    int    `json:"min_replicas"`
-	MaxReplicas    int    `json:"max_replicas"`
-	TargetMetric   string `json:"target_metric"`
-	TargetValue    string `json:"target_value"`
-	ScaleDownDelay string `json:"scale_down_delay"`
+// ValidateServedModelName validates that --served-model-name in command matches the model name
+// This is required for proper model identification and autoscaling
+func (req *ModelCreateRequest) ValidateServedModelName() error {
+	if len(req.Command) == 0 {
+		return fmt.Errorf("command is required and must contain --served-model-name parameter")
+	}
+
+	// Convert entire command to a single string for searching
+	fullCommand := strings.Join(req.Command, " ")
+
+	// Look for --served-model-name parameter with the expected model name
+	expectedParam := fmt.Sprintf("--served-model-name %s", req.Name)
+
+	if strings.Contains(fullCommand, expectedParam) {
+		return nil // Found and validated successfully
+	}
+
+	// Also check for --served-model-name=modelname format
+	expectedParamEquals := fmt.Sprintf("--served-model-name=%s", req.Name)
+	if strings.Contains(fullCommand, expectedParamEquals) {
+		return nil // Found and validated successfully
+	}
+
+	// If we reach here, the expected --served-model-name was not found
+	return fmt.Errorf("--served-model-name parameter must match model name '%s'. Please ensure your command contains '--served-model-name %s'", req.Name, req.Name)
 }
 
-// EnvVar represents an environment variable
-type EnvVar struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
+// ModelCreateFromYAMLRequest contains YAML manifest for custom deployment
+type ModelCreateFromYAMLRequest struct {
+	Name        string   `json:"name" binding:"required"`
+	DisplayName string   `json:"display_name" binding:"required"`
+	Description string   `json:"description"`
+	YAMLContent string   `json:"yaml_content" binding:"required"`
+	Tags        []string `json:"tags"`
 }
 
 // ModelType represents the type of AI model
@@ -108,13 +115,10 @@ type ResourceRequirement struct {
 
 // Model represents an AI model in the organization
 type Model struct {
-	ID             uint        `json:"id"`
-	PublicID       string      `json:"public_id"`
+	ID             string      `json:"id"` // Model name from Kubernetes
 	OrganizationID uint        `json:"organization_id"`
-	Name           string      `json:"name"`
 	DisplayName    string      `json:"display_name"`
 	Description    string      `json:"description"`
-	ModelType      ModelType   `json:"model_type"`
 	Status         ModelStatus `json:"status"`
 
 	// Model source information
@@ -136,10 +140,10 @@ type Model struct {
 
 	// Metadata
 	Tags            []string  `json:"tags"`
-	IsPublic        bool      `json:"is_public"`
+	Managed         bool      `json:"managed"` // true if managed by jan-server, false if unmanaged (e.g., Aibrix)
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
-	CreatedByUserID uint      `json:"created_by_user_id"`
+	CreatedByUserID string    `json:"created_by_user_id"` // User public ID (e.g. user_abc123)
 }
 
 // ModelUpdateRequest represents a request to update an existing model
@@ -148,17 +152,15 @@ type ModelUpdateRequest struct {
 	Description  *string              `json:"description"`
 	Requirements *ResourceRequirement `json:"requirements"`
 	Tags         []string             `json:"tags"`
-	IsPublic     *bool                `json:"is_public"`
 }
 
 // ModelFilter represents filtering options for model queries
 type ModelFilter struct {
 	OrganizationID  *uint        `json:"organization_id"`
-	ModelType       *ModelType   `json:"model_type"`
 	Status          *ModelStatus `json:"status"`
-	IsPublic        *bool        `json:"is_public"`
+	Managed         *bool        `json:"managed"` // filter by managed/unmanaged models
 	Tags            []string     `json:"tags"`
-	CreatedByUserID *uint        `json:"created_by_user_id"`
+	CreatedByUserID *string      `json:"created_by_user_id"`
 }
 
 // KubernetesStatus represents the availability of Kubernetes APIs

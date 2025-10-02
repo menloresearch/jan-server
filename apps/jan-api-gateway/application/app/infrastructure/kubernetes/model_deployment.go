@@ -90,6 +90,11 @@ func NewModelDeploymentManager(ks *KubernetesService) (*ModelDeploymentManager, 
 
 // CreateModelDeployment creates all resources for a model deployment
 func (mdm *ModelDeploymentManager) CreateModelDeployment(ctx context.Context, spec *ModelDeploymentSpec) error {
+	// Ensure namespace exists
+	if err := mdm.ensureNamespace(ctx, spec.Namespace); err != nil {
+		return fmt.Errorf("failed to ensure namespace: %w", err)
+	}
+
 	// Create Deployment
 	deployment := mdm.createDeployment(spec)
 	_, err := mdm.clientset.AppsV1().Deployments(spec.Namespace).Create(ctx, deployment, metav1.CreateOptions{})
@@ -138,16 +143,26 @@ func (mdm *ModelDeploymentManager) createDeployment(spec *ModelDeploymentSpec) *
 			corev1.ResourceCPU:    spec.CPURequest,
 			corev1.ResourceMemory: spec.MemoryRequest,
 		},
-		Limits: corev1.ResourceList{
-			corev1.ResourceCPU:    spec.CPULimit,
-			corev1.ResourceMemory: spec.MemoryLimit,
-		},
+	}
+
+	// Only set limits if they are specified (> 0)
+	if !spec.CPULimit.IsZero() || !spec.MemoryLimit.IsZero() {
+		resources.Limits = corev1.ResourceList{}
+		if !spec.CPULimit.IsZero() {
+			resources.Limits[corev1.ResourceCPU] = spec.CPULimit
+		}
+		if !spec.MemoryLimit.IsZero() {
+			resources.Limits[corev1.ResourceMemory] = spec.MemoryLimit
+		}
 	}
 
 	// Add GPU resources if specified
 	if spec.GPUCount > 0 {
 		gpuQuantity := resource.MustParse(fmt.Sprintf("%d", spec.GPUCount))
 		resources.Requests["nvidia.com/gpu"] = gpuQuantity
+		if resources.Limits == nil {
+			resources.Limits = corev1.ResourceList{}
+		}
 		resources.Limits["nvidia.com/gpu"] = gpuQuantity
 	}
 
@@ -484,9 +499,22 @@ func (mdm *ModelDeploymentManager) GetAllModels(ctx context.Context, namespace, 
 	// Get all deployments with aibrix model labels
 	labelSelector := "model.aibrix.ai/name"
 
-	deployments, err := mdm.clientset.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: labelSelector,
-	})
+	// If namespace is empty, search all namespaces
+	var deployments *appsv1.DeploymentList
+	var err error
+
+	if namespace == "" {
+		// Search all namespaces
+		deployments, err = mdm.clientset.AppsV1().Deployments("").List(ctx, metav1.ListOptions{
+			LabelSelector: labelSelector,
+		})
+	} else {
+		// Search specific namespace
+		deployments, err = mdm.clientset.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{
+			LabelSelector: labelSelector,
+		})
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to list deployments: %w", err)
 	}
@@ -529,6 +557,34 @@ type ModelInfo struct {
 	Replicas  int32             `json:"replicas"`
 	Labels    map[string]string `json:"labels"`
 	CreatedAt time.Time         `json:"created_at"`
+}
+
+// ensureNamespace creates a namespace if it doesn't exist
+func (mdm *ModelDeploymentManager) ensureNamespace(ctx context.Context, namespaceName string) error {
+	// Check if namespace exists
+	_, err := mdm.clientset.CoreV1().Namespaces().Get(ctx, namespaceName, metav1.GetOptions{})
+	if err == nil {
+		// Namespace already exists
+		return nil
+	}
+
+	// Create namespace if it doesn't exist
+	namespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespaceName,
+			Labels: map[string]string{
+				"app.kubernetes.io/managed-by": "jan-server",
+				"jan-server.menlo.ai/purpose":  "model-deployment",
+			},
+		},
+	}
+
+	_, err = mdm.clientset.CoreV1().Namespaces().Create(ctx, namespace, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create namespace %s: %w", namespaceName, err)
+	}
+
+	return nil
 }
 
 // Helper function

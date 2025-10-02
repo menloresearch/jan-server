@@ -11,7 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"menlo.ai/jan-api-gateway/app/infrastructure/cache"
 	"menlo.ai/jan-api-gateway/app/infrastructure/kubernetes"
-	"menlo.ai/jan-api-gateway/app/utils/idgen"
 )
 
 // Constants for managed model identification
@@ -53,11 +52,6 @@ func NewModelService(k8sService *kubernetes.KubernetesService, cacheService *cac
 		deploymentManager: deploymentManager,
 		cache:             cacheService,
 	}, nil
-}
-
-// createPublicID generates a unique public ID for a model
-func (s *ModelService) createPublicID() (string, error) {
-	return idgen.GenerateSecureID("mdl", 16)
 }
 
 // getCacheKey generates a cache key for model data
@@ -221,7 +215,7 @@ func (s *ModelService) GetGPUResources(ctx context.Context) (*GPUResources, erro
 		// Extract GPU type information
 		if node.GPUType != "" {
 			gpuTypeMap[node.GPUType] += node.GPUCount
-			
+
 			// Track VRAM per GPU type (assume all GPUs of same type have same VRAM)
 			if !node.TotalVRAM.IsZero() {
 				gpuTypeVRAMMap[node.GPUType] = node.TotalVRAM
@@ -250,7 +244,7 @@ func (s *ModelService) GetGPUResources(ctx context.Context) (*GPUResources, erro
 		if vram, exists := gpuTypeVRAMMap[gpuType]; exists && !vram.IsZero() {
 			vramPerGPU = vram.String()
 		}
-		
+
 		resources.Availability.ByType[gpuType] = GPUTypeAvailability{
 			Total:     total,
 			Available: total, // Assume all available for now
@@ -315,60 +309,95 @@ func (s *ModelService) GetModel(ctx context.Context, orgID uint, modelID string)
 }
 
 // CreateModel creates a new model for an organization
-func (s *ModelService) CreateModel(ctx context.Context, orgID uint, userID uint, req *ModelCreateRequest) (*Model, error) {
+func (s *ModelService) CreateModel(ctx context.Context, orgID uint, userID string, req *ModelCreateRequest) (*Model, error) {
 	if err := s.ValidateModelAPIAccess(ctx); err != nil {
 		return nil, err
 	}
 
-	// Validate resource requirements against cluster capabilities
-	if err := s.validateResourceRequirements(ctx, &req.Requirements); err != nil {
-		return nil, fmt.Errorf("resource requirements validation failed: %w", err)
+	// Set defaults
+	req.SetDefaults()
+
+	// Validate served-model-name consistency (required for proper model identification)
+	if err := req.ValidateServedModelName(); err != nil {
+		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 
-	// Validate deployment configuration
-	if err := s.validateDeploymentConfig(ctx, &req.DeploymentConfig); err != nil {
-		return nil, fmt.Errorf("deployment configuration validation failed: %w", err)
+	// Build resource requirements from simplified request
+	resourceReq := ResourceRequirement{
+		CPU:    resource.MustParse("1"),
+		Memory: resource.MustParse("2Gi"),
 	}
-
-	// Validate served-model-name consistency (required by Aibrix)
-	if err := s.validateServedModelName(req.Name, req.DeploymentConfig.Args); err != nil {
-		return nil, fmt.Errorf("served-model-name validation failed: %w", err)
+	if req.GPUCount > 0 {
+		resourceReq.GPU = &GPURequirement{
+			MinVRAM:       resource.MustParse("8Gi"),
+			PreferredVRAM: resource.MustParse("16Gi"),
+			GPUType:       "nvidia",
+			MinGPUs:       req.GPUCount,
+			MaxGPUs:       req.GPUCount,
+		}
 	}
-
-	publicID, err := s.createPublicID()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate public ID: %w", err)
-	}
-
-	// Set defaults for deployment config
-	s.setDeploymentDefaults(&req.DeploymentConfig)
 
 	model := &Model{
-		PublicID:        publicID,
+		ID:              req.Name, // Use model name as ID
 		OrganizationID:  orgID,
-		Name:            req.Name,
 		DisplayName:     req.DisplayName,
 		Description:     req.Description,
-		ModelType:       req.ModelType,
 		Status:          ModelStatusPending,
-		HuggingFaceID:   req.HuggingFaceID,
-		Requirements:    req.Requirements,
+		Requirements:    resourceReq,
 		Namespace:       DefaultNamespace,
 		DeploymentName:  req.Name,
 		ServiceName:     req.Name,
 		Tags:            req.Tags,
-		IsPublic:        req.IsPublic,
 		CreatedAt:       time.Now(),
 		UpdatedAt:       time.Now(),
 		CreatedByUserID: userID,
+		Managed:         true,
 	}
 
-	// Deploy to Kubernetes
-	if err := s.deployToKubernetes(ctx, model, &req.DeploymentConfig); err != nil {
+	// Deploy to Kubernetes with simplified config
+	if err := s.deployModelToKubernetes(ctx, model, req); err != nil {
 		return nil, fmt.Errorf("failed to deploy model to Kubernetes: %w", err)
 	}
 
 	// Update model status
+	model.Status = ModelStatusCreating
+
+	// Invalidate cache
+	_ = s.invalidateModelCache(ctx, orgID, req.Name)
+
+	return model, nil
+}
+
+// CreateModelFromYAML creates a model from YAML manifest
+func (s *ModelService) CreateModelFromYAML(ctx context.Context, orgID uint, userID string, req *ModelCreateFromYAMLRequest) (*Model, error) {
+	if err := s.ValidateModelAPIAccess(ctx); err != nil {
+		return nil, err
+	}
+
+	// TODO: Parse and validate YAML content
+	// TODO: Extract model information from YAML
+	// TODO: Apply YAML to Kubernetes cluster
+
+	// For now, create a simple model record
+	model := &Model{
+		ID:              req.Name,
+		OrganizationID:  orgID,
+		DisplayName:     req.DisplayName,
+		Description:     req.Description,
+		Status:          ModelStatusPending,
+		Namespace:       DefaultNamespace,
+		DeploymentName:  req.Name,
+		ServiceName:     req.Name,
+		Tags:            req.Tags,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+		CreatedByUserID: userID,
+		Managed:         false, // YAML deployments are unmanaged
+	}
+
+	// TODO: Apply YAML to cluster
+	// kubectl apply -f yaml_content
+
 	model.Status = ModelStatusCreating
 
 	// Invalidate cache
@@ -404,9 +433,6 @@ func (s *ModelService) UpdateModel(ctx context.Context, orgID uint, modelID stri
 	if req.Tags != nil {
 		model.Tags = req.Tags
 	}
-	if req.IsPublic != nil {
-		model.IsPublic = *req.IsPublic
-	}
 
 	model.UpdatedAt = time.Now()
 
@@ -416,7 +442,7 @@ func (s *ModelService) UpdateModel(ctx context.Context, orgID uint, modelID stri
 	}
 
 	// Invalidate cache
-	_ = s.invalidateModelCache(ctx, orgID, model.Name)
+	_ = s.invalidateModelCache(ctx, orgID, model.ID)
 
 	return model, nil
 }
@@ -433,12 +459,12 @@ func (s *ModelService) DeleteModel(ctx context.Context, orgID uint, modelID stri
 	}
 
 	// Delete from Kubernetes
-	if err := s.deploymentManager.DeleteModelDeployment(ctx, model.Name, DefaultNamespace); err != nil {
+	if err := s.deploymentManager.DeleteModelDeployment(ctx, model.ID, DefaultNamespace); err != nil {
 		return fmt.Errorf("failed to delete model from Kubernetes: %w", err)
 	}
 
 	// Invalidate cache
-	_ = s.invalidateModelCache(ctx, orgID, model.Name)
+	_ = s.invalidateModelCache(ctx, orgID, model.ID)
 
 	return nil
 }
@@ -467,14 +493,14 @@ func (s *ModelService) getModelsFromKubernetes(ctx context.Context, orgID uint) 
 
 // getModelFromKubernetes retrieves a specific model from Kubernetes
 func (s *ModelService) getModelFromKubernetes(ctx context.Context, orgID uint, modelID string) (*Model, error) {
-	// First get all models and find the one with matching public ID
+	// First get all models and find the one with matching ID
 	models, err := s.getModelsFromKubernetes(ctx, orgID)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, model := range models {
-		if model.PublicID == modelID {
+		if model.ID == modelID {
 			return model, nil
 		}
 	}
@@ -491,17 +517,14 @@ func (s *ModelService) convertModelInfoToModel(modelInfo *kubernetes.ModelInfo, 
 	}
 
 	description := modelInfo.Labels["description"]
-	modelTypeStr := modelInfo.Labels[ModelTypeLabelKey]
-	publicID := modelInfo.Labels["public-id"]
 
-	// Default values if not found in labels
-	if publicID == "" {
-		publicID = fmt.Sprintf("mdl_%s", modelInfo.Name)
-	}
+	// For unmanaged models, don't use database fields
+	var createdByUserID string
 
-	modelType := ModelTypeChat
-	if modelTypeStr != "" {
-		modelType = ModelType(modelTypeStr)
+	if modelInfo.IsManaged {
+		// For managed models, createdByUserID would be set from database
+	} else {
+		// Leave createdByUserID as empty for unmanaged models
 	}
 
 	// Determine status from Kubernetes status
@@ -515,26 +538,45 @@ func (s *ModelService) convertModelInfoToModel(modelInfo *kubernetes.ModelInfo, 
 		status = ModelStatusPending
 	}
 
+	// Extract actual resource requirements from deployment
+	requirements := s.extractResourceRequirements(modelInfo)
+
 	return &Model{
-		PublicID:       publicID,
-		OrganizationID: orgID,
-		Name:           modelInfo.Name,
-		DisplayName:    displayName,
-		Description:    description,
-		ModelType:      modelType,
-		Status:         status,
-		Namespace:      modelInfo.Namespace,
-		DeploymentName: modelInfo.Name,
-		ServiceName:    modelInfo.Name,
-		CreatedAt:      modelInfo.CreatedAt,
-		UpdatedAt:      modelInfo.CreatedAt, // Use creation time as fallback
-		// TODO: Extract more fields from labels/annotations if needed
+		ID:              modelInfo.Name, // Use model name from Kubernetes as ID
+		OrganizationID:  orgID,
+		DisplayName:     displayName,
+		Description:     description,
+		Status:          status,
+		Managed:         modelInfo.IsManaged,
+		Namespace:       modelInfo.Namespace,
+		DeploymentName:  modelInfo.Name,
+		ServiceName:     modelInfo.Name,
+		Requirements:    requirements,
+		CreatedAt:       modelInfo.CreatedAt,
+		UpdatedAt:       modelInfo.CreatedAt,
+		CreatedByUserID: createdByUserID, // 0 for unmanaged models
 	}
 }
 
-// deployToKubernetes deploys a model to Kubernetes
-func (s *ModelService) deployToKubernetes(ctx context.Context, model *Model, config *ModelDeploymentConfig) error {
-	// Parse CPU and Memory from string to resource.Quantity
+// extractResourceRequirements extracts actual resource requirements from Kubernetes ModelInfo
+func (s *ModelService) extractResourceRequirements(modelInfo *kubernetes.ModelInfo) ResourceRequirement {
+	// TODO: This should be implemented to extract actual resources from the deployment
+	// For now, return empty/zero values - this is where we would:
+	// 1. Query the deployment's resource requests/limits
+	// 2. Detect GPU usage and type
+	// 3. Get CPU/Memory requirements
+	// 4. Determine which node it's running on and GPU details
+
+	return ResourceRequirement{
+		CPU:    resource.MustParse("0"),
+		Memory: resource.MustParse("0"),
+		GPU:    nil, // Will be populated with actual GPU info
+	}
+}
+
+// deployModelToKubernetes deploys a model to Kubernetes with simplified configuration
+func (s *ModelService) deployModelToKubernetes(ctx context.Context, model *Model, req *ModelCreateRequest) error {
+	// Parse CPU and Memory from requirements
 	cpuRequest, err := resource.ParseQuantity(model.Requirements.CPU.String())
 	if err != nil {
 		return fmt.Errorf("invalid CPU request: %w", err)
@@ -545,42 +587,49 @@ func (s *ModelService) deployToKubernetes(ctx context.Context, model *Model, con
 		return fmt.Errorf("invalid memory request: %w", err)
 	}
 
+	// Build environment variables for Hugging Face
+	var envVars []corev1.EnvVar
+	if req.HuggingFaceToken != "" {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "HF_TOKEN",
+			Value: req.HuggingFaceToken,
+		})
+	}
+
 	// Create deployment spec
 	spec := &kubernetes.ModelDeploymentSpec{
-		Name:                model.Name,
-		Namespace:           model.Namespace,
-		Image:               config.Image,
-		ImagePullPolicy:     config.ImagePullPolicy,
-		Command:             config.Command,
-		Args:                config.Args,
-		Port:                8000,
-		CPURequest:          cpuRequest,
-		MemoryRequest:       memoryRequest,
-		GPUCount:            config.GPUCount,
-		InitialDelaySeconds: int32(config.InitialDelaySeconds),
-		EnablePVC:           config.EnablePVC,
-		StorageClass:        config.StorageClass,
-		EnableAutoscaling:   config.EnableAutoscaling,
-		ExtraEnv:            convertEnvVars(config.ExtraEnv),
+		Name:            model.ID,
+		Namespace:       model.Namespace,
+		Image:           req.Image,
+		ImagePullPolicy: "IfNotPresent",
+		Command:         req.Command,
+		Port:            8000,
+		CPURequest:      cpuRequest,
+		MemoryRequest:   memoryRequest,
+		// No CPU/Memory limits - allow full node utilization for GPU workloads
+		GPUCount:            req.GPUCount,
+		InitialDelaySeconds: int32(req.InitialDelaySeconds),
+		EnablePVC:           req.StorageSize > 0,
+		PVCName:             DefaultPVCName, // Use default PVC name
+		ExtraEnv:            envVars,
 		ManagedLabels: map[string]string{
 			ManagedByLabelKey:    ManagedByLabelValue,
-			ModelNameLabelKey:    model.Name,
+			ModelNameLabelKey:    model.ID,
 			OrganizationLabelKey: fmt.Sprintf("%d", model.OrganizationID),
-			ModelTypeLabelKey:    string(model.ModelType),
 		},
 	}
 
-	if config.AutoscalingConfig != nil {
-		spec.AutoscalingConfig = &kubernetes.ModelAutoscalingConfig{
-			MinReplicas:    int32(config.AutoscalingConfig.MinReplicas),
-			MaxReplicas:    int32(config.AutoscalingConfig.MaxReplicas),
-			TargetMetric:   config.AutoscalingConfig.TargetMetric,
-			TargetValue:    config.AutoscalingConfig.TargetValue,
-			ScaleDownDelay: config.AutoscalingConfig.ScaleDownDelay,
-		}
+	// Set storage class only if provided (let Kubernetes use default if empty)
+	if req.StorageClass != "" {
+		spec.StorageClass = req.StorageClass
 	}
 
-	return s.deploymentManager.CreateModelDeployment(ctx, spec)
+	// Deploy using deployment manager
+	if err := s.deploymentManager.CreateModelDeployment(ctx, spec); err != nil {
+		return fmt.Errorf("failed to deploy model: %w", err)
+	}
+
+	return nil
 }
 
 // updateKubernetesLabels updates labels on Kubernetes resources
@@ -607,13 +656,7 @@ func (s *ModelService) applyFilter(models []*Model, filter *ModelFilter) []*Mode
 
 // matchesFilter checks if a model matches the given filter
 func (s *ModelService) matchesFilter(model *Model, filter *ModelFilter) bool {
-	if filter.ModelType != nil && model.ModelType != *filter.ModelType {
-		return false
-	}
 	if filter.Status != nil && model.Status != *filter.Status {
-		return false
-	}
-	if filter.IsPublic != nil && model.IsPublic != *filter.IsPublic {
 		return false
 	}
 	if filter.CreatedByUserID != nil && model.CreatedByUserID != *filter.CreatedByUserID {
@@ -713,6 +756,8 @@ func (s *ModelService) validateResourcesAgainstCluster(ctx context.Context, requ
 }
 
 // validateDeploymentConfig validates deployment configuration
+// TODO: Remove this function - not needed for simplified API
+/*
 func (s *ModelService) validateDeploymentConfig(ctx context.Context, config *ModelDeploymentConfig) error {
 	if config.Image == "" {
 		return fmt.Errorf("container image is required")
@@ -744,6 +789,7 @@ func (s *ModelService) validateDeploymentConfig(ctx context.Context, config *Mod
 
 	return nil
 }
+*/
 
 // validateServedModelName validates that --served-model-name in args matches the model name
 // This is required by Aibrix for proper model identification and autoscaling
@@ -780,6 +826,8 @@ func (s *ModelService) validateServedModelName(modelName string, args []string) 
 }
 
 // setDeploymentDefaults sets default values for deployment configuration
+// TODO: Remove this function - not needed for simplified API
+/*
 func (s *ModelService) setDeploymentDefaults(config *ModelDeploymentConfig) {
 	if config.ImagePullPolicy == "" {
 		config.ImagePullPolicy = "IfNotPresent"
@@ -799,6 +847,7 @@ func (s *ModelService) setDeploymentDefaults(config *ModelDeploymentConfig) {
 		}
 	}
 }
+*/
 
 // ListAllModels returns all models in the cluster (managed and unmanaged)
 func (s *ModelService) ListAllModels(ctx context.Context, orgID uint) ([]*ModelInfo, error) {
@@ -813,8 +862,8 @@ func (s *ModelService) ListAllModels(ctx context.Context, orgID uint) ([]*ModelI
 		return cachedModels, nil
 	}
 
-	// Get all deployments from Kubernetes (managed and unmanaged)
-	allModels, err := s.deploymentManager.GetAllModels(ctx, DefaultNamespace, ManagedByLabelKey)
+	// Get all deployments from Kubernetes (managed and unmanaged) across all namespaces
+	allModels, err := s.deploymentManager.GetAllModels(ctx, "", ManagedByLabelKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get all models from Kubernetes: %w", err)
 	}
@@ -835,10 +884,43 @@ func (s *ModelService) GetClusterGPUStatus(ctx context.Context) (*kubernetes.Clu
 	return s.k8sService.GetClusterGPUStatus(ctx)
 }
 
-// ListModels returns models for an organization with filtering (backward compatibility for API)
+// ListModels returns models for an organization with filtering and caching
 func (s *ModelService) ListModels(ctx context.Context, orgID uint, filter *ModelFilter) ([]*Model, error) {
-	// Use the main GetModels method with filtering
-	return s.GetModels(ctx, orgID, filter)
+	if err := s.ValidateModelAPIAccess(ctx); err != nil {
+		return nil, err
+	}
+
+	// Generate cache key based on filter
+	cacheKey := s.getFilteredCacheKey(orgID, filter)
+
+	// Try cache first
+	var cachedModels []*Model
+	if err := s.getCachedModelData(ctx, cacheKey, &cachedModels); err == nil {
+		return cachedModels, nil
+	}
+
+	// Get all models from Kubernetes (managed and unmanaged) across all namespaces
+	allModelInfos, err := s.deploymentManager.GetAllModels(ctx, "", ManagedByLabelKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get models from Kubernetes: %w", err)
+	}
+
+	// Convert ModelInfo to Model and apply filters
+	var models []*Model
+	for _, modelInfo := range allModelInfos {
+		// Convert kubernetes.ModelInfo to Model (using existing method)
+		model := s.convertModelInfoToModel(modelInfo, orgID)
+
+		// Apply filters
+		if s.shouldIncludeModel(model, filter) {
+			models = append(models, model)
+		}
+	}
+
+	// Cache the filtered results
+	_ = s.cacheModelData(ctx, cacheKey, models)
+
+	return models, nil
 }
 
 // ModelInfo represents basic model information for listing
@@ -849,24 +931,11 @@ type ModelInfo struct {
 	Status      string    `json:"status"`
 	Replicas    int32     `json:"replicas"`
 	CreatedAt   time.Time `json:"created_at"`
-	ModelType   string    `json:"model_type,omitempty"`
 	DisplayName string    `json:"display_name,omitempty"`
 	Description string    `json:"description,omitempty"`
 }
 
 // Helper functions
-
-// convertEnvVars converts domain EnvVar to Kubernetes EnvVar
-func convertEnvVars(envVars []EnvVar) []corev1.EnvVar {
-	var k8sEnvVars []corev1.EnvVar
-	for _, env := range envVars {
-		k8sEnvVars = append(k8sEnvVars, corev1.EnvVar{
-			Name:  env.Name,
-			Value: env.Value,
-		})
-	}
-	return k8sEnvVars
-}
 
 // convertFromKubernetesModelInfo converts Kubernetes ModelInfo to domain ModelInfo
 func convertFromKubernetesModelInfo(k8sModels []*kubernetes.ModelInfo) []ModelInfo {
@@ -879,7 +948,6 @@ func convertFromKubernetesModelInfo(k8sModels []*kubernetes.ModelInfo) []ModelIn
 			Status:      k8sModel.Status,
 			Replicas:    k8sModel.Replicas,
 			CreatedAt:   k8sModel.CreatedAt,
-			ModelType:   k8sModel.Labels[ModelTypeLabelKey],
 			DisplayName: k8sModel.Labels["display-name"],
 			Description: k8sModel.Labels["description"],
 		})
@@ -898,11 +966,45 @@ func convertFromKubernetesModelInfoToPointers(k8sModels []*kubernetes.ModelInfo)
 			Status:      k8sModel.Status,
 			Replicas:    k8sModel.Replicas,
 			CreatedAt:   k8sModel.CreatedAt,
-			ModelType:   k8sModel.Labels[ModelTypeLabelKey],
 			DisplayName: k8sModel.Labels["display-name"],
 			Description: k8sModel.Labels["description"],
 		}
 		models = append(models, model)
 	}
 	return models
+}
+
+// getFilteredCacheKey generates a cache key based on organization and filter parameters
+func (s *ModelService) getFilteredCacheKey(orgID uint, filter *ModelFilter) string {
+	key := fmt.Sprintf("%sorg:%d", ModelCacheKeyPrefix, orgID)
+
+	if filter == nil {
+		return key + ":all"
+	}
+
+	if filter.Status != nil {
+		key += fmt.Sprintf(":status:%s", *filter.Status)
+	}
+	if filter.Managed != nil {
+		key += fmt.Sprintf(":managed:%t", *filter.Managed)
+	}
+
+	return key
+}
+
+// shouldIncludeModel checks if a model should be included based on filter criteria
+func (s *ModelService) shouldIncludeModel(model *Model, filter *ModelFilter) bool {
+	if filter == nil {
+		return true
+	}
+
+	if filter.Status != nil && model.Status != *filter.Status {
+		return false
+	}
+
+	if filter.Managed != nil && model.Managed != *filter.Managed {
+		return false
+	}
+
+	return true
 }

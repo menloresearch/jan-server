@@ -1643,7 +1643,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get all models belonging to the organization",
+                "description": "Get all models belonging to the organization (both managed and unmanaged)",
                 "consumes": [
                     "application/json"
                 ],
@@ -1657,20 +1657,14 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Filter by model type",
-                        "name": "model_type",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
                         "description": "Filter by model status",
                         "name": "status",
                         "in": "query"
                     },
                     {
                         "type": "boolean",
-                        "description": "Filter by public/private models",
-                        "name": "is_public",
+                        "description": "Filter by managed (true) or unmanaged (false) models",
+                        "name": "managed",
                         "in": "query"
                     }
                 ],
@@ -1757,14 +1751,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/organization/models/all": {
-            "get": {
+        "/v1/organization/models/yaml": {
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get all models in the cluster (both managed by jan-server and unmanaged)",
+                "description": "Create a new model deployment using custom YAML manifest",
                 "consumes": [
                     "application/json"
                 ],
@@ -1774,62 +1768,27 @@ const docTemplate = `{
                 "tags": [
                     "Models"
                 ],
-                "summary": "List all models in cluster",
-                "responses": {
-                    "200": {
-                        "description": "List of all models",
-                        "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.AllModelsListResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad request",
-                        "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden - models API not available",
-                        "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/v1/organization/models/status": {
-            "get": {
-                "security": [
+                "summary": "Create a model from YAML manifest",
+                "parameters": [
                     {
-                        "BearerAuth": []
+                        "description": "Model YAML creation request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelCreateFromYAMLRequest"
+                        }
                     }
                 ],
-                "description": "Get information about the Kubernetes cluster's capability for model deployment",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Models"
-                ],
-                "summary": "Get cluster status for models",
                 "responses": {
-                    "200": {
-                        "description": "Cluster status information",
+                    "201": {
+                        "description": "Model created successfully",
                         "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ClusterStatusResponse"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ModelResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad request",
+                        "description": "Invalid request body",
                         "schema": {
                             "$ref": "#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse"
                         }
@@ -1856,7 +1815,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get details of a specific model by its public ID",
+                "description": "Get details of a specific model by its name",
                 "consumes": [
                     "application/json"
                 ],
@@ -1866,11 +1825,11 @@ const docTemplate = `{
                 "tags": [
                     "Models"
                 ],
-                "summary": "Get a model by ID",
+                "summary": "Get a model by name",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Model public ID",
+                        "description": "Model name",
                         "name": "model_id",
                         "in": "path",
                         "required": true
@@ -1929,7 +1888,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Model public ID",
+                        "description": "Model name",
                         "name": "model_id",
                         "in": "path",
                         "required": true
@@ -1997,7 +1956,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Model public ID",
+                        "description": "Model name",
                         "name": "model_id",
                         "in": "path",
                         "required": true
@@ -3601,31 +3560,6 @@ const docTemplate = `{
                 }
             }
         },
-        "app_interfaces_http_routes_v1_organization_models.AllModelsListResponse": {
-            "type": "object",
-            "properties": {
-                "models": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelInfo"
-                    }
-                },
-                "total": {
-                    "type": "integer"
-                }
-            }
-        },
-        "app_interfaces_http_routes_v1_organization_models.ClusterStatusResponse": {
-            "type": "object",
-            "properties": {
-                "cluster_status": {
-                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_infrastructure_kubernetes.ClusterGPUStatus"
-                },
-                "organization_id": {
-                    "type": "integer"
-                }
-            }
-        },
         "app_interfaces_http_routes_v1_organization_models.ClusterValidationResponse": {
             "type": "object",
             "properties": {
@@ -3884,17 +3818,6 @@ const docTemplate = `{
                 }
             }
         },
-        "menlo_ai_jan-api-gateway_app_domain_organization_models.EnvVar": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string"
-                },
-                "value": {
-                    "type": "string"
-                }
-            }
-        },
         "menlo_ai_jan-api-gateway_app_domain_organization_models.GPUAvailability": {
             "type": "object",
             "properties": {
@@ -3971,7 +3894,8 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "created_by_user_id": {
-                    "type": "integer"
+                    "description": "User public ID (e.g. user_abc123)",
+                    "type": "string"
                 },
                 "deployment_name": {
                     "type": "string"
@@ -3991,19 +3915,15 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
-                    "type": "integer"
+                    "description": "Model name from Kubernetes",
+                    "type": "string"
                 },
                 "internal_url": {
                     "type": "string"
                 },
-                "is_public": {
+                "managed": {
+                    "description": "true if managed by jan-server, false if unmanaged (e.g., Aibrix)",
                     "type": "boolean"
-                },
-                "model_type": {
-                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelType"
-                },
-                "name": {
-                    "type": "string"
                 },
                 "namespace": {
                     "description": "Kubernetes deployment info",
@@ -4011,9 +3931,6 @@ const docTemplate = `{
                 },
                 "organization_id": {
                     "type": "integer"
-                },
-                "public_id": {
-                    "type": "string"
                 },
                 "repository_url": {
                     "type": "string"
@@ -4047,22 +3964,30 @@ const docTemplate = `{
                 }
             }
         },
-        "menlo_ai_jan-api-gateway_app_domain_organization_models.ModelAutoscalingConfig": {
+        "menlo_ai_jan-api-gateway_app_domain_organization_models.ModelCreateFromYAMLRequest": {
             "type": "object",
+            "required": [
+                "display_name",
+                "name",
+                "yaml_content"
+            ],
             "properties": {
-                "max_replicas": {
-                    "type": "integer"
-                },
-                "min_replicas": {
-                    "type": "integer"
-                },
-                "scale_down_delay": {
+                "description": {
                     "type": "string"
                 },
-                "target_metric": {
+                "display_name": {
                     "type": "string"
                 },
-                "target_value": {
+                "name": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "yaml_content": {
                     "type": "string"
                 }
             }
@@ -4071,18 +3996,15 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "display_name",
-                "model_type",
-                "name",
-                "requirements"
+                "image",
+                "name"
             ],
             "properties": {
-                "deployment_config": {
-                    "description": "Deployment configuration",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelDeploymentConfig"
-                        }
-                    ]
+                "command": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "description": {
                     "type": "string"
@@ -4090,125 +4012,35 @@ const docTemplate = `{
                 "display_name": {
                     "type": "string"
                 },
-                "huggingface_id": {
+                "gpu_count": {
+                    "type": "integer"
+                },
+                "hugging_face_token": {
                     "type": "string"
                 },
-                "is_public": {
-                    "type": "boolean"
+                "image": {
+                    "type": "string"
                 },
-                "model_type": {
-                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelType"
+                "initial_delay_seconds": {
+                    "type": "integer"
                 },
                 "name": {
                     "type": "string"
                 },
-                "repository_url": {
+                "replicas": {
+                    "type": "integer"
+                },
+                "storage_class": {
                     "type": "string"
                 },
-                "requirements": {
-                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ResourceRequirement"
+                "storage_size": {
+                    "type": "integer"
                 },
                 "tags": {
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
-                },
-                "version": {
-                    "type": "string"
-                }
-            }
-        },
-        "menlo_ai_jan-api-gateway_app_domain_organization_models.ModelDeploymentConfig": {
-            "type": "object",
-            "required": [
-                "image"
-            ],
-            "properties": {
-                "args": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "autoscaling_config": {
-                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelAutoscalingConfig"
-                },
-                "command": {
-                    "description": "Command and arguments",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "enable_autoscaling": {
-                    "description": "Autoscaling configuration",
-                    "type": "boolean"
-                },
-                "enable_pvc": {
-                    "description": "Storage configuration",
-                    "type": "boolean"
-                },
-                "extra_env": {
-                    "description": "Environment variables",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.EnvVar"
-                    }
-                },
-                "gpu_count": {
-                    "description": "Resource configuration",
-                    "type": "integer"
-                },
-                "hugging_face_token": {
-                    "description": "Optional Hugging Face token for private models",
-                    "type": "string"
-                },
-                "image": {
-                    "description": "Container image",
-                    "type": "string"
-                },
-                "image_pull_policy": {
-                    "type": "string"
-                },
-                "initial_delay_seconds": {
-                    "description": "Probe configuration",
-                    "type": "integer"
-                },
-                "storage_class": {
-                    "type": "string"
-                }
-            }
-        },
-        "menlo_ai_jan-api-gateway_app_domain_organization_models.ModelInfo": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "display_name": {
-                    "type": "string"
-                },
-                "is_managed": {
-                    "type": "boolean"
-                },
-                "model_type": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "namespace": {
-                    "type": "string"
-                },
-                "replicas": {
-                    "type": "integer"
-                },
-                "status": {
-                    "type": "string"
                 }
             }
         },
@@ -4229,21 +4061,6 @@ const docTemplate = `{
                 "ModelStatusStopped"
             ]
         },
-        "menlo_ai_jan-api-gateway_app_domain_organization_models.ModelType": {
-            "type": "string",
-            "enum": [
-                "chat",
-                "completion",
-                "embedding",
-                "vision"
-            ],
-            "x-enum-varnames": [
-                "ModelTypeChat",
-                "ModelTypeCompletion",
-                "ModelTypeEmbedding",
-                "ModelTypeVision"
-            ]
-        },
         "menlo_ai_jan-api-gateway_app_domain_organization_models.ModelUpdateRequest": {
             "type": "object",
             "properties": {
@@ -4252,9 +4069,6 @@ const docTemplate = `{
                 },
                 "display_name": {
                     "type": "string"
-                },
-                "is_public": {
-                    "type": "boolean"
                 },
                 "requirements": {
                     "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ResourceRequirement"

@@ -50,9 +50,3 @@ type ModelsListResponse struct {
 	Models []*models.Model `json:"models"`
 	Total  int             `json:"total"`
 }
-
-// AllModelsListResponse represents a list of all models (managed + unmanaged) response
-type AllModelsListResponse struct {
-	Models []*models.ModelInfo `json:"models"`
-	Total  int                 `json:"total"`
-}

@@ -558,22 +558,6 @@ definitions:
       code:
         type: string
     type: object
-  app_interfaces_http_routes_v1_organization_models.AllModelsListResponse:
-    properties:
-      models:
-        items:
-          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelInfo'
-        type: array
-      total:
-        type: integer
-    type: object
-  app_interfaces_http_routes_v1_organization_models.ClusterStatusResponse:
-    properties:
-      cluster_status:
-        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_infrastructure_kubernetes.ClusterGPUStatus'
-      organization_id:
-        type: integer
-    type: object
   app_interfaces_http_routes_v1_organization_models.ClusterValidationResponse:
     properties:
       dependencies:
@@ -746,13 +730,6 @@ definitions:
       version:
         type: string
     type: object
-  menlo_ai_jan-api-gateway_app_domain_organization_models.EnvVar:
-    properties:
-      name:
-        type: string
-      value:
-        type: string
-    type: object
   menlo_ai_jan-api-gateway_app_domain_organization_models.GPUAvailability:
     properties:
       by_type:
@@ -803,7 +780,8 @@ definitions:
       created_at:
         type: string
       created_by_user_id:
-        type: integer
+        description: User public ID (e.g. user_abc123)
+        type: string
       deployment_name:
         type: string
       description:
@@ -817,22 +795,18 @@ definitions:
         description: Model source information
         type: string
       id:
-        type: integer
+        description: Model name from Kubernetes
+        type: string
       internal_url:
         type: string
-      is_public:
+      managed:
+        description: true if managed by jan-server, false if unmanaged (e.g., Aibrix)
         type: boolean
-      model_type:
-        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelType'
-      name:
-        type: string
       namespace:
         description: Kubernetes deployment info
         type: string
       organization_id:
         type: integer
-      public_id:
-        type: string
       repository_url:
         type: string
       requirements:
@@ -853,116 +827,59 @@ definitions:
       version:
         type: string
     type: object
-  menlo_ai_jan-api-gateway_app_domain_organization_models.ModelAutoscalingConfig:
+  menlo_ai_jan-api-gateway_app_domain_organization_models.ModelCreateFromYAMLRequest:
     properties:
-      max_replicas:
-        type: integer
-      min_replicas:
-        type: integer
-      scale_down_delay:
-        type: string
-      target_metric:
-        type: string
-      target_value:
-        type: string
-    type: object
-  menlo_ai_jan-api-gateway_app_domain_organization_models.ModelCreateRequest:
-    properties:
-      deployment_config:
-        allOf:
-        - $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelDeploymentConfig'
-        description: Deployment configuration
       description:
         type: string
       display_name:
         type: string
-      huggingface_id:
-        type: string
-      is_public:
-        type: boolean
-      model_type:
-        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelType'
       name:
         type: string
-      repository_url:
-        type: string
-      requirements:
-        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ResourceRequirement'
       tags:
         items:
           type: string
         type: array
-      version:
+      yaml_content:
         type: string
     required:
     - display_name
-    - model_type
     - name
-    - requirements
+    - yaml_content
     type: object
-  menlo_ai_jan-api-gateway_app_domain_organization_models.ModelDeploymentConfig:
+  menlo_ai_jan-api-gateway_app_domain_organization_models.ModelCreateRequest:
     properties:
-      args:
-        items:
-          type: string
-        type: array
-      autoscaling_config:
-        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelAutoscalingConfig'
       command:
-        description: Command and arguments
         items:
           type: string
         type: array
-      enable_autoscaling:
-        description: Autoscaling configuration
-        type: boolean
-      enable_pvc:
-        description: Storage configuration
-        type: boolean
-      extra_env:
-        description: Environment variables
-        items:
-          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.EnvVar'
-        type: array
-      gpu_count:
-        description: Resource configuration
-        type: integer
-      hugging_face_token:
-        description: Optional Hugging Face token for private models
-        type: string
-      image:
-        description: Container image
-        type: string
-      image_pull_policy:
-        type: string
-      initial_delay_seconds:
-        description: Probe configuration
-        type: integer
-      storage_class:
-        type: string
-    required:
-    - image
-    type: object
-  menlo_ai_jan-api-gateway_app_domain_organization_models.ModelInfo:
-    properties:
-      created_at:
-        type: string
       description:
         type: string
       display_name:
         type: string
-      is_managed:
-        type: boolean
-      model_type:
+      gpu_count:
+        type: integer
+      hugging_face_token:
         type: string
+      image:
+        type: string
+      initial_delay_seconds:
+        type: integer
       name:
-        type: string
-      namespace:
         type: string
       replicas:
         type: integer
-      status:
+      storage_class:
         type: string
+      storage_size:
+        type: integer
+      tags:
+        items:
+          type: string
+        type: array
+    required:
+    - display_name
+    - image
+    - name
     type: object
   menlo_ai_jan-api-gateway_app_domain_organization_models.ModelStatus:
     enum:
@@ -978,26 +895,12 @@ definitions:
     - ModelStatusRunning
     - ModelStatusFailed
     - ModelStatusStopped
-  menlo_ai_jan-api-gateway_app_domain_organization_models.ModelType:
-    enum:
-    - chat
-    - completion
-    - embedding
-    - vision
-    type: string
-    x-enum-varnames:
-    - ModelTypeChat
-    - ModelTypeCompletion
-    - ModelTypeEmbedding
-    - ModelTypeVision
   menlo_ai_jan-api-gateway_app_domain_organization_models.ModelUpdateRequest:
     properties:
       description:
         type: string
       display_name:
         type: string
-      is_public:
-        type: boolean
       requirements:
         $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ResourceRequirement'
       tags:
@@ -3323,19 +3226,16 @@ paths:
     get:
       consumes:
       - application/json
-      description: Get all models belonging to the organization
+      description: Get all models belonging to the organization (both managed and
+        unmanaged)
       parameters:
-      - description: Filter by model type
-        in: query
-        name: model_type
-        type: string
       - description: Filter by model status
         in: query
         name: status
         type: string
-      - description: Filter by public/private models
+      - description: Filter by managed (true) or unmanaged (false) models
         in: query
-        name: is_public
+        name: managed
         type: boolean
       produces:
       - application/json
@@ -3402,7 +3302,7 @@ paths:
       - application/json
       description: Delete a model and its associated Kubernetes resources
       parameters:
-      - description: Model public ID
+      - description: Model name
         in: path
         name: model_id
         required: true
@@ -3436,9 +3336,9 @@ paths:
     get:
       consumes:
       - application/json
-      description: Get details of a specific model by its public ID
+      description: Get details of a specific model by its name
       parameters:
-      - description: Model public ID
+      - description: Model name
         in: path
         name: model_id
         required: true
@@ -3468,7 +3368,7 @@ paths:
             $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Get a model by ID
+      summary: Get a model by name
       tags:
       - Models
     put:
@@ -3476,7 +3376,7 @@ paths:
       - application/json
       description: Update an existing model's properties
       parameters:
-      - description: Model public ID
+      - description: Model name
         in: path
         name: model_id
         required: true
@@ -3515,20 +3415,27 @@ paths:
       summary: Update a model
       tags:
       - Models
-  /v1/organization/models/all:
-    get:
+  /v1/organization/models/yaml:
+    post:
       consumes:
       - application/json
-      description: Get all models in the cluster (both managed by jan-server and unmanaged)
+      description: Create a new model deployment using custom YAML manifest
+      parameters:
+      - description: Model YAML creation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/menlo_ai_jan-api-gateway_app_domain_organization_models.ModelCreateFromYAMLRequest'
       produces:
       - application/json
       responses:
-        "200":
-          description: List of all models
+        "201":
+          description: Model created successfully
           schema:
-            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.AllModelsListResponse'
+            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ModelResponse'
         "400":
-          description: Bad request
+          description: Invalid request body
           schema:
             $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
         "403":
@@ -3541,37 +3448,7 @@ paths:
             $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: List all models in cluster
-      tags:
-      - Models
-  /v1/organization/models/status:
-    get:
-      consumes:
-      - application/json
-      description: Get information about the Kubernetes cluster's capability for model
-        deployment
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: Cluster status information
-          schema:
-            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ClusterStatusResponse'
-        "400":
-          description: Bad request
-          schema:
-            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
-        "403":
-          description: Forbidden - models API not available
-          schema:
-            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/app_interfaces_http_routes_v1_organization_models.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get cluster status for models
+      summary: Create a model from YAML manifest
       tags:
       - Models
   /v1/organization/projects:
