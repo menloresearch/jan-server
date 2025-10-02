@@ -30,18 +30,12 @@ func NewSchemaWorkspace(w *workspace.Workspace) *Workspace {
 }
 
 func (w *Workspace) EtoD() *workspace.Workspace {
-	var instruction *string
-	if w.Instruction != nil {
-		value := *w.Instruction
-		instruction = &value
-	}
-
 	return &workspace.Workspace{
 		ID:          w.ID,
 		PublicID:    w.PublicID,
 		UserID:      w.UserID,
 		Name:        w.Name,
-		Instruction: instruction,
+		Instruction: w.Instruction,
 		CreatedAt:   w.CreatedAt,
 		UpdatedAt:   w.UpdatedAt,
 	}

@@ -3,6 +3,7 @@ package conv
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -31,11 +32,11 @@ type UpdateWorkspaceInstructionRequest struct {
 }
 
 type WorkspaceResponse struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Instruction *string `json:"instruction,omitempty"`
-	CreatedAt   int64   `json:"created_at"`
-	UpdatedAt   int64   `json:"updated_at"`
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Instruction *string   `json:"instruction,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type WorkspaceDeletedResponse struct {
@@ -337,8 +338,8 @@ func toWorkspaceResponse(entity *workspace.Workspace) WorkspaceResponse {
 		ID:          entity.PublicID,
 		Name:        entity.Name,
 		Instruction: instruction,
-		CreatedAt:   entity.CreatedAt.Unix(),
-		UpdatedAt:   entity.UpdatedAt.Unix(),
+		CreatedAt:   entity.CreatedAt,
+		UpdatedAt:   entity.UpdatedAt,
 	}
 }
 
