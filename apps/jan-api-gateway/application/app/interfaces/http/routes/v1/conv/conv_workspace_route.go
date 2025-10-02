@@ -3,6 +3,7 @@ package conv
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -29,6 +30,21 @@ type UpdateWorkspaceNameRequest struct {
 
 type UpdateWorkspaceInstructionRequest struct {
 	Instruction *string `json:"instruction"`
+}
+
+func (req CreateWorkspaceRequest) ConvertToWorkspace(userID uint) *workspace.Workspace {
+	var instruction *string
+	if req.Instruction != nil {
+		if trimmed := strings.TrimSpace(*req.Instruction); trimmed != "" {
+			instruction = &trimmed
+		}
+	}
+
+	return &workspace.Workspace{
+		UserID:      userID,
+		Name:        strings.TrimSpace(req.Name),
+		Instruction: instruction,
+	}
 }
 
 type WorkspaceResponse struct {
@@ -112,7 +128,8 @@ func (route *WorkspaceRoute) CreateWorkspace(reqCtx *gin.Context) {
 	}
 
 	ctx := reqCtx.Request.Context()
-	workspaceEntity, err := route.workspaceService.CreateWorkspace(ctx, user.ID, request.Name, request.Instruction)
+	workspace := request.ConvertToWorkspace(user.ID)
+	workspaceEntity, err := route.workspaceService.CreateWorkspace(ctx, workspace)
 	if err != nil {
 		status := http.StatusInternalServerError
 		if err.GetCode() == "3a5dcb2f-9f1c-4f4b-8893-4a62f72f7a00" || err.GetCode() == "94a6a12b-d4f0-4594-8125-95de7f9ce3d6" {
@@ -125,10 +142,7 @@ func (route *WorkspaceRoute) CreateWorkspace(reqCtx *gin.Context) {
 		return
 	}
 
-	reqCtx.JSON(http.StatusCreated, responses.GeneralResponse[WorkspaceResponse]{
-		Status: responses.ResponseCodeOk,
-		Result: toWorkspaceResponse(workspaceEntity),
-	})
+	reqCtx.JSON(http.StatusCreated, toWorkspaceResponse(workspaceEntity))
 }
 
 // ListWorkspaces godoc
@@ -233,10 +247,7 @@ func (route *WorkspaceRoute) UpdateWorkspaceName(reqCtx *gin.Context) {
 		return
 	}
 
-	reqCtx.JSON(http.StatusOK, responses.GeneralResponse[WorkspaceResponse]{
-		Status: responses.ResponseCodeOk,
-		Result: toWorkspaceResponse(updated),
-	})
+	reqCtx.JSON(http.StatusOK, toWorkspaceResponse(updated))
 }
 
 // UpdateWorkspaceInstruction godoc
@@ -283,10 +294,7 @@ func (route *WorkspaceRoute) UpdateWorkspaceInstruction(reqCtx *gin.Context) {
 		return
 	}
 
-	reqCtx.JSON(http.StatusOK, responses.GeneralResponse[WorkspaceResponse]{
-		Status: responses.ResponseCodeOk,
-		Result: toWorkspaceResponse(updated),
-	})
+	reqCtx.JSON(http.StatusOK, toWorkspaceResponse(updated))
 }
 
 // DeleteWorkspace godoc
@@ -319,13 +327,12 @@ func (route *WorkspaceRoute) DeleteWorkspace(reqCtx *gin.Context) {
 		return
 	}
 
-	reqCtx.JSON(http.StatusOK, responses.GeneralResponse[WorkspaceDeletedResponse]{
-		Status: responses.ResponseCodeOk,
-		Result: WorkspaceDeletedResponse{
-			ID:      workspaceEntity.PublicID,
-			Deleted: true,
-		},
-	})
+	result := WorkspaceDeletedResponse{
+		ID:      workspaceEntity.PublicID,
+		Deleted: true,
+	}
+
+	reqCtx.JSON(http.StatusOK, result)
 }
 
 func toWorkspaceResponse(entity *workspace.Workspace) WorkspaceResponse {

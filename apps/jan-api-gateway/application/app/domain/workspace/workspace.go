@@ -19,7 +19,7 @@ type Workspace struct {
 	UpdatedAt   time.Time
 }
 
-func (w *Workspace) Nomorlize() error {
+func (w *Workspace) Normalize() error {
 	trimmedName := strings.TrimSpace(w.Name)
 	if trimmedName == "" {
 		return common.NewErrorWithMessage("workspace name is required", "3a5dcb2f-9f1c-4f4b-8893-4a62f72f7a00")

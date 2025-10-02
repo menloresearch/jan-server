@@ -42,21 +42,16 @@ func (s *WorkspaceService) FindWorkspacesByFilter(ctx context.Context, filter Wo
 	return workspaces, nil
 }
 
-func (s *WorkspaceService) CreateWorkspace(ctx context.Context, userID uint, name string, instruction *string) (*Workspace, *common.Error) {
+func (s *WorkspaceService) CreateWorkspace(ctx context.Context, workspace *Workspace) (*Workspace, *common.Error) {
 
 	publicID, err := idgen.GenerateSecureID("ws", 24)
 	if err != nil {
 		return nil, common.NewError(err, "6d4af582-0c23-4f91-b45e-253956218b64")
 	}
 
-	workspace := &Workspace{
-		PublicID:    publicID,
-		UserID:      userID,
-		Name:        strings.TrimSpace(name),
-		Instruction: sanitizeInstruction(instruction),
-	}
+	workspace.PublicID = publicID
 
-	if err := workspace.Nomorlize(); err != nil {
+	if err := workspace.Normalize(); err != nil {
 		return nil, common.NewError(err, "26f0e93a-ff64-443f-8221-d18d36280336")
 	}
 
@@ -90,7 +85,7 @@ func (s *WorkspaceService) GetWorkspaceByPublicIDAndUserID(ctx context.Context, 
 
 func (s *WorkspaceService) UpdateWorkspaceName(ctx context.Context, workspace *Workspace, name string) (*Workspace, *common.Error) {
 	workspace.Name = strings.TrimSpace(name)
-	if err := workspace.Nomorlize(); err != nil {
+	if err := workspace.Normalize(); err != nil {
 		return nil, common.NewError(err, "447ec22a-09a6-45c7-bf87-f2fe2ca89631")
 	}
 	if err := s.repo.Update(ctx, workspace); err != nil {
@@ -114,11 +109,11 @@ func (s *WorkspaceService) DeleteWorkspaceWithConversations(ctx context.Context,
 	if workspace.ID == 0 {
 		return common.NewErrorWithMessage("workspace id is required", "7e2f82a6-1c4f-4f67-9ef6-8790896eb99c")
 	}
-	// if s.conversationRepo != nil {
-	// 	if err := s.conversationRepo.DeleteByWorkspacePublicID(ctx, workspace.PublicID); err != nil {
-	// 		return common.NewError(err, "2adf58f7-df2c-4f7f-bc11-2e9a2928c1f9")
-	// 	}
-	// }
+	if s.conversationRepo != nil {
+		if err := s.conversationRepo.DeleteByWorkspacePublicID(ctx, workspace.PublicID); err != nil {
+			return common.NewError(err, "2adf58f7-df2c-4f7f-bc11-2e9a2928c1f9")
+		}
+	}
 	if err := s.repo.Delete(ctx, workspace.ID); err != nil {
 		return common.NewError(err, "4cfb58ef-8016-4f24-8fcb-48d414d351d2")
 	}
