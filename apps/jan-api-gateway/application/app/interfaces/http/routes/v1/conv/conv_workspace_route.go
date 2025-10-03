@@ -24,7 +24,7 @@ type CreateWorkspaceRequest struct {
 	Instruction *string `json:"instruction"`
 }
 
-type UpdateWorkspaceNameRequest struct {
+type PatchWorkspaceRequest struct {
 	Name string `json:"name" binding:"required"`
 }
 
@@ -79,7 +79,7 @@ func (route *WorkspaceRoute) RegisterRouter(router gin.IRouter) {
 
 	workspaceMiddleware := route.workspaceService.GetWorkspaceMiddleware()
 	workspacesRouter.PATCH(
-		fmt.Sprintf("/:%s/name", workspace.WorkspaceContextKeyPublicID),
+		fmt.Sprintf("/:%s", workspace.WorkspaceContextKeyPublicID),
 		workspaceMiddleware,
 		route.UpdateWorkspaceName,
 	)
@@ -207,15 +207,15 @@ func (route *WorkspaceRoute) ListWorkspaces(reqCtx *gin.Context) {
 // @Accept json
 // @Produce json
 // @Param workspace_id path string true "Workspace ID"
-// @Param request body UpdateWorkspaceNameRequest true "Workspace name update payload"
+// @Param request body PatchWorkspaceRequest true "Patch model request"
 // @Success 200 {object} WorkspaceCreateResponse
 // @Failure 400 {object} responses.ErrorResponse
 // @Failure 401 {object} responses.ErrorResponse
 // @Failure 404 {object} responses.ErrorResponse
 // @Failure 500 {object} responses.ErrorResponse
-// @Router /v1/conv/workspaces/{workspace_id}/name [patch]
+// @Router /v1/conv/workspaces/{workspace_id} [patch]
 func (route *WorkspaceRoute) UpdateWorkspaceName(reqCtx *gin.Context) {
-	var request UpdateWorkspaceNameRequest
+	var request PatchWorkspaceRequest
 	if err := reqCtx.ShouldBindJSON(&request); err != nil {
 		reqCtx.AbortWithStatusJSON(http.StatusBadRequest, responses.ErrorResponse{
 			Code:  "6dc4fb8f-8af9-4b66-a67a-c2efdec59f5e",

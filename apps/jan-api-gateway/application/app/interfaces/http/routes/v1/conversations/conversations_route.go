@@ -564,7 +564,7 @@ func (api *ConversationAPI) UpdateConversationWorkspaceHandler(reqCtx *gin.Conte
 // @Produce json
 // @Param conversation_id path string true "Conversation ID"
 // @Param request body CreateItemsRequest true "Create items request"
-// @Success 200 openai.ListResponse[ConversationItemResponse] object "Created items"
+// @Success 200 {object} openai.ListResponse[ConversationItemResponse] "Created items"
 // @Failure 400 {object} responses.ErrorResponse "Invalid request payload or invalid item format"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
@@ -643,7 +643,7 @@ func (api *ConversationAPI) CreateItemsHandler(reqCtx *gin.Context) {
 // @Param limit query int false "Number of items to return (1-100)"
 // @Param after query string false "Cursor for pagination - ID of the last item from previous page"
 // @Param order query string false "Order of items (asc/desc)"
-// @Success 200 openai.ListResponse[ConversationItemResponse] object "List of items"
+// @Success 200 {object} openai.ListResponse[ConversationItemResponse] "List of items"
 // @Failure 400 {object} responses.ErrorResponse "Bad Request - Invalid pagination parameters"
 // @Failure 401 {object} responses.ErrorResponse "Unauthorized"
 // @Failure 403 {object} responses.ErrorResponse "Access denied"
