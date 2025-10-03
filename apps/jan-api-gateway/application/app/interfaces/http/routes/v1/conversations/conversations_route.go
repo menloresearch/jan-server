@@ -38,7 +38,7 @@ type UpdateConversationRequest struct {
 }
 
 type UpdateConversationWorkspaceRequest struct {
-	WorkspaceID *string `json:"workspace_id"`
+	WorkspaceID *string `json:"workspace_id,omitempty"`
 }
 
 type ConversationItemRequest struct {
@@ -61,7 +61,7 @@ type ExtendedConversationResponse struct {
 	ID                string            `json:"id"`
 	Title             string            `json:"title"`
 	Object            string            `json:"object"`
-	WorkspacePublicID string            `json:"workspace_id"`
+	WorkspacePublicID string            `json:"workspace_id,omitempty"`
 	CreatedAt         int64             `json:"created_at"`
 	Metadata          map[string]string `json:"metadata"`
 }
