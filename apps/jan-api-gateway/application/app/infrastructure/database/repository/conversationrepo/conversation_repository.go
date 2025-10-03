@@ -62,18 +62,9 @@ func (r *ConversationGormRepository) Update(ctx context.Context, conversation *d
 	query := r.db.GetQuery(ctx)
 
 	// select to update workspace nil as removing
-	_, err := query.Conversation.WithContext(ctx).
+	err := query.Conversation.WithContext(ctx).
 		Where(query.Conversation.ID.Eq(conversation.ID)).
-		Select(
-			query.Conversation.PublicID,
-			query.Conversation.Title,
-			query.Conversation.UserID,
-			query.Conversation.WorkspacePublicID,
-			query.Conversation.Status,
-			query.Conversation.Metadata,
-			query.Conversation.IsPrivate,
-		).
-		Updates(model)
+		Save(model)
 	return err
 }
 
