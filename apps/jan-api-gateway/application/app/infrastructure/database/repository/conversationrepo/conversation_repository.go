@@ -192,7 +192,11 @@ func (repo *ConversationGormRepository) applyFilter(
 		sql = sql.Where(query.Conversation.UserID.Eq(*filter.UserID))
 	}
 	if filter.WorkspacePublicID != nil {
-		sql = sql.Where(query.Conversation.WorkspacePublicID.Eq(*filter.WorkspacePublicID))
+		if strings.EqualFold(*filter.WorkspacePublicID, "none") {
+			sql = sql.Where(query.Conversation.WorkspacePublicID.IsNull())
+		} else {
+			sql = sql.Where(query.Conversation.WorkspacePublicID.Eq(*filter.WorkspacePublicID))
+		}
 	}
 	return sql
 }
