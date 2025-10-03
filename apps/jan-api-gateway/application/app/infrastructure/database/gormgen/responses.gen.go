@@ -79,6 +79,15 @@ func newResponse(db *gorm.DB, opts ...gen.DOOption) response {
 					field.RelationField
 				}
 			}
+			Workspace struct {
+				field.RelationField
+				User struct {
+					field.RelationField
+				}
+				Conversations struct {
+					field.RelationField
+				}
+			}
 			Items struct {
 				field.RelationField
 			}
@@ -103,6 +112,27 @@ func newResponse(db *gorm.DB, opts ...gen.DOOption) response {
 					field.RelationField
 				}{
 					RelationField: field.NewRelation("Items.Conversation.User.Projects", "dbschema.ProjectMember"),
+				},
+			},
+			Workspace: struct {
+				field.RelationField
+				User struct {
+					field.RelationField
+				}
+				Conversations struct {
+					field.RelationField
+				}
+			}{
+				RelationField: field.NewRelation("Items.Conversation.Workspace", "dbschema.Workspace"),
+				User: struct {
+					field.RelationField
+				}{
+					RelationField: field.NewRelation("Items.Conversation.Workspace.User", "dbschema.User"),
+				},
+				Conversations: struct {
+					field.RelationField
+				}{
+					RelationField: field.NewRelation("Items.Conversation.Workspace.Conversations", "dbschema.Conversation"),
 				},
 			},
 			Items: struct {
@@ -344,6 +374,15 @@ type responseHasManyItems struct {
 				field.RelationField
 			}
 			Projects struct {
+				field.RelationField
+			}
+		}
+		Workspace struct {
+			field.RelationField
+			User struct {
+				field.RelationField
+			}
+			Conversations struct {
 				field.RelationField
 			}
 		}

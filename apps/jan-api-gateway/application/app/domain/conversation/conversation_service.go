@@ -60,7 +60,7 @@ func (s *ConversationService) CountConversationsByFilter(ctx context.Context, fi
 	return count, nil
 }
 
-func (s *ConversationService) CreateConversation(ctx context.Context, userID uint, title *string, isPrivate bool, metadata map[string]string) (*Conversation, *common.Error) {
+func (s *ConversationService) CreateConversation(ctx context.Context, userID uint, title *string, isPrivate bool, metadata map[string]string, workspacePublicID *string) (*Conversation, *common.Error) {
 	if err := s.validator.ValidateConversationInput(title, metadata); err != nil {
 		return nil, common.NewError(err, "c3d4e5f6-g7h8-9012-cdef-345678901234")
 	}
@@ -71,12 +71,13 @@ func (s *ConversationService) CreateConversation(ctx context.Context, userID uin
 	}
 
 	conversation := &Conversation{
-		PublicID:  publicID,
-		Title:     title,
-		UserID:    userID,
-		Status:    ConversationStatusActive,
-		IsPrivate: isPrivate,
-		Metadata:  metadata,
+		PublicID:          publicID,
+		Title:             title,
+		UserID:            userID,
+		WorkspacePublicID: workspacePublicID,
+		Status:            ConversationStatusActive,
+		IsPrivate:         isPrivate,
+		Metadata:          metadata,
 	}
 
 	if err := s.conversationRepo.Create(ctx, conversation); err != nil {
@@ -134,6 +135,14 @@ func (s *ConversationService) UpdateConversation(ctx context.Context, entity *Co
 		return nil, common.NewError(err, "l2m3n4o5-p6q7-8901-lmno-234567890123")
 	}
 	return entity, nil
+}
+
+func (s *ConversationService) UpdateConversationWorkspace(ctx context.Context, conv *Conversation, workspacePublicID *string) (*Conversation, *common.Error) {
+	conv.WorkspacePublicID = workspacePublicID
+	if err := s.conversationRepo.Update(ctx, conv); err != nil {
+		return nil, common.NewError(err, "a3b4c5d6-e7f8-9012-abcd-ef3456789012")
+	}
+	return conv, nil
 }
 
 func (s *ConversationService) DeleteConversation(ctx context.Context, conv *Conversation) (bool, *common.Error) {

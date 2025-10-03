@@ -15,20 +15,22 @@ import (
 )
 
 type V1Route struct {
-	organizationRoute *organization.OrganizationRoute
-	chatRoute         *chat.ChatRoute
-	convChatRoute     *conv.ConvChatRoute
-	conversationAPI   *conversations.ConversationAPI
-	modelAPI          *ModelAPI
-	mcpAPI            *mcp.MCPAPI
-	authRoute         *auth.AuthRoute
-	responsesRoute    *responses.ResponseRoute
+	organizationRoute  *organization.OrganizationRoute
+	chatRoute          *chat.ChatRoute
+	convChatRoute      *conv.ConvChatRoute
+	convWorkspaceRoute *conv.WorkspaceRoute
+	conversationAPI    *conversations.ConversationAPI
+	modelAPI           *ModelAPI
+	mcpAPI             *mcp.MCPAPI
+	authRoute          *auth.AuthRoute
+	responsesRoute     *responses.ResponseRoute
 }
 
 func NewV1Route(
 	organizationRoute *organization.OrganizationRoute,
 	chatRoute *chat.ChatRoute,
 	convChatRoute *conv.ConvChatRoute,
+	convWorkspaceRoute *conv.WorkspaceRoute,
 	conversationAPI *conversations.ConversationAPI,
 	modelAPI *ModelAPI,
 	mcpAPI *mcp.MCPAPI,
@@ -39,6 +41,7 @@ func NewV1Route(
 		organizationRoute,
 		chatRoute,
 		convChatRoute,
+		convWorkspaceRoute,
 		conversationAPI,
 		modelAPI,
 		mcpAPI,
@@ -52,6 +55,7 @@ func (v1Route *V1Route) RegisterRouter(router gin.IRouter) {
 	v1Router.GET("/version", GetVersion)
 	v1Route.chatRoute.RegisterRouter(v1Router)
 	v1Route.convChatRoute.RegisterRouter(v1Router)
+	v1Route.convWorkspaceRoute.RegisterRouter(v1Router)
 	v1Route.conversationAPI.RegisterRouter(v1Router)
 	v1Route.modelAPI.RegisterRouter(v1Router)
 	v1Route.mcpAPI.RegisterRouter(v1Router)

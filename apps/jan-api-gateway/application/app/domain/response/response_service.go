@@ -554,7 +554,7 @@ func (s *ResponseService) HandleConversation(ctx context.Context, userID uint, r
 	}
 
 	// Create new conversation
-	conv, err := s.conversationService.CreateConversation(ctx, userID, nil, true, nil)
+	conv, err := s.conversationService.CreateConversation(ctx, userID, nil, true, nil, nil)
 	if err != nil {
 		return nil, err
 	}

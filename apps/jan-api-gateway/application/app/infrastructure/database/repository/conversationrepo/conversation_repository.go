@@ -30,6 +30,8 @@ func (r *ConversationGormRepository) Create(ctx context.Context, conversation *d
 		return err
 	}
 	conversation.ID = model.ID
+	conversation.CreatedAt = model.CreatedAt
+	conversation.UpdatedAt = model.UpdatedAt
 	return nil
 }
 
@@ -58,13 +60,23 @@ func (r *ConversationGormRepository) Update(ctx context.Context, conversation *d
 	model.ID = conversation.ID
 
 	query := r.db.GetQuery(ctx)
-	_, err := query.Conversation.WithContext(ctx).Where(query.Conversation.ID.Eq(conversation.ID)).Updates(model)
+
+	// select to update workspace nil as removing
+	err := query.Conversation.WithContext(ctx).
+		Where(query.Conversation.ID.Eq(conversation.ID)).
+		Save(model)
 	return err
 }
 
 func (r *ConversationGormRepository) Delete(ctx context.Context, id uint) error {
 	query := r.db.GetQuery(ctx)
 	_, err := query.Conversation.WithContext(ctx).Where(query.Conversation.ID.Eq(id)).Delete()
+	return err
+}
+
+func (r *ConversationGormRepository) DeleteByWorkspacePublicID(ctx context.Context, workspacePublicID string) error {
+	query := r.db.GetQuery(ctx)
+	_, err := query.Conversation.WithContext(ctx).Where(query.Conversation.WorkspacePublicID.Eq(workspacePublicID)).Delete()
 	return err
 }
 
@@ -169,6 +181,13 @@ func (repo *ConversationGormRepository) applyFilter(
 	}
 	if filter.UserID != nil {
 		sql = sql.Where(query.Conversation.UserID.Eq(*filter.UserID))
+	}
+	if filter.WorkspacePublicID != nil {
+		if strings.EqualFold(*filter.WorkspacePublicID, "none") {
+			sql = sql.Where(query.Conversation.WorkspacePublicID.IsNull())
+		} else {
+			sql = sql.Where(query.Conversation.WorkspacePublicID.Eq(*filter.WorkspacePublicID))
+		}
 	}
 	return sql
 }

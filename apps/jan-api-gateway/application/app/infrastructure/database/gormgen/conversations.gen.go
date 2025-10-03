@@ -35,6 +35,7 @@ func newConversation(db *gorm.DB, opts ...gen.DOOption) conversation {
 	_conversation.PublicID = field.NewString(tableName, "public_id")
 	_conversation.Title = field.NewString(tableName, "title")
 	_conversation.UserID = field.NewUint(tableName, "user_id")
+	_conversation.WorkspacePublicID = field.NewString(tableName, "workspace_public_id")
 	_conversation.Status = field.NewString(tableName, "status")
 	_conversation.Metadata = field.NewString(tableName, "metadata")
 	_conversation.IsPrivate = field.NewBool(tableName, "is_private")
@@ -50,6 +51,15 @@ func newConversation(db *gorm.DB, opts ...gen.DOOption) conversation {
 					field.RelationField
 				}
 				Projects struct {
+					field.RelationField
+				}
+			}
+			Workspace struct {
+				field.RelationField
+				User struct {
+					field.RelationField
+				}
+				Conversations struct {
 					field.RelationField
 				}
 			}
@@ -77,6 +87,27 @@ func newConversation(db *gorm.DB, opts ...gen.DOOption) conversation {
 					field.RelationField
 				}{
 					RelationField: field.NewRelation("Items.Conversation.User.Projects", "dbschema.ProjectMember"),
+				},
+			},
+			Workspace: struct {
+				field.RelationField
+				User struct {
+					field.RelationField
+				}
+				Conversations struct {
+					field.RelationField
+				}
+			}{
+				RelationField: field.NewRelation("Items.Conversation.Workspace", "dbschema.Workspace"),
+				User: struct {
+					field.RelationField
+				}{
+					RelationField: field.NewRelation("Items.Conversation.Workspace.User", "dbschema.User"),
+				},
+				Conversations: struct {
+					field.RelationField
+				}{
+					RelationField: field.NewRelation("Items.Conversation.Workspace.Conversations", "dbschema.Conversation"),
 				},
 			},
 			Items: struct {
@@ -122,6 +153,12 @@ func newConversation(db *gorm.DB, opts ...gen.DOOption) conversation {
 		RelationField: field.NewRelation("User", "dbschema.User"),
 	}
 
+	_conversation.Workspace = conversationBelongsToWorkspace{
+		db: db.Session(&gorm.Session{}),
+
+		RelationField: field.NewRelation("Workspace", "dbschema.Workspace"),
+	}
+
 	_conversation.fillFieldMap()
 
 	return _conversation
@@ -130,20 +167,23 @@ func newConversation(db *gorm.DB, opts ...gen.DOOption) conversation {
 type conversation struct {
 	conversationDo
 
-	ALL       field.Asterisk
-	ID        field.Uint
-	CreatedAt field.Time
-	UpdatedAt field.Time
-	DeletedAt field.Field
-	PublicID  field.String
-	Title     field.String
-	UserID    field.Uint
-	Status    field.String
-	Metadata  field.String
-	IsPrivate field.Bool
-	Items     conversationHasManyItems
+	ALL               field.Asterisk
+	ID                field.Uint
+	CreatedAt         field.Time
+	UpdatedAt         field.Time
+	DeletedAt         field.Field
+	PublicID          field.String
+	Title             field.String
+	UserID            field.Uint
+	WorkspacePublicID field.String
+	Status            field.String
+	Metadata          field.String
+	IsPrivate         field.Bool
+	Items             conversationHasManyItems
 
 	User conversationBelongsToUser
+
+	Workspace conversationBelongsToWorkspace
 
 	fieldMap map[string]field.Expr
 }
@@ -167,6 +207,7 @@ func (c *conversation) updateTableName(table string) *conversation {
 	c.PublicID = field.NewString(table, "public_id")
 	c.Title = field.NewString(table, "title")
 	c.UserID = field.NewUint(table, "user_id")
+	c.WorkspacePublicID = field.NewString(table, "workspace_public_id")
 	c.Status = field.NewString(table, "status")
 	c.Metadata = field.NewString(table, "metadata")
 	c.IsPrivate = field.NewBool(table, "is_private")
@@ -186,7 +227,7 @@ func (c *conversation) GetFieldByName(fieldName string) (field.OrderExpr, bool) 
 }
 
 func (c *conversation) fillFieldMap() {
-	c.fieldMap = make(map[string]field.Expr, 12)
+	c.fieldMap = make(map[string]field.Expr, 14)
 	c.fieldMap["id"] = c.ID
 	c.fieldMap["created_at"] = c.CreatedAt
 	c.fieldMap["updated_at"] = c.UpdatedAt
@@ -194,6 +235,7 @@ func (c *conversation) fillFieldMap() {
 	c.fieldMap["public_id"] = c.PublicID
 	c.fieldMap["title"] = c.Title
 	c.fieldMap["user_id"] = c.UserID
+	c.fieldMap["workspace_public_id"] = c.WorkspacePublicID
 	c.fieldMap["status"] = c.Status
 	c.fieldMap["metadata"] = c.Metadata
 	c.fieldMap["is_private"] = c.IsPrivate
@@ -206,6 +248,8 @@ func (c conversation) clone(db *gorm.DB) conversation {
 	c.Items.db.Statement.ConnPool = db.Statement.ConnPool
 	c.User.db = db.Session(&gorm.Session{Initialized: true})
 	c.User.db.Statement.ConnPool = db.Statement.ConnPool
+	c.Workspace.db = db.Session(&gorm.Session{Initialized: true})
+	c.Workspace.db.Statement.ConnPool = db.Statement.ConnPool
 	return c
 }
 
@@ -213,6 +257,7 @@ func (c conversation) replaceDB(db *gorm.DB) conversation {
 	c.conversationDo.ReplaceDB(db)
 	c.Items.db = db.Session(&gorm.Session{})
 	c.User.db = db.Session(&gorm.Session{})
+	c.Workspace.db = db.Session(&gorm.Session{})
 	return c
 }
 
@@ -229,6 +274,15 @@ type conversationHasManyItems struct {
 				field.RelationField
 			}
 			Projects struct {
+				field.RelationField
+			}
+		}
+		Workspace struct {
+			field.RelationField
+			User struct {
+				field.RelationField
+			}
+			Conversations struct {
 				field.RelationField
 			}
 		}
@@ -402,6 +456,87 @@ func (a conversationBelongsToUserTx) Count() int64 {
 }
 
 func (a conversationBelongsToUserTx) Unscoped() *conversationBelongsToUserTx {
+	a.tx = a.tx.Unscoped()
+	return &a
+}
+
+type conversationBelongsToWorkspace struct {
+	db *gorm.DB
+
+	field.RelationField
+}
+
+func (a conversationBelongsToWorkspace) Where(conds ...field.Expr) *conversationBelongsToWorkspace {
+	if len(conds) == 0 {
+		return &a
+	}
+
+	exprs := make([]clause.Expression, 0, len(conds))
+	for _, cond := range conds {
+		exprs = append(exprs, cond.BeCond().(clause.Expression))
+	}
+	a.db = a.db.Clauses(clause.Where{Exprs: exprs})
+	return &a
+}
+
+func (a conversationBelongsToWorkspace) WithContext(ctx context.Context) *conversationBelongsToWorkspace {
+	a.db = a.db.WithContext(ctx)
+	return &a
+}
+
+func (a conversationBelongsToWorkspace) Session(session *gorm.Session) *conversationBelongsToWorkspace {
+	a.db = a.db.Session(session)
+	return &a
+}
+
+func (a conversationBelongsToWorkspace) Model(m *dbschema.Conversation) *conversationBelongsToWorkspaceTx {
+	return &conversationBelongsToWorkspaceTx{a.db.Model(m).Association(a.Name())}
+}
+
+func (a conversationBelongsToWorkspace) Unscoped() *conversationBelongsToWorkspace {
+	a.db = a.db.Unscoped()
+	return &a
+}
+
+type conversationBelongsToWorkspaceTx struct{ tx *gorm.Association }
+
+func (a conversationBelongsToWorkspaceTx) Find() (result *dbschema.Workspace, err error) {
+	return result, a.tx.Find(&result)
+}
+
+func (a conversationBelongsToWorkspaceTx) Append(values ...*dbschema.Workspace) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Append(targetValues...)
+}
+
+func (a conversationBelongsToWorkspaceTx) Replace(values ...*dbschema.Workspace) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Replace(targetValues...)
+}
+
+func (a conversationBelongsToWorkspaceTx) Delete(values ...*dbschema.Workspace) (err error) {
+	targetValues := make([]interface{}, len(values))
+	for i, v := range values {
+		targetValues[i] = v
+	}
+	return a.tx.Delete(targetValues...)
+}
+
+func (a conversationBelongsToWorkspaceTx) Clear() error {
+	return a.tx.Clear()
+}
+
+func (a conversationBelongsToWorkspaceTx) Count() int64 {
+	return a.tx.Count()
+}
+
+func (a conversationBelongsToWorkspaceTx) Unscoped() *conversationBelongsToWorkspaceTx {
 	a.tx = a.tx.Unscoped()
 	return &a
 }
