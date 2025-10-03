@@ -257,6 +257,13 @@ definitions:
       object:
         type: string
     type: object
+  app_interfaces_http_routes_v1_conv.PatchWorkspaceRequest:
+    properties:
+      name:
+        type: string
+    required:
+    - name
+    type: object
   app_interfaces_http_routes_v1_conv.ResponseMetadata:
     properties:
       ask_item_id:
@@ -278,13 +285,6 @@ definitions:
     properties:
       instruction:
         type: string
-    type: object
-  app_interfaces_http_routes_v1_conv.UpdateWorkspaceNameRequest:
-    properties:
-      name:
-        type: string
-    required:
-    - name
     type: object
   app_interfaces_http_routes_v1_conv.WorkspaceCreateResponse:
     properties:
@@ -327,7 +327,7 @@ definitions:
   app_interfaces_http_routes_v1_conv.WorkspaceResponse:
     properties:
       created_at:
-        type: integer
+        type: string
       id:
         type: string
       instruction:
@@ -335,7 +335,7 @@ definitions:
       name:
         type: string
       updated_at:
-        type: integer
+        type: string
     type: object
   app_interfaces_http_routes_v1_conversations.AnnotationResponse:
     properties:
@@ -1303,6 +1303,23 @@ definitions:
       object:
         type: string
     type: object
+  ? menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ConversationItemResponse
+  : properties:
+      data:
+        items:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_conversations.ConversationItemResponse'
+        type: array
+      first_id:
+        type: string
+      has_more:
+        type: boolean
+      last_id:
+        type: string
+      object:
+        $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ObjectTypeList'
+      total:
+        type: integer
+    type: object
   ? menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_organization_invites_InviteResponse
   : properties:
       data:
@@ -2236,6 +2253,50 @@ paths:
       summary: Delete Workspace
       tags:
       - conv Workspaces API
+    patch:
+      consumes:
+      - application/json
+      description: Updates the name of a workspace.
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: workspace_id
+        required: true
+        type: string
+      - description: Patch model request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/app_interfaces_http_routes_v1_conv.PatchWorkspaceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/app_interfaces_http_routes_v1_conv.WorkspaceCreateResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update Workspace Name
+      tags:
+      - conv Workspaces API
   /v1/conv/workspaces/{workspace_id}/instruction:
     patch:
       consumes:
@@ -2279,51 +2340,6 @@ paths:
       security:
       - BearerAuth: []
       summary: Update Workspace Instruction
-      tags:
-      - conv Workspaces API
-  /v1/conv/workspaces/{workspace_id}/name:
-    patch:
-      consumes:
-      - application/json
-      description: Updates the name of a workspace.
-      parameters:
-      - description: Workspace ID
-        in: path
-        name: workspace_id
-        required: true
-        type: string
-      - description: Workspace name update payload
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/app_interfaces_http_routes_v1_conv.UpdateWorkspaceNameRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/app_interfaces_http_routes_v1_conv.WorkspaceCreateResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Update Workspace Name
       tags:
       - conv Workspaces API
   /v1/conversations:
@@ -2556,7 +2572,7 @@ paths:
         "200":
           description: List of items
           schema:
-            type: object
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ConversationItemResponse'
         "400":
           description: Bad Request - Invalid pagination parameters
           schema:
@@ -2604,7 +2620,7 @@ paths:
         "200":
           description: Created items
           schema:
-            type: object
+            $ref: '#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ConversationItemResponse'
         "400":
           description: Invalid request payload or invalid item format
           schema:

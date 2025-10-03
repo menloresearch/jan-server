@@ -552,16 +552,14 @@ const docTemplate = `{
                         }
                     }
                 }
-            }
-        },
-        "/v1/conv/workspaces/{workspace_id}/instruction": {
+            },
             "patch": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates the shared instruction for a workspace.",
+                "description": "Updates the name of a workspace.",
                 "consumes": [
                     "application/json"
                 ],
@@ -571,7 +569,7 @@ const docTemplate = `{
                 "tags": [
                     "conv Workspaces API"
                 ],
-                "summary": "Update Workspace Instruction",
+                "summary": "Update Workspace Name",
                 "parameters": [
                     {
                         "type": "string",
@@ -581,12 +579,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Workspace instruction update payload",
+                        "description": "Patch model request",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conv.UpdateWorkspaceInstructionRequest"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conv.PatchWorkspaceRequest"
                         }
                     }
                 ],
@@ -624,14 +622,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/conv/workspaces/{workspace_id}/name": {
+        "/v1/conv/workspaces/{workspace_id}/instruction": {
             "patch": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates the name of a workspace.",
+                "description": "Updates the shared instruction for a workspace.",
                 "consumes": [
                     "application/json"
                 ],
@@ -641,7 +639,7 @@ const docTemplate = `{
                 "tags": [
                     "conv Workspaces API"
                 ],
-                "summary": "Update Workspace Name",
+                "summary": "Update Workspace Instruction",
                 "parameters": [
                     {
                         "type": "string",
@@ -651,12 +649,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Workspace name update payload",
+                        "description": "Workspace instruction update payload",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conv.UpdateWorkspaceNameRequest"
+                            "$ref": "#/definitions/app_interfaces_http_routes_v1_conv.UpdateWorkspaceInstructionRequest"
                         }
                     }
                 ],
@@ -1050,7 +1048,7 @@ const docTemplate = `{
                     "200": {
                         "description": "List of items",
                         "schema": {
-                            "type": "object"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ConversationItemResponse"
                         }
                     },
                     "400": {
@@ -1124,7 +1122,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Created items",
                         "schema": {
-                            "type": "object"
+                            "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ConversationItemResponse"
                         }
                     },
                     "400": {
@@ -2982,6 +2980,17 @@ const docTemplate = `{
                 }
             }
         },
+        "app_interfaces_http_routes_v1_conv.PatchWorkspaceRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "app_interfaces_http_routes_v1_conv.ResponseMetadata": {
             "type": "object",
             "properties": {
@@ -3012,17 +3021,6 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "instruction": {
-                    "type": "string"
-                }
-            }
-        },
-        "app_interfaces_http_routes_v1_conv.UpdateWorkspaceNameRequest": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "name": {
                     "type": "string"
                 }
             }
@@ -3090,7 +3088,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "created_at": {
-                    "type": "integer"
+                    "type": "string"
                 },
                 "id": {
                     "type": "string"
@@ -3102,7 +3100,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updated_at": {
-                    "type": "integer"
+                    "type": "string"
                 }
             }
         },
@@ -4539,6 +4537,32 @@ const docTemplate = `{
                 },
                 "object": {
                     "type": "string"
+                }
+            }
+        },
+        "menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ListResponse-app_interfaces_http_routes_v1_conversations_ConversationItemResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/app_interfaces_http_routes_v1_conversations.ConversationItemResponse"
+                    }
+                },
+                "first_id": {
+                    "type": "string"
+                },
+                "has_more": {
+                    "type": "boolean"
+                },
+                "last_id": {
+                    "type": "string"
+                },
+                "object": {
+                    "$ref": "#/definitions/menlo_ai_jan-api-gateway_app_interfaces_http_responses_openai.ObjectTypeList"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },
